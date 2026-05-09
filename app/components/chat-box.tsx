@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { askQuestion } from '../actions/chat';
-import type { ChatResponse } from '@/lib/v0/server/rag';
+import type { ChatResponse, StreamEvent } from '@/lib/v0/server/rag';
 
 const EXAMPLE_QUESTIONS = [
   'wat doet ChatManta?',
@@ -26,6 +25,8 @@ export function ChatBox({
   const [threshold, setThreshold] = useState(defaultThreshold);
   const [enableRewrite, setEnableRewrite] = useState(defaultEnableRewrite);
   const [response, setResponse] = useState<ChatResponse | null>(null);
+  // Streaming-only: de tekst die binnenstroomt voor de huidige answer-call.
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   // Sessie tellers — leven binnen de huidige browser-sessie + ChatBox mount.
@@ -35,22 +36,79 @@ export function ChatBox({
   const [sessionQueryCount, setSessionQueryCount] = useState(0);
 
   function ask(q: string) {
-    if (!q.trim()) return;
+    const trimmed = q.trim();
+    if (!trimmed) return;
     setError(null);
+    setResponse(null);
+    setStreamingText(null);
     startTransition(async () => {
       try {
-        const res = await askQuestion({
-          question: q.trim(),
-          threshold,
-          enableRewrite,
-          version: botVersion,
+        const res = await fetch('/api/v0/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: trimmed,
+            threshold,
+            enableRewrite,
+            version: botVersion,
+          }),
         });
-        setResponse(res);
-        setSessionCostUsd((c) => c + res.totalCostUsd);
-        setSessionQueryCount((n) => n + 1);
+        if (!res.ok || !res.body) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status} — ${text || 'no body'}`);
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let final: ChatResponse | null = null;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, nl).trim();
+            buffer = buffer.slice(nl + 1);
+            if (!line) continue;
+            const event = JSON.parse(line) as StreamEvent;
+            if (event.kind === 'smalltalk' || event.kind === 'fallback') {
+              final = event.response;
+              setResponse(event.response);
+            } else if (event.kind === 'answer-start') {
+              // Show metadata-only response while waiting for tokens.
+              setStreamingText('');
+              setResponse({
+                botVersion: event.botVersion,
+                kind: 'answer',
+                answer: '',
+                rewrite: event.rewrite,
+                sources: event.sources,
+                threshold: event.threshold,
+                embedTokens: 0,
+                chatInputTokens: 0,
+                chatOutputTokens: 0,
+                totalCostUsd: 0,
+              });
+            } else if (event.kind === 'answer-delta') {
+              setStreamingText((prev) => (prev ?? '') + event.text);
+            } else if (event.kind === 'answer-done') {
+              final = event.response;
+              setResponse(event.response);
+              setStreamingText(null);
+            } else if (event.kind === 'error') {
+              throw new Error(event.message);
+            }
+          }
+        }
+        if (final) {
+          setSessionCostUsd((c) => c + final!.totalCostUsd);
+          setSessionQueryCount((n) => n + 1);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Onbekende fout');
         setResponse(null);
+        setStreamingText(null);
       }
     });
   }
@@ -116,7 +174,9 @@ export function ChatBox({
           </div>
         ) : null}
 
-        {response ? <AnswerPanel response={response} /> : null}
+        {response ? (
+          <AnswerPanel response={response} streamingText={streamingText} pending={pending} />
+        ) : null}
       </section>
 
       <aside className="lg:sticky lg:top-6 lg:self-start">
@@ -203,7 +263,15 @@ function ThresholdSlider({
   );
 }
 
-function AnswerPanel({ response }: { response: ChatResponse }) {
+function AnswerPanel({
+  response,
+  streamingText,
+  pending,
+}: {
+  response: ChatResponse;
+  streamingText: string | null;
+  pending: boolean;
+}) {
   const tone =
     response.kind === 'fallback'
       ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
@@ -232,9 +300,12 @@ function AnswerPanel({ response }: { response: ChatResponse }) {
         </div>
       ) : null}
       <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
-        {response.answer}
+        {streamingText !== null ? streamingText : response.answer}
+        {streamingText !== null && pending ? (
+          <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-zinc-400 align-middle dark:bg-zinc-500" />
+        ) : null}
       </p>
-      <Stats response={response} />
+      {streamingText === null ? <Stats response={response} /> : null}
     </div>
   );
 }

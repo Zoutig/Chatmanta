@@ -601,6 +601,210 @@ export async function runRagQuery({
 }
 
 // ---------------------------------------------------------------------------
+// runRagQueryStreaming — same pipeline, but yields incremental events so the
+// route handler can stream them as NDJSON. The final event always carries
+// the complete ChatResponse so the route can log it after streaming is done.
+// ---------------------------------------------------------------------------
+export type StreamEvent =
+  | { kind: 'smalltalk'; response: ChatResponse }
+  | { kind: 'fallback'; response: ChatResponse }
+  | {
+      kind: 'answer-start';
+      botVersion: string;
+      sources: ChatSource[];
+      rewrite: ChatRewriteInfo | null;
+      threshold: number;
+    }
+  | { kind: 'answer-delta'; text: string }
+  | { kind: 'answer-done'; response: ChatResponse }
+  | { kind: 'error'; message: string };
+
+export async function* runRagQueryStreaming(input: {
+  question: string;
+  threshold: number;
+  enableRewrite: boolean;
+  bot: BotConfig;
+}): AsyncGenerator<StreamEvent, void, void> {
+  const { threshold, enableRewrite, bot } = input;
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+    yield { kind: 'error', message: 'threshold must be in [0, 1]' };
+    return;
+  }
+  const original = input.question.trim();
+  if (original.length === 0) {
+    yield { kind: 'error', message: 'question is empty' };
+    return;
+  }
+  if (original.length > 1000) {
+    yield { kind: 'error', message: 'question too long (max 1000 chars)' };
+    return;
+  }
+
+  // 1. Pre-process (smalltalk shortcut + rewrite).
+  let rewriteInfo: ChatRewriteInfo | null = null;
+  let queryForEmbed = original;
+  if (enableRewrite) {
+    const pp = await preProcessInput(original, bot);
+    if (pp.kind === 'smalltalk') {
+      yield {
+        kind: 'smalltalk',
+        response: {
+          botVersion: bot.version,
+          kind: 'smalltalk',
+          answer: pp.reply,
+          preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
+          totalCostUsd: pp.costUsd,
+        },
+      };
+      return;
+    }
+    rewriteInfo = {
+      original,
+      rewritten: pp.query,
+      inputTokens: pp.inputTokens,
+      outputTokens: pp.outputTokens,
+      costUsd: pp.costUsd,
+    };
+    queryForEmbed = pp.query;
+  }
+  const rewriteCost = rewriteInfo?.costUsd ?? 0;
+
+  // 2. Multi-query expansion.
+  const mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
+  const expansionCost = mq.costUsd;
+
+  // 3. Embed all queries (batched).
+  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(mq.queries);
+
+  // 4. Retrieve per query, dedup keeping max similarity.
+  const bestById = new Map<string, RetrievedChunk>();
+  for (const v of vectors) {
+    const hits = await retrieveChunks(v, V0_RAG_DEFAULTS.TOP_K);
+    for (const h of hits) {
+      const prev = bestById.get(h.id);
+      if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
+    }
+  }
+  const merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+  const allSources = merged.map(toSource);
+  const topSim = merged[0]?.similarity ?? null;
+
+  // 5. Threshold filter.
+  const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
+  if (aboveThreshold.length === 0) {
+    yield {
+      kind: 'fallback',
+      response: {
+        botVersion: bot.version,
+        kind: 'fallback',
+        answer: FALLBACK_MESSAGE,
+        reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
+        topSimilarity: topSim,
+        rewrite: rewriteInfo,
+        sources: allSources,
+        threshold,
+        embedTokens,
+        totalCostUsd: embedCost + rewriteCost + expansionCost,
+      },
+    };
+    return;
+  }
+
+  // 6. Optional rerank.
+  let rerankCost = 0;
+  let rerankInputTokens = 0;
+  let rerankOutputTokens = 0;
+  let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
+  if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
+    const r = await rerankChunks(original, aboveThreshold, V0_RAG_DEFAULTS.TOP_K, bot);
+    final = r.ranked;
+    rerankCost = r.costUsd;
+    rerankInputTokens = r.inputTokens;
+    rerankOutputTokens = r.outputTokens;
+  }
+
+  // 7. Format context.
+  let context = '';
+  let used = 0;
+  for (const c of final) {
+    const block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${c.content}\n\n`;
+    if (context.length + block.length > V0_RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
+    context += block;
+    used++;
+  }
+  const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
+
+  // 8. Emit start event with metadata so UI can show sources panel before
+  //    tokens arrive.
+  const usedSources = final.slice(0, used).map(toSource);
+  yield {
+    kind: 'answer-start',
+    botVersion: bot.version,
+    sources: usedSources,
+    rewrite: rewriteInfo,
+    threshold,
+  };
+
+  // 9. Stream the LLM answer.
+  let accText = '';
+  let chatInputTokens = 0;
+  let chatOutputTokens = 0;
+  let chatCostUsd = 0;
+  try {
+    const stream = await openai().chat.completions.create({
+      model: bot.chatModel,
+      temperature: bot.chatTemperature,
+      max_tokens: V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      stream: true,
+      stream_options: { include_usage: true },
+      messages: [
+        { role: 'system', content: bot.systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    });
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        accText += delta;
+        yield { kind: 'answer-delta', text: delta };
+      }
+      // Last chunk in OpenAI stream carries the usage when stream_options
+      // include_usage:true is set.
+      if (chunk.usage) {
+        chatInputTokens = chunk.usage.prompt_tokens ?? 0;
+        chatOutputTokens = chunk.usage.completion_tokens ?? 0;
+        chatCostUsd =
+          (chatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
+          (chatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+      }
+    }
+  } catch (err) {
+    yield {
+      kind: 'error',
+      message: `LLM stream failed: ${err instanceof Error ? err.message : 'unknown'}`,
+    };
+    return;
+  }
+
+  // 10. Final event with complete response (used by route handler for logging).
+  yield {
+    kind: 'answer-done',
+    response: {
+      botVersion: bot.version,
+      kind: 'answer',
+      answer: accText.trim(),
+      rewrite: rewriteInfo,
+      sources: usedSources,
+      threshold,
+      embedTokens,
+      chatInputTokens: chatInputTokens + rerankInputTokens,
+      chatOutputTokens: chatOutputTokens + rerankOutputTokens,
+      totalCostUsd: embedCost + chatCostUsd + rewriteCost + expansionCost + rerankCost,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Document admin (used by V0-C-3 ingest + list + delete)
 // ---------------------------------------------------------------------------
 export type DocSummary = {
