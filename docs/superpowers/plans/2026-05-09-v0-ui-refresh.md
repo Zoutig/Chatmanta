@@ -792,21 +792,23 @@ function ExamplesBar({
 
 Enige wijziging: label naar uppercase tracking-style.
 
-- [ ] **Step 8: Update `AnswerPanel` met border-left accent (regels ±364-409)**
+- [ ] **Step 8: Update `AnswerPanel` — preserveer v0.3 logica + border-left accent**
 
-Vervang het complete `AnswerPanel` block door:
+Vervang het complete `AnswerPanel` block (en de NIEUWE sub-componenten `ConfidenceBadge`, `CitedText`, `FollowUpsBar` — die staan ondergebracht in dezelfde file) door deze gepolijste versies. Belangrijk: de v0.3 functionaliteit (parseStreamingV03, extras-badges, subQueries, CitedText, thinking-indicator, FollowUpsBar) blijft intact, alleen de styling wordt aangepast.
 
 ```tsx
 function AnswerPanel({
   response,
   streamingText,
   pending,
+  onAskFollowUp,
 }: {
   response: ChatResponse;
   streamingText: string | null;
   pending: boolean;
+  onAskFollowUp: (q: string) => void;
 }) {
-  // Border-left accent kleur per response-kind. Subtiele all-around border + bg blijven.
+  // Border-left accent per response-kind. Subtiele all-around border + bg blijven uniform.
   const accentClass =
     response.kind === 'fallback'
       ? 'border-l-amber-500'
@@ -821,11 +823,22 @@ function AnswerPanel({
       ? response.rewrite.rewritten
       : null;
 
+  // V0.3: tijdens streaming kan tekst <thinking>/<answer>/<confidence> bevatten.
+  // Parse client-side zodat we alleen het echte antwoord tonen.
+  const parsedStreaming = streamingText !== null ? parseStreamingV03(streamingText) : null;
+  const displayText = parsedStreaming !== null ? parsedStreaming.answer : response.answer;
+  const stillThinking =
+    parsedStreaming !== null &&
+    parsedStreaming.thinking !== null &&
+    parsedStreaming.answer.length === 0;
+
+  const extras = response.kind === 'answer' ? response.extras : undefined;
+
   return (
     <div
       className={`rounded-lg border border-zinc-200 border-l-2 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 ${accentClass}`}
     >
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
           {response.botVersion}
         </span>
@@ -839,29 +852,149 @@ function AnswerPanel({
             Smalltalk
           </span>
         ) : null}
+        {extras?.fromCache ? (
+          <span className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">
+            Cache
+          </span>
+        ) : null}
+        {extras?.cascadeUsed ? (
+          <span className="rounded border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-orange-700 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300">
+            Cascade
+          </span>
+        ) : null}
+        {extras?.confidence !== undefined ? <ConfidenceBadge value={extras.confidence} /> : null}
       </div>
       {rewriteToShow ? (
-        <div className="mb-3 rounded border border-blue-200 border-l-2 border-l-blue-500 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:border-l-blue-500 dark:bg-blue-950 dark:text-blue-200">
-          <span className="text-[10px] uppercase tracking-[0.08em]">Rewritten:</span>{' '}
+        <div className="mb-3 rounded border border-zinc-200 border-l-2 border-l-blue-500 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          <span className="mr-1 text-[10px] uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">
+            Rewritten
+          </span>
           <span className="italic">{rewriteToShow}</span>
         </div>
       ) : null}
-      <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
-        {streamingText !== null ? streamingText : response.answer}
-        {streamingText !== null && pending ? (
-          <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-zinc-400 align-middle dark:bg-zinc-500" />
-        ) : null}
-      </p>
+      {extras?.subQueries && extras.subQueries.length > 1 ? (
+        <details className="mb-3 rounded border border-zinc-200 border-l-2 border-l-blue-500 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">
+            Sub-vragen · {extras.subQueries.length}
+          </summary>
+          <ul className="mt-1 list-disc pl-4">
+            {extras.subQueries.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {stillThinking ? (
+        <p className="text-sm italic text-zinc-500 dark:text-zinc-400">
+          <span className="mr-1 text-[10px] uppercase tracking-[0.08em]">Denkt</span>
+          aan het nadenken…
+        </p>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
+          <CitedText
+            text={displayText}
+            sources={response.kind !== 'smalltalk' ? response.sources : []}
+          />
+          {streamingText !== null && pending ? (
+            <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-zinc-400 align-middle dark:bg-zinc-500" />
+          ) : null}
+        </p>
+      )}
+      {extras?.followUps && extras.followUps.length > 0 && streamingText === null ? (
+        <FollowUpsBar followUps={extras.followUps} onPick={onAskFollowUp} />
+      ) : null}
       {streamingText === null ? <Stats response={response} /> : null}
+    </div>
+  );
+}
+
+function ConfidenceBadge({ value }: { value: number }) {
+  const pct = Math.round(value * 100);
+  const tone =
+    value >= 0.8
+      ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
+      : value >= 0.5
+        ? 'border-yellow-200 text-yellow-800 dark:border-yellow-900 dark:text-yellow-300'
+        : 'border-red-200 text-red-700 dark:border-red-900 dark:text-red-300';
+  return (
+    <span
+      className={`rounded border bg-white px-1.5 py-0.5 font-mono text-[10px] dark:bg-zinc-900 ${tone}`}
+    >
+      conf {pct}%
+    </span>
+  );
+}
+
+function CitedText({
+  text,
+  sources,
+}: {
+  text: string;
+  sources: { filename: string | null; similarity: number }[];
+}) {
+  // Split rond [N] tokens en render ze als kleine sup-badges.
+  const parts: React.ReactNode[] = [];
+  const re = /\[(\d+)\]/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const num = Number.parseInt(m[1], 10);
+    const src = sources[num - 1];
+    parts.push(
+      <sup
+        key={`${m.index}`}
+        title={src ? `${src.filename ?? '(geen filename)'} · sim ${src.similarity.toFixed(3)}` : `chunk ${num}`}
+        className="ml-0.5 inline-block cursor-help rounded bg-zinc-100 px-1 font-mono text-[9px] font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+      >
+        {num}
+      </sup>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+function FollowUpsBar({
+  followUps,
+  onPick,
+}: {
+  followUps: string[];
+  onPick: (q: string) => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+        Vervolgvragen
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {followUps.map((q, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(q)}
+            className="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 hover:border-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 ```
 
-Wijzigingen:
-- All-around `border-amber-300 bg-amber-50` patroon → uniforme `border-zinc-200/zinc-800 bg-white/zinc-900` + `border-l-2 border-l-{kleur}`. Visueel rustiger.
-- Kind-badges (Fallback/Smalltalk) als uppercase tracking-labels naast de version-pill
-- Rewrite-block ook border-left pattern + label uppercase ("Herschreven voor zoekopdracht:" → "Rewritten:")
+Belangrijke veranderingen:
+- AnswerPanel: alle v0.3-logica blijft (parseStreamingV03, extras, CitedText, FollowUpsBar). Visueel: uniforme `border-zinc-200/zinc-800 bg-white/zinc-900` + `border-l-2 border-l-{kleur}` voor status.
+- Badges (Cache/Cascade): tekst-only kleur-tinten → outline-stijl met uppercase tracking ("Cache", "Cascade") — consistent met andere uppercase labels.
+- ConfidenceBadge: van vol-gevulde kleur-tint naar outline + mono "conf 80%" — visueel rustiger en mono-consistent.
+- CitedText: `bg-blue-100 text-blue-800` → neutraal `bg-zinc-100 text-zinc-700` met hover voor affordance — minder kleurpapegaai, mono numbers.
+- FollowUpsBar: label "Vervolgvragen" naar uppercase tracking (consistent met "Voorbeeldvragen" in ExamplesBar).
+- Rewrite-block: van blue-50 bg → neutrale bg met blue border-left accent (rustiger).
+- subQueries-details: zelfde border-left blue pattern, uppercase summary "Sub-vragen · N".
+- Thinking-indicator: van enkel emoji "💭" naar uppercase "Denkt" label — past bij rest van de typografie.
+- All-around `border-amber-300 bg-amber-50` patroon → uniforme bg + border-left. Visueel rustiger.
 
 - [ ] **Step 9: Update `SourcesPanel` en `SourcesPanelBody` (regels ±438-491)**
 
@@ -971,6 +1104,9 @@ Open `http://localhost:3000`. Stel een vraag (bv. "wat doet ChatManta?"). Expect
 - AnswerPanel met dunne border-left accent (zwart light, emerald dark)
 - Sources met emerald border-left voor hits
 - Threshold-waarde prominent en mono
+- v0.3-badges (Cache/Cascade/conf%) als outline-style uppercase labels naast versie-pill
+- CitedText `[N]` als neutrale grijze sup-numbers
+- FollowUpsBar met uppercase "Vervolgvragen" label
 - Toggle theme via switch en zie dezelfde polish in dark mode
 
 Stop met Ctrl+C.
