@@ -1,10 +1,11 @@
 // V0 demo home — chat UI + sources panel + threshold slider + ingest +
-// doc-list + bot version switcher.
+// doc-list + bot version switcher + theme switch.
 
 import { ChatBox } from './components/chat-box';
 import { DocList } from './components/doc-list';
 import { IngestForm } from './components/ingest-form';
 import { VersionSwitcher } from './components/version-switcher';
+import { ThemeSwitch } from './components/theme-switch';
 import { listDocs } from '@/lib/v0/server/rag';
 import { BOT_VERSIONS_ORDERED, BOTS, resolveBot } from '@/lib/v0/server/bots';
 
@@ -26,15 +27,20 @@ export default async function Home({
   });
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-6 p-6">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <main className="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-8 p-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">ChatManta V0</h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            RAG demo · OpenAI text-embedding-3-small + {bot.chatModel}
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            ChatManta
+          </h1>
+          <p className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+            RAG · {bot.version} · {bot.chatModel}
           </p>
         </div>
-        <VersionSwitcher current={bot.version} bots={allBots} />
+        <div className="flex items-center gap-2">
+          <ThemeSwitch />
+          <VersionSwitcher current={bot.version} bots={allBots} />
+        </div>
       </header>
 
       <ChatBox
