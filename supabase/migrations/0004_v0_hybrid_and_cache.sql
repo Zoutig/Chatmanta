@@ -9,8 +9,7 @@
 --   3. answer_cache tabel met question_embedding voor near-duplicate lookup.
 --   4. lookup_cached_answer RPC die de cache via vector-similarity ondervraagt.
 --
--- Backwards compatible: oude match_chunks RPC blijft bestaan, v0.1/v0.2
--- gebruiken die ongewijzigd.
+-- Idempotent: alle statements zijn safe om opnieuw te runnen.
 -- =============================================================================
 
 
@@ -21,10 +20,10 @@
 -- Generated tsvector kolom — auto-update bij content-wijziging, geen trigger nodig.
 -- 'dutch' config gebruikt Nederlandse stemmer (snelle/snel/sneltrein → 'snel').
 alter table public.document_chunks
-  add column content_tsv tsvector
+  add column if not exists content_tsv tsvector
   generated always as (to_tsvector('dutch', content)) stored;
 
-create index document_chunks_content_tsv_idx
+create index if not exists document_chunks_content_tsv_idx
   on public.document_chunks
   using gin (content_tsv);
 
@@ -33,8 +32,10 @@ create index document_chunks_content_tsv_idx
 -- RRF: score = 1/(k + rank) per ranking, gesommeerd over rankings. k=60
 -- is de canonieke RRF-constante (Cormack et al. 2009).
 --
--- Returns top-N chunks gerangschikt op combined_score, met de losse
--- vector- en keyword-scores zichtbaar voor inspectie.
+-- Implementation note: FULL OUTER JOIN op id ipv GROUP BY, zodat we geen
+-- aggregaten op uuid/text kolommen nodig hebben (Postgres heeft geen
+-- max(uuid)). De id is uniek per chunk dus join produceert per chunk
+-- precies één rij.
 create or replace function public.match_chunks_hybrid(
   p_organization_id uuid,
   query_embedding   vector(1536),
@@ -83,27 +84,19 @@ as $$
     order by kw desc
     limit greatest(match_count * 4, 20)
   ),
-  combined as (
-    select id, document_id, website_page_id, content, metadata,
-      sim, 1.0 / (60 + v_rank) as v_rrf, 0.0::float as k_rrf, 0.0::float as kw_score
-    from vector_results
-    union all
-    select id, document_id, website_page_id, content, metadata,
-      0.0::float, 0.0 as v_rrf, 1.0 / (60 + k_rank) as k_rrf, kw as kw_score
-    from keyword_results
-  ),
   fused as (
     select
-      id,
-      max(document_id)     as document_id,
-      max(website_page_id) as website_page_id,
-      max(content)         as content,
-      (array_agg(metadata))[1] as metadata,
-      max(sim)             as similarity,
-      max(kw_score)        as keyword_score,
-      sum(v_rrf + k_rrf)::float as combined_score
-    from combined
-    group by id
+      coalesce(v.id, k.id)                                  as id,
+      coalesce(v.document_id, k.document_id)                as document_id,
+      coalesce(v.website_page_id, k.website_page_id)        as website_page_id,
+      coalesce(v.content, k.content)                        as content,
+      coalesce(v.metadata, k.metadata)                      as metadata,
+      coalesce(v.sim, 0)::float                             as similarity,
+      coalesce(k.kw, 0)::float                              as keyword_score,
+      (coalesce(1.0 / (60 + v.v_rank), 0) +
+       coalesce(1.0 / (60 + k.k_rank), 0))::float           as combined_score
+    from vector_results v
+    full outer join keyword_results k on v.id = k.id
   )
   select id, document_id, website_page_id, content, metadata,
     similarity, keyword_score, combined_score
@@ -117,7 +110,7 @@ $$;
 -- Answer cache infrastructure
 -- -----------------------------------------------------------------------------
 
-create table public.answer_cache (
+create table if not exists public.answer_cache (
   id                 uuid         primary key default gen_random_uuid(),
   organization_id    uuid         not null references public.organizations(id) on delete cascade,
   bot_version        text         not null,
@@ -129,14 +122,16 @@ create table public.answer_cache (
   last_hit_at        timestamptz
 );
 
-create index answer_cache_embedding_idx
+create index if not exists answer_cache_embedding_idx
   on public.answer_cache
   using hnsw (question_embedding vector_cosine_ops);
 
-create index answer_cache_org_version_idx
+create index if not exists answer_cache_org_version_idx
   on public.answer_cache (organization_id, bot_version);
 
 alter table public.answer_cache enable row level security;
+
+drop policy if exists "answer_cache_select_org_members" on public.answer_cache;
 
 create policy "answer_cache_select_org_members"
   on public.answer_cache
