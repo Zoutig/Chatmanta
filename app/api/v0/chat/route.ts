@@ -7,7 +7,11 @@
 // Events: zie StreamEvent in lib/v0/server/rag.ts.
 
 import { NextResponse } from 'next/server';
-import { runRagQueryStreaming, type ChatResponse } from '@/lib/v0/server/rag';
+import {
+  runRagQueryStreaming,
+  type ChatHistoryTurn,
+  type ChatResponse,
+} from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
 import { logQuery } from '@/lib/v0/server/log';
 
@@ -18,7 +22,23 @@ type Body = {
   threshold?: unknown;
   enableRewrite?: unknown;
   version?: unknown;
+  history?: unknown;
 };
+
+function parseHistory(input: unknown): ChatHistoryTurn[] {
+  if (!Array.isArray(input)) return [];
+  const out: ChatHistoryTurn[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const role = (item as { role?: unknown }).role;
+    const content = (item as { content?: unknown }).content;
+    if ((role === 'user' || role === 'assistant') && typeof content === 'string') {
+      // Hard cap per turn om enorme history-payloads te voorkomen.
+      out.push({ role, content: content.slice(0, 4000) });
+    }
+  }
+  return out.slice(-20); // server-side hard cap
+}
 
 export async function POST(req: Request) {
   let body: Body;
@@ -32,12 +52,13 @@ export async function POST(req: Request) {
   const threshold = typeof body.threshold === 'number' ? body.threshold : 0.4;
   const enableRewrite = body.enableRewrite !== false;
   const version = typeof body.version === 'string' ? body.version : '';
+  const history = parseHistory(body.history);
   if (!question.trim()) {
     return NextResponse.json({ error: 'question is required' }, { status: 400 });
   }
 
   const bot = resolveBot(version);
-  const generator = runRagQueryStreaming({ question, threshold, enableRewrite, bot });
+  const generator = runRagQueryStreaming({ question, threshold, enableRewrite, bot, history });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

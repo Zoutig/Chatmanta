@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { ChatResponse, StreamEvent } from '@/lib/v0/server/rag';
+import type { ChatHistoryTurn, ChatResponse, StreamEvent } from '@/lib/v0/server/rag';
 
 const EXAMPLE_QUESTIONS = [
   'wat doet ChatManta?',
@@ -34,6 +34,15 @@ export function ChatBox({
   // costs per versie apart geteld kunnen worden tijdens vergelijking.
   const [sessionCostUsd, setSessionCostUsd] = useState(0);
   const [sessionQueryCount, setSessionQueryCount] = useState(0);
+  // Volledig conversatie-log voor weergave + meesturen aan server (laatste N).
+  const [history, setHistory] = useState<ChatHistoryTurn[]>([]);
+
+  function resetConversation() {
+    setHistory([]);
+    setResponse(null);
+    setStreamingText(null);
+    setError(null);
+  }
 
   function ask(q: string) {
     const trimmed = q.trim();
@@ -51,6 +60,7 @@ export function ChatBox({
             threshold,
             enableRewrite,
             version: botVersion,
+            history,
           }),
         });
         if (!res.ok || !res.body) {
@@ -104,6 +114,12 @@ export function ChatBox({
         if (final) {
           setSessionCostUsd((c) => c + final!.totalCostUsd);
           setSessionQueryCount((n) => n + 1);
+          // Append turn to conversation history so volgende vraag context heeft.
+          setHistory((h) => [
+            ...h,
+            { role: 'user', content: trimmed },
+            { role: 'assistant', content: final!.answer },
+          ]);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Onbekende fout');
@@ -126,7 +142,14 @@ export function ChatBox({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
       <section className="flex flex-col gap-4">
-        <SessionStats costUsd={sessionCostUsd} queryCount={sessionQueryCount} version={botVersion} />
+        <SessionStats
+          costUsd={sessionCostUsd}
+          queryCount={sessionQueryCount}
+          version={botVersion}
+          turnCount={history.length / 2}
+          onReset={resetConversation}
+        />
+        {history.length > 0 ? <HistoryPanel history={history} /> : null}
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Vraag
@@ -190,10 +213,14 @@ function SessionStats({
   costUsd,
   queryCount,
   version,
+  turnCount,
+  onReset,
 }: {
   costUsd: number;
   queryCount: number;
   version: string;
+  turnCount: number;
+  onReset: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
@@ -204,7 +231,43 @@ function SessionStats({
         {queryCount} {queryCount === 1 ? 'vraag' : 'vragen'}
       </span>
       <span className="font-mono">${costUsd.toFixed(6)}</span>
+      <span className="text-zinc-500 dark:text-zinc-400">·</span>
+      <span className="text-zinc-500 dark:text-zinc-400">
+        {turnCount} {turnCount === 1 ? 'turn in geschiedenis' : 'turns in geschiedenis'}
+      </span>
+      {turnCount > 0 ? (
+        <button
+          type="button"
+          onClick={onReset}
+          className="ml-auto rounded border border-zinc-300 px-2 py-0.5 text-zinc-600 hover:border-red-400 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-700 dark:hover:text-red-400"
+        >
+          Reset gesprek
+        </button>
+      ) : null}
     </div>
+  );
+}
+
+function HistoryPanel({ history }: { history: ChatHistoryTurn[] }) {
+  return (
+    <details className="rounded-md border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+        Gespreks-geschiedenis ({history.length / 2} turns)
+      </summary>
+      <ul className="space-y-2 px-3 pb-3">
+        {history.map((t, i) => (
+          <li
+            key={i}
+            className="rounded border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <span className="mr-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              {t.role === 'user' ? 'jij' : 'bot'}
+            </span>
+            <span className="whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">{t.content}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

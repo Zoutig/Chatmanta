@@ -216,14 +216,33 @@ function parsePreProcessOutput(raw: string): { kind: 'smalltalk'; reply: string 
   return { kind: 'search', query };
 }
 
+// Beperk hoeveel turns we meegeven aan de LLM-calls. Meer = duurder en
+// kan de LLM verwarren met oude context die niet meer relevant is.
+const MAX_HISTORY_TURNS = 4;
+
+export type ChatHistoryTurn = { role: 'user' | 'assistant'; content: string };
+
+function formatHistoryBlock(history: ChatHistoryTurn[]): string {
+  if (history.length === 0) return '';
+  const lines = history.map((t) =>
+    t.role === 'user' ? `gebruiker: ${t.content}` : `assistent: ${t.content}`,
+  );
+  return `GESPREKS-HISTORIE:\n${lines.join('\n')}\n\n`;
+}
+
 async function preProcessInput(
   original: string,
   bot: BotConfig,
+  history: ChatHistoryTurn[] = [],
 ): Promise<PreProcessResult> {
+  const trimmed = history.slice(-MAX_HISTORY_TURNS);
+  const userMessage = trimmed.length === 0
+    ? original
+    : `${formatHistoryBlock(trimmed)}HUIDIGE INPUT: ${original}`;
   const result = await chatComplete({
     model: bot.chatModel,
     system: bot.preProcessSystem,
-    user: original,
+    user: userMessage,
     temperature: V0_RAG_DEFAULTS.REWRITE_TEMPERATURE,
     maxTokens: V0_RAG_DEFAULTS.REWRITE_MAX_TOKENS,
   });
@@ -624,8 +643,10 @@ export async function* runRagQueryStreaming(input: {
   threshold: number;
   enableRewrite: boolean;
   bot: BotConfig;
+  history?: ChatHistoryTurn[];
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
+  const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     yield { kind: 'error', message: 'threshold must be in [0, 1]' };
     return;
@@ -644,7 +665,7 @@ export async function* runRagQueryStreaming(input: {
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
   if (enableRewrite) {
-    const pp = await preProcessInput(original, bot);
+    const pp = await preProcessInput(original, bot, history);
     if (pp.kind === 'smalltalk') {
       yield {
         kind: 'smalltalk',
@@ -759,6 +780,7 @@ export async function* runRagQueryStreaming(input: {
       stream_options: { include_usage: true },
       messages: [
         { role: 'system', content: bot.systemPrompt },
+        ...history.map((t) => ({ role: t.role, content: t.content })),
         { role: 'user', content: userPrompt },
       ],
     });
