@@ -20,23 +20,41 @@ const PHASE_LABELS: Record<PipelinePhase, string> = {
   followups: 'Vervolgvragen bedenken',
 };
 
-/** Mirror van parseV03Output uit lib/v0/server/rag.ts (server-only). */
+/**
+ * Mirror van parseV03Output uit lib/v0/server/rag.ts maar streaming-safe:
+ * - Een geopende <thinking> zonder sluit-tag yieldt thinking-text + lege answer
+ *   (UI toont dan "Denkt..." ipv de rauwe tag).
+ * - Gedeeltelijke open-tags aan het eind van de buffer (bv. "<a" voor <answer>)
+ *   worden afgeknipt zodat ze niet flikkeren totdat het hele tag binnen is.
+ */
 function parseStreamingV03(raw: string): { thinking: string | null; answer: string } {
-  const thinkingMatch = raw.match(/<thinking>([\s\S]*?)<\/thinking>/i);
-  const answerMatch = raw.match(/<answer>([\s\S]*?)(?:<\/answer>|$)/i);
-  let answer = answerMatch?.[1] ?? '';
-  if (!answerMatch) {
-    if (thinkingMatch) {
-      answer = raw.slice(raw.indexOf('</thinking>') + 11);
+  let thinking: string | null = null;
+  let body = raw;
+
+  const thinkOpenIdx = body.search(/<thinking>/i);
+  if (thinkOpenIdx !== -1) {
+    const afterOpen = body.slice(thinkOpenIdx + '<thinking>'.length);
+    const closeRel = afterOpen.search(/<\/thinking>/i);
+    if (closeRel !== -1) {
+      thinking = afterOpen.slice(0, closeRel).trim();
+      body = body.slice(0, thinkOpenIdx) + afterOpen.slice(closeRel + '</thinking>'.length);
     } else {
-      answer = raw;
+      // Open tag zonder sluit — alles erna is "denken in uitvoering"; geen answer-text yet.
+      thinking = afterOpen.trim();
+      body = body.slice(0, thinkOpenIdx);
     }
   }
-  answer = answer.replace(/<confidence>[\s\S]*$/i, '');
-  return {
-    thinking: thinkingMatch?.[1]?.trim() ?? null,
-    answer: answer.trim(),
-  };
+
+  // <answer>-open tag verwijderen (kan op elke positie staan na thinking).
+  body = body.replace(/<answer>/i, '');
+  // </answer> + eventuele <confidence> blok eraf.
+  body = body.replace(/<\/answer>[\s\S]*$/i, '');
+  body = body.replace(/<confidence>[\s\S]*$/i, '');
+  // Gedeeltelijke open-tag aan het einde ("<", "<a", "<conf"…) afknippen
+  // zodat het niet als zichtbare tekst flikkert tijdens streaming.
+  body = body.replace(/<[a-z/]*$/i, '');
+
+  return { thinking, answer: body.trim() };
 }
 
 export function UserMessage({ content }: { content: string }) {
