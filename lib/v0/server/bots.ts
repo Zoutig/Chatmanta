@@ -58,6 +58,25 @@ export type BotConfig = {
   cascadeModel: string;
   /** Cache identieke/zeer-vergelijkbare vragen via vector-similarity lookup. */
   cacheEnabled: boolean;
+  /**
+   * Parent-document retrieval: match op kleine chunks (precision), maar stuur
+   * de bijbehorende parent-chunk content naar de LLM (recall in completion).
+   * Vereist dat documents zijn ingest met v0:reingest-parents — anders fallt
+   * elke chunk terug op zijn eigen content (oude gedrag, parent_chunk_id NULL).
+   */
+  parentDocumentRetrieval: boolean;
+  /**
+   * Selective HyDE: alleen HyDE genereren als de top-1 cosine similarity in de
+   * eerste retrieve onder de trigger-threshold valt. Bespaart een LLM-call
+   * (~$0.0001) op queries waar vector-search al een goede match vindt.
+   */
+  selectiveHyDE: boolean;
+  /**
+   * Top-1 sim drempel waaronder selectiveHyDE getriggerd wordt. Default 0.5
+   * — bij OpenAI text-embedding-3-small + NL liggen "goede" matches typisch
+   * ≥ 0.55. Onder 0.5 betekent dat retrieval waarschijnlijk niet sterk is.
+   */
+  selectiveHyDETrigger: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -84,6 +103,9 @@ const V0_1: BotConfig = {
   cascadeOnLowConfidence: false,
   cascadeModel: 'gpt-4o',
   cacheEnabled: false,
+  parentDocumentRetrieval: false,
+  selectiveHyDE: false,
+  selectiveHyDETrigger: 0.5,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
@@ -208,19 +230,48 @@ Antwoord in dezelfde taal als de vraag — default Nederlands. Houd het beknopt 
 };
 
 // ---------------------------------------------------------------------------
+// v0.4 — retrieval upgrade: parent-document retrieval + selective HyDE
+//
+// Bouwt voort op v0.3 (alle features daar aan), maar:
+//   * HyDE alleen als top-1 sim onder de selectiveHyDETrigger valt — bespaart
+//     een LLM-call op queries waar vector-search al goed scoort.
+//   * Parent-document retrieval: match op kleine ~800-char chunks (precision),
+//     stuur de bijbehorende ~3200-char parent naar de LLM (recall in
+//     completion). Vereist dat documenten zijn herIngest met
+//     `npm run v0:reingest-parents` — anders fall-back naar small-chunk
+//     content (oud gedrag).
+//
+// Uitgebreide evaluatie via `npm run eval:run -- --versions=v0.3,v0.4` zodra
+// de re-ingest gedaan is.
+// ---------------------------------------------------------------------------
+const V0_4: BotConfig = {
+  ...V0_3,
+  version: 'v0.4',
+  label: 'v0.4 — parent-doc + selective HyDE',
+  description:
+    'v0.3 met twee retrieval-verbeteringen: parent-document retrieval (match klein, antwoord groot) en selective HyDE (alleen wanneer retrieval zwak presteert). Cost-neutraal of lager dan v0.3 omdat HyDE niet altijd draait.',
+  parentDocumentRetrieval: true,
+  selectiveHyDE: true,
+  selectiveHyDETrigger: 0.5,
+  // useHyDE blijft true: het BETEKENT nu "HyDE is beschikbaar"; selectiveHyDE
+  // bepaalt of die beschikbaarheid daadwerkelijk getriggerd wordt per query.
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
   [V0_1.version]: V0_1,
   [V0_2.version]: V0_2,
   [V0_3.version]: V0_3,
+  [V0_4.version]: V0_4,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_3.version;
+export const LATEST_BOT_VERSION = V0_4.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
-export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version, V0_2.version, V0_3.version];
+export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version, V0_2.version, V0_3.version, V0_4.version];
 
 /** Resolve a version string to a config; falls back to latest if unknown. */
 export function resolveBot(version: string | null | undefined): BotConfig {

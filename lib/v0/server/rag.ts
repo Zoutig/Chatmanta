@@ -350,6 +350,8 @@ async function retrieveChunksHybrid(
   queryVector: number[],
   queryText: string,
   topK: number,
+  /** v0.4: hydrateer parent_content na de hybrid-fusion (RPC kent geen parent join). */
+  withParents = false,
 ): Promise<RetrievedChunk[]> {
   const sb = supabase();
   const { data, error } = await sb.rpc('match_chunks_hybrid', {
@@ -362,7 +364,7 @@ async function retrieveChunksHybrid(
     // Fallback: als hybrid RPC ontbreekt (migratie 0004 niet toegepast),
     // val terug op vanilla vector search zodat de app blijft werken.
     console.warn('[hybrid] RPC failed, falling back to vector-only:', error.message);
-    return retrieveChunks(queryVector, topK);
+    return retrieveChunks(queryVector, topK, withParents);
   }
   type HybridRow = RawChunk & { combined_score: number; keyword_score: number };
   const rows = (data ?? []) as HybridRow[];
@@ -378,10 +380,31 @@ async function retrieveChunksHybrid(
     const { data: docs } = await sb2.from('documents').select('id, filename').in('id', docIds);
     docNameMap = new Map((docs ?? []).map((d) => [d.id as string, d.filename as string]));
   }
-  return rows.map((c) => ({
+  // Hybrid RPC retourneert geen parent_chunk_id; haal die op uit document_chunks
+  // als withParents aanstaat. Eén batch query — minimale latency.
+  let parentIdMap = new Map<string, string | null>();
+  if (withParents && rows.length > 0) {
+    const ids = rows.map((r) => r.id);
+    const { data: parentRows, error: parentErr } = await sb2
+      .from('document_chunks')
+      .select('id, parent_chunk_id')
+      .in('id', ids);
+    if (parentErr) {
+      console.warn('[parent lookup via hybrid] failed:', parentErr.message);
+    } else {
+      parentIdMap = new Map(
+        (parentRows ?? []).map((r) => [r.id as string, (r.parent_chunk_id as string | null) ?? null]),
+      );
+    }
+  }
+  const hydrated: RetrievedChunk[] = rows.map((c) => ({
     ...c,
     filename: c.document_id ? docNameMap.get(c.document_id) ?? null : null,
+    parent_chunk_id: withParents ? parentIdMap.get(c.id) ?? null : c.parent_chunk_id ?? null,
+    // parent_content is undefined hier — wordt door hydrateParentContent gevuld.
   }));
+  if (withParents) await hydrateParentContent(hydrated);
+  return hydrated;
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +651,9 @@ type RawChunk = {
   content: string;
   metadata: Record<string, unknown>;
   similarity: number;
+  /** v0.4 parent-document retrieval — null als chunk geen parent heeft (oude ingest). */
+  parent_chunk_id?: string | null;
+  parent_content?: string | null;
 };
 
 export type RetrievedChunk = RawChunk & { filename: string | null };
@@ -635,14 +661,17 @@ export type RetrievedChunk = RawChunk & { filename: string | null };
 async function retrieveChunks(
   queryVector: number[],
   topK: number,
+  /** v0.4: gebruik match_chunks_with_parents zodat parent_content meekomt. */
+  withParents = false,
 ): Promise<RetrievedChunk[]> {
   const sb = supabase();
-  const { data, error } = await sb.rpc('match_chunks', {
+  const rpcName = withParents ? 'match_chunks_with_parents' : 'match_chunks';
+  const { data, error } = await sb.rpc(rpcName, {
     p_organization_id: DEV_ORG_ID,
     query_embedding: queryVector,
     match_count: topK,
   });
-  if (error) throw new Error(`match_chunks: ${error.message}`);
+  if (error) throw new Error(`${rpcName}: ${error.message}`);
 
   const raw = (data ?? []) as RawChunk[];
   if (raw.length === 0) return [];
@@ -665,6 +694,35 @@ async function retrieveChunks(
     ...c,
     filename: c.document_id ? docNameMap.get(c.document_id) ?? null : null,
   }));
+}
+
+/**
+ * v0.4 parent-document retrieval helper — given chunks die mogelijk een
+ * parent_chunk_id hebben maar geen parent_content (omdat ze via de hybrid-RPC
+ * binnenkwamen die geen parent join doet), batch-fetch alle parents en vul
+ * parent_content in. Chunks zonder parent_chunk_id blijven onaangeroerd.
+ */
+async function hydrateParentContent(chunks: RetrievedChunk[]): Promise<void> {
+  const needsHydration = chunks.filter(
+    (c) => c.parent_chunk_id && c.parent_content === undefined,
+  );
+  if (needsHydration.length === 0) return;
+  const parentIds = Array.from(new Set(needsHydration.map((c) => c.parent_chunk_id as string)));
+  const sb = supabase();
+  const { data, error } = await sb
+    .from('parent_chunks')
+    .select('id, content')
+    .in('id', parentIds);
+  if (error) {
+    // Niet fataal — fall-back: chunk content gebruikt zoals eerst.
+    console.warn('[parent_chunks] hydrate failed:', error.message);
+    for (const c of needsHydration) c.parent_content = null;
+    return;
+  }
+  const byId = new Map((data ?? []).map((r) => [r.id as string, r.content as string]));
+  for (const c of needsHydration) {
+    c.parent_content = byId.get(c.parent_chunk_id as string) ?? null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -693,7 +751,7 @@ type BaseChatResponse = {
   length: Length;
 };
 
-/** Optionele v0.3-velden die extra context over het antwoord geven. */
+/** Optionele v0.3+ velden die extra context over het antwoord geven. */
 export type V03Extras = {
   /** Confidence 0..1 zoals gerapporteerd door het antwoord-model. */
   confidence?: number;
@@ -707,6 +765,12 @@ export type V03Extras = {
   subQueries?: string[];
   /** HyDE hypothetisch document (voor inspectie). */
   hydeDocument?: string;
+  /** v0.4: top-1 cosine similarity uit eerste retrieve (vóór threshold filter). */
+  top1Sim?: number | null;
+  /** v0.4: werd selective HyDE daadwerkelijk getriggerd? */
+  hydeTriggered?: boolean;
+  /** v0.4: parent-document retrieval gebruikt (chunk → parent context substituut). */
+  parentDocUsed?: boolean;
 };
 
 export type ChatResponse =
