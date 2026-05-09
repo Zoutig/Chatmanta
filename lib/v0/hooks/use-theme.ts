@@ -43,11 +43,13 @@ export function useTheme(): {
   const [resolved, setResolved] = useState<ResolvedTheme>('light');
 
   // Eerste mount: lees opgeslagen voorkeur en resolve.
+  /* eslint-disable react-hooks/set-state-in-effect -- bewust patroon: SSR-safe defaults via useState, dan op de client localStorage uitlezen. Lazy initializer zou hydration-mismatch geven op aria-checked state in ThemeSwitch. */
   useEffect(() => {
     const stored = readChoice();
     setChoice(stored);
     setResolved(resolveTheme(stored));
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Listen naar OS-preference change als choice='system'.
   useEffect(() => {
