@@ -45,3 +45,9 @@ next-env.d.ts
 .claude/
 graphify-out/
 .superpowers/
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+tests/.auth-state.json

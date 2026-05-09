@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "check-env": "node --env-file=.env.local scripts/check-env.mjs",
     "verify-schema": "node --env-file=.env.local scripts/verify-schema.mjs",
     "v0:ingest": "node --env-file=.env.local scripts/v0-ingest.mjs",
@@ -31,6 +33,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
