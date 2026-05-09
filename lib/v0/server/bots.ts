@@ -77,6 +77,18 @@ export type BotConfig = {
    * ≥ 0.55. Onder 0.5 betekent dat retrieval waarschijnlijk niet sterk is.
    */
   selectiveHyDETrigger: number;
+  /**
+   * v0.4 claim verification: na het antwoord splitten we de tekst in claims,
+   * embedden elke claim, vergelijken met de chunks die de LLM zag. Per claim
+   * een verified-flag + best matching chunk. Telemetrie alleen — wijzigt het
+   * antwoord niet.
+   */
+  claimVerification: boolean;
+  /**
+   * Min cosine sim om een claim als 'verified' te markeren. Default 0.7 — in
+   * lijn met de blueprint similarity threshold. Validatie via eval-corpus.
+   */
+  claimVerificationThreshold: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -106,6 +118,8 @@ const V0_1: BotConfig = {
   parentDocumentRetrieval: false,
   selectiveHyDE: false,
   selectiveHyDETrigger: 0.5,
+  claimVerification: false,
+  claimVerificationThreshold: 0.7,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
@@ -255,6 +269,8 @@ const V0_4: BotConfig = {
   selectiveHyDETrigger: 0.5,
   // useHyDE blijft true: het BETEKENT nu "HyDE is beschikbaar"; selectiveHyDE
   // bepaalt of die beschikbaarheid daadwerkelijk getriggerd wordt per query.
+  claimVerification: true,
+  claimVerificationThreshold: 0.7,
 };
 
 // ---------------------------------------------------------------------------

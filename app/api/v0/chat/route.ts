@@ -13,8 +13,11 @@ import {
   type ChatResponse,
 } from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
-import { logQuery } from '@/lib/v0/server/log';
+import { logQuery, logBlockedQuery } from '@/lib/v0/server/log';
 import { normalizeStyle } from '@/lib/v0/style';
+import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
+import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
+import { getActiveOrgId } from '@/lib/v0/server/active-org';
 
 export const runtime = 'nodejs';
 
@@ -49,6 +52,24 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
 }
 
 export async function POST(req: Request) {
+  // v0.4 security gate #1 — rate limit per IP. Faalt door als bucket overstroomt.
+  const ip = getClientIp(req);
+  const rl = getRateLimiter().check(ip);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'rate limit exceeded', retryAfterSec: rl.retryAfterSec },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rl.retryAfterSec),
+          'X-RateLimit-Limit': String(rl.limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Math.floor(rl.resetAt / 1000)),
+        },
+      },
+    );
+  }
+
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -67,6 +88,53 @@ export async function POST(req: Request) {
   }
 
   const bot = resolveBot(version);
+
+  // v0.4 security gate #2 — prompt-injection detector.
+  // 'log-only' mode (default): we registreren de match en gaan door.
+  // 'block' mode: we wijzen de query af met INJECTION_BLOCKED_MESSAGE.
+  const injection = detectInjection(question);
+  const injectionMode = getInjectionMode();
+
+  if (injection.detected && injectionMode === 'block') {
+    const patternName = injection.pattern?.name ?? 'unknown';
+    // Fire-and-forget log — niet blocking voor de user response.
+    logBlockedQuery({
+      question,
+      botVersion: bot.version,
+      tone,
+      length,
+      injectionPattern: patternName,
+      blockedMessage: INJECTION_BLOCKED_MESSAGE,
+    }).catch(() => undefined);
+
+    // NDJSON-stream met één 'fallback' event zodat de client-side parser het
+    // identiek behandelt aan een normale fallback (bestaande handler hoeft
+    // niets nieuws te kennen).
+    const blockedResponse: ChatResponse = {
+      botVersion: bot.version,
+      tone,
+      length,
+      kind: 'fallback',
+      answer: INJECTION_BLOCKED_MESSAGE,
+      reason: `Injection patroon gedetecteerd: ${patternName}`,
+      topSimilarity: null,
+      rewrite: null,
+      sources: [],
+      threshold,
+      embedTokens: 0,
+      totalCostUsd: 0,
+    };
+    const ndjson = JSON.stringify({ kind: 'fallback', response: blockedResponse }) + '\n';
+    return new Response(ndjson, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  const organizationId = getActiveOrgId(req);
   const generator = runRagQueryStreaming({
     question,
     threshold,
@@ -75,6 +143,7 @@ export async function POST(req: Request) {
     history,
     tone,
     length,
+    organizationId,
   });
 
   const encoder = new TextEncoder();
@@ -101,9 +170,14 @@ export async function POST(req: Request) {
       } finally {
         controller.close();
       }
-      // Fire-and-forget logging na het sluiten van de stream.
+      // Fire-and-forget logging na het sluiten van de stream. Bij log-only
+      // injection-detectie geven we de detectie info mee zodat query_log
+      // de telemetrie krijgt zonder dat we de query blokkeerden.
       if (finalResponse) {
-        logQuery(question, finalResponse).catch(() => undefined);
+        const injectionInfo = injection.detected
+          ? { detected: true, pattern: injection.pattern?.name ?? null }
+          : undefined;
+        logQuery(question, finalResponse, injectionInfo).catch(() => undefined);
       }
     },
   });

@@ -525,6 +525,7 @@ function PhaseLineFromPlaceholder({ phase }: { phase: PipelinePhase }) {
     reflect: 'Antwoord controleren',
     cascade: 'Sterker model raadplegen',
     followups: 'Vervolgvragen bedenken',
+    verify: 'Antwoord verifiëren',
   };
   return (
     <div

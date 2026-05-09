@@ -10,6 +10,7 @@
 
 import 'server-only';
 
+import { performance } from 'node:perf_hooks';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import type { BotConfig } from './bots';
@@ -352,10 +353,12 @@ async function retrieveChunksHybrid(
   topK: number,
   /** v0.4: hydrateer parent_content na de hybrid-fusion (RPC kent geen parent join). */
   withParents = false,
+  /** v0.4 multi-org: scope retrieval naar deze org. Default DEV_ORG voor backward compat. */
+  organizationId: string = DEV_ORG_ID,
 ): Promise<RetrievedChunk[]> {
   const sb = supabase();
   const { data, error } = await sb.rpc('match_chunks_hybrid', {
-    p_organization_id: DEV_ORG_ID,
+    p_organization_id: organizationId,
     query_embedding: queryVector,
     query_text: queryText,
     match_count: topK,
@@ -364,7 +367,7 @@ async function retrieveChunksHybrid(
     // Fallback: als hybrid RPC ontbreekt (migratie 0004 niet toegepast),
     // val terug op vanilla vector search zodat de app blijft werken.
     console.warn('[hybrid] RPC failed, falling back to vector-only:', error.message);
-    return retrieveChunks(queryVector, topK, withParents);
+    return retrieveChunks(queryVector, topK, withParents, organizationId);
   }
   type HybridRow = RawChunk & { combined_score: number; keyword_score: number };
   const rows = (data ?? []) as HybridRow[];
@@ -413,10 +416,11 @@ async function retrieveChunksHybrid(
 async function lookupCachedAnswer(
   queryVector: number[],
   botVersion: string,
+  organizationId: string = DEV_ORG_ID,
 ): Promise<ChatResponse | null> {
   const sb = supabase();
   const { data, error } = await sb.rpc('lookup_cached_answer', {
-    p_organization_id: DEV_ORG_ID,
+    p_organization_id: organizationId,
     p_bot_version: botVersion,
     query_embedding: queryVector,
     min_similarity: 0.97,
@@ -440,11 +444,12 @@ async function writeCachedAnswer(
   queryVector: number[],
   botVersion: string,
   response: ChatResponse,
+  organizationId: string = DEV_ORG_ID,
 ): Promise<void> {
   try {
     const sb = supabase();
     await sb.from('answer_cache').insert({
-      organization_id: DEV_ORG_ID,
+      organization_id: organizationId,
       bot_version: botVersion,
       question,
       question_embedding: queryVector,
@@ -663,11 +668,13 @@ async function retrieveChunks(
   topK: number,
   /** v0.4: gebruik match_chunks_with_parents zodat parent_content meekomt. */
   withParents = false,
+  /** v0.4 multi-org: scope retrieval naar deze org. Default DEV_ORG voor backward compat. */
+  organizationId: string = DEV_ORG_ID,
 ): Promise<RetrievedChunk[]> {
   const sb = supabase();
   const rpcName = withParents ? 'match_chunks_with_parents' : 'match_chunks';
   const { data, error } = await sb.rpc(rpcName, {
-    p_organization_id: DEV_ORG_ID,
+    p_organization_id: organizationId,
     query_embedding: queryVector,
     match_count: topK,
   });
@@ -751,6 +758,15 @@ type BaseChatResponse = {
   length: Length;
 };
 
+/** Per-claim verification result (v0.4 feature 3). Compact structure voor extras. */
+export type ClaimVerificationData = {
+  index: number;
+  text: string;
+  verified: boolean;
+  bestSimilarity: number;
+  bestChunkId: string | null;
+};
+
 /** Optionele v0.3+ velden die extra context over het antwoord geven. */
 export type V03Extras = {
   /** Confidence 0..1 zoals gerapporteerd door het antwoord-model. */
@@ -771,6 +787,35 @@ export type V03Extras = {
   hydeTriggered?: boolean;
   /** v0.4: parent-document retrieval gebruikt (chunk → parent context substituut). */
   parentDocUsed?: boolean;
+  /** v0.4: per-claim verification (alleen aanwezig als bot.claimVerification aan stond). */
+  claims?: ClaimVerificationData[];
+  /** v0.4: aggregate verified-ratio (0..1). NaN als 0 claims gefilterd uit antwoord. */
+  claimConfidence?: number;
+  /** v0.4: drempel die gebruikt is voor verified-flag (uit bot config). */
+  claimVerificationThreshold?: number;
+  /**
+   * v0.4 latency profiling: per-fase timings in ms, plus total. Wordt door
+   * log.ts gemapped naar query_log.{embedding_ms,retrieval_ms,rerank_ms,
+   * generation_ms,total_ms} kolommen plus phase_timings_ms (jsonb).
+   */
+  phaseTimingsMs?: PhaseTimings;
+};
+
+/** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
+export type PhaseTimings = {
+  preprocess_ms?: number;
+  cache_lookup_ms?: number;
+  decompose_ms?: number;
+  hyde_ms?: number;
+  expand_ms?: number;
+  embedding_ms: number;
+  retrieval_ms: number;
+  rerank_ms?: number;
+  generation_ms: number;
+  verify_ms?: number;
+  followups_ms?: number;
+  cascade_ms?: number;
+  total_ms: number;
 };
 
 export type ChatResponse =
@@ -980,7 +1025,8 @@ export type PipelinePhase =
   | 'answer'
   | 'reflect'
   | 'cascade'
-  | 'followups';
+  | 'followups'
+  | 'verify';
 
 export type StreamEvent =
   | { kind: 'status'; phase: PipelinePhase }
@@ -1005,10 +1051,13 @@ export async function* runRagQueryStreaming(input: {
   history?: ChatHistoryTurn[];
   tone?: Tone;
   length?: Length;
+  /** v0.4 multi-org: scope retrieval+cache naar deze org. Default DEV_ORG. */
+  organizationId?: string;
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
   const tone: Tone = input.tone ?? DEFAULT_TONE;
   const length: Length = input.length ?? DEFAULT_LENGTH;
+  const orgId = input.organizationId ?? DEV_ORG_ID;
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     yield { kind: 'error', message: 'threshold must be in [0, 1]' };
@@ -1024,6 +1073,18 @@ export async function* runRagQueryStreaming(input: {
     return;
   }
 
+  // v0.4 latency profiling: t0 = pipeline-start. Per-fase delta's worden
+  // hieronder gecapture-d via tMark() helper en opgeteld in `timings`.
+  const tPipelineStart = performance.now();
+  const timings: Partial<PhaseTimings> = {};
+  const tMark = (key: keyof PhaseTimings) => {
+    const start = performance.now();
+    return () => {
+      const dt = Math.round(performance.now() - start);
+      timings[key] = ((timings[key] as number | undefined) ?? 0) + dt;
+    };
+  };
+
   // Bouw de samengestelde system prompt één keer; gebruikt door main answer-call
   // en (v0.3) cascade-call. Pre-processor en helper-LLM-calls (rerank, hyde,
   // decompose, follow-ups) gebruiken hun eigen task-specifieke prompts.
@@ -1034,7 +1095,9 @@ export async function* runRagQueryStreaming(input: {
   let queryForEmbed = original;
   if (enableRewrite) {
     yield { kind: 'status', phase: 'preprocess' };
+    const stopPp = tMark('preprocess_ms');
     const pp = await preProcessInput(original, bot, history);
+    stopPp();
     if (pp.kind === 'smalltalk') {
       yield {
         kind: 'smalltalk',
@@ -1067,10 +1130,14 @@ export async function* runRagQueryStreaming(input: {
   let preCacheEmbedCost = 0;
   if (bot.cacheEnabled) {
     yield { kind: 'status', phase: 'cache' };
+    const stopCache = tMark('cache_lookup_ms');
+    const stopEmbedCache = tMark('embedding_ms');
     const cacheEmbed = await embedTexts([original]);
+    stopEmbedCache();
     preCacheEmbedTokens = cacheEmbed.tokens;
     preCacheEmbedCost = cacheEmbed.costUsd;
-    const cached = await lookupCachedAnswer(cacheEmbed.vectors[0], bot.version);
+    const cached = await lookupCachedAnswer(cacheEmbed.vectors[0], bot.version, orgId);
+    stopCache();
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
       // Tone/length: gecachte rij is mogelijk geschreven onder andere stijl-
@@ -1099,7 +1166,9 @@ export async function* runRagQueryStreaming(input: {
   let decomposeOutputTokens = 0;
   if (bot.queryDecomposition) {
     yield { kind: 'status', phase: 'decompose' };
+    const stopDec = tMark('decompose_ms');
     const dec = await decomposeQuery(queryForEmbed, bot);
+    stopDec();
     subQueries = dec.subQueries;
     decomposeCost = dec.costUsd;
     decomposeInputTokens = dec.inputTokens;
@@ -1110,19 +1179,26 @@ export async function* runRagQueryStreaming(input: {
   let hydeInputTokens = 0;
   let hydeOutputTokens = 0;
   let hydeDoc: string | null = null;
+  let hydeTriggered = false;
   const querySet: { text: string; isHyde: boolean }[] = subQueries.map((q) => ({
     text: q,
     isHyde: false,
   }));
-  if (bot.useHyDE) {
+  // v0.4 selective HyDE: alleen wanneer top-1 sim onder de trigger valt. Skip
+  // upfront generation; we voeren HyDE pas na de eerste retrieve uit.
+  const hydeUpfront = bot.useHyDE && !bot.selectiveHyDE;
+  if (hydeUpfront) {
     yield { kind: 'status', phase: 'hyde' };
+    const stopHyde = tMark('hyde_ms');
     // Eén HyDE-doc voor de eerste sub-query (de "main" intent) — meerdere
     // HyDE-calls bij decompose zou cost vermenigvuldigen.
     const hyde = await generateHydeDocument(subQueries[0], bot);
+    stopHyde();
     hydeDoc = hyde.hypothetical;
     hydeCost = hyde.costUsd;
     hydeInputTokens = hyde.inputTokens;
     hydeOutputTokens = hyde.outputTokens;
+    hydeTriggered = true;
     querySet.push({ text: hyde.hypothetical, isHyde: true });
   }
 
@@ -1130,7 +1206,9 @@ export async function* runRagQueryStreaming(input: {
   let mq;
   if (bot.multiQueryCount > 1) {
     yield { kind: 'status', phase: 'expand' };
+    const stopExp = tMark('expand_ms');
     mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
+    stopExp();
     for (const q of mq.queries.slice(1)) querySet.push({ text: q, isHyde: false });
   } else {
     mq = { queries: [], inputTokens: 0, outputTokens: 0, costUsd: 0 };
@@ -1139,22 +1217,31 @@ export async function* runRagQueryStreaming(input: {
 
   // 4. Embed all queries (batched).
   yield { kind: 'status', phase: 'embed' };
+  const stopEmbed = tMark('embedding_ms');
   const queryTexts = querySet.map((q) => q.text);
   const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(queryTexts);
+  stopEmbed();
+  // Selective-HyDE embed wordt later optioneel toegevoegd (v0.4). Zelfde
+  // vorm als de hoofd-embed; we splitsen voor logging-helderheid.
+  let selectiveHyDEEmbedTokens = 0;
+  let selectiveHyDEEmbedCost = 0;
 
   // 5. Retrieve per query (parallel). Hybrid (vector + FTS) als bot.hybridSearch,
   //    anders pure vector. HyDE-vectoren skippen FTS (hypothetisch document is
   //    geen oorspronkelijke gebruikersvraag-text — keyword search heeft daar
-  //    geen waarde over).
+  //    geen waarde over). Parent-doc retrieval propagated via withParents.
   yield { kind: 'status', phase: 'retrieve' };
+  const stopRetrieve = tMark('retrieval_ms');
+  const withParents = bot.parentDocumentRetrieval;
   const allHits = await Promise.all(
     querySet.map((q, i) => {
       if (bot.hybridSearch && !q.isHyde) {
-        return retrieveChunksHybrid(vectors[i], q.text, V0_RAG_DEFAULTS.TOP_K);
+        return retrieveChunksHybrid(vectors[i], q.text, V0_RAG_DEFAULTS.TOP_K, withParents, orgId);
       }
-      return retrieveChunks(vectors[i], V0_RAG_DEFAULTS.TOP_K);
+      return retrieveChunks(vectors[i], V0_RAG_DEFAULTS.TOP_K, withParents, orgId);
     }),
   );
+  stopRetrieve();
   const bestById = new Map<string, RetrievedChunk>();
   for (const hits of allHits) {
     for (const h of hits) {
@@ -1162,9 +1249,49 @@ export async function* runRagQueryStreaming(input: {
       if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
     }
   }
-  const merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+  let merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+  let topSim = merged[0]?.similarity ?? null;
+  // Snapshot van top-1 sim NA de eerste retrieve, vóór eventuele HyDE-augment.
+  // Wordt gelogd ongeacht selective HyDE (interessante baseline-metriek).
+  const top1SimInitial = topSim;
+
+  // v0.4 selective HyDE: trigger pas hier, ALS top-1 onder de drempel zat.
+  // Eén HyDE generate + embed + retrieve + merge. We zoeken NIET opnieuw met
+  // de andere queries (sub-queries / multi-query) want die hadden hun kans al.
+  if (bot.useHyDE && bot.selectiveHyDE && (topSim ?? 0) < bot.selectiveHyDETrigger) {
+    yield { kind: 'status', phase: 'hyde' };
+    const stopHydeGen = tMark('hyde_ms');
+    const hyde = await generateHydeDocument(subQueries[0], bot);
+    stopHydeGen();
+    hydeDoc = hyde.hypothetical;
+    hydeCost = hyde.costUsd;
+    hydeInputTokens = hyde.inputTokens;
+    hydeOutputTokens = hyde.outputTokens;
+    hydeTriggered = true;
+
+    const stopHydeEmbed = tMark('embedding_ms');
+    const hydeEmbed = await embedTexts([hyde.hypothetical]);
+    stopHydeEmbed();
+    const stopHydeRetrieve = tMark('retrieval_ms');
+    const hydeRetrieved = await retrieveChunks(
+      hydeEmbed.vectors[0],
+      V0_RAG_DEFAULTS.TOP_K,
+      withParents,
+      orgId,
+    );
+    stopHydeRetrieve();
+    for (const h of hydeRetrieved) {
+      const prev = bestById.get(h.id);
+      if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
+    }
+    merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+    topSim = merged[0]?.similarity ?? null;
+    // hydeEmbed kost extra embed-tokens en cost — tel ze bij de embed-totalen.
+    // (Deze worden verderop in het response object opgeteld.)
+    selectiveHyDEEmbedTokens = hydeEmbed.tokens;
+    selectiveHyDEEmbedCost = hydeEmbed.costUsd;
+  }
   const allSources = merged.map(toSource);
-  const topSim = merged[0]?.similarity ?? null;
 
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
@@ -1182,9 +1309,15 @@ export async function* runRagQueryStreaming(input: {
         rewrite: rewriteInfo,
         sources: allSources,
         threshold,
-        embedTokens: embedTokens + preCacheEmbedTokens,
+        embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
         totalCostUsd:
-          embedCost + preCacheEmbedCost + rewriteCost + expansionCost + hydeCost + decomposeCost,
+          embedCost +
+          preCacheEmbedCost +
+          selectiveHyDEEmbedCost +
+          rewriteCost +
+          expansionCost +
+          hydeCost +
+          decomposeCost,
       },
     };
     return;
@@ -1198,8 +1331,10 @@ export async function* runRagQueryStreaming(input: {
   let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
   if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
     yield { kind: 'status', phase: 'rerank' };
+    const stopRerank = tMark('rerank_ms');
     const candidates = aboveThreshold.slice(0, V0_RAG_DEFAULTS.MAX_RERANK_INPUT);
     const r = await rerankChunks(original, candidates, V0_RAG_DEFAULTS.TOP_K, bot);
+    stopRerank();
     final = r.ranked;
     rerankCost = r.costUsd;
     rerankInputTokens = r.inputTokens;
@@ -1207,10 +1342,18 @@ export async function* runRagQueryStreaming(input: {
   }
 
   // 7. Format context.
+  // v0.4 parent-document retrieval: als parent_content niet null is, sturen we
+  // dat naar de LLM ipv de small chunk content (parent geeft meer omringende
+  // context, small chunk had alleen het exacte match-fragment).
+  // Backwards-compat: chunks zonder parent (oude ingest) krijgen gewoon hun
+  // eigen content.
   let context = '';
   let used = 0;
+  let anyParentSwap = false;
   for (const c of final) {
-    const block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${c.content}\n\n`;
+    const text = c.parent_content ?? c.content;
+    if (c.parent_content) anyParentSwap = true;
+    const block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${text}\n\n`;
     if (context.length + block.length > V0_RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
     context += block;
     used++;
@@ -1234,6 +1377,7 @@ export async function* runRagQueryStreaming(input: {
   let chatInputTokens = 0;
   let chatOutputTokens = 0;
   let chatCostUsd = 0;
+  const stopGeneration = tMark('generation_ms');
   try {
     const stream = await openai().chat.completions.create({
       model: bot.chatModel,
@@ -1264,12 +1408,14 @@ export async function* runRagQueryStreaming(input: {
       }
     }
   } catch (err) {
+    stopGeneration();
     yield {
       kind: 'error',
       message: `LLM stream failed: ${err instanceof Error ? err.message : 'unknown'}`,
     };
     return;
   }
+  stopGeneration();
 
   // 10. Post-processing for v0.3: parse structured output, optional cascade,
   //     follow-ups, cache write.
@@ -1297,6 +1443,7 @@ export async function* runRagQueryStreaming(input: {
       bot.cascadeModel !== bot.chatModel
     ) {
       yield { kind: 'status', phase: 'cascade' };
+      const stopCascade = tMark('cascade_ms');
       try {
         const stronger = await chatComplete({
           model: bot.cascadeModel,
@@ -1321,13 +1468,48 @@ export async function* runRagQueryStreaming(input: {
       } catch (err) {
         console.warn('[cascade] failed, keeping initial answer:', err);
       }
+      stopCascade();
     }
+  }
+
+  // v0.4 claim verification — split antwoord in claims, embed-vergelijk met
+  // de chunks die de LLM zag (parent_content waar beschikbaar). Cheap: één
+  // batched embed call, ~$0.0001. Geen LLM-call, geen prompt-cost.
+  let claimVerifyEmbedTokens = 0;
+  let claimVerifyEmbedCost = 0;
+  let claimsList: ClaimVerificationData[] | undefined;
+  let claimConfidence: number | undefined;
+  if (bot.claimVerification) {
+    yield { kind: 'status', phase: 'verify' };
+    const stopVerify = tMark('verify_ms');
+    try {
+      const { verifyClaims } = await import('./claims');
+      const chunkInputs = final.slice(0, used).map((c) => ({
+        id: c.id,
+        text: c.parent_content ?? c.content,
+      }));
+      const result = await verifyClaims({
+        answerText: finalAnswerText,
+        chunks: chunkInputs,
+        threshold: bot.claimVerificationThreshold,
+      });
+      claimVerifyEmbedTokens = result.embedTokens;
+      claimVerifyEmbedCost = result.costUsd;
+      if (result.claims.length > 0) {
+        claimsList = result.claims;
+        claimConfidence = Number.isFinite(result.confidence) ? result.confidence : undefined;
+      }
+    } catch (err) {
+      console.warn('[claim verification] failed:', err);
+    }
+    stopVerify();
   }
 
   // Follow-ups generatie (na het uiteindelijke antwoord, kan in parallel met
   // cache write — maar simpel sequential voor nu).
   if (bot.generateFollowUps) {
     yield { kind: 'status', phase: 'followups' };
+    const stopFollowups = tMark('followups_ms');
     try {
       const fu = await generateFollowUps(original, finalAnswerText, bot);
       followUps = fu.followUps;
@@ -1337,11 +1519,14 @@ export async function* runRagQueryStreaming(input: {
     } catch (err) {
       console.warn('[followups] failed:', err);
     }
+    stopFollowups();
   }
 
   const totalCost =
     embedCost +
     preCacheEmbedCost +
+    selectiveHyDEEmbedCost +
+    claimVerifyEmbedCost +
     chatCostUsd +
     rewriteCost +
     expansionCost +
@@ -1360,7 +1545,8 @@ export async function* runRagQueryStreaming(input: {
     rewrite: rewriteInfo,
     sources: usedSources,
     threshold,
-    embedTokens: embedTokens + preCacheEmbedTokens,
+    embedTokens:
+      embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens + claimVerifyEmbedTokens,
     chatInputTokens:
       chatInputTokens +
       rerankInputTokens +
@@ -1382,6 +1568,36 @@ export async function* runRagQueryStreaming(input: {
       ...(followUps && followUps.length > 0 ? { followUps } : {}),
       ...(subQueries.length > 1 ? { subQueries } : {}),
       ...(hydeDoc ? { hydeDocument: hydeDoc } : {}),
+      // v0.4 retrieval-telemetry — top-1 sim vóór threshold + HyDE-augment,
+      // selective-HyDE flag, parent-doc usage. Door log.ts gelezen voor
+      // query_log.{top1_sim, hyde_triggered}.
+      ...(top1SimInitial !== null ? { top1Sim: top1SimInitial } : {}),
+      ...(hydeTriggered ? { hydeTriggered: true } : {}),
+      ...(anyParentSwap ? { parentDocUsed: true } : {}),
+      // v0.4 claim verification (data-only — UI rendering apart).
+      ...(claimsList ? { claims: claimsList } : {}),
+      ...(claimConfidence !== undefined ? { claimConfidence } : {}),
+      ...(bot.claimVerification
+        ? { claimVerificationThreshold: bot.claimVerificationThreshold }
+        : {}),
+      // v0.4 latency profiling — finalize total + propagate full breakdown.
+      phaseTimingsMs: {
+        embedding_ms: timings.embedding_ms ?? 0,
+        retrieval_ms: timings.retrieval_ms ?? 0,
+        generation_ms: timings.generation_ms ?? 0,
+        total_ms: Math.round(performance.now() - tPipelineStart),
+        ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
+        ...(timings.cache_lookup_ms !== undefined
+          ? { cache_lookup_ms: timings.cache_lookup_ms }
+          : {}),
+        ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
+        ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
+        ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
+        ...(timings.rerank_ms !== undefined ? { rerank_ms: timings.rerank_ms } : {}),
+        ...(timings.cascade_ms !== undefined ? { cascade_ms: timings.cascade_ms } : {}),
+        ...(timings.verify_ms !== undefined ? { verify_ms: timings.verify_ms } : {}),
+        ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
+      },
     },
   };
 
@@ -1391,7 +1607,7 @@ export async function* runRagQueryStreaming(input: {
     // We hebben de vector niet apart bewaard, dus skip cache write als
     // pre-cache embed niet draaide. Embed is goedkoop dus even opnieuw doen.
     embedTexts([original])
-      .then((r) => writeCachedAnswer(original, r.vectors[0], bot.version, finalResponse))
+      .then((r) => writeCachedAnswer(original, r.vectors[0], bot.version, finalResponse, orgId))
       .catch(() => undefined);
   }
 

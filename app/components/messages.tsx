@@ -18,6 +18,7 @@ const PHASE_LABELS: Record<PipelinePhase, string> = {
   reflect: 'Antwoord controleren',
   cascade: 'Sterker model raadplegen',
   followups: 'Vervolgvragen bedenken',
+  verify: 'Antwoord verifiëren',
 };
 
 /**
