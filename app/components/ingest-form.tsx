@@ -23,7 +23,7 @@ export function IngestForm() {
         Document toevoegen
       </h2>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        .txt of .md, max 100 KB. Wordt direct gechunked + geëmbed.
+        .txt of .md, max 200 KB. Wordt direct gechunked + geëmbed.
       </p>
       <form ref={formRef} action={action} className="mt-3 flex flex-col gap-3">
         <input

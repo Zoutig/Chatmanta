@@ -6,7 +6,7 @@
 // vanuit ingelogde sessies bereikbaar via de UI; defense-in-depth zou een
 // expliciete cookie check toevoegen — V0 accepteert proxy alleen.
 //
-// Limits: 100KB per upload (server-side enforced), .txt/.md extension only.
+// Limits: 200KB per upload (server-side enforced), .txt/.md extension only.
 // Geen rate limiting in V0 (Upstash komt in V1 Phase 6); password-gate is
 // de primaire kostenbarriere.
 
@@ -19,7 +19,7 @@ import {
   type IngestResult,
 } from '@/lib/v0/server/rag';
 
-const MAX_FILE_BYTES = 100 * 1024;
+const MAX_FILE_BYTES = 200 * 1024;
 const ALLOWED_EXTS = new Set(['txt', 'md']);
 
 export type IngestActionState =
