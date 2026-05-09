@@ -242,6 +242,118 @@ async function preProcessInput(
 }
 
 // ---------------------------------------------------------------------------
+// Multi-query expansion — generate N variant search queries via one LLM call.
+// Returns the variants (always includes the original as one of them) plus the
+// LLM call's tokens/cost. Defensive parser tolerates numbered, bulleted, or
+// plain-line outputs.
+// ---------------------------------------------------------------------------
+const MULTI_QUERY_SYSTEM = `Je bent een zoekvragen-expander. Je krijgt één zoekvraag in en geeft N alternatieve formuleringen terug die hetzelfde willen vinden, maar in verschillende bewoordingen, opdat een vector-search meer kans heeft om relevante fragmenten op te halen.
+
+Regels:
+- Gebruik synoniemen, andere zinsconstructies, of een andere kijk-hoek.
+- Behoud de oorspronkelijke INTENTIE — vraag niets nieuws.
+- Geef ALLEEN de varianten — één per regel, geen nummering, geen aanhalingstekens, geen uitleg.`;
+
+async function generateMultiQueries(
+  baseQuery: string,
+  count: number,
+  bot: BotConfig,
+): Promise<{ queries: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
+  if (count <= 1) {
+    return { queries: [baseQuery], inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  }
+  const result = await chatComplete({
+    model: bot.chatModel,
+    system: MULTI_QUERY_SYSTEM,
+    user: `Geef ${count - 1} alternatieve formuleringen van deze zoekvraag (één per regel):\n\n${baseQuery}`,
+    temperature: 0.5,
+    maxTokens: 300,
+  });
+  // Parse one query per line, strip bullets/numbering/quotes.
+  const lines = result.text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
+    .map((l) => l.replace(/^["'„](.+)["'"]$/, '$1').trim())
+    .filter((l) => l.length > 0 && l.length < 500);
+  // Always start with the base query so even malformed output is useful.
+  const seen = new Set<string>([baseQuery.toLowerCase()]);
+  const queries: string[] = [baseQuery];
+  for (const l of lines) {
+    const key = l.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    queries.push(l);
+    if (queries.length >= count) break;
+  }
+  return {
+    queries,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// LLM-based rerank — given the question + N candidate chunks, return their
+// indices in best-to-worst order. Used to improve precision when multi-query
+// has flooded the candidate pool with weak hits.
+// ---------------------------------------------------------------------------
+const RERANK_SYSTEM = `Je rangschikt fragmenten op relevantie. Je krijgt een vraag en genummerde fragmenten. Geef de nummers terug in volgorde van MEEST naar MINST relevant, gescheiden door komma's. Geen uitleg, geen nummering, alleen de getallen. Voorbeeld output: 3, 1, 5, 2, 4`;
+
+async function rerankChunks(
+  question: string,
+  chunks: RetrievedChunk[],
+  topN: number,
+  bot: BotConfig,
+): Promise<{ ranked: RetrievedChunk[]; inputTokens: number; outputTokens: number; costUsd: number }> {
+  if (chunks.length <= 1 || topN >= chunks.length) {
+    return { ranked: chunks.slice(0, topN), inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  }
+  const numbered = chunks
+    .map((c, i) => `[${i + 1}] ${c.content.slice(0, 300).replace(/\s+/g, ' ').trim()}`)
+    .join('\n\n');
+
+  const result = await chatComplete({
+    model: bot.chatModel,
+    system: RERANK_SYSTEM,
+    user: `Vraag: ${question}\n\nFragmenten:\n${numbered}\n\nGeef de top ${topN} fragmenten op relevantie:`,
+    temperature: 0.0,
+    maxTokens: 100,
+  });
+
+  // Parse "3, 1, 5, 2" → [2, 0, 4, 1] (0-based indices into chunks)
+  const indices = result.text
+    .split(/[,\s]+/)
+    .map((s) => Number.parseInt(s, 10) - 1)
+    .filter((n) => Number.isInteger(n) && n >= 0 && n < chunks.length);
+
+  // Dedup while preserving order; if parser failed (no valid indices), fall
+  // back to the original similarity order.
+  const seen = new Set<number>();
+  const ordered: RetrievedChunk[] = [];
+  for (const idx of indices) {
+    if (seen.has(idx)) continue;
+    seen.add(idx);
+    ordered.push(chunks[idx]);
+    if (ordered.length >= topN) break;
+  }
+  // If reranker ignored some chunks, append them at the back so we still
+  // return up to topN.
+  if (ordered.length < topN) {
+    for (let i = 0; i < chunks.length && ordered.length < topN; i++) {
+      if (!seen.has(i)) ordered.push(chunks[i]);
+    }
+  }
+
+  return {
+    ranked: ordered,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // match_chunks RPC + JOIN with documents for filenames
 // ---------------------------------------------------------------------------
 type RawChunk = {
@@ -400,19 +512,31 @@ export async function runRagQuery({
     queryForEmbed = pp.query;
   }
 
-  // 2. Embed the (possibly rewritten) query.
-  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts([queryForEmbed]);
-  const queryVector = vectors[0];
+  // 2. Optional multi-query expansion. Cost: extra LLM call when count > 1.
+  const mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
+  const expansionCost = mq.costUsd;
 
-  // 3. Retrieve top-K.
-  const chunks = await retrieveChunks(queryVector, V0_RAG_DEFAULTS.TOP_K);
-  const allSources = chunks.map(toSource);
-  const topSim = chunks[0]?.similarity ?? null;
+  // 3. Embed all queries (1 OpenAI call, batched).
+  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(mq.queries);
 
-  // 4. Threshold filter.
-  const relevant = chunks.filter((c) => c.similarity >= threshold);
+  // 4. Retrieve per query, then dedup on chunk id keeping the highest
+  //    similarity seen across queries.
+  const bestById = new Map<string, RetrievedChunk>();
+  for (const v of vectors) {
+    const hits = await retrieveChunks(v, V0_RAG_DEFAULTS.TOP_K);
+    for (const h of hits) {
+      const prev = bestById.get(h.id);
+      if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
+    }
+  }
+  const merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+  const allSources = merged.map(toSource);
+  const topSim = merged[0]?.similarity ?? null;
+
+  // 5. Threshold filter.
+  const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
-  if (relevant.length === 0) {
+  if (aboveThreshold.length === 0) {
     return {
       botVersion: bot.version,
       kind: 'fallback',
@@ -423,14 +547,27 @@ export async function runRagQuery({
       sources: allSources,
       threshold,
       embedTokens,
-      totalCostUsd: embedCost + rewriteCost,
+      totalCostUsd: embedCost + rewriteCost + expansionCost,
     };
   }
 
-  // 5. Format context (cap at MAX_CONTEXT_CHARS).
+  // 6. Optional LLM rerank — pick the best TOP_K from the above-threshold pool.
+  let rerankCost = 0;
+  let rerankInputTokens = 0;
+  let rerankOutputTokens = 0;
+  let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
+  if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
+    const r = await rerankChunks(original, aboveThreshold, V0_RAG_DEFAULTS.TOP_K, bot);
+    final = r.ranked;
+    rerankCost = r.costUsd;
+    rerankInputTokens = r.inputTokens;
+    rerankOutputTokens = r.outputTokens;
+  }
+
+  // 7. Format context (cap at MAX_CONTEXT_CHARS).
   let context = '';
   let used = 0;
-  for (const c of relevant) {
+  for (const c of final) {
     const block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${c.content}\n\n`;
     if (context.length + block.length > V0_RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
     context += block;
@@ -441,7 +578,7 @@ export async function runRagQuery({
   // is purely an embedding-time tactic.
   const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
-  // 6. LLM call.
+  // 8. LLM call.
   const chat = await chatComplete({
     model: bot.chatModel,
     system: bot.systemPrompt,
@@ -454,12 +591,12 @@ export async function runRagQuery({
     kind: 'answer',
     answer: chat.text.trim(),
     rewrite: rewriteInfo,
-    sources: relevant.slice(0, used).map(toSource),
+    sources: final.slice(0, used).map(toSource),
     threshold,
     embedTokens,
-    chatInputTokens: chat.inputTokens,
-    chatOutputTokens: chat.outputTokens,
-    totalCostUsd: embedCost + chat.costUsd + rewriteCost,
+    chatInputTokens: chat.inputTokens + rerankInputTokens,
+    chatOutputTokens: chat.outputTokens + rerankOutputTokens,
+    totalCostUsd: embedCost + chat.costUsd + rewriteCost + expansionCost + rerankCost,
   };
 }
 

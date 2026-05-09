@@ -34,6 +34,10 @@ export type BotConfig = {
   enableRewriteByDefault: boolean;
   /** OpenAI chat model id. Embedding model is global (text-embedding-3-small). */
   chatModel: string;
+  /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
+  multiQueryCount: number;
+  /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */
+  rerank: 'none' | 'llm';
 };
 
 // ---------------------------------------------------------------------------
@@ -48,6 +52,8 @@ const V0_1: BotConfig = {
   chatTemperature: 0.4,
   enableRewriteByDefault: true,
   chatModel: 'gpt-4o-mini',
+  multiQueryCount: 1,
+  rerank: 'none',
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
@@ -93,17 +99,31 @@ QUERY: <herschreven zoekvraag>`,
 };
 
 // ---------------------------------------------------------------------------
+// v0.2 — multi-query + LLM rerank (zelfde persona/prompts als v0.1)
+// ---------------------------------------------------------------------------
+const V0_2: BotConfig = {
+  ...V0_1,
+  version: 'v0.2',
+  label: 'v0.2 — multi-query + rerank',
+  description:
+    'Zelfde persona als v0.1, maar genereert 3 zoekvragen-varianten en herrangschikt de chunks met een extra LLM-pass. Hogere kosten, betere recall en precision op vage vragen.',
+  multiQueryCount: 3,
+  rerank: 'llm',
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
   [V0_1.version]: V0_1,
+  [V0_2.version]: V0_2,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_1.version;
+export const LATEST_BOT_VERSION = V0_2.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
-export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version];
+export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version, V0_2.version];
 
 /** Resolve a version string to a config; falls back to latest if unknown. */
 export function resolveBot(version: string | null | undefined): BotConfig {
