@@ -23,6 +23,7 @@ import { EmptyState } from './empty-state';
 import { AssistantMessage, UserMessage, ErrorMessage } from './messages';
 import { RightPanel, type RightTab } from './right-panel';
 import type { BotMeta } from './bot-dropdown';
+import { useStyle } from './use-style';
 
 type Turn = {
   user: string;
@@ -43,6 +44,7 @@ export function ChatShell({
   botVersion,
   bots,
   botFlags,
+  botSystemPrompt,
   defaultThreshold,
   defaultEnableRewrite,
   docs,
@@ -53,6 +55,7 @@ export function ChatShell({
   botVersion: string;
   bots: BotMeta[];
   botFlags: BotFlags;
+  botSystemPrompt: string;
   defaultThreshold: number;
   defaultEnableRewrite: boolean;
   docs: DocSummary[];
@@ -62,6 +65,7 @@ export function ChatShell({
 }) {
   const [threshold, setThreshold] = useState(defaultThreshold);
   const [rewriteOn, setRewriteOn] = useState(defaultEnableRewrite);
+  const { tone, length, setTone, setLength } = useStyle();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [activeCite, setActiveCite] = useState<number | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>('sources');
@@ -169,6 +173,8 @@ export function ChatShell({
               enableRewrite: rewriteOn,
               version: botVersion,
               history,
+              tone,
+              length,
             }),
           });
           if (!res.ok || !res.body) {
@@ -201,6 +207,8 @@ export function ChatShell({
                   streamingText: '',
                   response: {
                     botVersion: event.botVersion,
+                    tone,
+                    length,
                     kind: 'answer',
                     answer: '',
                     rewrite: event.rewrite,
@@ -246,7 +254,7 @@ export function ChatShell({
         }
       });
     },
-    [botVersion, persistTurn, rewriteOn, threshold, updateLastTurn],
+    [botVersion, persistTurn, rewriteOn, threshold, tone, length, updateLastTurn],
   );
 
   const onCiteClick = useCallback((idx: number) => {
@@ -409,8 +417,10 @@ export function ChatShell({
           pending={pending}
           threshold={threshold}
           onThresholdChange={setThreshold}
-          rewriteOn={rewriteOn}
-          onToggleRewrite={() => setRewriteOn((v) => !v)}
+          tone={tone}
+          onToneChange={setTone}
+          length={length}
+          onLengthChange={setLength}
         />
       </main>
 
@@ -421,9 +431,14 @@ export function ChatShell({
           response={latestResponse}
           threshold={threshold}
           onThreshold={setThreshold}
+          tone={tone}
+          onToneChange={setTone}
+          length={length}
+          onLengthChange={setLength}
           rewriteOn={rewriteOn}
           onToggleRewrite={() => setRewriteOn((v) => !v)}
           botVersion={botVersion}
+          botSystemPrompt={botSystemPrompt}
           bots={bots}
           botFlags={botFlags}
           activeCite={activeCite}

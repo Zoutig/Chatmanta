@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './svg-icons';
+import { StylePill } from './style-pill';
+import type { Length, Tone } from '@/lib/v0/style-types';
 
 const MAX_CHARS = 1000;
 const PRESETS: { value: number; label: string }[] = [
@@ -16,15 +18,19 @@ export function Composer({
   pending,
   threshold,
   onThresholdChange,
-  rewriteOn,
-  onToggleRewrite,
+  tone,
+  onToneChange,
+  length,
+  onLengthChange,
 }: {
   onSend: (q: string) => void;
   pending: boolean;
   threshold: number;
   onThresholdChange: (v: number) => void;
-  rewriteOn: boolean;
-  onToggleRewrite: () => void;
+  tone: Tone;
+  onToneChange: (t: Tone) => void;
+  length: Length;
+  onLengthChange: (l: Length) => void;
 }) {
   const [value, setValue] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -63,15 +69,9 @@ export function Composer({
           disabled={pending}
         />
         <div className="composer-actions">
-          <button
-            type="button"
-            className={`composer-tool${rewriteOn ? ' on' : ''}`}
-            onClick={onToggleRewrite}
-            title="Smalltalk-detect, typo-correctie, synoniem-expansie (+1 LLM-call ≈ $0.0001)"
-          >
-            <Icon name="sparkle" size={12} /> Rewrite
-          </button>
           <ThresholdPill threshold={threshold} onChange={onThresholdChange} />
+          <StylePill kind="tone" value={tone} onChange={onToneChange} />
+          <StylePill kind="length" value={length} onChange={onLengthChange} />
           <span className="spacer" />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-faint)' }}>
             {value.length}/{MAX_CHARS}

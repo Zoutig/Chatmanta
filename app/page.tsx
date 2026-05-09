@@ -44,6 +44,7 @@ export default async function Home({
         cascadeOnLowConfidence: bot.cascadeOnLowConfidence,
         cascadeModel: bot.cascadeModel,
       }}
+      botSystemPrompt={bot.systemPrompt}
       defaultThreshold={bot.similarityThreshold}
       defaultEnableRewrite={bot.enableRewriteByDefault}
       docs={docs}

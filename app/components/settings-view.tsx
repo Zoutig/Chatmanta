@@ -3,10 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { Icon } from './svg-icons';
 import type { BotMeta } from './bot-dropdown';
+import { StyleSegmented } from './style-segmented';
+import type { Length, Tone } from '@/lib/v0/style-types';
 
 export function SettingsView({
   threshold,
   onThreshold,
+  tone,
+  onToneChange,
+  length,
+  onLengthChange,
   rewriteOn,
   onToggleRewrite,
   botVersion,
@@ -15,6 +21,10 @@ export function SettingsView({
 }: {
   threshold: number;
   onThreshold: (v: number) => void;
+  tone: Tone;
+  onToneChange: (t: Tone) => void;
+  length: Length;
+  onLengthChange: (l: Length) => void;
   rewriteOn: boolean;
   onToggleRewrite: () => void;
   botVersion: string;
@@ -73,6 +83,9 @@ export function SettingsView({
         </div>
         <div className="slider-hint">lager = lossere match · hoger = strikter</div>
       </div>
+
+      <StyleSegmented kind="tone" value={tone} onChange={onToneChange} />
+      <StyleSegmented kind="length" value={length} onChange={onLengthChange} />
 
       <div className="settings-section">
         <div className="settings-label">Pipeline-opties</div>

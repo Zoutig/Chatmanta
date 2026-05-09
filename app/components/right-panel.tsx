@@ -6,9 +6,12 @@ import { SourcesView } from './sources-view';
 import { DocsView } from './docs-view';
 import { SettingsView } from './settings-view';
 import { EmbedView } from './embed-view';
+import { EvalsView } from './evals-view';
+import { PromptView } from './prompt-view';
 import type { BotMeta } from './bot-dropdown';
+import type { Length, Tone } from '@/lib/v0/style-types';
 
-export type RightTab = 'sources' | 'docs' | 'settings' | 'embed';
+export type RightTab = 'sources' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals';
 
 export function RightPanel({
   tab,
@@ -16,9 +19,14 @@ export function RightPanel({
   response,
   threshold,
   onThreshold,
+  tone,
+  onToneChange,
+  length,
+  onLengthChange,
   rewriteOn,
   onToggleRewrite,
   botVersion,
+  botSystemPrompt,
   bots,
   botFlags,
   activeCite,
@@ -30,9 +38,14 @@ export function RightPanel({
   response: ChatResponse | null;
   threshold: number;
   onThreshold: (v: number) => void;
+  tone: Tone;
+  onToneChange: (t: Tone) => void;
+  length: Length;
+  onLengthChange: (l: Length) => void;
   rewriteOn: boolean;
   onToggleRewrite: () => void;
   botVersion: string;
+  botSystemPrompt: string;
   bots: BotMeta[];
   botFlags: {
     cacheEnabled: boolean;
@@ -61,8 +74,14 @@ export function RightPanel({
         <Tab tab="settings" active={tab === 'settings'} onClick={onTabChange}>
           Instellingen
         </Tab>
+        <Tab tab="prompt" active={tab === 'prompt'} onClick={onTabChange}>
+          Prompt
+        </Tab>
         <Tab tab="embed" active={tab === 'embed'} onClick={onTabChange}>
           Widget
+        </Tab>
+        <Tab tab="evals" active={tab === 'evals'} onClick={onTabChange}>
+          Evals
         </Tab>
       </div>
       <div className="right-content">
@@ -79,6 +98,10 @@ export function RightPanel({
           <SettingsView
             threshold={threshold}
             onThreshold={onThreshold}
+            tone={tone}
+            onToneChange={onToneChange}
+            length={length}
+            onLengthChange={onLengthChange}
             rewriteOn={rewriteOn}
             onToggleRewrite={onToggleRewrite}
             botVersion={botVersion}
@@ -86,7 +109,16 @@ export function RightPanel({
             botFlags={botFlags}
           />
         ) : null}
+        {tab === 'prompt' ? (
+          <PromptView
+            botVersion={botVersion}
+            botSystemPrompt={botSystemPrompt}
+            tone={tone}
+            length={length}
+          />
+        ) : null}
         {tab === 'embed' ? <EmbedView botVersion={botVersion} /> : null}
+        {tab === 'evals' ? <EvalsView /> : null}
       </div>
     </aside>
   );
