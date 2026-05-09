@@ -40,6 +40,64 @@ type QueryLogRow = {
   cost_usd: number;
 };
 
+/**
+ * All-time usage totalen voor de DEV_ORG, gelezen uit query_log.
+ *
+ * Gebruikt door de sidebar footer ("hoeveel tokens / cost ben ik kwijt sinds
+ * we deze setup hebben"). Voor V0 is het corpus klein genoeg dat we alle rijen
+ * binnen halen en client-side optellen — een paar honderd queries kost ms.
+ * Bij V1 verhuist dit naar een aggregate-RPC of materialized view.
+ */
+export type AllTimeUsage = {
+  queryCount: number;
+  totalCostUsd: number;
+  embedTokens: number;
+  chatInputTokens: number;
+  chatOutputTokens: number;
+  preTokens: number; // pre_in + pre_out (rewrite/preprocess)
+  totalTokens: number;
+};
+
+export async function getAllTimeUsage(): Promise<AllTimeUsage> {
+  const empty: AllTimeUsage = {
+    queryCount: 0,
+    totalCostUsd: 0,
+    embedTokens: 0,
+    chatInputTokens: 0,
+    chatOutputTokens: 0,
+    preTokens: 0,
+    totalTokens: 0,
+  };
+  try {
+    const { data, error } = await sb()
+      .from('query_log')
+      .select(
+        'embed_tokens, chat_in_tokens, chat_out_tokens, pre_in_tokens, pre_out_tokens, cost_usd',
+      )
+      .eq('organization_id', DEV_ORG_ID);
+    if (error || !data) return empty;
+    return data.reduce<AllTimeUsage>((acc, r) => {
+      const embed = Number(r.embed_tokens) || 0;
+      const chatIn = Number(r.chat_in_tokens) || 0;
+      const chatOut = Number(r.chat_out_tokens) || 0;
+      const preIn = Number(r.pre_in_tokens) || 0;
+      const preOut = Number(r.pre_out_tokens) || 0;
+      const cost = Number(r.cost_usd) || 0;
+      acc.queryCount += 1;
+      acc.embedTokens += embed;
+      acc.chatInputTokens += chatIn;
+      acc.chatOutputTokens += chatOut;
+      acc.preTokens += preIn + preOut;
+      acc.totalTokens += embed + chatIn + chatOut + preIn + preOut;
+      acc.totalCostUsd += cost;
+      return acc;
+    }, empty);
+  } catch {
+    // Failure-mode net als logQuery: geen blocker, gewoon nullen tonen.
+    return empty;
+  }
+}
+
 export async function logQuery(
   question: string,
   response: ChatResponse,
