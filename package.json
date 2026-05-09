@@ -13,7 +13,10 @@
     "v0:chat": "node --env-file=.env.local scripts/v0-chat.mjs",
     "v0:list": "node --env-file=.env.local scripts/v0-list-docs.mjs",
     "v0:reset": "node --env-file=.env.local scripts/v0-reset.mjs",
-    "v0:tune": "node --env-file=.env.local scripts/v0-tune-threshold.mjs"
+    "v0:tune": "node --env-file=.env.local scripts/v0-tune-threshold.mjs",
+    "migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "migrate:status": "node --env-file=.env.local scripts/migrate.mjs status",
+    "migrate:bootstrap": "node --env-file=.env.local scripts/migrate.mjs bootstrap"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
@@ -22,6 +25,7 @@
     "nanoid": "^5.1.11",
     "next": "16.2.6",
     "openai": "^6.37.0",
+    "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1"
