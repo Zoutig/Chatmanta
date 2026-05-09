@@ -82,14 +82,17 @@ State leeft in `<html data-theme>` + localStorage. Hook luistert naar `prefers-c
 - Toetsenbord-toegankelijk (radio-groep semantiek)
 
 ### `app/components/chat-box.tsx`
-Visuele wijzigingen, geen logica:
+Visuele wijzigingen, geen logica. De file bevat sinds 2026-05-09 ook `PhaseIndicator` en `HistoryPanel` (multi-turn dialog + perceived speed); die worden in dezelfde stijl meegenomen.
+
 - Vraag-textarea: uppercase tracking-label boven het veld i.p.v. inline `Vraag` font-medium
 - Threshold-slider: label en waarde meer prominent, waarde in mono
 - Submit-button: hoogte-consistent met andere inputs
 - AnswerPanel: border-left accent (zwart light, emerald dark) i.p.v. dunne all-around border alleen
 - Stats-regel: mono, kleinere font, secondaire kleur
 - SourcesPanel: per chunk een border-left ipv all-around (kleur-gecodeerd op similarity ≥ threshold)
-- SessionStats: card met meer ademruimte, kostbedrag in mono prominent
+- SessionStats: card met meer ademruimte, kostbedrag en turn-count in mono prominent, "Reset gesprek"-knop subtiel rechts
+- **PhaseIndicator** *(bestaande)*: behoudt pulse-dot animatie; in dark mode krijgt de dot accent-emerald wanneer phase = `answer`/`retrieve` (signaleert "actief werk"), zinc-grijs voor andere phases
+- **HistoryPanel** *(bestaande)*: `<details>`-element houdt de collapsible affordance; per turn-rij krijgt een border-left accent (zinc light / zinc-700 dark) met de rol-label (`jij`/`bot`) in mono uppercase tracking
 
 ### `app/components/ingest-form.tsx`
 - Section-header met uppercase tracking-label
@@ -138,6 +141,8 @@ Visuele wijzigingen, geen logica:
 | Fallback | `amber-500` | `amber-50` | `amber-500` | `amber-950/40` |
 | Error | `red-500` | `red-50` | `red-500` | `red-950/40` |
 | Smalltalk | `sky-500` | `sky-50` | `sky-500` | `sky-950/40` |
+| Pipeline-fase actief | `zinc-400` | `white` | `zinc-600` | `zinc-900` |
+| History-turn | `zinc-300` | `white` | `zinc-700` | `zinc-950` |
 
 ### Border-left accent pattern
 `border-l-2` met de status-kleur, plus dunne all-around `border` in zinc-200/zinc-800 voor structuur. Vervangt het huidige `border` + `bg-tone` patroon dat nu over de hele rand kleurt.
@@ -205,4 +210,4 @@ Klaar als:
 - [ ] Status-borders (border-left pattern) consistent toegepast op antwoord-blok, sources, ingest-status
 - [ ] Playwright smoke-test slaagt
 - [ ] Geen TypeScript-fouten
-- [ ] V0 functionaliteit (vraag stellen, streaming, ingest, delete, version-switch) onveranderd
+- [ ] V0 functionaliteit (vraag stellen, streaming, ingest, delete, version-switch, multi-turn history, reset gesprek, phase indicator) onveranderd
