@@ -8,13 +8,18 @@
     "start": "next start",
     "lint": "eslint",
     "check-env": "node --env-file=.env.local scripts/check-env.mjs",
-    "verify-schema": "node --env-file=.env.local scripts/verify-schema.mjs"
+    "verify-schema": "node --env-file=.env.local scripts/verify-schema.mjs",
+    "v0:ingest": "node --env-file=.env.local scripts/v0-ingest.mjs",
+    "v0:chat": "node --env-file=.env.local scripts/v0-chat.mjs",
+    "v0:list": "node --env-file=.env.local scripts/v0-list-docs.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "nanoid": "^5.1.11",
     "next": "16.2.6",
+    "openai": "^6.37.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
