@@ -1,14 +1,22 @@
-// Placeholder home page — full chat UI lands in V0-C-2.
+// V0 demo home — chat UI + sources panel + threshold slider.
+
+import { ChatBox } from './components/chat-box';
+import { V0_RAG_DEFAULTS } from '@/lib/v0/server/rag';
+
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
   return (
-    <main className="flex min-h-svh items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold">ChatManta V0</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Auth gate werkt — chat UI volgt in volgende slice.
-        </p>
-      </div>
+    <main className="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-6 p-6">
+      <header className="flex items-baseline justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">ChatManta V0</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            RAG demo · OpenAI text-embedding-3-small + gpt-4o-mini
+          </p>
+        </div>
+      </header>
+      <ChatBox defaultThreshold={V0_RAG_DEFAULTS.SIMILARITY_THRESHOLD} />
     </main>
   );
 }
