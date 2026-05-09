@@ -1,7 +1,21 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { ChatHistoryTurn, ChatResponse, StreamEvent } from '@/lib/v0/server/rag';
+import type {
+  ChatHistoryTurn,
+  ChatResponse,
+  PipelinePhase,
+  StreamEvent,
+} from '@/lib/v0/server/rag';
+
+const PHASE_LABELS: Record<PipelinePhase, string> = {
+  preprocess: 'Vraag begrijpen…',
+  expand: 'Zoekvragen genereren…',
+  embed: 'Vraag omzetten naar vector…',
+  retrieve: 'Documenten zoeken…',
+  rerank: 'Beste fragmenten kiezen…',
+  answer: 'Antwoord schrijven…',
+};
 
 const EXAMPLE_QUESTIONS = [
   'wat doet ChatManta?',
@@ -27,6 +41,8 @@ export function ChatBox({
   const [response, setResponse] = useState<ChatResponse | null>(null);
   // Streaming-only: de tekst die binnenstroomt voor de huidige answer-call.
   const [streamingText, setStreamingText] = useState<string | null>(null);
+  // Huidige pipeline-fase tijdens een lopende vraag — null wanneer niets loopt.
+  const [phase, setPhase] = useState<PipelinePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   // Sessie tellers — leven binnen de huidige browser-sessie + ChatBox mount.
@@ -50,6 +66,7 @@ export function ChatBox({
     setError(null);
     setResponse(null);
     setStreamingText(null);
+    setPhase(null);
     startTransition(async () => {
       try {
         const res = await fetch('/api/v0/chat', {
@@ -82,9 +99,12 @@ export function ChatBox({
             buffer = buffer.slice(nl + 1);
             if (!line) continue;
             const event = JSON.parse(line) as StreamEvent;
-            if (event.kind === 'smalltalk' || event.kind === 'fallback') {
+            if (event.kind === 'status') {
+              setPhase(event.phase);
+            } else if (event.kind === 'smalltalk' || event.kind === 'fallback') {
               final = event.response;
               setResponse(event.response);
+              setPhase(null);
             } else if (event.kind === 'answer-start') {
               // Show metadata-only response while waiting for tokens.
               setStreamingText('');
@@ -106,6 +126,7 @@ export function ChatBox({
               final = event.response;
               setResponse(event.response);
               setStreamingText(null);
+              setPhase(null);
             } else if (event.kind === 'error') {
               throw new Error(event.message);
             }
@@ -125,6 +146,7 @@ export function ChatBox({
         setError(err instanceof Error ? err.message : 'Onbekende fout');
         setResponse(null);
         setStreamingText(null);
+        setPhase(null);
       }
     });
   }
@@ -197,6 +219,10 @@ export function ChatBox({
           </div>
         ) : null}
 
+        {pending && !response && phase ? (
+          <PhaseIndicator phase={phase} />
+        ) : null}
+
         {response ? (
           <AnswerPanel response={response} streamingText={streamingText} pending={pending} />
         ) : null}
@@ -244,6 +270,15 @@ function SessionStats({
           Reset gesprek
         </button>
       ) : null}
+    </div>
+  );
+}
+
+function PhaseIndicator({ phase }: { phase: PipelinePhase }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-zinc-500 dark:bg-zinc-400" />
+      <span>{PHASE_LABELS[phase]}</span>
     </div>
   );
 }

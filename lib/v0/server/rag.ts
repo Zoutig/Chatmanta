@@ -42,6 +42,8 @@ export const V0_RAG_DEFAULTS = {
   CHAT_MAX_TOKENS: 500,
   REWRITE_TEMPERATURE: 0.3,
   REWRITE_MAX_TOKENS: 200,
+  /** Max chunks die naar de rerank-LLM gaan — beperkt latency van rerank-call. */
+  MAX_RERANK_INPUT: 10,
 } as const;
 
 export const FALLBACK_MESSAGE =
@@ -624,7 +626,17 @@ export async function runRagQuery({
 // route handler can stream them as NDJSON. The final event always carries
 // the complete ChatResponse so the route can log it after streaming is done.
 // ---------------------------------------------------------------------------
+/** Pipeline-fase events voor UI-feedback tijdens de pre-streaming fase. */
+export type PipelinePhase =
+  | 'preprocess'
+  | 'expand'
+  | 'embed'
+  | 'retrieve'
+  | 'rerank'
+  | 'answer';
+
 export type StreamEvent =
+  | { kind: 'status'; phase: PipelinePhase }
   | { kind: 'smalltalk'; response: ChatResponse }
   | { kind: 'fallback'; response: ChatResponse }
   | {
@@ -665,6 +677,7 @@ export async function* runRagQueryStreaming(input: {
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
   if (enableRewrite) {
+    yield { kind: 'status', phase: 'preprocess' };
     const pp = await preProcessInput(original, bot, history);
     if (pp.kind === 'smalltalk') {
       yield {
@@ -691,16 +704,27 @@ export async function* runRagQueryStreaming(input: {
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
   // 2. Multi-query expansion.
-  const mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
+  let mq;
+  if (bot.multiQueryCount > 1) {
+    yield { kind: 'status', phase: 'expand' };
+    mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
+  } else {
+    mq = { queries: [queryForEmbed], inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  }
   const expansionCost = mq.costUsd;
 
   // 3. Embed all queries (batched).
+  yield { kind: 'status', phase: 'embed' };
   const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(mq.queries);
 
-  // 4. Retrieve per query, dedup keeping max similarity.
+  // 4. Retrieve per query (parallel — was sequential, ~3x sneller bij multi-query),
+  //    dedup keeping max similarity.
+  yield { kind: 'status', phase: 'retrieve' };
+  const allHits = await Promise.all(
+    vectors.map((v) => retrieveChunks(v, V0_RAG_DEFAULTS.TOP_K)),
+  );
   const bestById = new Map<string, RetrievedChunk>();
-  for (const v of vectors) {
-    const hits = await retrieveChunks(v, V0_RAG_DEFAULTS.TOP_K);
+  for (const hits of allHits) {
     for (const h of hits) {
       const prev = bestById.get(h.id);
       if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
@@ -731,13 +755,16 @@ export async function* runRagQueryStreaming(input: {
     return;
   }
 
-  // 6. Optional rerank.
+  // 6. Optional rerank — cap input op MAX_RERANK_INPUT om de LLM-call kort
+  //    te houden. Top-N op similarity is een goede pre-filter.
   let rerankCost = 0;
   let rerankInputTokens = 0;
   let rerankOutputTokens = 0;
   let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
   if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
-    const r = await rerankChunks(original, aboveThreshold, V0_RAG_DEFAULTS.TOP_K, bot);
+    yield { kind: 'status', phase: 'rerank' };
+    const candidates = aboveThreshold.slice(0, V0_RAG_DEFAULTS.MAX_RERANK_INPUT);
+    const r = await rerankChunks(original, candidates, V0_RAG_DEFAULTS.TOP_K, bot);
     final = r.ranked;
     rerankCost = r.costUsd;
     rerankInputTokens = r.inputTokens;
@@ -757,6 +784,7 @@ export async function* runRagQueryStreaming(input: {
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
+  yield { kind: 'status', phase: 'answer' };
   const usedSources = final.slice(0, used).map(toSource);
   yield {
     kind: 'answer-start',
