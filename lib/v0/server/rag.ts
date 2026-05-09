@@ -52,23 +52,36 @@ export const V0_RAG_DEFAULTS = {
 export const FALLBACK_MESSAGE =
   'Daar heb ik geen informatie over. Stel je vraag anders, of neem contact op met de organisatie.';
 
-const SYSTEM_PROMPT = `Je bent een Nederlandse kennisassistent voor MKB-bedrijven.
+const SYSTEM_PROMPT = `Je bent een vriendelijke, behulpzame Nederlandse assistent. Je klinkt natuurlijk — als een collega die helpt — niet stijf of formeel.
 
 Beantwoord de vraag van de gebruiker op basis van de gegeven context-fragmenten:
-- Synthetiseer de relevante informatie tot een natuurlijke, behulpzame uitleg.
+- Synthetiseer de relevante informatie tot een natuurlijke, prettige uitleg.
 - Herformuleer in eigen woorden waar dat de leesbaarheid helpt; herhaal niet woordelijk.
 - Geef NOOIT feiten die niet in de context staan. Als de informatie ontbreekt of onduidelijk is: zeg dat eerlijk in plaats van iets aan te nemen.
 - Antwoord in dezelfde taal als de (originele) vraag — default Nederlands.
-- Houd het beknopt maar volledig — typisch 2-5 zinnen.`;
+- Houd het beknopt maar volledig — typisch 2-5 zinnen, vriendelijk van toon.`;
 
-const REWRITE_SYSTEM = `Je bent een query-herschrijver voor een semantische zoekmachine. Je herformuleert de vraag van de gebruiker tot een vorm die beter aansluit bij hoe de bron-documenten geschreven zijn.
+// Pre-processor prompt — beslist tussen smalltalk en search en doet meteen
+// query rewrite voor de search-tak. Eén LLM-call, twee uitkomsten.
+const PRE_PROCESS_SYSTEM = `Je bent een pre-processor voor een vriendelijke Nederlandse assistent met een kennisbasis.
 
-Regels:
-- Corrigeer evidente typfouten en grammaticafouten.
-- Maak impliciete onderwerpen expliciet als die uit de vraag zelf duidelijk zijn (bv. "wat doet het?" → "wat doet ChatManta?" wanneer dat duidelijk de intentie is).
-- Voeg synoniemen of verwante termen toe die de vraag verduidelijken.
-- Behoud de oorspronkelijke intentie EXACT — voeg geen interpretaties of antwoorden toe.
-- Geef ALLEEN de herschreven vraag terug — geen uitleg, geen aanhalingstekens, geen prefix.`;
+Bekijk de input van de gebruiker en kies EXACT één van twee acties:
+
+A) SMALLTALK — gebruik dit als de input een begroeting, bedankje, afscheid, kort instemmingswoord, of andere conversatie zonder informatie-verzoek is. Voorbeelden: "hey", "hoi", "bedankt", "doei", "ok", "leuk", "hoe gaat het?".
+   → Geef dan zelf een korte, warme reactie van 1 zin.
+
+B) SEARCH — gebruik dit voor elke echte vraag of verzoek om informatie, hoe kort ook. Voorbeelden: "wat doet jullie bedrijf?", "hoeveel kost dat?", "openingstijden?".
+   → Herschrijf de vraag tot een zoekvraag: corrigeer typfouten, maak impliciete onderwerpen expliciet, voeg synoniemen toe waar nuttig. Behoud de intentie. Geef GEEN antwoord — alleen de herschreven zoekvraag.
+
+Antwoord ALTIJD in EXACT dit formaat (geen extra tekst):
+
+ACTION: smalltalk
+REPLY: <je vriendelijke reactie>
+
+OF
+
+ACTION: search
+QUERY: <de herschreven zoekvraag>`;
 
 // ---------------------------------------------------------------------------
 // Lazy clients
@@ -186,41 +199,74 @@ async function chatComplete({
 }
 
 // ---------------------------------------------------------------------------
-// Query rewriting — optional pre-embed step that fixes typos, expands
-// underspecified queries, and adds synonyms. Improves retrieval quality on
-// ambiguous or typo-heavy user input at the cost of one extra LLM call
-// (~$0.0001 per question with gpt-4o-mini).
+// Pre-processor — een gpt-4o-mini call die beslist of de input smalltalk is
+// (begroeting/dank/afscheid: meteen vriendelijk antwoorden, geen retrieval)
+// of een echte zoekvraag (rewrite voor betere similarity, dan de RAG-loop in).
+// Eén LLM-call dekt beide gevallen, ~$0.0001 met gpt-4o-mini.
 // ---------------------------------------------------------------------------
-type RewriteResult = {
-  rewritten: string;
+type PreProcessTokens = {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
 };
 
-async function rewriteQuery(original: string): Promise<RewriteResult> {
+type PreProcessResult =
+  | ({ kind: 'smalltalk'; reply: string } & PreProcessTokens)
+  | ({ kind: 'search'; query: string } & PreProcessTokens);
+
+function stripQuotes(s: string): string {
+  const t = s.trim();
+  if (t.length < 2) return t;
+  const first = t[0];
+  const last = t[t.length - 1];
+  if ((first === '"' && last === '"') || (first === '„' && last === '"') || (first === "'" && last === "'")) {
+    return t.slice(1, -1).trim();
+  }
+  return t;
+}
+
+/**
+ * Parse the model's two-line output. Returns null on malformed reply so the
+ * caller can fall back to default search behavior.
+ */
+function parsePreProcessOutput(raw: string): { kind: 'smalltalk'; reply: string } | { kind: 'search'; query: string } | null {
+  const text = raw.trim();
+  const actionMatch = text.match(/^ACTION:\s*(smalltalk|search)\b/im);
+  if (!actionMatch) return null;
+  const action = actionMatch[1].toLowerCase();
+
+  if (action === 'smalltalk') {
+    const replyMatch = text.match(/^REPLY:\s*([\s\S]+?)$/im);
+    const reply = stripQuotes(replyMatch?.[1] ?? '').slice(0, 500);
+    if (!reply) return null;
+    return { kind: 'smalltalk', reply };
+  }
+
+  const queryMatch = text.match(/^QUERY:\s*([\s\S]+?)$/im);
+  const query = stripQuotes(queryMatch?.[1] ?? '').slice(0, 1000);
+  if (!query) return null;
+  return { kind: 'search', query };
+}
+
+async function preProcessInput(original: string): Promise<PreProcessResult> {
   const result = await chatComplete({
-    system: REWRITE_SYSTEM,
+    system: PRE_PROCESS_SYSTEM,
     user: original,
     temperature: V0_RAG_DEFAULTS.REWRITE_TEMPERATURE,
     maxTokens: V0_RAG_DEFAULTS.REWRITE_MAX_TOKENS,
   });
-  // Strip surrounding quotes the model sometimes adds despite the system prompt.
-  let rewritten = result.text.trim();
-  if (
-    (rewritten.startsWith('"') && rewritten.endsWith('"')) ||
-    (rewritten.startsWith('„') && rewritten.endsWith('"'))
-  ) {
-    rewritten = rewritten.slice(1, -1).trim();
-  }
-  // Defensive: fall back to original if rewrite is empty or too long.
-  if (rewritten.length === 0 || rewritten.length > 1000) rewritten = original;
-  return {
-    rewritten,
+  const tokens: PreProcessTokens = {
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     costUsd: result.costUsd,
   };
+  const parsed = parsePreProcessOutput(result.text);
+  if (!parsed) {
+    // Defensive: malformed output → assume search with the original query so
+    // we still produce a useful response.
+    return { kind: 'search', query: original, ...tokens };
+  }
+  return { ...parsed, ...tokens };
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +337,12 @@ export type ChatRewriteInfo = {
 
 export type ChatResponse =
   | {
+      kind: 'smalltalk';
+      answer: string;
+      preProcessTokens: { in: number; out: number };
+      totalCostUsd: number;
+    }
+  | {
       kind: 'answer';
       answer: string;
       rewrite: ChatRewriteInfo | null;
@@ -342,19 +394,30 @@ export async function runRagQuery({
   if (original.length === 0) throw new Error('question is empty');
   if (original.length > 1000) throw new Error('question too long (max 1000 chars)');
 
-  // 1. Optional rewrite — fixes typos, expands underspecified queries.
+  // 1. Optional pre-processor — classifies smalltalk vs search and rewrites
+  //    the query in one shot. Smalltalk is answered immediately without any
+  //    retrieval (the assistant should be able to say "hoi" without searching
+  //    the knowledge base).
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
   if (enableRewrite) {
-    const r = await rewriteQuery(original);
+    const pp = await preProcessInput(original);
+    if (pp.kind === 'smalltalk') {
+      return {
+        kind: 'smalltalk',
+        answer: pp.reply,
+        preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
+        totalCostUsd: pp.costUsd,
+      };
+    }
     rewriteInfo = {
       original,
-      rewritten: r.rewritten,
-      inputTokens: r.inputTokens,
-      outputTokens: r.outputTokens,
-      costUsd: r.costUsd,
+      rewritten: pp.query,
+      inputTokens: pp.inputTokens,
+      outputTokens: pp.outputTokens,
+      costUsd: pp.costUsd,
     };
-    queryForEmbed = r.rewritten;
+    queryForEmbed = pp.query;
   }
 
   // 2. Embed the (possibly rewritten) query.
