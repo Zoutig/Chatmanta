@@ -64,10 +64,12 @@ export function useTheme(): {
 
   const set = useCallback((c: ThemeChoice) => {
     setChoice(c);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, c);
-    } catch {
-      // Negeer write-fouten in private browsing
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, c);
+      } catch {
+        // Negeer write-fouten in private browsing
+      }
     }
     const next = resolveTheme(c);
     setResolved(next);
