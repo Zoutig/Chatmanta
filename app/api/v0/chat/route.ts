@@ -14,6 +14,7 @@ import {
 } from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
 import { logQuery } from '@/lib/v0/server/log';
+import { normalizeStyle } from '@/lib/v0/style';
 
 export const runtime = 'nodejs';
 
@@ -28,6 +29,8 @@ type Body = {
   enableRewrite?: unknown;
   version?: unknown;
   history?: unknown;
+  tone?: unknown;
+  length?: unknown;
 };
 
 function parseHistory(input: unknown): ChatHistoryTurn[] {
@@ -58,12 +61,21 @@ export async function POST(req: Request) {
   const enableRewrite = body.enableRewrite !== false;
   const version = typeof body.version === 'string' ? body.version : '';
   const history = parseHistory(body.history);
+  const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
   if (!question.trim()) {
     return NextResponse.json({ error: 'question is required' }, { status: 400 });
   }
 
   const bot = resolveBot(version);
-  const generator = runRagQueryStreaming({ question, threshold, enableRewrite, bot, history });
+  const generator = runRagQueryStreaming({
+    question,
+    threshold,
+    enableRewrite,
+    bot,
+    history,
+    tone,
+    length,
+  });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

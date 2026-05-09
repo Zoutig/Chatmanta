@@ -38,6 +38,8 @@ type QueryLogRow = {
   pre_in_tokens: number;
   pre_out_tokens: number;
   cost_usd: number;
+  tone: string;
+  length: string;
 };
 
 /**
@@ -121,6 +123,8 @@ export async function logQuery(
             pre_in_tokens: response.preProcessTokens.in,
             pre_out_tokens: response.preProcessTokens.out,
             cost_usd: response.totalCostUsd,
+            tone: response.tone,
+            length: response.length,
           }
         : {
             organization_id: DEV_ORG_ID,
@@ -141,6 +145,8 @@ export async function logQuery(
             pre_in_tokens: response.rewrite?.inputTokens ?? 0,
             pre_out_tokens: response.rewrite?.outputTokens ?? 0,
             cost_usd: response.totalCostUsd,
+            tone: response.tone,
+            length: response.length,
           };
 
     const { error } = await sb().from('query_log').insert(row);

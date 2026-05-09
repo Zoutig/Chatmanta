@@ -13,6 +13,8 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import type { BotConfig } from './bots';
+import { buildSystemPrompt } from '../style';
+import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -685,6 +687,10 @@ export type ChatRewriteInfo = {
 type BaseChatResponse = {
   /** Bot version that produced this response. */
   botVersion: string;
+  /** Tone toggle waarmee deze response gegenereerd is. */
+  tone: Tone;
+  /** Length toggle waarmee deze response gegenereerd is. */
+  length: Length;
 };
 
 /** Optionele v0.3-velden die extra context over het antwoord geven. */
@@ -752,11 +758,15 @@ export async function runRagQuery({
   threshold,
   enableRewrite,
   bot,
+  tone = DEFAULT_TONE,
+  length = DEFAULT_LENGTH,
 }: {
   question: string;
   threshold: number;
   enableRewrite: boolean;
   bot: BotConfig;
+  tone?: Tone;
+  length?: Length;
 }): Promise<ChatResponse> {
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     throw new Error('threshold must be in [0, 1]');
@@ -764,6 +774,8 @@ export async function runRagQuery({
   const original = question.trim();
   if (original.length === 0) throw new Error('question is empty');
   if (original.length > 1000) throw new Error('question too long (max 1000 chars)');
+
+  const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
 
   // 1. Optional pre-processor — classifies smalltalk vs search and rewrites
   //    the query in one shot. Smalltalk is answered immediately without any
@@ -776,6 +788,8 @@ export async function runRagQuery({
     if (pp.kind === 'smalltalk') {
       return {
         botVersion: bot.version,
+        tone,
+        length,
         kind: 'smalltalk',
         answer: pp.reply,
         preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
@@ -819,6 +833,8 @@ export async function runRagQuery({
   if (aboveThreshold.length === 0) {
     return {
       botVersion: bot.version,
+      tone,
+      length,
       kind: 'fallback',
       answer: FALLBACK_MESSAGE,
       reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
@@ -861,13 +877,15 @@ export async function runRagQuery({
   // 8. LLM call.
   const chat = await chatComplete({
     model: bot.chatModel,
-    system: bot.systemPrompt,
+    system: styledSystemPrompt,
     user: userPrompt,
     temperature: bot.chatTemperature,
   });
 
   return {
     botVersion: bot.version,
+    tone,
+    length,
     kind: 'answer',
     answer: chat.text.trim(),
     rewrite: rewriteInfo,
@@ -921,8 +939,12 @@ export async function* runRagQueryStreaming(input: {
   enableRewrite: boolean;
   bot: BotConfig;
   history?: ChatHistoryTurn[];
+  tone?: Tone;
+  length?: Length;
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
+  const tone: Tone = input.tone ?? DEFAULT_TONE;
+  const length: Length = input.length ?? DEFAULT_LENGTH;
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     yield { kind: 'error', message: 'threshold must be in [0, 1]' };
@@ -938,6 +960,11 @@ export async function* runRagQueryStreaming(input: {
     return;
   }
 
+  // Bouw de samengestelde system prompt één keer; gebruikt door main answer-call
+  // en (v0.3) cascade-call. Pre-processor en helper-LLM-calls (rerank, hyde,
+  // decompose, follow-ups) gebruiken hun eigen task-specifieke prompts.
+  const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
+
   // 1. Pre-process (smalltalk shortcut + rewrite).
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
@@ -949,6 +976,8 @@ export async function* runRagQueryStreaming(input: {
         kind: 'smalltalk',
         response: {
           botVersion: bot.version,
+          tone,
+          length,
           kind: 'smalltalk',
           answer: pp.reply,
           preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
@@ -980,10 +1009,14 @@ export async function* runRagQueryStreaming(input: {
     const cached = await lookupCachedAnswer(cacheEmbed.vectors[0], bot.version);
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
-      const enriched: ChatResponse =
+      // Tone/length: gecachte rij is mogelijk geschreven onder andere stijl-
+      // toggles; we accepteren mismatch (zie spec) en zetten de huidige call's
+      // toggles op de response zodat logging klopt.
+      const baseEnriched =
         cached.kind === 'answer'
           ? { ...cached, extras: { ...(cached.extras ?? {}), fromCache: true } }
           : cached;
+      const enriched: ChatResponse = { ...baseEnriched, tone, length };
       yield {
         kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',
         response: enriched,
@@ -1076,6 +1109,8 @@ export async function* runRagQueryStreaming(input: {
       kind: 'fallback',
       response: {
         botVersion: bot.version,
+        tone,
+        length,
         kind: 'fallback',
         answer: FALLBACK_MESSAGE,
         reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
@@ -1143,7 +1178,7 @@ export async function* runRagQueryStreaming(input: {
       stream: true,
       stream_options: { include_usage: true },
       messages: [
-        { role: 'system', content: bot.systemPrompt },
+        { role: 'system', content: styledSystemPrompt },
         ...history.map((t) => ({ role: t.role, content: t.content })),
         { role: 'user', content: userPrompt },
       ],
@@ -1201,7 +1236,7 @@ export async function* runRagQueryStreaming(input: {
       try {
         const stronger = await chatComplete({
           model: bot.cascadeModel,
-          system: bot.systemPrompt,
+          system: styledSystemPrompt,
           user: userPrompt,
           temperature: bot.chatTemperature,
           maxTokens: V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
@@ -1254,6 +1289,8 @@ export async function* runRagQueryStreaming(input: {
 
   const finalResponse: ChatResponse = {
     botVersion: bot.version,
+    tone,
+    length,
     kind: 'answer',
     answer: finalAnswerText,
     rewrite: rewriteInfo,
