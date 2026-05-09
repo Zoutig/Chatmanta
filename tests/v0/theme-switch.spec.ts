@@ -10,28 +10,29 @@ test.describe('V0 theme switch', () => {
     await page.evaluate(() => window.localStorage.clear());
   });
 
-  test('toggle switches html class and persists across reload', async ({ page }) => {
+  test('icon-toggle wisselt html.dark en blijft over reload', async ({ page }) => {
     await page.goto('/');
 
-    // Wacht tot ThemeSwitch zichtbaar is
-    const switchGroup = page.getByRole('radiogroup', { name: 'Theme' });
-    await expect(switchGroup).toBeVisible();
-
-    // Klik Dark
-    await switchGroup.getByRole('radio', { name: 'Dark mode' }).click();
-
-    // Verify <html> heeft class="dark" en data-theme="dark"
     const html = page.locator('html');
+    const toggle = page.getByRole('switch', { name: /Schakel naar (dark|light) mode/ });
+    await expect(toggle).toBeVisible();
+
+    // Bepaal huidige stand. We klikken altijd naar dark als startpunt.
+    const isDarkNow = await html.evaluate((el) => el.classList.contains('dark'));
+    if (!isDarkNow) {
+      // Eerste klik → dark
+      await toggle.click();
+    }
     await expect(html).toHaveClass(/(?:^| )dark(?: |$)/);
     await expect(html).toHaveAttribute('data-theme', 'dark');
 
-    // Reload — verify dark mode behoudt
+    // Reload — dark moet blijven
     await page.reload();
     await expect(html).toHaveClass(/(?:^| )dark(?: |$)/);
     await expect(html).toHaveAttribute('data-theme', 'dark');
 
-    // Klik Light
-    await switchGroup.getByRole('radio', { name: 'Light mode' }).click();
+    // Klik nog eens → light
+    await page.getByRole('switch', { name: /Schakel naar light mode/ }).click();
     await expect(html).not.toHaveClass(/(?:^| )dark(?: |$)/);
     await expect(html).toHaveAttribute('data-theme', 'light');
   });
@@ -39,14 +40,15 @@ test.describe('V0 theme switch', () => {
   test('no FOUC on hard reload — initial paint matches stored choice', async ({ page }) => {
     // Stel dark in via een eerste bezoek
     await page.goto('/');
-    await page.getByRole('radio', { name: 'Dark mode' }).click();
+    const html = page.locator('html');
+    const isDarkNow = await html.evaluate((el) => el.classList.contains('dark'));
+    if (!isDarkNow) {
+      await page.getByRole('switch', { name: /Schakel naar dark mode/ }).click();
+    }
 
     // Hard-reload met cache-bust en check dat <html> al class='dark' heeft
-    // VOORDAT React hydrateert. We doen dit door de class direct na navigatie te checken.
+    // VOORDAT React hydrateert. Het inline FOUC-script staat synchroon in <head>.
     await page.goto('/', { waitUntil: 'commit' });
-
-    // 'commit' betekent: navigatie is begonnen maar DOM nog niet volledig geladen.
-    // Het inline FOUC-script is op dit moment al gedraaid (synchroon in <head>).
     const htmlClass = await page.evaluate(() => document.documentElement.className);
     expect(htmlClass).toContain('dark');
   });

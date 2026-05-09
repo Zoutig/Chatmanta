@@ -1,17 +1,23 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
+const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'] });
+// Plus Jakarta Sans alleen voor het ChatManta-wordmark in de sidebar.
+const jakarta = Plus_Jakarta_Sans({
+  variable: '--font-jakarta',
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+});
 
 export const metadata: Metadata = {
   title: 'ChatManta V0',
   description: 'V0 RAG demo — Jorion Solutions.',
 };
 
-// Inline script dat vóór React-hydratie de juiste theme-class zet op <html>.
-// Voorkomt flash-of-wrong-theme op hard-reload. Houden we klein en synchroon.
+// Inline FOUC-prevention: zet <html class="dark"> + data-theme synchroon op basis
+// van localStorage of OS-prefered-color-scheme. Houden we klein en synchroon.
 const themeBootScript = `
 (function() {
   try {
@@ -34,14 +40,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="nl"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrains.variable} ${jakarta.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

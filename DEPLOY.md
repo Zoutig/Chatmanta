@@ -41,6 +41,21 @@ Settings → Environment Variables. Zet alles op **Production, Preview, Developm
 3. Stel een vraag → antwoord moet streamen
 4. Check de Function logs in Vercel dashboard voor je eerste vraag — moet ~3-10s duren afhankelijk van versie
 
+## Browser/viewport — desktop-only voor V0
+
+V0 is **desktop-first ontworpen, ≥880px aanbevolen**. Onder die breedte
+worden de sidebar (threads + nieuwe-vraag) en het rechter paneel (bronnen,
+documenten, instellingen, widget-preview) verborgen via één enkele
+@media-rule in `app/globals.css`. De chat blijft dan technisch werken,
+maar zonder die panelen kun je geen nieuwe gesprekken starten, geen oude
+gesprekken openen, geen documenten uploaden en geen bronnen bekijken.
+
+Bewuste keuze: V0 is intern + 2-3 testklanten op laptop. Echte responsive
+mobile UX hoort bij V1 (Fase 6 widget-laag) wanneer er een publiek-facing
+oppervlak komt.
+
+Geadviseerd: open V0 op laptop/desktop, ≥880px viewport.
+
 ## Veelvoorkomende deploy-issues
 
 - **"FUNCTION_INVOCATION_TIMEOUT"** → max-duration is op 60s gezet, mocht v0.3 toch langer doen: upgrade naar Pro of zet versie defaults op v0.1
