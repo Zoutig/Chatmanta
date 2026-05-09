@@ -10,6 +10,7 @@
 
 import { runRagQuery, type ChatResponse } from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
+import { logQuery } from '@/lib/v0/server/log';
 
 export async function askQuestion(input: {
   question: string;
@@ -18,10 +19,13 @@ export async function askQuestion(input: {
   version: string;
 }): Promise<ChatResponse> {
   const bot = resolveBot(input.version);
-  return runRagQuery({
+  const response = await runRagQuery({
     question: input.question,
     threshold: input.threshold,
     enableRewrite: input.enableRewrite,
     bot,
   });
+  // Fire-and-forget logging — never blocks the user response on a log write.
+  logQuery(input.question, response).catch(() => undefined);
+  return response;
 }

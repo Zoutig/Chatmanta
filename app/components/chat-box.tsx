@@ -4,6 +4,15 @@ import { useState, useTransition } from 'react';
 import { askQuestion } from '../actions/chat';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 
+const EXAMPLE_QUESTIONS = [
+  'wat doet ChatManta?',
+  'voor welke doelgroep is het?',
+  'welke stack gebruiken jullie?',
+  'wie heeft het gebouwd?',
+  'wat zijn de kernprincipes?',
+  'hoe werkt RAG bij jullie?',
+];
+
 export function ChatBox({
   botVersion,
   defaultThreshold,
@@ -19,21 +28,26 @@ export function ChatBox({
   const [response, setResponse] = useState<ChatResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Sessie tellers — leven binnen de huidige browser-sessie + ChatBox mount.
+  // Gereset zodra de versie wisselt (key prop op ChatBox in page.tsx) zodat
+  // costs per versie apart geteld kunnen worden tijdens vergelijking.
+  const [sessionCostUsd, setSessionCostUsd] = useState(0);
+  const [sessionQueryCount, setSessionQueryCount] = useState(0);
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const q = question.trim();
-    if (!q) return;
+  function ask(q: string) {
+    if (!q.trim()) return;
     setError(null);
     startTransition(async () => {
       try {
         const res = await askQuestion({
-          question: q,
+          question: q.trim(),
           threshold,
           enableRewrite,
           version: botVersion,
         });
         setResponse(res);
+        setSessionCostUsd((c) => c + res.totalCostUsd);
+        setSessionQueryCount((n) => n + 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Onbekende fout');
         setResponse(null);
@@ -41,9 +55,20 @@ export function ChatBox({
     });
   }
 
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    ask(question);
+  }
+
+  function onExampleClick(q: string) {
+    setQuestion(q);
+    ask(q);
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
       <section className="flex flex-col gap-4">
+        <SessionStats costUsd={sessionCostUsd} queryCount={sessionQueryCount} version={botVersion} />
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Vraag
@@ -74,6 +99,8 @@ export function ChatBox({
             </span>
           </label>
 
+          <ExamplesBar onPick={onExampleClick} disabled={pending} />
+
           <button
             type="submit"
             disabled={pending || question.trim().length === 0}
@@ -95,6 +122,55 @@ export function ChatBox({
       <aside className="lg:sticky lg:top-6 lg:self-start">
         <SourcesPanel response={response} />
       </aside>
+    </div>
+  );
+}
+
+function SessionStats({
+  costUsd,
+  queryCount,
+  version,
+}: {
+  costUsd: number;
+  queryCount: number;
+  version: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+      <span>
+        <strong>Sessie</strong> ({version})
+      </span>
+      <span className="text-zinc-500 dark:text-zinc-400">
+        {queryCount} {queryCount === 1 ? 'vraag' : 'vragen'}
+      </span>
+      <span className="font-mono">${costUsd.toFixed(6)}</span>
+    </div>
+  );
+}
+
+function ExamplesBar({
+  onPick,
+  disabled,
+}: {
+  onPick: (q: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">Voorbeeldvragen</span>
+      <div className="flex flex-wrap gap-1.5">
+        {EXAMPLE_QUESTIONS.map((q) => (
+          <button
+            key={q}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(q)}
+            className="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 hover:border-zinc-500 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
