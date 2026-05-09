@@ -4,9 +4,16 @@ import { useState, useTransition } from 'react';
 import { askQuestion } from '../actions/chat';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 
-export function ChatBox({ defaultThreshold }: { defaultThreshold: number }) {
+export function ChatBox({
+  defaultThreshold,
+  defaultEnableRewrite,
+}: {
+  defaultThreshold: number;
+  defaultEnableRewrite: boolean;
+}) {
   const [question, setQuestion] = useState('');
   const [threshold, setThreshold] = useState(defaultThreshold);
+  const [enableRewrite, setEnableRewrite] = useState(defaultEnableRewrite);
   const [response, setResponse] = useState<ChatResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -18,7 +25,7 @@ export function ChatBox({ defaultThreshold }: { defaultThreshold: number }) {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await askQuestion({ question: q, threshold });
+        const res = await askQuestion({ question: q, threshold, enableRewrite });
         setResponse(res);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Onbekende fout');
@@ -44,6 +51,21 @@ export function ChatBox({ defaultThreshold }: { defaultThreshold: number }) {
           </label>
 
           <ThresholdSlider value={threshold} onChange={setThreshold} />
+
+          <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={enableRewrite}
+              onChange={(e) => setEnableRewrite(e.target.checked)}
+              className="h-4 w-4 accent-zinc-900 dark:accent-zinc-50"
+            />
+            <span>
+              Vraag eerst herschrijven door LLM
+              <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">
+                (typfouten + synoniemen, +1 LLM-call ≈ $0.0001)
+              </span>
+            </span>
+          </label>
 
           <button
             type="submit"
@@ -108,6 +130,12 @@ function AnswerPanel({ response }: { response: ChatResponse }) {
           : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
       }`}
     >
+      {response.rewrite && response.rewrite.rewritten !== response.rewrite.original ? (
+        <div className="mb-3 rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+          <span className="font-medium">Herschreven voor zoekopdracht:</span>{' '}
+          <span className="italic">{response.rewrite.rewritten}</span>
+        </div>
+      ) : null}
       <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
         {response.answer}
       </p>
@@ -119,6 +147,9 @@ function AnswerPanel({ response }: { response: ChatResponse }) {
 function Stats({ response }: { response: ChatResponse }) {
   const items: string[] = [];
   items.push(`drempel ${response.threshold.toFixed(2)}`);
+  if (response.rewrite) {
+    items.push(`rewrite ${response.rewrite.inputTokens}→${response.rewrite.outputTokens}t`);
+  }
   items.push(`embed ${response.embedTokens}t`);
   if (response.kind === 'answer') {
     items.push(`chat ${response.chatInputTokens}→${response.chatOutputTokens}t`);

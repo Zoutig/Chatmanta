@@ -40,19 +40,35 @@ export const V0_RAG_DEFAULTS = {
   SIMILARITY_THRESHOLD: 0.4,
   MAX_CONTEXT_CHARS: 12000,
   CHAT_MAX_TOKENS: 500,
-  CHAT_TEMPERATURE: 0.2,
+  // 0.4 (was 0.2): geeft het model wat ruimte om te herformuleren ipv woordelijk
+  // citeren, zonder feitelijkheid op te offeren. Anti-hallucinatie blijft via
+  // de system prompt afgedwongen.
+  CHAT_TEMPERATURE: 0.4,
+  REWRITE_TEMPERATURE: 0.3,
+  REWRITE_MAX_TOKENS: 200,
+  ENABLE_REWRITE_BY_DEFAULT: true,
 } as const;
 
 export const FALLBACK_MESSAGE =
   'Daar heb ik geen informatie over. Stel je vraag anders, of neem contact op met de organisatie.';
 
-const SYSTEM_PROMPT = `Je bent een Nederlandse kennisassistent. Beantwoord de vraag van de gebruiker UITSLUITEND op basis van de gegeven context-fragmenten.
+const SYSTEM_PROMPT = `Je bent een Nederlandse kennisassistent voor MKB-bedrijven.
 
-Strikte regels:
-- Verzin niets. Als de context geen antwoord geeft, zeg dat letterlijk.
-- Citeer feiten direct uit de context. Geen aannames.
-- Antwoord in dezelfde taal als de vraag (default: Nederlands).
-- Houd het antwoord beknopt en feitelijk.`;
+Beantwoord de vraag van de gebruiker op basis van de gegeven context-fragmenten:
+- Synthetiseer de relevante informatie tot een natuurlijke, behulpzame uitleg.
+- Herformuleer in eigen woorden waar dat de leesbaarheid helpt; herhaal niet woordelijk.
+- Geef NOOIT feiten die niet in de context staan. Als de informatie ontbreekt of onduidelijk is: zeg dat eerlijk in plaats van iets aan te nemen.
+- Antwoord in dezelfde taal als de (originele) vraag — default Nederlands.
+- Houd het beknopt maar volledig — typisch 2-5 zinnen.`;
+
+const REWRITE_SYSTEM = `Je bent een query-herschrijver voor een semantische zoekmachine. Je herformuleert de vraag van de gebruiker tot een vorm die beter aansluit bij hoe de bron-documenten geschreven zijn.
+
+Regels:
+- Corrigeer evidente typfouten en grammaticafouten.
+- Maak impliciete onderwerpen expliciet als die uit de vraag zelf duidelijk zijn (bv. "wat doet het?" → "wat doet ChatManta?" wanneer dat duidelijk de intentie is).
+- Voeg synoniemen of verwante termen toe die de vraag verduidelijken.
+- Behoud de oorspronkelijke intentie EXACT — voeg geen interpretaties of antwoorden toe.
+- Geef ALLEEN de herschreven vraag terug — geen uitleg, geen aanhalingstekens, geen prefix.`;
 
 // ---------------------------------------------------------------------------
 // Lazy clients
@@ -143,14 +159,18 @@ type ChatCompleteResult = {
 async function chatComplete({
   system,
   user,
+  temperature = V0_RAG_DEFAULTS.CHAT_TEMPERATURE,
+  maxTokens = V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
 }: {
   system: string;
   user: string;
+  temperature?: number;
+  maxTokens?: number;
 }): Promise<ChatCompleteResult> {
   const resp = await openai().chat.completions.create({
     model: CHAT_MODEL,
-    temperature: V0_RAG_DEFAULTS.CHAT_TEMPERATURE,
-    max_tokens: V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
+    temperature,
+    max_tokens: maxTokens,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -163,6 +183,44 @@ async function chatComplete({
     (inputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
     (outputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
   return { text, inputTokens, outputTokens, costUsd };
+}
+
+// ---------------------------------------------------------------------------
+// Query rewriting — optional pre-embed step that fixes typos, expands
+// underspecified queries, and adds synonyms. Improves retrieval quality on
+// ambiguous or typo-heavy user input at the cost of one extra LLM call
+// (~$0.0001 per question with gpt-4o-mini).
+// ---------------------------------------------------------------------------
+type RewriteResult = {
+  rewritten: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+};
+
+async function rewriteQuery(original: string): Promise<RewriteResult> {
+  const result = await chatComplete({
+    system: REWRITE_SYSTEM,
+    user: original,
+    temperature: V0_RAG_DEFAULTS.REWRITE_TEMPERATURE,
+    maxTokens: V0_RAG_DEFAULTS.REWRITE_MAX_TOKENS,
+  });
+  // Strip surrounding quotes the model sometimes adds despite the system prompt.
+  let rewritten = result.text.trim();
+  if (
+    (rewritten.startsWith('"') && rewritten.endsWith('"')) ||
+    (rewritten.startsWith('„') && rewritten.endsWith('"'))
+  ) {
+    rewritten = rewritten.slice(1, -1).trim();
+  }
+  // Defensive: fall back to original if rewrite is empty or too long.
+  if (rewritten.length === 0 || rewritten.length > 1000) rewritten = original;
+  return {
+    rewritten,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -223,10 +281,19 @@ export type ChatSource = {
   contentExcerpt: string;
 };
 
+export type ChatRewriteInfo = {
+  original: string;
+  rewritten: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+};
+
 export type ChatResponse =
   | {
       kind: 'answer';
       answer: string;
+      rewrite: ChatRewriteInfo | null;
       sources: ChatSource[];
       threshold: number;
       embedTokens: number;
@@ -239,6 +306,7 @@ export type ChatResponse =
       answer: string;
       reason: string;
       topSimilarity: number | null;
+      rewrite: ChatRewriteInfo | null;
       sources: ChatSource[];
       threshold: number;
       embedTokens: number;
@@ -261,42 +329,61 @@ function toSource(c: RetrievedChunk): ChatSource {
 export async function runRagQuery({
   question,
   threshold,
+  enableRewrite = V0_RAG_DEFAULTS.ENABLE_REWRITE_BY_DEFAULT,
 }: {
   question: string;
   threshold: number;
+  enableRewrite?: boolean;
 }): Promise<ChatResponse> {
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     throw new Error('threshold must be in [0, 1]');
   }
-  const trimmed = question.trim();
-  if (trimmed.length === 0) throw new Error('question is empty');
-  if (trimmed.length > 1000) throw new Error('question too long (max 1000 chars)');
+  const original = question.trim();
+  if (original.length === 0) throw new Error('question is empty');
+  if (original.length > 1000) throw new Error('question too long (max 1000 chars)');
 
-  // 1. Embed the question.
-  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts([trimmed]);
+  // 1. Optional rewrite — fixes typos, expands underspecified queries.
+  let rewriteInfo: ChatRewriteInfo | null = null;
+  let queryForEmbed = original;
+  if (enableRewrite) {
+    const r = await rewriteQuery(original);
+    rewriteInfo = {
+      original,
+      rewritten: r.rewritten,
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      costUsd: r.costUsd,
+    };
+    queryForEmbed = r.rewritten;
+  }
+
+  // 2. Embed the (possibly rewritten) query.
+  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts([queryForEmbed]);
   const queryVector = vectors[0];
 
-  // 2. Retrieve top-K.
+  // 3. Retrieve top-K.
   const chunks = await retrieveChunks(queryVector, V0_RAG_DEFAULTS.TOP_K);
   const allSources = chunks.map(toSource);
   const topSim = chunks[0]?.similarity ?? null;
 
-  // 3. Threshold filter.
+  // 4. Threshold filter.
   const relevant = chunks.filter((c) => c.similarity >= threshold);
+  const rewriteCost = rewriteInfo?.costUsd ?? 0;
   if (relevant.length === 0) {
     return {
       kind: 'fallback',
       answer: FALLBACK_MESSAGE,
       reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
       topSimilarity: topSim,
-      sources: allSources, // toon ze nog wel voor inspectie
+      rewrite: rewriteInfo,
+      sources: allSources,
       threshold,
       embedTokens,
-      totalCostUsd: embedCost,
+      totalCostUsd: embedCost + rewriteCost,
     };
   }
 
-  // 4. Format context (cap at MAX_CONTEXT_CHARS).
+  // 5. Format context (cap at MAX_CONTEXT_CHARS).
   let context = '';
   let used = 0;
   for (const c of relevant) {
@@ -305,20 +392,24 @@ export async function runRagQuery({
     context += block;
     used++;
   }
-  const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${trimmed}`;
+  // Use the ORIGINAL question in the answer prompt — model should answer the
+  // user's actual question, not the rewritten search-query form. The rewrite
+  // is purely an embedding-time tactic.
+  const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
-  // 5. LLM call.
+  // 6. LLM call.
   const chat = await chatComplete({ system: SYSTEM_PROMPT, user: userPrompt });
 
   return {
     kind: 'answer',
     answer: chat.text.trim(),
+    rewrite: rewriteInfo,
     sources: relevant.slice(0, used).map(toSource),
     threshold,
     embedTokens,
     chatInputTokens: chat.inputTokens,
     chatOutputTokens: chat.outputTokens,
-    totalCostUsd: embedCost + chat.costUsd,
+    totalCostUsd: embedCost + chat.costUsd + rewriteCost,
   };
 }
 

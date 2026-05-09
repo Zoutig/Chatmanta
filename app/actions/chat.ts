@@ -13,6 +13,7 @@ import { runRagQuery, type ChatResponse } from '@/lib/v0/server/rag';
 export async function askQuestion(input: {
   question: string;
   threshold: number;
+  enableRewrite: boolean;
 }): Promise<ChatResponse> {
   return runRagQuery(input);
 }

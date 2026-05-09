@@ -21,7 +21,10 @@ export default async function Home() {
         </div>
       </header>
 
-      <ChatBox defaultThreshold={V0_RAG_DEFAULTS.SIMILARITY_THRESHOLD} />
+      <ChatBox
+        defaultThreshold={V0_RAG_DEFAULTS.SIMILARITY_THRESHOLD}
+        defaultEnableRewrite={V0_RAG_DEFAULTS.ENABLE_REWRITE_BY_DEFAULT}
+      />
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
         <IngestForm />
