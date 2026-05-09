@@ -17,6 +17,11 @@ import { logQuery } from '@/lib/v0/server/log';
 
 export const runtime = 'nodejs';
 
+// V0.3 doet tot ~6 LLM-calls + retrieval per vraag. Vercel default function
+// timeout is 10s op Hobby — te kort voor v0.3 streaming. 60s is het Hobby
+// max; ruim voor onze worst case (~10s).
+export const maxDuration = 60;
+
 type Body = {
   question?: unknown;
   threshold?: unknown;
