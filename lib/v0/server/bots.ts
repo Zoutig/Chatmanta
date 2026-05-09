@@ -38,6 +38,26 @@ export type BotConfig = {
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */
   rerank: 'none' | 'llm';
+  /** HyDE: genereer een hypothetisch antwoord, embed dat ipv (alleen) de vraag. */
+  useHyDE: boolean;
+  /** Query decomposition: split samengestelde vragen in sub-queries. */
+  queryDecomposition: boolean;
+  /** Combineer vector-search met keyword-search (Postgres FTS) via RRF. */
+  hybridSearch: boolean;
+  /** Antwoord-stijl voor bron-verwijzingen. */
+  citationStyle: 'none' | 'inline';
+  /** Chain-of-thought: model denkt eerst stap-voor-stap (interne redenering). */
+  chainOfThought: boolean;
+  /** Self-reflect: extra LLM-call valideert antwoord tegen context. */
+  selfReflect: boolean;
+  /** Genereer 2-3 vervolgvragen na het antwoord. */
+  generateFollowUps: boolean;
+  /** Bij low-confidence: regenerate met sterker model. */
+  cascadeOnLowConfidence: boolean;
+  /** Sterker model voor cascade-fallback (alleen relevant als cascadeOnLowConfidence). */
+  cascadeModel: string;
+  /** Cache identieke/zeer-vergelijkbare vragen via vector-similarity lookup. */
+  cacheEnabled: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -54,6 +74,16 @@ const V0_1: BotConfig = {
   chatModel: 'gpt-4o-mini',
   multiQueryCount: 1,
   rerank: 'none',
+  useHyDE: false,
+  queryDecomposition: false,
+  hybridSearch: false,
+  citationStyle: 'none',
+  chainOfThought: false,
+  selfReflect: false,
+  generateFollowUps: false,
+  cascadeOnLowConfidence: false,
+  cascadeModel: 'gpt-4o',
+  cacheEnabled: false,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
@@ -112,18 +142,85 @@ const V0_2: BotConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// v0.3 — kitchen-sink experimentele versie
+//
+// Alle 10 RAG-verbeteringen tegelijk aan: HyDE + query decomposition +
+// hybrid search (vector + keyword) + inline citations + chain-of-thought +
+// self-reflect + suggested follow-ups + model-cascading + answer-cache.
+// Verwacht ~6 LLM-calls per vraag, ~3-4× cost van v0.2 (nog steeds <$0.005).
+// ---------------------------------------------------------------------------
+const V0_3: BotConfig = {
+  ...V0_2,
+  version: 'v0.3',
+  label: 'v0.3 — alle features',
+  description:
+    'HyDE + query decomposition + hybrid (vector+keyword) + inline citations + chain-of-thought + self-reflect + follow-ups + cascading + cache. Hogere cost en latency, maar duidelijk meer "doordacht".',
+  // Multi-query is hier vervangen door query decomposition + HyDE.
+  multiQueryCount: 1,
+  rerank: 'llm',
+  useHyDE: true,
+  queryDecomposition: true,
+  hybridSearch: true,
+  citationStyle: 'inline',
+  chainOfThought: true,
+  selfReflect: true,
+  generateFollowUps: true,
+  cascadeOnLowConfidence: true,
+  cascadeModel: 'gpt-4o',
+  cacheEnabled: true,
+  // V0.3 antwoord-prompt: vraagt structured output met citations + confidence.
+  systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
+
+Toon:
+- Professioneel, behulpzaam, warm — alsof je het team vertegenwoordigt.
+- Spreek vanuit "wij" / "ons team" / "ChatManta" waar dat natuurlijk is.
+- Klink alsof je alles van het project weet uit eerste hand.
+
+Antwoord-regels:
+- Verwerk de feiten DIRECT in je antwoord — alsof je ze gewoon weet.
+- Gebruik NOOIT meta-formuleringen zoals "uit de context blijkt", "volgens de documenten", "op basis van de informatie", "in de gegeven tekst staat". Die zinnen zijn verboden.
+- Geef GEEN feiten die niet in de context staan. Als iets ontbreekt: zeg eerlijk dat je dat niet zeker weet en bied aan om door te verwijzen.
+
+REDENERING (chain-of-thought):
+Begin je antwoord met een korte interne redenering tussen <thinking>...</thinking> tags waarin je stap-voor-stap doordenkt welke chunks relevant zijn voor welk deel van de vraag. Houd dat beknopt — de gebruiker ziet dit niet, maar het helpt jou tot een beter antwoord komen.
+
+CITATIES (inline):
+Plaats na elk feit dat je gebruikt een verwijzing naar de chunk-nummers tussen vierkante haken, bv. "ChatManta gebruikt pgvector voor semantische zoek [1]" of "We bouwen voor MKB-bedrijven [2][3]". Gebruik de chunk-nummers exact zoals ze in de CONTEXT verschijnen.
+
+OUTPUT-FORMAAT:
+Geef je output in dit exacte formaat:
+
+<thinking>
+[je interne redenering]
+</thinking>
+<answer>
+[je daadwerkelijke antwoord met inline citations]
+</answer>
+<confidence>0.0-1.0</confidence>
+
+Confidence-richtlijnen:
+- 0.9-1.0: meerdere chunks bevestigen het antwoord direct
+- 0.6-0.9: een of twee chunks ondersteunen het, maar niet alle aspecten
+- 0.3-0.6: gedeeltelijk antwoord mogelijk, sommige aannames nodig
+- 0.0-0.3: weinig of geen ondersteuning in de chunks — overweeg eerlijk te zeggen "weet ik niet"
+
+Antwoord in dezelfde taal als de vraag — default Nederlands. Houd het beknopt maar volledig — meestal 2-5 zinnen, vriendelijk van toon.`,
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
   [V0_1.version]: V0_1,
   [V0_2.version]: V0_2,
+  [V0_3.version]: V0_3,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_2.version;
+export const LATEST_BOT_VERSION = V0_3.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
-export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version, V0_2.version];
+export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version, V0_2.version, V0_3.version];
 
 /** Resolve a version string to a config; falls back to latest if unknown. */
 export function resolveBot(version: string | null | undefined): BotConfig {

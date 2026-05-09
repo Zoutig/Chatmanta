@@ -263,6 +263,174 @@ async function preProcessInput(
 }
 
 // ---------------------------------------------------------------------------
+// HyDE — Hypothetical Document Embeddings.
+// Genereer een hypothetisch antwoord op de vraag (kan onzin bevatten), embed
+// dat antwoord ipv (of naast) de vraag. Werkt vaak beter dan vraag-embedding
+// omdat hypothetische antwoorden lijken op de echte chunks in de corpus.
+// ---------------------------------------------------------------------------
+const HYDE_SYSTEM = `Je bent een hypothese-generator voor een vector-zoekmachine.
+
+Schrijf een KORTE, plausibel klinkende paragraaf (2-4 zinnen) die de gebruikersvraag zou kunnen beantwoorden — alsof je de informatie uit een bedrijfsdocument citeert. De inhoud mag verzonnen zijn, het doel is alleen dat de schrijfstijl en het onderwerp lijken op echte bron-documenten.
+
+Geef ALLEEN de paragraaf — geen uitleg, geen aanhalingstekens.`;
+
+async function generateHydeDocument(
+  query: string,
+  bot: BotConfig,
+): Promise<{ hypothetical: string; inputTokens: number; outputTokens: number; costUsd: number }> {
+  const result = await chatComplete({
+    model: bot.chatModel,
+    system: HYDE_SYSTEM,
+    user: query,
+    temperature: 0.5,
+    maxTokens: 200,
+  });
+  const text = stripQuotes(result.text).slice(0, 1500);
+  return {
+    hypothetical: text || query,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Query decomposition — split samengestelde vragen in atomaire sub-queries.
+// "Wat is de prijs en levertijd?" → ["Wat is de prijs?", "Wat is de levertijd?"]
+// Eenvoudige vragen geven [originele query] terug.
+// ---------------------------------------------------------------------------
+const DECOMP_SYSTEM = `Je splitst samengestelde vragen in losse deelvragen.
+
+Regels:
+- Als de vraag MEERDERE onafhankelijke informatie-verzoeken bevat, geef ze één per regel terug.
+- Als de vraag ÉÉN verzoek is, geef alleen die ene vraag terug.
+- Behoud de oorspronkelijke woordkeuze zoveel mogelijk — herformuleer alleen als dat helpt.
+- Geef ALLEEN de deelvragen — geen nummering, geen uitleg.
+
+Voorbeelden:
+"Wat is de prijs en hoe lang duurt levering?" →
+Wat is de prijs?
+Hoe lang duurt levering?
+
+"Wat doet ChatManta?" →
+Wat doet ChatManta?`;
+
+async function decomposeQuery(
+  query: string,
+  bot: BotConfig,
+): Promise<{ subQueries: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
+  const result = await chatComplete({
+    model: bot.chatModel,
+    system: DECOMP_SYSTEM,
+    user: query,
+    temperature: 0.2,
+    maxTokens: 200,
+  });
+  const lines = result.text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
+    .map((l) => stripQuotes(l))
+    .filter((l) => l.length > 0 && l.length < 500);
+  const subQueries = lines.length > 0 ? lines : [query];
+  return {
+    subQueries,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hybrid retrieve — combineert vector similarity met keyword-search via
+// match_chunks_hybrid RPC (RRF-fusion in SQL).
+// ---------------------------------------------------------------------------
+async function retrieveChunksHybrid(
+  queryVector: number[],
+  queryText: string,
+  topK: number,
+): Promise<RetrievedChunk[]> {
+  const sb = supabase();
+  const { data, error } = await sb.rpc('match_chunks_hybrid', {
+    p_organization_id: DEV_ORG_ID,
+    query_embedding: queryVector,
+    query_text: queryText,
+    match_count: topK,
+  });
+  if (error) {
+    // Fallback: als hybrid RPC ontbreekt (migratie 0004 niet toegepast),
+    // val terug op vanilla vector search zodat de app blijft werken.
+    console.warn('[hybrid] RPC failed, falling back to vector-only:', error.message);
+    return retrieveChunks(queryVector, topK);
+  }
+  type HybridRow = RawChunk & { combined_score: number; keyword_score: number };
+  const rows = (data ?? []) as HybridRow[];
+  if (rows.length === 0) return [];
+
+  // Hydrate filenames (zelfde als retrieveChunks).
+  const sb2 = supabase();
+  const docIds = Array.from(
+    new Set(rows.map((c) => c.document_id).filter((v): v is string => !!v)),
+  );
+  let docNameMap = new Map<string, string>();
+  if (docIds.length > 0) {
+    const { data: docs } = await sb2.from('documents').select('id, filename').in('id', docIds);
+    docNameMap = new Map((docs ?? []).map((d) => [d.id as string, d.filename as string]));
+  }
+  return rows.map((c) => ({
+    ...c,
+    filename: c.document_id ? docNameMap.get(c.document_id) ?? null : null,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Answer cache — embedding-based near-duplicate lookup. Hit threshold ~0.97.
+// ---------------------------------------------------------------------------
+async function lookupCachedAnswer(
+  queryVector: number[],
+  botVersion: string,
+): Promise<ChatResponse | null> {
+  const sb = supabase();
+  const { data, error } = await sb.rpc('lookup_cached_answer', {
+    p_organization_id: DEV_ORG_ID,
+    p_bot_version: botVersion,
+    query_embedding: queryVector,
+    min_similarity: 0.97,
+  });
+  if (error) {
+    console.warn('[cache] lookup failed:', error.message);
+    return null;
+  }
+  const hit = (data ?? [])[0];
+  if (!hit) return null;
+  // Bump hit_count fire-and-forget.
+  sb.from('answer_cache')
+    .update({ hit_count: undefined, last_hit_at: new Date().toISOString() })
+    .eq('id', hit.id)
+    .then(() => undefined);
+  return hit.response_json as ChatResponse;
+}
+
+async function writeCachedAnswer(
+  question: string,
+  queryVector: number[],
+  botVersion: string,
+  response: ChatResponse,
+): Promise<void> {
+  try {
+    const sb = supabase();
+    await sb.from('answer_cache').insert({
+      organization_id: DEV_ORG_ID,
+      bot_version: botVersion,
+      question,
+      question_embedding: queryVector,
+      response_json: response,
+    });
+  } catch (err) {
+    console.warn('[cache] write failed:', err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Multi-query expansion — generate N variant search queries via one LLM call.
 // Returns the variants (always includes the original as one of them) plus the
 // LLM call's tokens/cost. Defensive parser tolerates numbered, bulleted, or
@@ -308,6 +476,80 @@ async function generateMultiQueries(
   }
   return {
     queries,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// V0.3 structured-output parser — extract <thinking>, <answer>, <confidence>
+// uit een (mogelijk gedeeltelijke) tekst. Tolerant voor missende tags.
+// ---------------------------------------------------------------------------
+export type ParsedV03Output = {
+  thinking: string | null;
+  answer: string;
+  confidence: number | null;
+};
+
+export function parseV03Output(raw: string): ParsedV03Output {
+  const thinkingMatch = raw.match(/<thinking>([\s\S]*?)<\/thinking>/i);
+  const answerMatch = raw.match(/<answer>([\s\S]*?)(?:<\/answer>|$)/i);
+  const confMatch = raw.match(/<confidence>\s*([0-9]*\.?[0-9]+)/i);
+
+  let answer = answerMatch?.[1]?.trim() ?? '';
+  // Als geen <answer>-tag aanwezig is, val terug op alles na </thinking>
+  // of op de hele tekst — defensief tegen modellen die het format negeren.
+  if (!answerMatch) {
+    if (thinkingMatch) {
+      answer = raw.slice(raw.indexOf('</thinking>') + 11).trim();
+      // Strip eventuele <confidence>... aan het einde.
+      answer = answer.replace(/<confidence>[\s\S]*$/i, '').trim();
+    } else {
+      answer = raw.replace(/<confidence>[\s\S]*$/i, '').trim();
+    }
+  }
+
+  const confidence = confMatch ? Number.parseFloat(confMatch[1]) : null;
+  return {
+    thinking: thinkingMatch?.[1]?.trim() ?? null,
+    answer,
+    confidence: confidence !== null && Number.isFinite(confidence) ? confidence : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up question generator — produceert 2-3 logische vervolgvragen op
+// basis van de zojuist gegeven antwoord. Gebruikt voor "Suggested follow-ups"
+// chips in de UI.
+// ---------------------------------------------------------------------------
+const FOLLOWUP_SYSTEM = `Je krijgt een vraag-antwoord-paar te zien. Bedenk 2 of 3 logische vervolgvragen die de gebruiker waarschijnlijk daarna wil stellen.
+
+Regels:
+- Houd elke vervolgvraag kort (max ~10 woorden).
+- Verschillend van de oorspronkelijke vraag.
+- Sluit aan op het besproken onderwerp.
+- Geef ALLEEN de vragen — één per regel, geen nummering, geen uitleg.`;
+
+async function generateFollowUps(
+  question: string,
+  answer: string,
+  bot: BotConfig,
+): Promise<{ followUps: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
+  const result = await chatComplete({
+    model: bot.chatModel,
+    system: FOLLOWUP_SYSTEM,
+    user: `Vraag: ${question}\n\nAntwoord: ${answer}\n\nVervolgvragen:`,
+    temperature: 0.6,
+    maxTokens: 150,
+  });
+  const lines = result.text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
+    .map((l) => stripQuotes(l))
+    .filter((l) => l.length > 0 && l.length < 200);
+  return {
+    followUps: lines.slice(0, 3),
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     costUsd: result.costUsd,
@@ -445,6 +687,22 @@ type BaseChatResponse = {
   botVersion: string;
 };
 
+/** Optionele v0.3-velden die extra context over het antwoord geven. */
+export type V03Extras = {
+  /** Confidence 0..1 zoals gerapporteerd door het antwoord-model. */
+  confidence?: number;
+  /** Werd cascading toegepast (regenerate met sterker model)? */
+  cascadeUsed?: boolean;
+  /** Suggested follow-up questions voor de UI. */
+  followUps?: string[];
+  /** Cache hit (geen pipeline gerund)? */
+  fromCache?: boolean;
+  /** Gebruikte sub-queries na decomposition. */
+  subQueries?: string[];
+  /** HyDE hypothetisch document (voor inspectie). */
+  hydeDocument?: string;
+};
+
 export type ChatResponse =
   | (BaseChatResponse & {
       kind: 'smalltalk';
@@ -462,6 +720,7 @@ export type ChatResponse =
       chatInputTokens: number;
       chatOutputTokens: number;
       totalCostUsd: number;
+      extras?: V03Extras;
     })
   | (BaseChatResponse & {
       kind: 'fallback';
@@ -628,12 +887,18 @@ export async function runRagQuery({
 // ---------------------------------------------------------------------------
 /** Pipeline-fase events voor UI-feedback tijdens de pre-streaming fase. */
 export type PipelinePhase =
+  | 'cache'
   | 'preprocess'
+  | 'decompose'
+  | 'hyde'
   | 'expand'
   | 'embed'
   | 'retrieve'
   | 'rerank'
-  | 'answer';
+  | 'answer'
+  | 'reflect'
+  | 'cascade'
+  | 'followups';
 
 export type StreamEvent =
   | { kind: 'status'; phase: PipelinePhase }
@@ -703,25 +968,95 @@ export async function* runRagQueryStreaming(input: {
   }
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
-  // 2. Multi-query expansion.
+  // 2. Cache lookup (v0.3+) — embed origineel, check answer_cache.
+  //    Hit threshold 0.97 ≈ near-duplicate vraag.
+  let preCacheEmbedTokens = 0;
+  let preCacheEmbedCost = 0;
+  if (bot.cacheEnabled) {
+    yield { kind: 'status', phase: 'cache' };
+    const cacheEmbed = await embedTexts([original]);
+    preCacheEmbedTokens = cacheEmbed.tokens;
+    preCacheEmbedCost = cacheEmbed.costUsd;
+    const cached = await lookupCachedAnswer(cacheEmbed.vectors[0], bot.version);
+    if (cached) {
+      // Mark cache hit + return. Sources/threshold copy uit gecachte response.
+      const enriched: ChatResponse =
+        cached.kind === 'answer'
+          ? { ...cached, extras: { ...(cached.extras ?? {}), fromCache: true } }
+          : cached;
+      yield {
+        kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',
+        response: enriched,
+      } as StreamEvent;
+      return;
+    }
+  }
+
+  // 3. Build query set:
+  //    - v0.3: query decomposition (sub-queries) + HyDE per sub-query
+  //    - v0.2: multi-query expansion
+  //    - v0.1: single query
+  let subQueries: string[] = [queryForEmbed];
+  let decomposeCost = 0;
+  let decomposeInputTokens = 0;
+  let decomposeOutputTokens = 0;
+  if (bot.queryDecomposition) {
+    yield { kind: 'status', phase: 'decompose' };
+    const dec = await decomposeQuery(queryForEmbed, bot);
+    subQueries = dec.subQueries;
+    decomposeCost = dec.costUsd;
+    decomposeInputTokens = dec.inputTokens;
+    decomposeOutputTokens = dec.outputTokens;
+  }
+
+  let hydeCost = 0;
+  let hydeInputTokens = 0;
+  let hydeOutputTokens = 0;
+  let hydeDoc: string | null = null;
+  const querySet: { text: string; isHyde: boolean }[] = subQueries.map((q) => ({
+    text: q,
+    isHyde: false,
+  }));
+  if (bot.useHyDE) {
+    yield { kind: 'status', phase: 'hyde' };
+    // Eén HyDE-doc voor de eerste sub-query (de "main" intent) — meerdere
+    // HyDE-calls bij decompose zou cost vermenigvuldigen.
+    const hyde = await generateHydeDocument(subQueries[0], bot);
+    hydeDoc = hyde.hypothetical;
+    hydeCost = hyde.costUsd;
+    hydeInputTokens = hyde.inputTokens;
+    hydeOutputTokens = hyde.outputTokens;
+    querySet.push({ text: hyde.hypothetical, isHyde: true });
+  }
+
+  // Multi-query expansion (alleen bot.multiQueryCount > 1; v0.2 pad).
   let mq;
   if (bot.multiQueryCount > 1) {
     yield { kind: 'status', phase: 'expand' };
     mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
+    for (const q of mq.queries.slice(1)) querySet.push({ text: q, isHyde: false });
   } else {
-    mq = { queries: [queryForEmbed], inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    mq = { queries: [], inputTokens: 0, outputTokens: 0, costUsd: 0 };
   }
   const expansionCost = mq.costUsd;
 
-  // 3. Embed all queries (batched).
+  // 4. Embed all queries (batched).
   yield { kind: 'status', phase: 'embed' };
-  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(mq.queries);
+  const queryTexts = querySet.map((q) => q.text);
+  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(queryTexts);
 
-  // 4. Retrieve per query (parallel — was sequential, ~3x sneller bij multi-query),
-  //    dedup keeping max similarity.
+  // 5. Retrieve per query (parallel). Hybrid (vector + FTS) als bot.hybridSearch,
+  //    anders pure vector. HyDE-vectoren skippen FTS (hypothetisch document is
+  //    geen oorspronkelijke gebruikersvraag-text — keyword search heeft daar
+  //    geen waarde over).
   yield { kind: 'status', phase: 'retrieve' };
   const allHits = await Promise.all(
-    vectors.map((v) => retrieveChunks(v, V0_RAG_DEFAULTS.TOP_K)),
+    querySet.map((q, i) => {
+      if (bot.hybridSearch && !q.isHyde) {
+        return retrieveChunksHybrid(vectors[i], q.text, V0_RAG_DEFAULTS.TOP_K);
+      }
+      return retrieveChunks(vectors[i], V0_RAG_DEFAULTS.TOP_K);
+    }),
   );
   const bestById = new Map<string, RetrievedChunk>();
   for (const hits of allHits) {
@@ -748,8 +1083,9 @@ export async function* runRagQueryStreaming(input: {
         rewrite: rewriteInfo,
         sources: allSources,
         threshold,
-        embedTokens,
-        totalCostUsd: embedCost + rewriteCost + expansionCost,
+        embedTokens: embedTokens + preCacheEmbedTokens,
+        totalCostUsd:
+          embedCost + preCacheEmbedCost + rewriteCost + expansionCost + hydeCost + decomposeCost,
       },
     };
     return;
@@ -836,22 +1172,129 @@ export async function* runRagQueryStreaming(input: {
     return;
   }
 
-  // 10. Final event with complete response (used by route handler for logging).
-  yield {
-    kind: 'answer-done',
-    response: {
-      botVersion: bot.version,
-      kind: 'answer',
-      answer: accText.trim(),
-      rewrite: rewriteInfo,
-      sources: usedSources,
-      threshold,
-      embedTokens,
-      chatInputTokens: chatInputTokens + rerankInputTokens,
-      chatOutputTokens: chatOutputTokens + rerankOutputTokens,
-      totalCostUsd: embedCost + chatCostUsd + rewriteCost + expansionCost + rerankCost,
+  // 10. Post-processing for v0.3: parse structured output, optional cascade,
+  //     follow-ups, cache write.
+  let finalAnswerText = accText.trim();
+  let confidence: number | null = null;
+  let cascadeUsed = false;
+  let cascadeInputTokens = 0;
+  let cascadeOutputTokens = 0;
+  let cascadeCost = 0;
+  let followUps: string[] | undefined;
+  let followUpsCost = 0;
+  let followUpsInputTokens = 0;
+  let followUpsOutputTokens = 0;
+
+  if (bot.citationStyle === 'inline' || bot.chainOfThought) {
+    const parsed = parseV03Output(accText);
+    finalAnswerText = parsed.answer || accText.trim();
+    confidence = parsed.confidence;
+
+    // Cascade naar sterker model bij low confidence.
+    if (
+      bot.cascadeOnLowConfidence &&
+      confidence !== null &&
+      confidence < 0.5 &&
+      bot.cascadeModel !== bot.chatModel
+    ) {
+      yield { kind: 'status', phase: 'cascade' };
+      try {
+        const stronger = await chatComplete({
+          model: bot.cascadeModel,
+          system: bot.systemPrompt,
+          user: userPrompt,
+          temperature: bot.chatTemperature,
+          maxTokens: V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
+        });
+        const reparsed = parseV03Output(stronger.text);
+        finalAnswerText = reparsed.answer || stronger.text.trim();
+        confidence = reparsed.confidence ?? confidence;
+        cascadeInputTokens = stronger.inputTokens;
+        cascadeOutputTokens = stronger.outputTokens;
+        // Cascade gebruikt een ander model — bereken cost via OpenAI std rates
+        // voor gpt-4o (USD per 1M). Hardcoded omdat het een bewuste fallback is.
+        const GPT4O_IN = 2.5,
+          GPT4O_OUT = 10.0;
+        cascadeCost =
+          (stronger.inputTokens / 1_000_000) * GPT4O_IN +
+          (stronger.outputTokens / 1_000_000) * GPT4O_OUT;
+        cascadeUsed = true;
+      } catch (err) {
+        console.warn('[cascade] failed, keeping initial answer:', err);
+      }
+    }
+  }
+
+  // Follow-ups generatie (na het uiteindelijke antwoord, kan in parallel met
+  // cache write — maar simpel sequential voor nu).
+  if (bot.generateFollowUps) {
+    yield { kind: 'status', phase: 'followups' };
+    try {
+      const fu = await generateFollowUps(original, finalAnswerText, bot);
+      followUps = fu.followUps;
+      followUpsInputTokens = fu.inputTokens;
+      followUpsOutputTokens = fu.outputTokens;
+      followUpsCost = fu.costUsd;
+    } catch (err) {
+      console.warn('[followups] failed:', err);
+    }
+  }
+
+  const totalCost =
+    embedCost +
+    preCacheEmbedCost +
+    chatCostUsd +
+    rewriteCost +
+    expansionCost +
+    rerankCost +
+    decomposeCost +
+    hydeCost +
+    cascadeCost +
+    followUpsCost;
+
+  const finalResponse: ChatResponse = {
+    botVersion: bot.version,
+    kind: 'answer',
+    answer: finalAnswerText,
+    rewrite: rewriteInfo,
+    sources: usedSources,
+    threshold,
+    embedTokens: embedTokens + preCacheEmbedTokens,
+    chatInputTokens:
+      chatInputTokens +
+      rerankInputTokens +
+      cascadeInputTokens +
+      decomposeInputTokens +
+      hydeInputTokens +
+      followUpsInputTokens,
+    chatOutputTokens:
+      chatOutputTokens +
+      rerankOutputTokens +
+      cascadeOutputTokens +
+      decomposeOutputTokens +
+      hydeOutputTokens +
+      followUpsOutputTokens,
+    totalCostUsd: totalCost,
+    extras: {
+      ...(confidence !== null ? { confidence } : {}),
+      ...(cascadeUsed ? { cascadeUsed: true } : {}),
+      ...(followUps && followUps.length > 0 ? { followUps } : {}),
+      ...(subQueries.length > 1 ? { subQueries } : {}),
+      ...(hydeDoc ? { hydeDocument: hydeDoc } : {}),
     },
   };
+
+  // Cache write (fire-and-forget) — alleen v0.3.
+  if (bot.cacheEnabled) {
+    // Embed origineel was al gedaan voor pre-cache lookup; hergebruik die.
+    // We hebben de vector niet apart bewaard, dus skip cache write als
+    // pre-cache embed niet draaide. Embed is goedkoop dus even opnieuw doen.
+    embedTexts([original])
+      .then((r) => writeCachedAnswer(original, r.vectors[0], bot.version, finalResponse))
+      .catch(() => undefined);
+  }
+
+  yield { kind: 'answer-done', response: finalResponse };
 }
 
 // ---------------------------------------------------------------------------

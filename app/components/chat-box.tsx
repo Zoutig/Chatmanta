@@ -8,13 +8,42 @@ import type {
   StreamEvent,
 } from '@/lib/v0/server/rag';
 
+/**
+ * Client-side mirror van parseV03Output (server file mag niet vanuit client
+ * geïmporteerd worden door 'server-only' marker). Houd in sync.
+ */
+function parseStreamingV03(raw: string): { thinking: string | null; answer: string } {
+  const thinkingMatch = raw.match(/<thinking>([\s\S]*?)<\/thinking>/i);
+  const answerMatch = raw.match(/<answer>([\s\S]*?)(?:<\/answer>|$)/i);
+  let answer = answerMatch?.[1] ?? '';
+  if (!answerMatch) {
+    if (thinkingMatch) {
+      answer = raw.slice(raw.indexOf('</thinking>') + 11);
+    } else {
+      answer = raw;
+    }
+  }
+  // Strip eventuele <confidence>...</confidence> aan het einde tijdens streaming.
+  answer = answer.replace(/<confidence>[\s\S]*$/i, '');
+  return {
+    thinking: thinkingMatch?.[1]?.trim() ?? null,
+    answer: answer.trim(),
+  };
+}
+
 const PHASE_LABELS: Record<PipelinePhase, string> = {
+  cache: 'Geheugen raadplegen…',
   preprocess: 'Vraag begrijpen…',
+  decompose: 'Vraag opdelen in onderdelen…',
+  hyde: 'Hypothetisch antwoord schetsen…',
   expand: 'Zoekvragen genereren…',
   embed: 'Vraag omzetten naar vector…',
   retrieve: 'Documenten zoeken…',
   rerank: 'Beste fragmenten kiezen…',
   answer: 'Antwoord schrijven…',
+  reflect: 'Antwoord controleren…',
+  cascade: 'Sterker model raadplegen…',
+  followups: 'Vervolgvragen bedenken…',
 };
 
 const EXAMPLE_QUESTIONS = [
@@ -224,7 +253,12 @@ export function ChatBox({
         ) : null}
 
         {response ? (
-          <AnswerPanel response={response} streamingText={streamingText} pending={pending} />
+          <AnswerPanel
+            response={response}
+            streamingText={streamingText}
+            pending={pending}
+            onAskFollowUp={onExampleClick}
+          />
         ) : null}
       </section>
 
@@ -365,10 +399,12 @@ function AnswerPanel({
   response,
   streamingText,
   pending,
+  onAskFollowUp,
 }: {
   response: ChatResponse;
   streamingText: string | null;
   pending: boolean;
+  onAskFollowUp: (q: string) => void;
 }) {
   const tone =
     response.kind === 'fallback'
@@ -384,12 +420,39 @@ function AnswerPanel({
       ? response.rewrite.rewritten
       : null;
 
+  // V0.3: tijdens streaming kan tekst <thinking>/<answer>/<confidence> bevatten.
+  // Parse client-side zodat we alleen het echte antwoord tonen.
+  const parsedStreaming = streamingText !== null ? parseStreamingV03(streamingText) : null;
+  const displayText =
+    parsedStreaming !== null
+      ? parsedStreaming.answer
+      : response.answer;
+  const stillThinking =
+    parsedStreaming !== null &&
+    parsedStreaming.thinking !== null &&
+    parsedStreaming.answer.length === 0;
+
+  const extras = response.kind === 'answer' ? response.extras : undefined;
+
   return (
     <div className={`rounded-lg border p-4 ${tone}`}>
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
           {response.botVersion}
         </span>
+        {extras?.fromCache ? (
+          <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900 dark:text-violet-200">
+            uit cache
+          </span>
+        ) : null}
+        {extras?.cascadeUsed ? (
+          <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-200">
+            sterker model
+          </span>
+        ) : null}
+        {extras?.confidence !== undefined ? (
+          <ConfidenceBadge value={extras.confidence} />
+        ) : null}
       </div>
       {rewriteToShow ? (
         <div className="mb-3 rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
@@ -397,13 +460,109 @@ function AnswerPanel({
           <span className="italic">{rewriteToShow}</span>
         </div>
       ) : null}
-      <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
-        {streamingText !== null ? streamingText : response.answer}
-        {streamingText !== null && pending ? (
-          <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-zinc-400 align-middle dark:bg-zinc-500" />
-        ) : null}
-      </p>
+      {extras?.subQueries && extras.subQueries.length > 1 ? (
+        <details className="mb-3 rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+          <summary className="cursor-pointer font-medium">
+            Vraag opgesplitst in {extras.subQueries.length} sub-vragen
+          </summary>
+          <ul className="mt-1 list-disc pl-4">
+            {extras.subQueries.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {stillThinking ? (
+        <p className="text-sm italic text-zinc-500 dark:text-zinc-400">
+          💭 Aan het nadenken…
+        </p>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
+          <CitedText
+            text={displayText}
+            sources={response.kind !== 'smalltalk' ? response.sources : []}
+          />
+          {streamingText !== null && pending ? (
+            <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-zinc-400 align-middle dark:bg-zinc-500" />
+          ) : null}
+        </p>
+      )}
+      {extras?.followUps && extras.followUps.length > 0 && streamingText === null ? (
+        <FollowUpsBar followUps={extras.followUps} onPick={onAskFollowUp} />
+      ) : null}
       {streamingText === null ? <Stats response={response} /> : null}
+    </div>
+  );
+}
+
+function ConfidenceBadge({ value }: { value: number }) {
+  const pct = Math.round(value * 100);
+  const tone =
+    value >= 0.8
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200'
+      : value >= 0.5
+        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+        : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200';
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${tone}`}>
+      confidence {pct}%
+    </span>
+  );
+}
+
+function CitedText({
+  text,
+  sources,
+}: {
+  text: string;
+  sources: { filename: string | null; similarity: number }[];
+}) {
+  // Split rond [N] tokens en render ze als kleine sup-badges.
+  const parts: React.ReactNode[] = [];
+  const re = /\[(\d+)\]/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const num = Number.parseInt(m[1], 10);
+    const src = sources[num - 1];
+    parts.push(
+      <sup
+        key={`${m.index}`}
+        title={src ? `${src.filename ?? '(geen filename)'} · sim ${src.similarity.toFixed(3)}` : `chunk ${num}`}
+        className="ml-0.5 inline-block cursor-help rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      >
+        {num}
+      </sup>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+function FollowUpsBar({
+  followUps,
+  onPick,
+}: {
+  followUps: string[];
+  onPick: (q: string) => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-col gap-1">
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">Vervolgvragen</span>
+      <div className="flex flex-wrap gap-1.5">
+        {followUps.map((q, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(q)}
+            className="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 hover:border-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
