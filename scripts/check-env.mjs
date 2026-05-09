@@ -82,9 +82,18 @@ try {
   fail(`fetch failed: ${err.message}`);
 }
 
+console.log('\n--- V0 AI provider keys (soft check) ---');
+const v0Keys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'];
+for (const k of v0Keys) {
+  const v = process.env[k];
+  if (!v) console.log(`  ⚠ ${k} not set — required vóór V0 RAG-flow getest kan worden`);
+  else if (v.startsWith('sk-ant-your') || v.startsWith('sk-your')) console.log(`  ⚠ ${k} still placeholder`);
+  else pass(`${k} present (${v.length} chars)`);
+}
+
 console.log('');
 if (allOk) {
-  console.log('✓ All checks passed. Ready for Phase 1.');
+  console.log('✓ All required checks passed.');
   process.exit(0);
 } else {
   console.log('✗ One or more checks failed. Fix .env.local and retry.');

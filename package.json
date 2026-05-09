@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check-env": "node --env-file=.env.local scripts/check-env.mjs"
+    "check-env": "node --env-file=.env.local scripts/check-env.mjs",
+    "verify-schema": "node --env-file=.env.local scripts/verify-schema.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

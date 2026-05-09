@@ -45,19 +45,9 @@ create index organizations_deleted_at_idx
 
 alter table public.organizations enable row level security;
 
--- Members can see their own (non-deleted) organizations.
-create policy "organizations_select_own"
-  on public.organizations
-  for select
-  to authenticated
-  using (
-    deleted_at is null
-    and id in (
-      select organization_id
-      from public.organization_members
-      where user_id = (select auth.uid())
-    )
-  );
+-- Note: SELECT policy for organizations is defined further down, AFTER
+-- organization_members exists, since it references that table in a subquery
+-- and Postgres validates referenced relations at policy-creation time.
 
 -- No INSERT/UPDATE/DELETE policy: customers cannot mutate organizations
 -- via RLS. Jorion-admin handles this via service-role wrappers.
@@ -142,6 +132,26 @@ create policy "organization_members_select_own"
 
 -- No INSERT/UPDATE/DELETE policy: membership changes happen via
 -- service-role wrappers (Jorion-admin invite flow, sectie 21).
+
+
+-- =============================================================================
+-- DEFERRED POLICY: organizations.SELECT
+-- =============================================================================
+-- Defined here (not next to the table) because it references
+-- organization_members in a subquery — that table must exist before the
+-- policy can be created.
+create policy "organizations_select_own"
+  on public.organizations
+  for select
+  to authenticated
+  using (
+    deleted_at is null
+    and id in (
+      select organization_id
+      from public.organization_members
+      where user_id = (select auth.uid())
+    )
+  );
 
 
 -- =============================================================================
