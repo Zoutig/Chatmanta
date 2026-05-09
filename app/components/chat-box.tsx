@@ -154,7 +154,7 @@ function AnswerPanel({ response }: { response: ChatResponse }) {
 function Stats({ response }: { response: ChatResponse }) {
   const items: string[] = [];
   if (response.kind === 'smalltalk') {
-    items.push('smalltalk · geen retrieval');
+    items.push('direct · geen retrieval');
     items.push(`pre ${response.preProcessTokens.in}→${response.preProcessTokens.out}t`);
     items.push(`$${response.totalCostUsd.toFixed(6)}`);
   } else {
@@ -198,7 +198,7 @@ function SourcesPanelBody({ response }: { response: ChatResponse | null }) {
   if (response.kind === 'smalltalk') {
     return (
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-        Smalltalk — geen retrieval uitgevoerd.
+        Direct antwoord — geen documenten doorzocht.
       </p>
     );
   }
