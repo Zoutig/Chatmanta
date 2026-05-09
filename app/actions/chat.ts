@@ -9,11 +9,19 @@
 // cookie check here too; V0 demo accepts proxy alone.
 
 import { runRagQuery, type ChatResponse } from '@/lib/v0/server/rag';
+import { resolveBot } from '@/lib/v0/server/bots';
 
 export async function askQuestion(input: {
   question: string;
   threshold: number;
   enableRewrite: boolean;
+  version: string;
 }): Promise<ChatResponse> {
-  return runRagQuery(input);
+  const bot = resolveBot(input.version);
+  return runRagQuery({
+    question: input.question,
+    threshold: input.threshold,
+    enableRewrite: input.enableRewrite,
+    bot,
+  });
 }

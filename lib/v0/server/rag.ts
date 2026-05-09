@@ -12,6 +12,7 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import type { BotConfig } from './bots';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -23,7 +24,9 @@ const EMBED_DIM = 1536;
 const EMBED_COST_PER_M_USD = 0.02;
 const EMBED_BATCH_SIZE = 100;
 
-const CHAT_MODEL = 'gpt-4o-mini';
+// Cost rates voor gpt-4o-mini (USD per 1M tokens). Wanneer een toekomstige
+// bot-versie naar een ander chat-model gaat, moet dit een lookup-tabel
+// worden — voor nu is gpt-4o-mini de enige V0-keuze.
 const CHAT_INPUT_PER_M_USD = 0.15;
 const CHAT_OUTPUT_PER_M_USD = 0.60;
 
@@ -31,73 +34,20 @@ const CHAT_OUTPUT_PER_M_USD = 0.60;
 const CHUNK_CHARS = 2000;
 const CHUNK_OVERLAP_CHARS = 200;
 
-// V0 RAG config (parallel aan lib/rag/config.ts; V0 wegwerp dus apart).
-// Default 0.4 in plaats van blueprint-default 0.7: V0 testing toont dat
-// OpenAI text-embedding-3-small + NL content scoort in 0.4-0.6 range zelfs
-// voor goede matches (zie git commit b8d74b5 + project memory).
+// Structurele defaults — niet bot-versie-specifiek. Voor per-versie variatie
+// (prompts, threshold, temperatuur, model) zie lib/v0/server/bots.ts.
 export const V0_RAG_DEFAULTS = {
   TOP_K: 5,
-  SIMILARITY_THRESHOLD: 0.4,
   MAX_CONTEXT_CHARS: 12000,
   CHAT_MAX_TOKENS: 500,
-  // 0.4 (was 0.2): geeft het model wat ruimte om te herformuleren ipv woordelijk
-  // citeren, zonder feitelijkheid op te offeren. Anti-hallucinatie blijft via
-  // de system prompt afgedwongen.
-  CHAT_TEMPERATURE: 0.4,
   REWRITE_TEMPERATURE: 0.3,
   REWRITE_MAX_TOKENS: 200,
-  ENABLE_REWRITE_BY_DEFAULT: true,
 } as const;
 
 export const FALLBACK_MESSAGE =
   'Daar heb ik geen informatie over. Stel je vraag anders, of neem contact op met de organisatie.';
 
-const SYSTEM_PROMPT = `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
-
-Toon:
-- Professioneel, behulpzaam, warm — alsof je het team vertegenwoordigt.
-- Spreek vanuit "wij" / "ons team" / "ChatManta" waar dat natuurlijk is.
-- Klink alsof je alles van het project weet uit eerste hand.
-
-Antwoord-regels:
-- Verwerk de feiten DIRECT in je antwoord — alsof je ze gewoon weet.
-- Gebruik NOOIT meta-formuleringen zoals "uit de context blijkt", "volgens de documenten", "op basis van de informatie", "in de gegeven tekst staat". Die zinnen zijn verboden.
-- Geef GEEN feiten die niet in de context staan. Als iets ontbreekt: zeg eerlijk dat je dat niet zeker weet en bied aan om door te verwijzen.
-- Antwoord in dezelfde taal als de vraag — default Nederlands.
-- Houd het beknopt maar volledig — meestal 2-5 zinnen, in vlotte spreektaal.`;
-
-// Pre-processor prompt — bepaalt of input direct beantwoord wordt (smalltalk
-// + meta-vragen over de bot) of via RAG (kennisvraag uit de documenten).
-// Eén LLM-call, twee uitkomsten.
-const PRE_PROCESS_SYSTEM = `Je bent de pre-processor voor de klantcontact-assistent van ChatManta (een product van Jorion Solutions). Je gesprekspartners zijn meestal vrienden van de founders, geïnteresseerden, of founders zelf.
-
-Bekijk de input en kies EXACT één van twee acties:
-
-A) SMALLTALK — gebruik dit als de input GEEN documenten-zoekactie nodig heeft. Drie types vallen hieronder:
-   1) Begroetingen, bedankjes, afscheid, korte conversatie — bv. "hey", "hoi", "bedankt", "doei", "ok", "leuk".
-   2) Vragen OVER jou of je rol — bv. "wat doe je?", "wat kan je?", "waar kan je me mee helpen?", "wie ben je?", "hoe werk je?".
-   3) Vragen over algemene assistentie zonder specifieke kennisvraag — bv. "kan je me helpen?", "ik heb een vraag".
-
-   → Geef zelf een professioneel-warm antwoord van 1-3 zinnen in de stijl van een klantcontact-medewerker. Spreek vanuit "wij" / "ChatManta" / "ons team" waar passend. Klink alsof je voor ChatManta werkt en het project goed kent.
-
-   Voorbeelden:
-   - "hey" → "Hoi! Leuk dat je er bent. Wat wil je weten over ChatManta?"
-   - "wat kan je?" → "Ik help je graag met alles rond ChatManta — wat het is, wat het doet, voor wie we het bouwen, en hoe het technisch werkt. Stel gerust een vraag."
-   - "bedankt" → "Graag gedaan! Laat het weten als er nog iets is."
-
-B) SEARCH — gebruik dit voor inhoudelijke vragen waarvoor je in onze documentatie moet kijken. Bv. "wat doet ChatManta?", "welke stack gebruiken jullie?", "wat is de prijs?", "hoe werkt de RAG?", "voor welke doelgroep?".
-   → Herschrijf de vraag tot een goede semantische zoekvraag: corrigeer typfouten, maak impliciete onderwerpen expliciet ("wat is dat?" → "wat is ChatManta?"), voeg synoniemen toe waar nuttig. Behoud de intentie.
-   → Geef GEEN antwoord — alleen de herschreven zoekvraag.
-
-Antwoord ALTIJD in EXACT dit formaat (geen extra tekst, geen aanhalingstekens om de tekst):
-
-ACTION: smalltalk
-REPLY: <je antwoord>
-
-OF
-
-ACTION: search
-QUERY: <herschreven zoekvraag>`;
+// (System prompts leven per bot-versie in lib/v0/server/bots.ts.)
 
 // ---------------------------------------------------------------------------
 // Lazy clients
@@ -186,18 +136,20 @@ type ChatCompleteResult = {
 };
 
 async function chatComplete({
+  model,
   system,
   user,
-  temperature = V0_RAG_DEFAULTS.CHAT_TEMPERATURE,
+  temperature,
   maxTokens = V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
 }: {
+  model: string;
   system: string;
   user: string;
-  temperature?: number;
+  temperature: number;
   maxTokens?: number;
 }): Promise<ChatCompleteResult> {
   const resp = await openai().chat.completions.create({
-    model: CHAT_MODEL,
+    model,
     temperature,
     max_tokens: maxTokens,
     messages: [
@@ -264,9 +216,13 @@ function parsePreProcessOutput(raw: string): { kind: 'smalltalk'; reply: string 
   return { kind: 'search', query };
 }
 
-async function preProcessInput(original: string): Promise<PreProcessResult> {
+async function preProcessInput(
+  original: string,
+  bot: BotConfig,
+): Promise<PreProcessResult> {
   const result = await chatComplete({
-    system: PRE_PROCESS_SYSTEM,
+    model: bot.chatModel,
+    system: bot.preProcessSystem,
     user: original,
     temperature: V0_RAG_DEFAULTS.REWRITE_TEMPERATURE,
     maxTokens: V0_RAG_DEFAULTS.REWRITE_MAX_TOKENS,
@@ -351,14 +307,19 @@ export type ChatRewriteInfo = {
   costUsd: number;
 };
 
+type BaseChatResponse = {
+  /** Bot version that produced this response. */
+  botVersion: string;
+};
+
 export type ChatResponse =
-  | {
+  | (BaseChatResponse & {
       kind: 'smalltalk';
       answer: string;
       preProcessTokens: { in: number; out: number };
       totalCostUsd: number;
-    }
-  | {
+    })
+  | (BaseChatResponse & {
       kind: 'answer';
       answer: string;
       rewrite: ChatRewriteInfo | null;
@@ -368,8 +329,8 @@ export type ChatResponse =
       chatInputTokens: number;
       chatOutputTokens: number;
       totalCostUsd: number;
-    }
-  | {
+    })
+  | (BaseChatResponse & {
       kind: 'fallback';
       answer: string;
       reason: string;
@@ -379,7 +340,7 @@ export type ChatResponse =
       threshold: number;
       embedTokens: number;
       totalCostUsd: number;
-    };
+    });
 
 const EXCERPT_CHARS = 240;
 
@@ -397,11 +358,13 @@ function toSource(c: RetrievedChunk): ChatSource {
 export async function runRagQuery({
   question,
   threshold,
-  enableRewrite = V0_RAG_DEFAULTS.ENABLE_REWRITE_BY_DEFAULT,
+  enableRewrite,
+  bot,
 }: {
   question: string;
   threshold: number;
-  enableRewrite?: boolean;
+  enableRewrite: boolean;
+  bot: BotConfig;
 }): Promise<ChatResponse> {
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     throw new Error('threshold must be in [0, 1]');
@@ -417,9 +380,10 @@ export async function runRagQuery({
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
   if (enableRewrite) {
-    const pp = await preProcessInput(original);
+    const pp = await preProcessInput(original, bot);
     if (pp.kind === 'smalltalk') {
       return {
+        botVersion: bot.version,
         kind: 'smalltalk',
         answer: pp.reply,
         preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
@@ -450,6 +414,7 @@ export async function runRagQuery({
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
   if (relevant.length === 0) {
     return {
+      botVersion: bot.version,
       kind: 'fallback',
       answer: FALLBACK_MESSAGE,
       reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
@@ -477,9 +442,15 @@ export async function runRagQuery({
   const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
   // 6. LLM call.
-  const chat = await chatComplete({ system: SYSTEM_PROMPT, user: userPrompt });
+  const chat = await chatComplete({
+    model: bot.chatModel,
+    system: bot.systemPrompt,
+    user: userPrompt,
+    temperature: bot.chatTemperature,
+  });
 
   return {
+    botVersion: bot.version,
     kind: 'answer',
     answer: chat.text.trim(),
     rewrite: rewriteInfo,

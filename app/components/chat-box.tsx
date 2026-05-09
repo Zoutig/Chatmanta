@@ -5,9 +5,11 @@ import { askQuestion } from '../actions/chat';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 
 export function ChatBox({
+  botVersion,
   defaultThreshold,
   defaultEnableRewrite,
 }: {
+  botVersion: string;
   defaultThreshold: number;
   defaultEnableRewrite: boolean;
 }) {
@@ -25,7 +27,12 @@ export function ChatBox({
     setError(null);
     startTransition(async () => {
       try {
-        const res = await askQuestion({ question: q, threshold, enableRewrite });
+        const res = await askQuestion({
+          question: q,
+          threshold,
+          enableRewrite,
+          version: botVersion,
+        });
         setResponse(res);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Onbekende fout');
@@ -137,6 +144,11 @@ function AnswerPanel({ response }: { response: ChatResponse }) {
 
   return (
     <div className={`rounded-lg border p-4 ${tone}`}>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+          {response.botVersion}
+        </span>
+      </div>
       {rewriteToShow ? (
         <div className="mb-3 rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
           <span className="font-medium">Herschreven voor zoekopdracht:</span>{' '}
