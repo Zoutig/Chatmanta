@@ -46,6 +46,9 @@ next-env.d.ts
 graphify-out/
 .superpowers/
 
+# eval framework outputs (markdown + CSV per run, regenereerbaar uit DB)
+/eval-out/
+
 # playwright
 /test-results/
 /playwright-report/

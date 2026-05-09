@@ -1,0 +1,151 @@
+{
+  "_meta": {
+    "description": "V0 eval seed corpus — gold-vragen voor ChatManta v0.4 eval framework. Re-seed via `npm run eval:seed` is idempotent op slug.",
+    "based_on": "scripts/fixtures/v0-sample.md (V0 sample document)",
+    "version": 1,
+    "language": "nl"
+  },
+  "questions": [
+    {
+      "slug": "wat-doet-chatmanta",
+      "question": "Wat doet ChatManta?",
+      "gold_answer": "ChatManta is een knowledge-bot voor MKB-bedrijven. Klanten uploaden documenten en koppelen hun website; ChatManta indexeert die kennis en stelt een chatbot beschikbaar als embedded widget op de klantsite om bezoekersvragen te beantwoorden.",
+      "gold_facts": [
+        "knowledge-bot voor MKB",
+        "klanten uploaden documenten",
+        "website-koppeling / crawlen",
+        "embedded widget"
+      ],
+      "tags": ["product", "core"],
+      "difficulty": "easy"
+    },
+    {
+      "slug": "vector-database",
+      "question": "Welke vector-database gebruikt ChatManta?",
+      "gold_answer": "ChatManta gebruikt pgvector — de Postgres-extensie voor vector-similarity-search.",
+      "gold_facts": ["pgvector"],
+      "tags": ["stack", "tech"],
+      "difficulty": "easy"
+    },
+    {
+      "slug": "oprichter-jorion",
+      "question": "Wie is de oprichter van Jorion Solutions?",
+      "gold_answer": "Sebastiaan Olyslag is de oprichter van Jorion Solutions.",
+      "gold_facts": ["Sebastiaan Olyslag"],
+      "tags": ["company", "factual"],
+      "difficulty": "easy"
+    },
+    {
+      "slug": "v1-llm-model",
+      "question": "Welk LLM-model gebruikt V1 van ChatManta?",
+      "gold_answer": "V1 draait op Anthropic Claude Haiku 4.5 voor de actieve LLM-calls.",
+      "gold_facts": ["Claude Haiku 4.5", "Anthropic"],
+      "tags": ["stack", "llm"],
+      "difficulty": "easy"
+    },
+    {
+      "slug": "embedding-model",
+      "question": "Welk embedding-model gebruikt ChatManta en hoeveel dimensies heeft het?",
+      "gold_answer": "ChatManta gebruikt OpenAI text-embedding-3-small met 1536 dimensies.",
+      "gold_facts": ["text-embedding-3-small", "OpenAI", "1536 dimensies"],
+      "tags": ["stack", "embeddings"],
+      "difficulty": "easy"
+    },
+    {
+      "slug": "hosting-platform",
+      "question": "Op welk platform wordt ChatManta gehost?",
+      "gold_answer": "Hosting en cron jobs draaien op Vercel.",
+      "gold_facts": ["Vercel"],
+      "tags": ["stack", "infra"],
+      "difficulty": "easy"
+    },
+    {
+      "slug": "kernprincipes",
+      "question": "Wat zijn de drie kernprincipes van ChatManta?",
+      "gold_answer": "ChatManta is gebouwd rond drie principes: multi-tenancy by design (organization_id + RLS op klantdata), anti-hallucinatie (fallback-zin als geen chunk de similarity-drempel haalt), en cost-discipline (LLM-calls gelogd met tokens en EUR).",
+      "gold_facts": [
+        "multi-tenancy by design",
+        "anti-hallucinatie / fallback",
+        "cost-discipline / token-logging"
+      ],
+      "tags": ["principles", "core"],
+      "difficulty": "medium"
+    },
+    {
+      "slug": "firecrawl-limit",
+      "question": "Hoeveel pagina's mag Firecrawl maximaal crawlen per klantwebsite?",
+      "gold_answer": "Firecrawl heeft een limiet van 50 pagina's per crawl.",
+      "gold_facts": ["50 pagina's", "Firecrawl"],
+      "tags": ["stack", "limits"],
+      "difficulty": "medium"
+    },
+    {
+      "slug": "supabase-region",
+      "question": "In welke regio draait de Supabase-instance?",
+      "gold_answer": "Supabase draait in de West Europe region.",
+      "gold_facts": ["West Europe"],
+      "tags": ["stack", "infra"],
+      "difficulty": "medium"
+    },
+    {
+      "slug": "fallback-gedrag",
+      "question": "Wat doet ChatManta als geen enkele chunk de similarity-drempel haalt?",
+      "gold_answer": "Dan valt de bot terug op een vooraf ingestelde fallback-zin in plaats van iets te verzinnen — anti-hallucination by design.",
+      "gold_facts": [
+        "fallback-zin",
+        "geen verzonnen antwoord / anti-hallucinatie",
+        "similarity-drempel niet gehaald"
+      ],
+      "tags": ["principles", "rag-behaviour"],
+      "difficulty": "medium"
+    },
+    {
+      "slug": "doelgroep-jorion",
+      "question": "Voor welke doelgroep bouwt Jorion Solutions?",
+      "gold_answer": "Jorion Solutions bouwt SaaS-producten voor het MKB, met focus op AI-toepassingen die direct meetbare waarde leveren.",
+      "gold_facts": ["MKB", "SaaS", "AI met meetbare waarde"],
+      "tags": ["company", "positioning"],
+      "difficulty": "medium"
+    },
+    {
+      "slug": "stack-overzicht",
+      "question": "Welke technologieën vormen samen de V1-stack van ChatManta?",
+      "gold_answer": "V1 combineert Next.js 14+ (App Router) met TypeScript, Supabase (Postgres + Auth + Storage + pgvector) in West Europe, Anthropic Claude Haiku 4.5 voor LLM-calls, OpenAI text-embedding-3-small (1536 dim) voor embeddings, Firecrawl voor het crawlen, en Vercel voor hosting/cron.",
+      "gold_facts": [
+        "Next.js 14+ App Router",
+        "TypeScript",
+        "Supabase (Postgres / Auth / Storage / pgvector)",
+        "Claude Haiku 4.5",
+        "text-embedding-3-small",
+        "Firecrawl",
+        "Vercel"
+      ],
+      "tags": ["stack", "synthesis"],
+      "difficulty": "hard"
+    },
+    {
+      "slug": "rls-uitleg",
+      "question": "Hoe wordt klantdata afgeschermd in ChatManta?",
+      "gold_answer": "Elk stukje klantdata heeft een organization_id en is afgeschermd via Row-Level Security (RLS) — multi-tenancy by design.",
+      "gold_facts": ["organization_id", "Row-Level Security", "multi-tenancy"],
+      "tags": ["security", "principles"],
+      "difficulty": "hard"
+    },
+    {
+      "slug": "out-of-corpus-prijs",
+      "question": "Wat kost ChatManta per maand voor een klant?",
+      "gold_answer": "De prijs is niet beschikbaar in de kennisbasis. Het juiste gedrag is dat de bot eerlijk zegt dat hij dat niet zeker weet en aanbiedt om door te verwijzen — niet een prijs verzinnen.",
+      "gold_facts": [],
+      "tags": ["out-of-corpus", "anti-hallucination"],
+      "difficulty": "hard"
+    },
+    {
+      "slug": "smalltalk-greeting",
+      "question": "Hoi, wat kan je voor mij doen?",
+      "gold_answer": "Een warme, professionele begroeting van 1-3 zinnen die uitnodigt tot een inhoudelijke vraag over ChatManta — geen documenten-zoekactie nodig. Spreekt vanuit 'wij' / 'ons team' / 'ChatManta'.",
+      "gold_facts": [],
+      "tags": ["smalltalk", "preprocessor"],
+      "difficulty": "easy"
+    }
+  ]
+}
