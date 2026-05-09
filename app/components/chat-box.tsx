@@ -202,15 +202,17 @@ export function ChatBox({
         />
         {history.length > 0 ? <HistoryPanel history={history} /> : null}
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Vraag
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+              Vraag
+            </span>
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Stel een vraag over de geüploade documenten…"
               rows={3}
               maxLength={1000}
-              className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
             />
           </label>
 
@@ -243,7 +245,8 @@ export function ChatBox({
         </form>
 
         {error ? (
-          <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+          <div className="rounded-md border border-zinc-200 border-l-2 border-l-red-500 bg-white p-3 text-sm text-red-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-red-400">
+            <span className="mr-2 text-[10px] uppercase tracking-[0.08em]">Fout</span>
             {error}
           </div>
         ) : null}
@@ -283,23 +286,28 @@ function SessionStats({
   onReset: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-      <span>
-        <strong>Sessie</strong> ({version})
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+      <span className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+        Sessie
       </span>
+      <span className="font-mono text-zinc-700 dark:text-zinc-300">{version}</span>
+      <span className="text-zinc-300 dark:text-zinc-700">·</span>
       <span className="text-zinc-500 dark:text-zinc-400">
         {queryCount} {queryCount === 1 ? 'vraag' : 'vragen'}
       </span>
-      <span className="font-mono">${costUsd.toFixed(6)}</span>
-      <span className="text-zinc-500 dark:text-zinc-400">·</span>
+      <span className="text-zinc-300 dark:text-zinc-700">·</span>
+      <span className="font-mono text-zinc-900 dark:text-zinc-50">
+        ${costUsd.toFixed(6)}
+      </span>
+      <span className="text-zinc-300 dark:text-zinc-700">·</span>
       <span className="text-zinc-500 dark:text-zinc-400">
-        {turnCount} {turnCount === 1 ? 'turn in geschiedenis' : 'turns in geschiedenis'}
+        {turnCount} {turnCount === 1 ? 'turn' : 'turns'}
       </span>
       {turnCount > 0 ? (
         <button
           type="button"
           onClick={onReset}
-          className="ml-auto rounded border border-zinc-300 px-2 py-0.5 text-zinc-600 hover:border-red-400 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-700 dark:hover:text-red-400"
+          className="ml-auto rounded border border-zinc-200 px-2 py-0.5 text-[11px] text-zinc-500 hover:border-red-400 hover:text-red-600 dark:border-zinc-800 dark:text-zinc-500 dark:hover:border-red-700 dark:hover:text-red-400"
         >
           Reset gesprek
         </button>
@@ -309,27 +317,31 @@ function SessionStats({
 }
 
 function PhaseIndicator({ phase }: { phase: PipelinePhase }) {
+  const accentDot =
+    phase === 'answer' || phase === 'retrieve'
+      ? 'bg-emerald-500 dark:bg-emerald-400'
+      : 'bg-zinc-400 dark:bg-zinc-500';
   return (
-    <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-zinc-500 dark:bg-zinc-400" />
-      <span>{PHASE_LABELS[phase]}</span>
+    <div className="flex items-center gap-3 rounded-md border border-zinc-200 border-l-2 border-l-zinc-400 bg-white p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:border-l-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+      <span className={`inline-block h-2 w-2 animate-pulse rounded-full ${accentDot}`} />
+      <span className="font-mono text-xs">{PHASE_LABELS[phase]}</span>
     </div>
   );
 }
 
 function HistoryPanel({ history }: { history: ChatHistoryTurn[] }) {
   return (
-    <details className="rounded-md border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
-      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-        Gespreks-geschiedenis ({history.length / 2} turns)
+    <details className="rounded-md border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+        Geschiedenis · {history.length / 2} turns
       </summary>
-      <ul className="space-y-2 px-3 pb-3">
+      <ul className="space-y-1.5 px-3 pb-3">
         {history.map((t, i) => (
           <li
             key={i}
-            className="rounded border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+            className="rounded border border-zinc-200 border-l-2 border-l-zinc-300 bg-zinc-50 p-2 text-xs dark:border-zinc-800 dark:border-l-zinc-700 dark:bg-zinc-950"
           >
-            <span className="mr-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <span className="mr-2 font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
               {t.role === 'user' ? 'jij' : 'bot'}
             </span>
             <span className="whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">{t.content}</span>
@@ -348,8 +360,10 @@ function ExamplesBar({
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">Voorbeeldvragen</span>
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+        Voorbeeldvragen
+      </span>
       <div className="flex flex-wrap gap-1.5">
         {EXAMPLE_QUESTIONS.map((q) => (
           <button
@@ -375,11 +389,13 @@ function ThresholdSlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+    <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">
       <span className="flex items-baseline justify-between">
-        Similarity threshold
-        <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-          {value.toFixed(2)} (lager = lossere match, hoger = strikter)
+        <span className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+          Similarity threshold
+        </span>
+        <span className="font-mono text-xs text-zinc-900 dark:text-zinc-50">
+          {value.toFixed(2)}
         </span>
       </span>
       <input
@@ -391,6 +407,9 @@ function ThresholdSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-zinc-900 dark:accent-zinc-50"
       />
+      <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+        lager = lossere match · hoger = strikter
+      </span>
     </label>
   );
 }
@@ -406,12 +425,13 @@ function AnswerPanel({
   pending: boolean;
   onAskFollowUp: (q: string) => void;
 }) {
-  const tone =
+  // Border-left accent per response-kind. Subtiele all-around border + bg blijven uniform.
+  const accentClass =
     response.kind === 'fallback'
-      ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
+      ? 'border-l-amber-500'
       : response.kind === 'smalltalk'
-        ? 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950'
-        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900';
+        ? 'border-l-sky-500'
+        : 'border-l-zinc-900 dark:border-l-emerald-500';
 
   const rewriteToShow =
     response.kind !== 'smalltalk' &&
@@ -423,10 +443,7 @@ function AnswerPanel({
   // V0.3: tijdens streaming kan tekst <thinking>/<answer>/<confidence> bevatten.
   // Parse client-side zodat we alleen het echte antwoord tonen.
   const parsedStreaming = streamingText !== null ? parseStreamingV03(streamingText) : null;
-  const displayText =
-    parsedStreaming !== null
-      ? parsedStreaming.answer
-      : response.answer;
+  const displayText = parsedStreaming !== null ? parsedStreaming.answer : response.answer;
   const stillThinking =
     parsedStreaming !== null &&
     parsedStreaming.thinking !== null &&
@@ -435,35 +452,47 @@ function AnswerPanel({
   const extras = response.kind === 'answer' ? response.extras : undefined;
 
   return (
-    <div className={`rounded-lg border p-4 ${tone}`}>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+    <div
+      className={`rounded-lg border border-zinc-200 border-l-2 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 ${accentClass}`}
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
           {response.botVersion}
         </span>
+        {response.kind === 'fallback' ? (
+          <span className="text-[10px] uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
+            Fallback
+          </span>
+        ) : null}
+        {response.kind === 'smalltalk' ? (
+          <span className="text-[10px] uppercase tracking-[0.08em] text-sky-700 dark:text-sky-400">
+            Smalltalk
+          </span>
+        ) : null}
         {extras?.fromCache ? (
-          <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900 dark:text-violet-200">
-            uit cache
+          <span className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">
+            Cache
           </span>
         ) : null}
         {extras?.cascadeUsed ? (
-          <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-200">
-            sterker model
+          <span className="rounded border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-orange-700 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300">
+            Cascade
           </span>
         ) : null}
-        {extras?.confidence !== undefined ? (
-          <ConfidenceBadge value={extras.confidence} />
-        ) : null}
+        {extras?.confidence !== undefined ? <ConfidenceBadge value={extras.confidence} /> : null}
       </div>
       {rewriteToShow ? (
-        <div className="mb-3 rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
-          <span className="font-medium">Herschreven voor zoekopdracht:</span>{' '}
+        <div className="mb-3 rounded border border-zinc-200 border-l-2 border-l-blue-500 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          <span className="mr-1 text-[10px] uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">
+            Rewritten
+          </span>
           <span className="italic">{rewriteToShow}</span>
         </div>
       ) : null}
       {extras?.subQueries && extras.subQueries.length > 1 ? (
-        <details className="mb-3 rounded border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
-          <summary className="cursor-pointer font-medium">
-            Vraag opgesplitst in {extras.subQueries.length} sub-vragen
+        <details className="mb-3 rounded border border-zinc-200 border-l-2 border-l-blue-500 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">
+            Sub-vragen · {extras.subQueries.length}
           </summary>
           <ul className="mt-1 list-disc pl-4">
             {extras.subQueries.map((q, i) => (
@@ -474,7 +503,8 @@ function AnswerPanel({
       ) : null}
       {stillThinking ? (
         <p className="text-sm italic text-zinc-500 dark:text-zinc-400">
-          💭 Aan het nadenken…
+          <span className="mr-1 text-[10px] uppercase tracking-[0.08em]">Denkt</span>
+          aan het nadenken…
         </p>
       ) : (
         <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-50">
@@ -499,13 +529,15 @@ function ConfidenceBadge({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const tone =
     value >= 0.8
-      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200'
+      ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
       : value >= 0.5
-        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-        : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200';
+        ? 'border-yellow-200 text-yellow-800 dark:border-yellow-900 dark:text-yellow-300'
+        : 'border-red-200 text-red-700 dark:border-red-900 dark:text-red-300';
   return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${tone}`}>
-      confidence {pct}%
+    <span
+      className={`rounded border bg-white px-1.5 py-0.5 font-mono text-[10px] dark:bg-zinc-900 ${tone}`}
+    >
+      conf {pct}%
     </span>
   );
 }
@@ -530,7 +562,7 @@ function CitedText({
       <sup
         key={`${m.index}`}
         title={src ? `${src.filename ?? '(geen filename)'} · sim ${src.similarity.toFixed(3)}` : `chunk ${num}`}
-        className="ml-0.5 inline-block cursor-help rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+        className="ml-0.5 inline-block cursor-help rounded bg-zinc-100 px-1 font-mono text-[9px] font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
       >
         {num}
       </sup>,
@@ -549,8 +581,10 @@ function FollowUpsBar({
   onPick: (q: string) => void;
 }) {
   return (
-    <div className="mt-3 flex flex-col gap-1">
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">Vervolgvragen</span>
+    <div className="mt-3 flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+        Vervolgvragen
+      </span>
       <div className="flex flex-wrap gap-1.5">
         {followUps.map((q, i) => (
           <button
@@ -597,7 +631,9 @@ function Stats({ response }: { response: ChatResponse }) {
 function SourcesPanel({ response }: { response: ChatResponse | null }) {
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Bronnen</h2>
+      <h2 className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+        Bronnen
+      </h2>
       <SourcesPanelBody response={response} />
     </div>
   );
@@ -624,27 +660,29 @@ function SourcesPanelBody({ response }: { response: ChatResponse | null }) {
     );
   }
   return (
-    <ul className="mt-3 space-y-3">
-      {response.sources.map((s, i) => (
-        <li
-          key={i}
-          className={`rounded border p-2 text-xs ${
-            s.similarity >= response.threshold
-              ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40'
-              : 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950'
-          }`}
-        >
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate font-medium text-zinc-700 dark:text-zinc-300">
-              {s.filename ?? '(geen filename)'}
-            </span>
-            <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
-              {s.similarity.toFixed(3)}
-            </span>
-          </div>
-          <p className="mt-1 text-zinc-600 dark:text-zinc-400">{s.contentExcerpt}</p>
-        </li>
-      ))}
+    <ul className="mt-3 space-y-2">
+      {response.sources.map((s, i) => {
+        const hit = s.similarity >= response.threshold;
+        const accent = hit
+          ? 'border-l-emerald-500'
+          : 'border-l-zinc-300 dark:border-l-zinc-700';
+        return (
+          <li
+            key={i}
+            className={`rounded border border-zinc-200 border-l-2 bg-white p-2 text-xs dark:border-zinc-800 dark:bg-zinc-950 ${accent}`}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="truncate font-medium text-zinc-700 dark:text-zinc-300">
+                {s.filename ?? '(geen filename)'}
+              </span>
+              <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                {s.similarity.toFixed(3)}
+              </span>
+            </div>
+            <p className="mt-1 text-zinc-600 dark:text-zinc-400">{s.contentExcerpt}</p>
+          </li>
+        );
+      })}
     </ul>
   );
 }
