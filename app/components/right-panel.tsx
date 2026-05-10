@@ -7,12 +7,13 @@ import { DocsView } from './docs-view';
 import { SettingsView } from './settings-view';
 import { EmbedView } from './embed-view';
 import { EvalsView } from './evals-view';
+import { LatencyView } from './latency-view';
 import { PromptView } from './prompt-view';
 import { ClaimsView } from './claims-view';
 import type { BotMeta } from './bot-dropdown';
 import type { Length, Tone } from '@/lib/v0/style-types';
 
-export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals';
+export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals' | 'latency';
 
 export function RightPanel({
   tab,
@@ -33,6 +34,7 @@ export function RightPanel({
   activeCite,
   onCiteClick,
   docs,
+  activeOrgId,
 }: {
   tab: RightTab;
   onTabChange: (t: RightTab) => void;
@@ -57,6 +59,7 @@ export function RightPanel({
   activeCite: number | null;
   onCiteClick: (idx: number) => void;
   docs: DocSummary[];
+  activeOrgId: string;
 }) {
   const sourceCount = useMemo(() => {
     if (!response || response.kind === 'smalltalk') return 0;
@@ -125,6 +128,9 @@ export function RightPanel({
         <Tab tab="evals" active={tab === 'evals'} onClick={onTabChange}>
           Evals
         </Tab>
+        <Tab tab="latency" active={tab === 'latency'} onClick={onTabChange}>
+          Latency
+        </Tab>
       </div>
       <div className="right-content">
         {tab === 'sources' ? (
@@ -164,6 +170,7 @@ export function RightPanel({
         ) : null}
         {tab === 'embed' ? <EmbedView botVersion={botVersion} /> : null}
         {tab === 'evals' ? <EvalsView /> : null}
+        {tab === 'latency' ? <LatencyView organizationId={activeOrgId} /> : null}
       </div>
     </aside>
   );
