@@ -74,7 +74,21 @@ export function RightPanel({
           overflow-x: auto in globals.css niet doorkwam naar de computed
           style. Gevolg: 7 tabs op 380px width pasten niet en de laatste
           (Evals) was niet bereikbaar. Quick-fix; nettere oplossing
-          (overflow-menu of stacked) komt in een latere sessie. */}
+          (overflow-menu of stacked) komt in een latere sessie.
+
+          ::-webkit-scrollbar regels kunnen niet via inline-style; een
+          dedicated <style>-tag (raw CSS, geen PostCSS pipeline) zet de
+          dark/light scrollbar-tinten correct. */}
+      <style>{`
+        .right-tabs::-webkit-scrollbar { height: 4px; }
+        .right-tabs::-webkit-scrollbar-track { background: transparent; }
+        .right-tabs::-webkit-scrollbar-thumb {
+          background: var(--surface-3);
+          border-radius: 2px;
+          border: none;
+        }
+        .right-tabs::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+      `}</style>
       <div
         className="right-tabs"
         role="tablist"
@@ -82,6 +96,7 @@ export function RightPanel({
           overflowX: 'auto',
           overflowY: 'hidden',
           scrollbarWidth: 'thin',
+          scrollbarColor: 'var(--surface-3) transparent',
           scrollBehavior: 'smooth',
           maskImage:
             'linear-gradient(to right, black 0, black calc(100% - 18px), transparent 100%)',
