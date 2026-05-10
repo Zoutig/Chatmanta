@@ -33,16 +33,25 @@ Optioneel, indien beschikbaar op de gebruikersmachine (vraag de gebruiker waar z
 
 ## Werkstroom per sessie
 
-### Bij elke nieuwe sessie (eerste actie, vóór je antwoord geeft op de eerste vraag)
+### Bij elke nieuwe sessie
 
+De **SessionStart hook** in `.claude/settings.json` runt automatisch `.claude/hooks/session-start.mjs` en geeft je een briefing in je context:
+- Huidige branch + of je achterloopt op `origin/main`
+- Recente commits op `origin/main` van de teamgenoot
+- Lokale uncommitted wijzigingen
+- Open PRs
+
+**Belangrijk:** de hook doet `git fetch` (alleen ophalen), géén `git pull` (die zou ongevraagd kunnen mergen). Als je achterloopt: vraag de gebruiker of pull veilig is.
+
+Heb je geen briefing gekregen (hook gefaald)? Doe handmatig:
 ```bash
-git status                                          # huidige branch + clean state?
+git status
 git fetch origin
-git log HEAD..origin/main --oneline                 # wat heeft de teamgenoot gepushed?
-gh pr list --state merged --limit 5 2>/dev/null     # recent gemergde PRs voor context
+git log HEAD..origin/main --oneline
+gh pr list --state open --limit 5
 ```
 
-Als er nieuwe commits/PRs zijn: lees de PR descriptions met `gh pr view <n>` om te begrijpen wat er veranderd is. Zo bouw je context op over werk dat de teamgenoot heeft gedaan terwijl jij offline was.
+Bij interessante PRs: `gh pr view <n>` voor de volledige description en diff.
 
 ### Voor elke niet-triviale taak
 

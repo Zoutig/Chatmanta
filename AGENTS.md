@@ -93,11 +93,22 @@ Twee developers (Sebastiaan + Jorian, beide junior) bouwen aan deze codebase. Vo
 > **Voor een nieuwe Claude Code sessie**: lees `docs/ONBOARDING_AGENT.md` om volledig op te starten.
 > **Voor mensen**: `docs/ONBOARDING.md` heeft de setup-instructies.
 
-**Bij elke nieuwe sessie (eerste actie, vóór je iets anders doet):**
-1. `git status` — bevestig schone state
-2. `git fetch origin && git log HEAD..origin/main --oneline` — wat heeft de collega gepushed sinds vorige sessie?
-3. Bij recent gemergde PRs: `gh pr list --state merged --limit 5` voor context op collega's werk
-4. Als er nieuwe code is: lees `graphify-out/GRAPH_REPORT.md` voor structurele veranderingen
+**Bij elke nieuwe sessie:**
+
+De SessionStart hook (`.claude/hooks/session-start.mjs`) doet automatisch een `git fetch` en levert je een briefing:
+- Huidige branch, of je achterloopt op `origin/main`, recente commits van de teamgenoot
+- Lokale uncommitted wijzigingen
+- Open PRs
+
+Heb je deze briefing niet zien verschijnen (hook faalde of niet ingeladen)? Doe handmatig:
+```
+git status && git fetch origin && git log HEAD..origin/main --oneline
+gh pr list --state open --limit 5
+```
+
+Bij recente code-wijzigingen: lees `graphify-out/GRAPH_REPORT.md` voor structurele context.
+
+**De hook doet géén `git pull` automatisch** — dat zou ongevraagd mergeconflicten kunnen veroorzaken. Vraag de gebruiker of pull veilig is voor je het uitvoert.
 
 **Voor je begint te bouwen:**
 - Maak een feature branch: `git checkout -b feat/<naam>/<beschrijving>` (bv. `feat/seb/widget-theme`). Nooit direct op `main`.
