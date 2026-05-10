@@ -88,6 +88,10 @@ export function ChatShell({
   // All-time usage — geinitialiseerd vanuit query_log op server, daarna lokaal
   // bumpen bij elke succesvolle response zodat de footer real-time meeloopt.
   const [allTimeUsage, setAllTimeUsage] = useState<AllTimeUsage>(initialAllTimeUsage);
+  // Seed voor de EmptyState voorbeeldvragen — 0 = initial render (deterministisch
+  // i.v.m. hydration), elke "Nieuwe vraag"-klik bumpt 'm zodat de gebruiker
+  // andere 4 voorbeelden ziet.
+  const [examplesSeed, setExamplesSeed] = useState(0);
 
   // Body locking — chat-route mag niet body-scrollen, alleen interne containers.
   useEffect(() => {
@@ -276,6 +280,7 @@ export function ChatShell({
     setActiveCite(null);
     setActiveThreadId(null);
     activeThreadIdRef.current = null;
+    setExamplesSeed((s) => s + 1);
   }, []);
 
   const onSelectThread = useCallback(async (id: string) => {
@@ -391,7 +396,12 @@ export function ChatShell({
 
         <div className="conversation" ref={convoRef}>
           {turns.length === 0 ? (
-            <EmptyState onPick={ask} docCount={docs.length} chunkCount={totalChunks} />
+            <EmptyState
+              onPick={ask}
+              docCount={docs.length}
+              chunkCount={totalChunks}
+              seed={examplesSeed}
+            />
           ) : (
             <div className="conversation-inner">
               {turns.map((t, i) => {
