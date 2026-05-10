@@ -153,9 +153,33 @@ export async function POST(req: Request) {
       let finalResponse: ChatResponse | null = null;
       try {
         for await (const event of generator) {
-          // Capture the final ChatResponse for logging.
+          // Capture / merge naar finalResponse voor logQuery aan het einde.
+          // V0.4: followups-done en metrics-done vullen finalResponse aan ná
+          // answer-done. Zonder die merge zou query_log de followups-tokens en
+          // followups_ms missen.
           if (event.kind === 'smalltalk' || event.kind === 'fallback' || event.kind === 'answer-done') {
             finalResponse = event.response;
+          } else if (event.kind === 'followups-done' && finalResponse?.kind === 'answer') {
+            const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
+            finalResponse = {
+              ...fr,
+              chatInputTokens: fr.chatInputTokens + event.inputTokens,
+              chatOutputTokens: fr.chatOutputTokens + event.outputTokens,
+              totalCostUsd: fr.totalCostUsd + event.costUsd,
+              extras: {
+                ...(fr.extras ?? {}),
+                ...(event.followUps.length > 0 ? { followUps: event.followUps } : {}),
+              },
+            };
+          } else if (event.kind === 'metrics-done' && finalResponse?.kind === 'answer') {
+            const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
+            finalResponse = {
+              ...fr,
+              extras: {
+                ...(fr.extras ?? {}),
+                phaseTimingsMs: event.phaseTimingsMs,
+              },
+            };
           }
           controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
         }

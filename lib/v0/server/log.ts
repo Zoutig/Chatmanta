@@ -61,6 +61,10 @@ type QueryLogRow = {
   // queries; true + pattern naam voor verdachte input.
   injection_detected: boolean;
   injection_pattern: string | null;
+  // v0.4 cache telemetry (migration 0012). True wanneer answer_cache een hit
+  // gaf en de pipeline vroeg-exit deed. False voor smalltalk/fallback/blocked
+  // en voor verse RAG-runs.
+  from_cache: boolean;
 };
 
 /**
@@ -153,6 +157,7 @@ export async function logQuery(
     const generationMs = typeof t?.generation_ms === 'number' ? t.generation_ms : null;
     const totalMs = typeof t?.total_ms === 'number' ? t.total_ms : null;
     const phaseTimings = t ?? null;
+    const fromCache = extras?.fromCache === true;
 
     const row: QueryLogRow =
       response.kind === 'smalltalk'
@@ -186,6 +191,7 @@ export async function logQuery(
             phase_timings_ms: null,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
+            from_cache: false,
           }
         : {
             organization_id: organizationId,
@@ -223,6 +229,7 @@ export async function logQuery(
             phase_timings_ms: phaseTimings,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
+            from_cache: fromCache,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -307,6 +314,7 @@ export async function logBlockedQuery(input: {
       phase_timings_ms: null,
       injection_detected: true,
       injection_pattern: input.injectionPattern,
+      from_cache: false,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);

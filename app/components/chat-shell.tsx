@@ -246,6 +246,35 @@ export function ChatShell({
               } else if (event.kind === 'answer-done') {
                 final = event.response;
                 updateLastTurn({ response: event.response, streamingText: null, livePhase: null });
+              } else if (event.kind === 'followups-done' && final?.kind === 'answer') {
+                // V0.4: followups komen apart binnen na answer-done. Merge in
+                // de UI-turn én in `final` zodat persistTurn straks de juiste
+                // tokens/cost in usage opneemt.
+                const fr: Extract<ChatResponse, { kind: 'answer' }> = final;
+                final = {
+                  ...fr,
+                  chatInputTokens: fr.chatInputTokens + event.inputTokens,
+                  chatOutputTokens: fr.chatOutputTokens + event.outputTokens,
+                  totalCostUsd: fr.totalCostUsd + event.costUsd,
+                  extras: {
+                    ...(fr.extras ?? {}),
+                    ...(event.followUps.length > 0 ? { followUps: event.followUps } : {}),
+                  },
+                };
+                updateLastTurn({ response: final, livePhase: null });
+              } else if (event.kind === 'metrics-done' && final?.kind === 'answer') {
+                // V0.4: finale phaseTimingsMs (inclusief followups_ms). Vervangt
+                // de partial die op answer-done meekwam. Daarna is `final`
+                // compleet en mag persistTurn draaien.
+                const fr: Extract<ChatResponse, { kind: 'answer' }> = final;
+                final = {
+                  ...fr,
+                  extras: {
+                    ...(fr.extras ?? {}),
+                    phaseTimingsMs: event.phaseTimingsMs,
+                  },
+                };
+                updateLastTurn({ response: final });
               } else if (event.kind === 'error') {
                 throw new Error(event.message);
               }
