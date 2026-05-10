@@ -1074,6 +1074,19 @@ export type StreamEvent =
     }
   | { kind: 'answer-delta'; text: string }
   | { kind: 'answer-done'; response: ChatResponse }
+  // V0.4: followups draaien nu ná answer-done zodat de gebruiker het antwoord
+  // direct ziet i.p.v. ~0.8s te wachten. Dit event levert de followUps na
+  // (samen met de extra token/cost-deltas die nog niet in answer-done zaten).
+  | {
+      kind: 'followups-done';
+      followUps: string[];
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+    }
+  // V0.4: finale phaseTimingsMs nadat followups_ms is gemeten. Consumer moet
+  // hierop wachten vóór logQuery anders mist query_log de followups-fase.
+  | { kind: 'metrics-done'; phaseTimingsMs: PhaseTimings }
   | { kind: 'error'; message: string };
 
 export async function* runRagQueryStreaming(input: {
@@ -1561,24 +1574,13 @@ export async function* runRagQueryStreaming(input: {
     stopVerify();
   }
 
-  // Follow-ups generatie (na het uiteindelijke antwoord, kan in parallel met
-  // cache write — maar simpel sequential voor nu).
-  if (bot.generateFollowUps) {
-    yield { kind: 'status', phase: 'followups' };
-    const stopFollowups = tMark('followups_ms');
-    try {
-      const fu = await generateFollowUps(original, finalAnswerText, bot);
-      followUps = fu.followUps;
-      followUpsInputTokens = fu.inputTokens;
-      followUpsOutputTokens = fu.outputTokens;
-      followUpsCost = fu.costUsd;
-    } catch (err) {
-      console.warn('[followups] failed:', err);
-    }
-    stopFollowups();
-  }
+  // V0.4: followups draaien hier nog NIET. We yielden eerst answer-done met
+  // alle data exclusief followups, daarna pas (na een aparte status+yield)
+  // de followups-done en metrics-done events. Dit haalt ~0.8s p50 van de
+  // time-to-final-answer voor de gebruiker — followups zijn UI-bonus, geen
+  // onderdeel van het kernantwoord.
 
-  const totalCost =
+  const totalCostBeforeFollowups =
     embedCost +
     preCacheEmbedCost +
     selectiveHyDEEmbedCost +
@@ -1589,10 +1591,29 @@ export async function* runRagQueryStreaming(input: {
     rerankCost +
     decomposeCost +
     hydeCost +
-    cascadeCost +
-    followUpsCost;
+    cascadeCost;
 
-  const finalResponse: ChatResponse = {
+  // phaseTimingsMs op answer-done — followups_ms ontbreekt nog (komt via
+  // metrics-done event nadat followups is gemeten). total_ms is hier de
+  // time-to-final-answer; metrics-done stuurt later de geüpdate total.
+  const phaseTimingsAtAnswer: PhaseTimings = {
+    embedding_ms: timings.embedding_ms ?? 0,
+    retrieval_ms: timings.retrieval_ms ?? 0,
+    generation_ms: timings.generation_ms ?? 0,
+    total_ms: Math.round(performance.now() - tPipelineStart),
+    ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
+    ...(timings.cache_lookup_ms !== undefined
+      ? { cache_lookup_ms: timings.cache_lookup_ms }
+      : {}),
+    ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
+    ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
+    ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
+    ...(timings.rerank_ms !== undefined ? { rerank_ms: timings.rerank_ms } : {}),
+    ...(timings.cascade_ms !== undefined ? { cascade_ms: timings.cascade_ms } : {}),
+    ...(timings.verify_ms !== undefined ? { verify_ms: timings.verify_ms } : {}),
+  };
+
+  const initialResponse: ChatResponse = {
     botVersion: bot.version,
     tone,
     length,
@@ -1608,20 +1629,18 @@ export async function* runRagQueryStreaming(input: {
       rerankInputTokens +
       cascadeInputTokens +
       decomposeInputTokens +
-      hydeInputTokens +
-      followUpsInputTokens,
+      hydeInputTokens,
     chatOutputTokens:
       chatOutputTokens +
       rerankOutputTokens +
       cascadeOutputTokens +
       decomposeOutputTokens +
-      hydeOutputTokens +
-      followUpsOutputTokens,
-    totalCostUsd: totalCost,
+      hydeOutputTokens,
+    totalCostUsd: totalCostBeforeFollowups,
     extras: {
       ...(confidence !== null ? { confidence } : {}),
       ...(cascadeUsed ? { cascadeUsed: true } : {}),
-      ...(followUps && followUps.length > 0 ? { followUps } : {}),
+      // followUps wordt apart geyield via 'followups-done' — niet hier.
       ...(subQueries.length > 1 ? { subQueries } : {}),
       ...(hydeDoc ? { hydeDocument: hydeDoc } : {}),
       // v0.4 retrieval-telemetry — top-1 sim vóór threshold + HyDE-augment,
@@ -1636,39 +1655,66 @@ export async function* runRagQueryStreaming(input: {
       ...(bot.claimVerification
         ? { claimVerificationThreshold: bot.claimVerificationThreshold }
         : {}),
-      // v0.4 latency profiling — finalize total + propagate full breakdown.
-      phaseTimingsMs: {
-        embedding_ms: timings.embedding_ms ?? 0,
-        retrieval_ms: timings.retrieval_ms ?? 0,
-        generation_ms: timings.generation_ms ?? 0,
-        total_ms: Math.round(performance.now() - tPipelineStart),
-        ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
-        ...(timings.cache_lookup_ms !== undefined
-          ? { cache_lookup_ms: timings.cache_lookup_ms }
-          : {}),
-        ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
-        ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
-        ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
-        ...(timings.rerank_ms !== undefined ? { rerank_ms: timings.rerank_ms } : {}),
-        ...(timings.cascade_ms !== undefined ? { cascade_ms: timings.cascade_ms } : {}),
-        ...(timings.verify_ms !== undefined ? { verify_ms: timings.verify_ms } : {}),
-        ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
-      },
+      phaseTimingsMs: phaseTimingsAtAnswer,
     },
   };
 
-  // Cache write (fire-and-forget) — v0.3+. V0.4: hergebruik de pre-cache embed
-  // vector ipv opnieuw embedden (~1.2s + cost-saving per request). Echte error-
-  // log ipv stille catch, zodat we cache-write failures kunnen zien — eerste
-  // latency-analyse vond 0% hit-rate en de stille catch maskeerde mogelijk
-  // de oorzaak.
+  yield { kind: 'answer-done', response: initialResponse };
+
+  // Followups na de answer-done yield — gebruiker ziet antwoord al, followups
+  // verschijnen kort daarna in de UI via het followups-done event.
+  if (bot.generateFollowUps) {
+    yield { kind: 'status', phase: 'followups' };
+    const stopFollowups = tMark('followups_ms');
+    try {
+      const fu = await generateFollowUps(original, finalAnswerText, bot);
+      followUps = fu.followUps;
+      followUpsInputTokens = fu.inputTokens;
+      followUpsOutputTokens = fu.outputTokens;
+      followUpsCost = fu.costUsd;
+    } catch (err) {
+      console.warn('[followups] failed:', err);
+    }
+    stopFollowups();
+    yield {
+      kind: 'followups-done',
+      followUps: followUps ?? [],
+      inputTokens: followUpsInputTokens,
+      outputTokens: followUpsOutputTokens,
+      costUsd: followUpsCost,
+    };
+  }
+
+  // Finale phaseTimingsMs — bevat nu ook followups_ms (als die ran). total_ms
+  // wordt opnieuw berekend zodat de followups-tijd erin meetelt.
+  const phaseTimingsFinal: PhaseTimings = {
+    ...phaseTimingsAtAnswer,
+    total_ms: Math.round(performance.now() - tPipelineStart),
+    ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
+  };
+  yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsFinal };
+
+  // Cache write (fire-and-forget) — v0.4: hergebruik de pre-cache embed
+  // vector ipv opnieuw embedden (~1.2s + cost-saving per request). Echte
+  // error-log ipv stille catch. We schrijven de COMPLETE response naar de
+  // cache (inclusief followups + finale timings), zodat een cache-hit later
+  // dezelfde UX levert als een verse RAG-run.
   if (bot.cacheEnabled && cacheEmbedVector) {
-    writeCachedAnswer(original, cacheEmbedVector, bot.version, finalResponse, orgId).catch(
+    const cachedResponse: ChatResponse = {
+      ...initialResponse,
+      chatInputTokens: initialResponse.chatInputTokens + followUpsInputTokens,
+      chatOutputTokens: initialResponse.chatOutputTokens + followUpsOutputTokens,
+      totalCostUsd: initialResponse.totalCostUsd + followUpsCost,
+      extras: {
+        ...initialResponse.extras,
+        ...(followUps && followUps.length > 0 ? { followUps } : {}),
+        phaseTimingsMs: phaseTimingsFinal,
+      },
+    };
+    writeCachedAnswer(original, cacheEmbedVector, bot.version, cachedResponse, orgId).catch(
       (err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err),
     );
   }
-
-  yield { kind: 'answer-done', response: finalResponse };
 }
 
 // ---------------------------------------------------------------------------
