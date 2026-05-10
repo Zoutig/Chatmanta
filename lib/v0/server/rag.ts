@@ -423,7 +423,15 @@ async function retrieveChunksHybrid(
 
 // ---------------------------------------------------------------------------
 // Answer cache — embedding-based near-duplicate lookup. Hit threshold ~0.97.
+//
+// V0.4 latency-werk: we roepen de RPC nu met min_similarity=0 aan en filteren
+// de threshold in TS, zodat we bij een miss alsnog de top-1 similarity kunnen
+// loggen. Eerste latency-analyse vond 0/17 hits in productie inclusief 3×
+// dezelfde vraag — zonder best-sim-log is niet te zien of dat door (a) lege
+// cache, (b) te streng threshold, of (c) andere oorzaak komt.
 // ---------------------------------------------------------------------------
+const CACHE_HIT_THRESHOLD = 0.97;
+
 async function lookupCachedAnswer(
   queryVector: number[],
   botVersion: string,
@@ -434,20 +442,29 @@ async function lookupCachedAnswer(
     p_organization_id: organizationId,
     p_bot_version: botVersion,
     query_embedding: queryVector,
-    min_similarity: 0.97,
+    min_similarity: 0,
   });
   if (error) {
     console.warn('[cache] lookup failed:', error.message);
     return null;
   }
-  const hit = (data ?? [])[0];
-  if (!hit) return null;
+  const top = (data ?? [])[0] as { id: string; response_json: ChatResponse; similarity: number } | undefined;
+  if (!top) {
+    console.info(`[cache] miss — no candidates org=${organizationId} ver=${botVersion}`);
+    return null;
+  }
+  if (top.similarity < CACHE_HIT_THRESHOLD) {
+    console.info(
+      `[cache] miss — best_sim=${top.similarity.toFixed(3)} (need ≥${CACHE_HIT_THRESHOLD}) org=${organizationId} ver=${botVersion}`,
+    );
+    return null;
+  }
   // Bump hit_count fire-and-forget.
   sb.from('answer_cache')
     .update({ hit_count: undefined, last_hit_at: new Date().toISOString() })
-    .eq('id', hit.id)
+    .eq('id', top.id)
     .then(() => undefined);
-  return hit.response_json as ChatResponse;
+  return top.response_json;
 }
 
 async function writeCachedAnswer(
@@ -1106,6 +1123,12 @@ export async function* runRagQueryStreaming(input: {
   // decompose, follow-ups) gebruiken hun eigen task-specifieke prompts.
   const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
 
+  // V0.4 latency: bewaar de pre-cache embed-vector op outer scope zodat we
+  // hem kunnen hergebruiken bij de fire-and-forget cache-write na het
+  // antwoord (zie verderop). Spaart één embed-call (~1.2s) per request waar
+  // bot.cacheEnabled aan staat.
+  let cacheEmbedVector: number[] | null = null;
+
   // 1. Pre-process (smalltalk shortcut + rewrite).
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
@@ -1152,7 +1175,8 @@ export async function* runRagQueryStreaming(input: {
     stopEmbedCache();
     preCacheEmbedTokens = cacheEmbed.tokens;
     preCacheEmbedCost = cacheEmbed.costUsd;
-    const cached = await lookupCachedAnswer(cacheEmbed.vectors[0], bot.version, orgId);
+    cacheEmbedVector = cacheEmbed.vectors[0];
+    const cached = await lookupCachedAnswer(cacheEmbedVector, bot.version, orgId);
     stopCache();
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
@@ -1617,14 +1641,15 @@ export async function* runRagQueryStreaming(input: {
     },
   };
 
-  // Cache write (fire-and-forget) — alleen v0.3.
-  if (bot.cacheEnabled) {
-    // Embed origineel was al gedaan voor pre-cache lookup; hergebruik die.
-    // We hebben de vector niet apart bewaard, dus skip cache write als
-    // pre-cache embed niet draaide. Embed is goedkoop dus even opnieuw doen.
-    embedTexts([original])
-      .then((r) => writeCachedAnswer(original, r.vectors[0], bot.version, finalResponse, orgId))
-      .catch(() => undefined);
+  // Cache write (fire-and-forget) — v0.3+. V0.4: hergebruik de pre-cache embed
+  // vector ipv opnieuw embedden (~1.2s + cost-saving per request). Echte error-
+  // log ipv stille catch, zodat we cache-write failures kunnen zien — eerste
+  // latency-analyse vond 0% hit-rate en de stille catch maskeerde mogelijk
+  // de oorzaak.
+  if (bot.cacheEnabled && cacheEmbedVector) {
+    writeCachedAnswer(original, cacheEmbedVector, bot.version, finalResponse, orgId).catch(
+      (err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err),
+    );
   }
 
   yield { kind: 'answer-done', response: finalResponse };
