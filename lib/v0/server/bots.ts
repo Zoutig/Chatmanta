@@ -270,7 +270,12 @@ const V0_4: BotConfig = {
   // useHyDE blijft true: het BETEKENT nu "HyDE is beschikbaar"; selectiveHyDE
   // bepaalt of die beschikbaarheid daadwerkelijk getriggerd wordt per query.
   claimVerification: true,
-  claimVerificationThreshold: 0.7,
+  // Empirisch: text-embedding-3-small op Nederlandse tekst geeft cosine-sim
+  // 0.45–0.65 voor "duidelijk overlappende" content, niet 0.7+. 0.4 matcht
+  // de retrieval-threshold default en sluit aan op de V0-tuning (zie memory
+  // v0_rag_threshold_finding). Bij 0.7 werd zelfs letterlijk gequote bron
+  // gemarkeerd als "ongegrond".
+  claimVerificationThreshold: 0.4,
 };
 
 // ---------------------------------------------------------------------------
