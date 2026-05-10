@@ -88,7 +88,7 @@ Bouw geen vooruit-werk uit een latere fase. Definition of Done van vorige fase m
 
 ## Werken in een team van twee
 
-Twee developers (Sebastiaan + Jorian, beide junior) bouwen aan deze codebase. Voorkom mergeconflicten en zorg dat de andere agent + persoon je werk kunnen volgen.
+Twee developers (Sebastiaan + Niels, beide junior) bouwen aan deze codebase. Voorkom mergeconflicten en zorg dat de andere agent + persoon je werk kunnen volgen.
 
 > **Voor een nieuwe Claude Code sessie**: lees `docs/ONBOARDING_AGENT.md` om volledig op te starten.
 > **Voor mensen**: `docs/ONBOARDING.md` heeft de setup-instructies.
@@ -127,6 +127,6 @@ Bij recente code-wijzigingen: lees `graphify-out/GRAPH_REPORT.md` voor structure
 - Afspraak: gebruik `--no-verify` alleen voor noodgevallen waarbij je het uitlegt in de commit message.
 - Review is *niet* afgedwongen, maar de afspraak is: vraag collega om te kijken voor je merget.
 
-**Voor agents specifiek (Sebastiaan + Jorian's Claude Code):**
+**Voor agents specifiek (Sebastiaan + Niels' Claude Code):**
 - Krijg je een `[BLOCKED]` melding bij `git push`? Goed — je probeerde direct op main te pushen. Maak een feature branch en push opnieuw.
 - Probeer NOOIT `git push --no-verify` zonder dat de gebruiker er expliciet om vraagt. Dit ondermijnt de hele bescherming.
