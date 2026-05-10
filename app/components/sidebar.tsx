@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { Icon } from './svg-icons';
 import type { ThreadSummary } from '@/lib/v0/server/threads';
 import type { AllTimeUsage } from '@/lib/v0/server/log';
+import type { OrgOption } from './chat-shell';
+import { setActiveOrgAction } from '../actions/active-org';
 
 export function Sidebar({
   threads,
@@ -13,6 +15,8 @@ export function Sidebar({
   onDeleteThread,
   usage,
   onNewChat,
+  activeOrgSlug,
+  availableOrgs,
 }: {
   threads: ThreadSummary[];
   activeThreadId: string | null;
@@ -20,6 +24,8 @@ export function Sidebar({
   onDeleteThread: (id: string) => void;
   usage: AllTimeUsage;
   onNewChat: () => void;
+  activeOrgSlug: string;
+  availableOrgs: OrgOption[];
 }) {
   const [search, setSearch] = useState('');
 
@@ -87,19 +93,130 @@ export function Sidebar({
 
       <div className="sidebar-footer">
         <UsageStrip usage={usage} />
-        <div className="user-chip">
-          <div className="user-avatar">SO</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="user-name">Sebastiaan O.</div>
-            <div className="user-org">jorion · admin</div>
-          </div>
-          <span style={{ color: 'var(--fg-dim)' }}>
-            <Icon name="dots" size={14} />
-          </span>
-        </div>
+        <OrgSwitcher activeSlug={activeOrgSlug} options={availableOrgs} />
       </div>
     </aside>
   );
+}
+
+// ---------------------------------------------------------------------------
+// OrgSwitcher — interactieve user-chip linksonder. Klik = popover met de
+// beschikbare orgs. Selectie gaat via setActiveOrgAction (zet cookie +
+// revalidatePath('/')) zodat sidebar/page een verse render krijgt met de
+// data van de nieuwe org.
+// ---------------------------------------------------------------------------
+function OrgSwitcher({
+  activeSlug,
+  options,
+}: {
+  activeSlug: string;
+  options: OrgOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside / Escape sluit de popover.
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const active = options.find((o) => o.slug === activeSlug) ?? options[0];
+  const initials = active ? deriveInitials(active.name) : 'SO';
+
+  function pick(slug: string) {
+    if (slug === activeSlug) {
+      setOpen(false);
+      return;
+    }
+    startTransition(async () => {
+      const r = await setActiveOrgAction(slug);
+      if (!r.ok) {
+        console.warn('setActiveOrg failed:', r.error);
+        return;
+      }
+      setOpen(false);
+      // revalidatePath('/') in de action zorgt voor een verse server-render.
+    });
+  }
+
+  return (
+    <div className="org-switcher" ref={containerRef}>
+      <button
+        type="button"
+        className={`user-chip user-chip-button${open ? ' open' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={pending}
+      >
+        <div className="user-avatar">{initials}</div>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+          <div className="user-name">Sebastiaan O.</div>
+          <div className="user-org">{active?.name ?? activeSlug} · admin</div>
+        </div>
+        <span style={{ color: 'var(--fg-dim)', display: 'flex' }}>
+          {pending ? <span className="org-switcher-spinner" /> : <Icon name="caret" size={12} />}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="org-switcher-popover" role="listbox">
+          <div className="org-switcher-label">Wissel organisatie</div>
+          {options.map((o) => {
+            const isActive = o.slug === activeSlug;
+            return (
+              <button
+                key={o.slug}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                className={`org-switcher-row${isActive ? ' active' : ''}`}
+                onClick={() => pick(o.slug)}
+                disabled={pending}
+              >
+                <span className="org-switcher-row-avatar">{deriveInitials(o.name)}</span>
+                <span className="org-switcher-row-text">
+                  <span className="org-switcher-row-name">{o.name}</span>
+                  <span className="org-switcher-row-slug">{o.slug}</span>
+                </span>
+                {isActive ? (
+                  <span className="org-switcher-row-check" aria-hidden="true">
+                    <Icon name="check" size={11} />
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function deriveInitials(name: string): string {
+  const parts = name
+    .replace(/[(){}\[\]]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (parts.length === 0) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
 function ThreadItem({

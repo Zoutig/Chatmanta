@@ -81,7 +81,9 @@ export type AllTimeUsage = {
   totalTokens: number;
 };
 
-export async function getAllTimeUsage(): Promise<AllTimeUsage> {
+export async function getAllTimeUsage(
+  organizationId: string = DEV_ORG_ID,
+): Promise<AllTimeUsage> {
   const empty: AllTimeUsage = {
     queryCount: 0,
     totalCostUsd: 0,
@@ -97,7 +99,7 @@ export async function getAllTimeUsage(): Promise<AllTimeUsage> {
       .select(
         'embed_tokens, chat_in_tokens, chat_out_tokens, pre_in_tokens, pre_out_tokens, cost_usd',
       )
-      .eq('organization_id', DEV_ORG_ID);
+      .eq('organization_id', organizationId);
     if (error || !data) return empty;
     return data.reduce<AllTimeUsage>((acc, r) => {
       const embed = Number(r.embed_tokens) || 0;
@@ -125,6 +127,7 @@ export async function logQuery(
   question: string,
   response: ChatResponse,
   injection?: { detected: boolean; pattern: string | null },
+  organizationId: string = DEV_ORG_ID,
 ): Promise<void> {
   try {
     // v0.4 retrieval-telemetry + claim verification uit extras (alleen
@@ -154,7 +157,7 @@ export async function logQuery(
     const row: QueryLogRow =
       response.kind === 'smalltalk'
         ? {
-            organization_id: DEV_ORG_ID,
+            organization_id: organizationId,
             bot_version: response.botVersion,
             kind: 'smalltalk' as const,
             question,
@@ -185,7 +188,7 @@ export async function logQuery(
             injection_pattern: injection?.pattern ?? null,
           }
         : {
-            organization_id: DEV_ORG_ID,
+            organization_id: organizationId,
             bot_version: response.botVersion,
             kind: response.kind,
             question,
@@ -240,7 +243,7 @@ export async function logQuery(
     // als de tabel/kolom niet bestaat (oude DB) of insert hapert.
     if (queryLogId && claims && claims.length > 0 && verificationThreshold !== null) {
       const cvRows = claims.map((c) => ({
-        organization_id: DEV_ORG_ID,
+        organization_id: organizationId,
         query_log_id: queryLogId,
         claim_index: c.index,
         claim_text: c.text,
@@ -271,10 +274,11 @@ export async function logBlockedQuery(input: {
   length: string;
   injectionPattern: string;
   blockedMessage: string;
+  organizationId?: string;
 }): Promise<void> {
   try {
     const row: QueryLogRow = {
-      organization_id: DEV_ORG_ID,
+      organization_id: input.organizationId ?? DEV_ORG_ID,
       bot_version: input.botVersion,
       kind: 'blocked',
       question: input.question,

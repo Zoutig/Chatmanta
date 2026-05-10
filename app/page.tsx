@@ -5,6 +5,7 @@ import { listDocs } from '@/lib/v0/server/rag';
 import { listThreads } from '@/lib/v0/server/threads';
 import { getAllTimeUsage } from '@/lib/v0/server/log';
 import { BOT_VERSIONS_ORDERED, BOTS, resolveBot } from '@/lib/v0/server/bots';
+import { getActiveOrgFromCookies, listKnownOrgs } from '@/lib/v0/server/active-org';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +16,18 @@ export default async function Home({
 }) {
   const { v } = await searchParams;
   const bot = resolveBot(v);
+
+  // v0.4 multi-org: lees active-org cookie hier zodat alle data-fetches
+  // gescoped zijn op één org. Switchen via de sidebar-popover triggert
+  // revalidatePath('/'), waardoor deze re-evaluatie plaatsvindt met
+  // verse data uit de nieuwe org.
+  const activeOrg = await getActiveOrgFromCookies();
+  const orgs = listKnownOrgs();
+
   const [docs, threads, allTimeUsage] = await Promise.all([
-    listDocs(),
-    listThreads(),
-    getAllTimeUsage(),
+    listDocs(activeOrg.id),
+    listThreads(activeOrg.id),
+    getAllTimeUsage(activeOrg.id),
   ]);
   const totalChunks = docs.reduce((a, d) => a + d.chunkCount, 0);
 
@@ -35,7 +44,7 @@ export default async function Home({
 
   return (
     <ChatShell
-      key={bot.version}
+      key={`${bot.version}-${activeOrg.slug}`}
       botVersion={bot.version}
       bots={allBots}
       botFlags={{
@@ -51,6 +60,8 @@ export default async function Home({
       totalChunks={totalChunks}
       initialThreads={threads}
       initialAllTimeUsage={allTimeUsage}
+      activeOrgSlug={activeOrg.slug}
+      availableOrgs={orgs.map((o) => ({ slug: o.slug, name: o.name }))}
     />
   );
 }

@@ -80,13 +80,14 @@ function deriveTitle(firstUserMessage: string): string {
 
 // ---------------------------------------------------------------------------
 // listThreads — sidebar lijst, gesorteerd op recente activiteit.
+// v0.4 multi-org: scope op actieve org. Default DEV_ORG voor backward compat.
 // ---------------------------------------------------------------------------
-export async function listThreads(): Promise<ThreadSummary[]> {
+export async function listThreads(organizationId: string = DEV_ORG_ID): Promise<ThreadSummary[]> {
   const sb = db();
   const { data: threads, error } = await sb
     .from('v0_threads')
     .select('id, bot_version, title, created_at, updated_at')
-    .eq('organization_id', DEV_ORG_ID)
+    .eq('organization_id', organizationId)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if (error) throw new Error(`listThreads: ${error.message}`);
@@ -119,13 +120,16 @@ export async function listThreads(): Promise<ThreadSummary[]> {
 // getThread — laad volledige conversatie (header + messages in volgorde).
 // Returns null als thread niet bestaat / soft-deleted is.
 // ---------------------------------------------------------------------------
-export async function getThread(threadId: string): Promise<ThreadDetail | null> {
+export async function getThread(
+  threadId: string,
+  organizationId: string = DEV_ORG_ID,
+): Promise<ThreadDetail | null> {
   const sb = db();
   const { data: t, error: tErr } = await sb
     .from('v0_threads')
     .select('id, bot_version, title, created_at, updated_at')
     .eq('id', threadId)
-    .eq('organization_id', DEV_ORG_ID)
+    .eq('organization_id', organizationId)
     .is('deleted_at', null)
     .maybeSingle();
   if (tErr) throw new Error(`getThread: ${tErr.message}`);
@@ -185,7 +189,10 @@ export async function commitTurn(opts: {
   userContent: string;
   response: ChatResponse;
   botVersion: string;
+  /** v0.4 multi-org: schrijven naar deze org. Default DEV_ORG voor backward compat. */
+  organizationId?: string;
 }): Promise<{ summary: ThreadSummary }> {
+  const orgId = opts.organizationId ?? DEV_ORG_ID;
   const sb = db();
   const trimmedUser = opts.userContent.trim();
   if (trimmedUser.length === 0) {
@@ -205,7 +212,7 @@ export async function commitTurn(opts: {
     const { data: created, error: cErr } = await sb
       .from('v0_threads')
       .insert({
-        organization_id: DEV_ORG_ID,
+        organization_id: orgId,
         bot_version: botVersion,
         title,
       })
@@ -223,7 +230,7 @@ export async function commitTurn(opts: {
       .from('v0_threads')
       .select('id, title, bot_version, created_at')
       .eq('id', threadId)
-      .eq('organization_id', DEV_ORG_ID)
+      .eq('organization_id', orgId)
       .is('deleted_at', null)
       .maybeSingle();
     if (tErr) throw new Error(`commitTurn fetch: ${tErr.message}`);
@@ -269,7 +276,7 @@ export async function commitTurn(opts: {
     .from('v0_threads')
     .update({ updated_at: nowIso })
     .eq('id', threadId)
-    .eq('organization_id', DEV_ORG_ID);
+    .eq('organization_id', orgId);
   if (uErr) throw new Error(`commitTurn touch: ${uErr.message}`);
 
   // messageCount in summary = 2 * (turns) — handig voor sidebar-preview.
@@ -292,13 +299,16 @@ export async function commitTurn(opts: {
 // deleteThread — soft-delete; messages blijven via FK cascade staan tot
 // een eventuele hard-cleanup.
 // ---------------------------------------------------------------------------
-export async function deleteThread(threadId: string): Promise<void> {
+export async function deleteThread(
+  threadId: string,
+  organizationId: string = DEV_ORG_ID,
+): Promise<void> {
   const sb = db();
   const { error } = await sb
     .from('v0_threads')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', threadId)
-    .eq('organization_id', DEV_ORG_ID)
+    .eq('organization_id', organizationId)
     .is('deleted_at', null);
   if (error) throw new Error(`deleteThread: ${error.message}`);
 }

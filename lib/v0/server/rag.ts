@@ -1625,12 +1625,12 @@ export type DocSummary = {
   createdAt: string;
 };
 
-export async function listDocs(): Promise<DocSummary[]> {
+export async function listDocs(organizationId: string = DEV_ORG_ID): Promise<DocSummary[]> {
   const sb = supabase();
   const { data: docs, error } = await sb
     .from('documents')
     .select('id, filename, status, created_at')
-    .eq('organization_id', DEV_ORG_ID)
+    .eq('organization_id', organizationId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
   if (error) throw new Error(`listDocs: ${error.message}`);

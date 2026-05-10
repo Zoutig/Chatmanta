@@ -40,6 +40,8 @@ export type BotFlags = {
   cascadeModel: string;
 };
 
+export type OrgOption = { slug: string; name: string };
+
 export function ChatShell({
   botVersion,
   bots,
@@ -51,6 +53,8 @@ export function ChatShell({
   totalChunks,
   initialThreads,
   initialAllTimeUsage,
+  activeOrgSlug,
+  availableOrgs,
 }: {
   botVersion: string;
   bots: BotMeta[];
@@ -62,6 +66,8 @@ export function ChatShell({
   totalChunks: number;
   initialThreads: ThreadSummary[];
   initialAllTimeUsage: AllTimeUsage;
+  activeOrgSlug: string;
+  availableOrgs: OrgOption[];
 }) {
   const [threshold, setThreshold] = useState(defaultThreshold);
   const [rewriteOn, setRewriteOn] = useState(defaultEnableRewrite);
@@ -367,6 +373,8 @@ export function ChatShell({
         onDeleteThread={onDeleteThread}
         usage={allTimeUsage}
         onNewChat={onNewChat}
+        activeOrgSlug={activeOrgSlug}
+        availableOrgs={availableOrgs}
       />
 
       <main className="main">

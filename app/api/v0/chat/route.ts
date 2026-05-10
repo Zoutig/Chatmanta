@@ -105,6 +105,7 @@ export async function POST(req: Request) {
       length,
       injectionPattern: patternName,
       blockedMessage: INJECTION_BLOCKED_MESSAGE,
+      organizationId: getActiveOrgId(req),
     }).catch(() => undefined);
 
     // NDJSON-stream met één 'fallback' event zodat de client-side parser het
@@ -177,7 +178,7 @@ export async function POST(req: Request) {
         const injectionInfo = injection.detected
           ? { detected: true, pattern: injection.pattern?.name ?? null }
           : undefined;
-        logQuery(question, finalResponse, injectionInfo).catch(() => undefined);
+        logQuery(question, finalResponse, injectionInfo, organizationId).catch(() => undefined);
       }
     },
   });
