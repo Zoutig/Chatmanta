@@ -41,8 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local agent / tooling artifacts (not committed)
-.claude/
+# local agent / tooling artifacts
+# .claude/: shared files (settings.json + hooks/) WEL committen voor team-consistentie
+.claude/settings.local.json
+.claude/.cache/
 graphify-out/
 .superpowers/
 

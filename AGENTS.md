@@ -85,3 +85,48 @@ Bouw geen vooruit-werk uit een latere fase. Definition of Done van vorige fase m
 - Wijzig nooit een gemarkeerde V1 hard rule zonder te vragen
 - Als je iets niet zeker weet: zeg dat en stel een verifieerbare check voor
 - Bij library-versies en npm-packages: lees `node_modules/<pkg>/README` of recente docs voor je veronderstelt hoe de API eruitziet — Next.js, Supabase en Vercel AI SDK veranderen snel
+
+## Werken in een team van twee
+
+Twee developers (Sebastiaan + Jorian, beide junior) bouwen aan deze codebase. Voorkom mergeconflicten en zorg dat de andere agent + persoon je werk kunnen volgen.
+
+> **Voor een nieuwe Claude Code sessie**: lees `docs/ONBOARDING_AGENT.md` om volledig op te starten.
+> **Voor mensen**: `docs/ONBOARDING.md` heeft de setup-instructies.
+
+**Bij elke nieuwe sessie:**
+
+De SessionStart hook (`.claude/hooks/session-start.mjs`) doet automatisch een `git fetch` en levert je een briefing:
+- Huidige branch, of je achterloopt op `origin/main`, recente commits van de teamgenoot
+- Lokale uncommitted wijzigingen
+- Open PRs
+
+Heb je deze briefing niet zien verschijnen (hook faalde of niet ingeladen)? Doe handmatig:
+```
+git status && git fetch origin && git log HEAD..origin/main --oneline
+gh pr list --state open --limit 5
+```
+
+Bij recente code-wijzigingen: lees `graphify-out/GRAPH_REPORT.md` voor structurele context.
+
+**De hook doet géén `git pull` automatisch** — dat zou ongevraagd mergeconflicten kunnen veroorzaken. Vraag de gebruiker of pull veilig is voor je het uitvoert.
+
+**Voor je begint te bouwen:**
+- Maak een feature branch: `git checkout -b feat/<naam>/<beschrijving>` (bv. `feat/seb/widget-theme`). Nooit direct op `main`.
+- Branches kort houden — een branch die langer dan 2-3 dagen leeft = mergeconflict-risico
+- Twijfel of een file ook door collega bewerkt wordt? Vraag de gebruiker, of check `git log --all --since="2 days" -- <file>`
+
+**Voor je een PR maakt:**
+- Vul `.github/pull_request_template.md` volledig in. Dit is wat de reviewer + zijn agent leest om context te krijgen — schrijf het voor een collega die niet bij je gesprek was.
+- Run `graphify update .` bij nieuwe files of grote refactors, en commit de updated graph mee
+- Check of je geen V1 hard rules schendt (zie boven)
+- PR aanmaken met `gh pr create` — gebruik de template (gh detecteert die automatisch)
+
+**Branch protection op `main`:**
+- Lokale `.githooks/pre-push` blokkeert `git push origin main`. Hook activeert via `core.hooksPath` (auto-gezet door `npm install` via het `postinstall` script).
+- Niet 100% server-side afgedwongen — `git push --no-verify` omzeilt de hook. Dit is bewust een soft-gate: GitHub Pro is nodig voor échte server-side bescherming op een private repo.
+- Afspraak: gebruik `--no-verify` alleen voor noodgevallen waarbij je het uitlegt in de commit message.
+- Review is *niet* afgedwongen, maar de afspraak is: vraag collega om te kijken voor je merget.
+
+**Voor agents specifiek (Sebastiaan + Jorian's Claude Code):**
+- Krijg je een `[BLOCKED]` melding bij `git push`? Goed — je probeerde direct op main te pushen. Maak een feature branch en push opnieuw.
+- Probeer NOOIT `git push --no-verify` zonder dat de gebruiker er expliciet om vraagt. Dit ondermijnt de hele bescherming.

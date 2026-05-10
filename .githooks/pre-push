@@ -1,0 +1,23 @@
+#!/bin/sh
+# Blokkeert direct pushen naar 'main'. Alle wijzigingen via PR.
+# Bypass voor noodgevallen: git push --no-verify
+
+protected_branch='main'
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/$protected_branch" ]; then
+        echo ""
+        echo "[BLOCKED] Direct pushen naar '$protected_branch' is geblokkeerd."
+        echo ""
+        echo "Maak een feature branch en open een PR:"
+        echo "  git checkout -b feat/<naam>/<beschrijving>"
+        echo "  git push -u origin HEAD"
+        echo "  gh pr create"
+        echo ""
+        echo "Bypass alleen voor noodgevallen: git push --no-verify"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0
