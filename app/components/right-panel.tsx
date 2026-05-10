@@ -70,7 +70,25 @@ export function RightPanel({
 
   return (
     <aside className="right-panel">
-      <div className="right-tabs" role="tablist">
+      {/* Inline styles als bypass van een PostCSS/Tailwind v4 quirk waardoor
+          overflow-x: auto in globals.css niet doorkwam naar de computed
+          style. Gevolg: 7 tabs op 380px width pasten niet en de laatste
+          (Evals) was niet bereikbaar. Quick-fix; nettere oplossing
+          (overflow-menu of stacked) komt in een latere sessie. */}
+      <div
+        className="right-tabs"
+        role="tablist"
+        style={{
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'thin',
+          scrollBehavior: 'smooth',
+          maskImage:
+            'linear-gradient(to right, black 0, black calc(100% - 18px), transparent 100%)',
+          WebkitMaskImage:
+            'linear-gradient(to right, black 0, black calc(100% - 18px), transparent 100%)',
+        }}
+      >
         <Tab tab="sources" active={tab === 'sources'} onClick={onTabChange} count={sourceCount}>
           Bronnen
         </Tab>
@@ -156,6 +174,7 @@ function Tab({
       aria-selected={active}
       className={`right-tab${active ? ' active' : ''}`}
       onClick={() => onClick(tab)}
+      style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
     >
       {children}
       {count !== undefined && count > 0 ? <span className="count">{count}</span> : null}

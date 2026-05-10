@@ -1244,7 +1244,34 @@ body.body-fixed { overflow: hidden; }
   flex-shrink: 0;
   height: 49px;
   gap: 4px;
+  /* Quick-fix: 6 tabs passen niet meer in 380px width. Horizontale scroll
+     met fade-edge; betere oplossing (overflow-menu of stacked) komt later. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 18px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 18px),
+    transparent 100%
+  );
 }
+.right-tabs::-webkit-scrollbar { height: 4px; }
+.right-tabs::-webkit-scrollbar-track { background: transparent; }
+.right-tabs::-webkit-scrollbar-thumb {
+  background: var(--surface-2);
+  border-radius: 2px;
+  border: none;
+}
+.right-tabs::-webkit-scrollbar-thumb:hover { background: var(--surface-3); }
 .right-tab {
   background: transparent;
   border: none;
@@ -1257,6 +1284,8 @@ body.body-fixed { overflow: hidden; }
   position: relative;
   font-family: var(--font-sans);
   transition: color 0.12s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .right-tab:hover { color: var(--fg-muted); }
 .right-tab.active { color: var(--fg); }
