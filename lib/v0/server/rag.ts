@@ -1129,15 +1129,33 @@ export async function* runRagQueryStreaming(input: {
   // bot.cacheEnabled aan staat.
   let cacheEmbedVector: number[] | null = null;
 
-  // 1. Pre-process (smalltalk shortcut + rewrite).
+  // 1+2. Pre-process & cache-embed — parallel.
+  //
+  // V0.4: preProcessInput(original) en embedTexts([original]) hangen beide
+  // alleen af van `original`, niet van elkaars output. We firen ze parallel
+  // om ~1s p50 te besparen (was preprocess + cache_lookup seriëel ≈ 2.1s,
+  // nu max ≈ 1.1s). Smalltalk-pad: cache-embed is dan wasted work — laat de
+  // promise stil aflopen via void/.catch om unhandled rejection te
+  // voorkomen.
+  //
+  // LET OP: preprocess_ms en cache_lookup_ms timers overlappen nu in wall-
+  // clock tijd, dus hun som > totaal. Gebruik total_ms voor gevoelde latency.
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
-  if (enableRewrite) {
+  let preCacheEmbedTokens = 0;
+  let preCacheEmbedCost = 0;
+
+  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, history) : null;
+  const cacheEmbedPromise = bot.cacheEnabled ? embedTexts([original]) : null;
+
+  if (preProcessPromise) {
     yield { kind: 'status', phase: 'preprocess' };
     const stopPp = tMark('preprocess_ms');
-    const pp = await preProcessInput(original, bot, history);
+    const pp = await preProcessPromise;
     stopPp();
     if (pp.kind === 'smalltalk') {
+      // Discard de parallel-gestarte cache-embed — voorkom unhandled rejection.
+      if (cacheEmbedPromise) void cacheEmbedPromise.catch(() => undefined);
       yield {
         kind: 'smalltalk',
         response: {
@@ -1163,15 +1181,13 @@ export async function* runRagQueryStreaming(input: {
   }
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
-  // 2. Cache lookup (v0.3+) — embed origineel, check answer_cache.
-  //    Hit threshold 0.97 ≈ near-duplicate vraag.
-  let preCacheEmbedTokens = 0;
-  let preCacheEmbedCost = 0;
-  if (bot.cacheEnabled) {
+  // Cache lookup — embed liep al parallel met preprocess; we awaiten alleen
+  // het resultaat (in de best case is hij al klaar).
+  if (cacheEmbedPromise) {
     yield { kind: 'status', phase: 'cache' };
     const stopCache = tMark('cache_lookup_ms');
     const stopEmbedCache = tMark('embedding_ms');
-    const cacheEmbed = await embedTexts([original]);
+    const cacheEmbed = await cacheEmbedPromise;
     stopEmbedCache();
     preCacheEmbedTokens = cacheEmbed.tokens;
     preCacheEmbedCost = cacheEmbed.costUsd;
