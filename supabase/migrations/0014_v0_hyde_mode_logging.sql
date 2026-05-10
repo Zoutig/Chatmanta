@@ -1,5 +1,15 @@
 -- =============================================================================
--- Migration 0013 — V0 HyDE-modus logging
+-- Migration 0014 — V0 HyDE-modus logging
+--
+-- Hernoemd van 0013 → 0014 om naam-collision met 0013_lockdown_users_update
+-- te vermijden (beide werden parallel gemerged). Functioneel identiek aan
+-- het origineel. Als je deze migratie al onder de oude naam hebt gerund:
+--
+--   update public._migrations
+--      set id = '0014_v0_hyde_mode_logging'
+--    where id = '0013_v0_hyde_mode_logging';
+--
+-- (Run één keer per environment dat de oude naam in z'n tracking-tabel heeft.)
 --
 -- Voor systematische A/B/C-eval van HyDE-modi (Geen / Upfront / Selective)
 -- per query, los van de impliciete bot-versie-keuze. Vier kolommen:
