@@ -736,6 +736,10 @@ async function hydrateParentContent(chunks: RetrievedChunk[]): Promise<void> {
 // runRagQuery — public entrypoint for chat server action
 // ---------------------------------------------------------------------------
 export type ChatSource = {
+  /** chunk-id — gebruikt door claim-verification UI om claims naar hun
+      best-matching bron-chunk te linken. Optioneel zodat oude gecachte
+      responses zonder id-veld blijven werken. */
+  id?: string;
   filename: string | null;
   similarity: number;
   contentExcerpt: string;
@@ -853,6 +857,7 @@ const EXCERPT_CHARS = 240;
 
 function toSource(c: RetrievedChunk): ChatSource {
   return {
+    id: c.id,
     filename: c.filename,
     similarity: c.similarity,
     contentExcerpt:

@@ -8,10 +8,11 @@ import { SettingsView } from './settings-view';
 import { EmbedView } from './embed-view';
 import { EvalsView } from './evals-view';
 import { PromptView } from './prompt-view';
+import { ClaimsView } from './claims-view';
 import type { BotMeta } from './bot-dropdown';
 import type { Length, Tone } from '@/lib/v0/style-types';
 
-export type RightTab = 'sources' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals';
+export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals';
 
 export function RightPanel({
   tab,
@@ -62,11 +63,19 @@ export function RightPanel({
     return response.sources.length;
   }, [response]);
 
+  const claimCount = useMemo(() => {
+    if (!response || response.kind !== 'answer') return 0;
+    return response.extras?.claims?.length ?? 0;
+  }, [response]);
+
   return (
     <aside className="right-panel">
       <div className="right-tabs" role="tablist">
         <Tab tab="sources" active={tab === 'sources'} onClick={onTabChange} count={sourceCount}>
           Bronnen
+        </Tab>
+        <Tab tab="claims" active={tab === 'claims'} onClick={onTabChange} count={claimCount}>
+          Claims
         </Tab>
         <Tab tab="docs" active={tab === 'docs'} onClick={onTabChange} count={docs.length}>
           Documenten
@@ -92,6 +101,9 @@ export function RightPanel({
             activeCite={activeCite}
             onCiteClick={onCiteClick}
           />
+        ) : null}
+        {tab === 'claims' ? (
+          <ClaimsView response={response} onCiteClick={onCiteClick} />
         ) : null}
         {tab === 'docs' ? <DocsView docs={docs} /> : null}
         {tab === 'settings' ? (

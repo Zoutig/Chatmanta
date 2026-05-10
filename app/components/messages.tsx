@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import Image from 'next/image';
 import { Icon } from './svg-icons';
 import type { ChatResponse, PipelinePhase } from '@/lib/v0/server/rag';
+import { chipLabel, summarizeClaims, type GroundedSummary } from '@/lib/v0/claim-display';
+import { ClaimsList } from './claims-view';
 
 const PHASE_LABELS: Record<PipelinePhase, string> = {
   cache: 'Geheugen raadplegen',
@@ -86,6 +88,21 @@ function ConfidenceBadge({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const tone = value >= 0.8 ? 'high' : value >= 0.5 ? 'mid' : 'low';
   return <span className={`confidence-badge ${tone}`}>conf {pct}%</span>;
+}
+
+function GroundedChip({ summary }: { summary: GroundedSummary }) {
+  if (summary.total === 0) return null;
+  const icon = summary.tone === 'high' ? '✓' : summary.tone === 'mid' ? '~' : '⚠';
+  return (
+    <span
+      className={`grounded-chip ${summary.tone}`}
+      title={
+        `${summary.verified} verified · ${summary.partial} deels · ${summary.unverified} ongegrond`
+      }
+    >
+      {icon} {chipLabel(summary)}
+    </span>
+  );
 }
 
 function CitedText({
@@ -319,6 +336,15 @@ export function AssistantMessage({
   const sourceCount = response.kind === 'smalltalk' ? 0 : response.sources.length;
   const isStreaming = streamingText !== null;
 
+  // Claim verification: aanwezig als bot.claimVerification aan stond op de
+  // run die deze response produceerde. Tijdens streaming nog null/undefined,
+  // pas op de uiteindelijke 'answer-done' response gevuld.
+  const claimThreshold = extras?.claimVerificationThreshold ?? 0.7;
+  const claimSummary = useMemo(
+    () => summarizeClaims(extras?.claims, claimThreshold),
+    [extras?.claims, claimThreshold],
+  );
+
   const rewriteToShow =
     response.kind !== 'smalltalk' &&
     response.rewrite &&
@@ -352,6 +378,9 @@ export function AssistantMessage({
           {extras?.cascadeUsed ? <span className="kind-chip cascade">Cascade</span> : null}
           {extras?.confidence !== undefined && !isStreaming ? (
             <ConfidenceBadge value={extras.confidence} />
+          ) : null}
+          {!isStreaming && claimSummary.total > 0 ? (
+            <GroundedChip summary={claimSummary} />
           ) : null}
         </div>
       </div>
@@ -420,6 +449,24 @@ export function AssistantMessage({
           </>
         )}
       </div>
+
+      {!isStreaming && extras?.claims && extras.claims.length > 0 && response.kind === 'answer' ? (
+        <details className="claims-breakdown">
+          <summary className="claims-breakdown-summary">
+            <Icon name="caret" size={11} /> Claims · {claimSummary.verified}/{claimSummary.total} grounded
+            {claimSummary.partial > 0 ? ` · ${claimSummary.partial} deels` : ''}
+            {claimSummary.unverified > 0 ? ` · ${claimSummary.unverified} ongegrond` : ''}
+          </summary>
+          <div style={{ marginTop: 10 }}>
+            <ClaimsList
+              claims={extras.claims}
+              threshold={claimThreshold}
+              sources={response.sources}
+              onCiteClick={onCiteClick}
+            />
+          </div>
+        </details>
+      ) : null}
 
       {!isStreaming ? (
         <>
