@@ -25,7 +25,8 @@
     "eval:run-all": "npm run eval:seed && npm run eval:run && npm run eval:report",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "migrate:status": "node --env-file=.env.local scripts/migrate.mjs status",
-    "migrate:bootstrap": "node --env-file=.env.local scripts/migrate.mjs bootstrap"
+    "migrate:bootstrap": "node --env-file=.env.local scripts/migrate.mjs bootstrap",
+    "postinstall": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
