@@ -54,6 +54,7 @@ export function ChatShell({
   initialThreads,
   initialAllTimeUsage,
   activeOrgSlug,
+  activeOrgId,
   availableOrgs,
 }: {
   botVersion: string;
@@ -67,6 +68,7 @@ export function ChatShell({
   initialThreads: ThreadSummary[];
   initialAllTimeUsage: AllTimeUsage;
   activeOrgSlug: string;
+  activeOrgId: string;
   availableOrgs: OrgOption[];
 }) {
   const [threshold, setThreshold] = useState(defaultThreshold);
@@ -452,6 +454,7 @@ export function ChatShell({
           activeCite={activeCite}
           onCiteClick={onCiteClick}
           docs={docs}
+          activeOrgId={activeOrgId}
         />
       ) : null}
     </div>

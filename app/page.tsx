@@ -61,6 +61,7 @@ export default async function Home({
       initialThreads={threads}
       initialAllTimeUsage={allTimeUsage}
       activeOrgSlug={activeOrg.slug}
+      activeOrgId={activeOrg.id}
       availableOrgs={orgs.map((o) => ({ slug: o.slug, name: o.name }))}
     />
   );
