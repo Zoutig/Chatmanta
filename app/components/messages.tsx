@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import Image from 'next/image';
 import { Icon } from './svg-icons';
+import { LatencyBar } from './latency-bar';
 import type { ChatResponse, PipelinePhase } from '@/lib/v0/server/rag';
 import { chipLabel, summarizeClaims, type GroundedSummary } from '@/lib/v0/claim-display';
 import { ClaimsList } from './claims-view';
@@ -386,6 +387,9 @@ export function AssistantMessage({
       </div>
 
       {livePhase ? <PhaseLive phase={livePhase} /> : null}
+      {!isStreaming && response.kind === 'answer' ? (
+        <LatencyBar phaseTimings={extras?.phaseTimingsMs} />
+      ) : null}
 
       {rewriteToShow ? (
         <div className="rewrite-banner">
