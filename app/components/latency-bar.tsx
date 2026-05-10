@@ -10,10 +10,14 @@
 import { useState } from 'react';
 import type { PhaseTimings } from '@/lib/v0/server/rag';
 
-type PhaseKey = keyof PhaseTimings;
+// Alle PhaseTimings keys behalve 'total_ms' (dat is het geheel, niet een fase
+// op zich). Door dit type te gebruiken voor de lookup tables krijgen we
+// compile-time exhaustiveness: een nieuwe PhaseTimings-key zonder color/label
+// triggert een type-error.
+type PhaseDisplayKey = Exclude<keyof PhaseTimings, 'total_ms'>;
 
 // Kleuren — consistent met het mockup en de Latency-tab.
-const PHASE_COLOR: Record<string, string> = {
+const PHASE_COLOR: Record<PhaseDisplayKey, string> = {
   embedding_ms: '#7aa2f7',
   retrieval_ms: '#9ece6a',
   rerank_ms: '#e0af68',
@@ -28,7 +32,7 @@ const PHASE_COLOR: Record<string, string> = {
   cascade_ms: '#a9b1d6',
 };
 
-const PHASE_LABEL: Record<string, string> = {
+const PHASE_LABEL: Record<PhaseDisplayKey, string> = {
   embedding_ms: 'embed',
   retrieval_ms: 'retrieval',
   rerank_ms: 'rerank',
@@ -43,6 +47,23 @@ const PHASE_LABEL: Record<string, string> = {
   cascade_ms: 'cascade',
 };
 
+// Pipeline-volgorde — bepaalt links-naar-rechts in de stacked bar. Hoisted
+// naar module scope om per-render allocatie te vermijden.
+const ORDER: readonly PhaseDisplayKey[] = [
+  'preprocess_ms',
+  'cache_lookup_ms',
+  'decompose_ms',
+  'hyde_ms',
+  'expand_ms',
+  'embedding_ms',
+  'retrieval_ms',
+  'rerank_ms',
+  'generation_ms',
+  'verify_ms',
+  'followups_ms',
+  'cascade_ms',
+];
+
 function formatMs(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.round(ms)}ms`;
@@ -55,26 +76,11 @@ export function LatencyBar({ phaseTimings }: { phaseTimings: PhaseTimings | unde
   const total = phaseTimings.total_ms;
   if (!Number.isFinite(total) || total <= 0) return null;
 
-  // Verzamel non-zero non-total fases in de volgorde waarin ze in de pipeline
-  // ongeveer voorkomen. Zo blijft de stacked-bar leesbaar.
-  const ORDER: PhaseKey[] = [
-    'preprocess_ms',
-    'cache_lookup_ms',
-    'decompose_ms',
-    'hyde_ms',
-    'expand_ms',
-    'embedding_ms',
-    'retrieval_ms',
-    'rerank_ms',
-    'generation_ms',
-    'verify_ms',
-    'followups_ms',
-    'cascade_ms',
-  ];
+  // Verzamel non-zero fases in pipeline-volgorde (zie ORDER hierboven).
   const phases = ORDER.flatMap((k) => {
     const v = phaseTimings[k];
     if (typeof v !== 'number' || v <= 0) return [];
-    return [{ key: k as string, ms: v }];
+    return [{ key: k, ms: v }];
   });
 
   if (phases.length === 0) {

@@ -17,7 +17,6 @@
 import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { DEV_ORG_ID } from './rag';
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -139,7 +138,7 @@ function aggregateFromRows(
 // getLatencySnapshot — main entrypoint
 // ---------------------------------------------------------------------------
 export async function getLatencySnapshot(
-  organizationId: string = DEV_ORG_ID,
+  organizationId: string,
   window: LatencyWindow = '7d',
 ): Promise<LatencySnapshot> {
   const client = sb();

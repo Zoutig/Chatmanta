@@ -20,7 +20,7 @@ const WINDOWS: { key: LatencyWindow; label: string }[] = [
 ];
 
 export function LatencyView({ organizationId }: { organizationId: string }) {
-  const [window, setWindow] = useState<LatencyWindow>('7d');
+  const [currentWindow, setCurrentWindow] = useState<LatencyWindow>('7d');
   const [snapshot, setSnapshot] = useState<LatencySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +43,8 @@ export function LatencyView({ organizationId }: { organizationId: string }) {
   );
 
   useEffect(() => {
-    void load(window);
-  }, [load, window]);
+    void load(currentWindow);
+  }, [load, currentWindow]);
 
   return (
     <div className="latency-view">
@@ -55,9 +55,9 @@ export function LatencyView({ organizationId }: { organizationId: string }) {
               key={w.key}
               type="button"
               role="tab"
-              aria-selected={window === w.key}
-              className={window === w.key ? 'active' : ''}
-              onClick={() => setWindow(w.key)}
+              aria-selected={currentWindow === w.key}
+              className={currentWindow === w.key ? 'active' : ''}
+              onClick={() => setCurrentWindow(w.key)}
               disabled={loading}
             >
               {w.label}
@@ -67,7 +67,7 @@ export function LatencyView({ organizationId }: { organizationId: string }) {
         <button
           type="button"
           className="btn-secondary"
-          onClick={() => void load(window)}
+          onClick={() => void load(currentWindow)}
           disabled={loading}
           style={{ padding: '4px 8px', fontSize: 11 }}
         >
@@ -155,7 +155,7 @@ function Slowest({ slowest }: { slowest: SlowQueryRow[] }) {
             <span className="latency-slowest-q" title={r.question}>
               {r.question}
             </span>
-            <span className={`latency-slowest-ms${r.totalMs < 5000 ? ' warn' : ''}`}>
+            <span className={`latency-slowest-ms${r.totalMs >= 5000 ? ' crit' : ''}`}>
               {fmt(r.totalMs)}
             </span>
             <span className="latency-slowest-meta">

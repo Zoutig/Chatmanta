@@ -2380,10 +2380,10 @@ body.body-fixed { overflow: hidden; }
 }
 .latency-slowest-ms {
   font-variant-numeric: tabular-nums;
-  color: var(--err);
-}
-.latency-slowest-ms.warn {
   color: var(--warn);
+}
+.latency-slowest-ms.crit {
+  color: var(--err);
 }
 .latency-slowest-meta {
   color: var(--fg-faint);
