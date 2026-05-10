@@ -24,6 +24,7 @@ import { AssistantMessage, UserMessage, ErrorMessage } from './messages';
 import { RightPanel, type RightTab } from './right-panel';
 import type { BotMeta } from './bot-dropdown';
 import { useStyle } from './use-style';
+import { useHydeMode } from './use-hyde-mode';
 
 type Turn = {
   user: string;
@@ -74,6 +75,7 @@ export function ChatShell({
   const [threshold, setThreshold] = useState(defaultThreshold);
   const [rewriteOn, setRewriteOn] = useState(defaultEnableRewrite);
   const { tone, length, setTone, setLength } = useStyle();
+  const { hydeMode, setHydeMode } = useHydeMode();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [activeCite, setActiveCite] = useState<number | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>('sources');
@@ -187,6 +189,7 @@ export function ChatShell({
               history,
               tone,
               length,
+              hydeMode,
             }),
           });
           if (!res.ok || !res.body) {
@@ -295,7 +298,7 @@ export function ChatShell({
         }
       });
     },
-    [botVersion, persistTurn, rewriteOn, threshold, tone, length, updateLastTurn],
+    [botVersion, persistTurn, rewriteOn, threshold, tone, length, hydeMode, updateLastTurn],
   );
 
   const onCiteClick = useCallback((idx: number) => {
@@ -484,6 +487,8 @@ export function ChatShell({
           onToneChange={setTone}
           length={length}
           onLengthChange={setLength}
+          hydeMode={hydeMode}
+          onHydeModeChange={setHydeMode}
           rewriteOn={rewriteOn}
           onToggleRewrite={() => setRewriteOn((v) => !v)}
           botVersion={botVersion}

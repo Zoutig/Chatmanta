@@ -15,8 +15,11 @@ import { performance } from 'node:perf_hooks';
 
 import {
   runRagQueryStreaming,
+  resolveHydeMode,
   type ChatResponse,
   type ChatSource,
+  type HydeModeRequest,
+  type HydeModeResolved,
 } from './rag';
 import { resolveBot, type BotConfig } from './bots';
 
@@ -84,6 +87,11 @@ export type EvalRunRow = {
   judge_parse_error: boolean;
   judge_cost_usd: number;
   judge_latency_ms: number;
+  // v0.5 HyDE-modus tracking — voor 3-way A/B/C aggregatie in eval-report.
+  // 'auto' (default) = bot-config volgen; expliciete waarde = override.
+  // _actual = wat resolveHydeMode opleverde, voor groepering.
+  hyde_mode_requested: HydeModeRequest;
+  hyde_mode_actual: HydeModeResolved;
 };
 
 // ---------------------------------------------------------------------------
@@ -281,8 +289,12 @@ export async function runEvalRow(args: {
   organizationId: string;
   question: EvalQuestion;
   bot: BotConfig;
+  /** Optionele HyDE-modus override; 'auto' of undefined volgt bot-config. */
+  hydeMode?: HydeModeRequest;
 }): Promise<EvalRunRow> {
   const { organizationId, question, bot } = args;
+  const hydeModeRequested: HydeModeRequest = args.hydeMode ?? 'auto';
+  const hydeModeActual = resolveHydeMode(bot, hydeModeRequested);
 
   // Cache uit tijdens eval — anders cached v0.3 antwoord 1 en hergebruikt
   // dat voor identieke vragen in een herhaalde run, wat de eval onbetrouwbaar
@@ -303,6 +315,7 @@ export async function runEvalRow(args: {
       threshold: evalBot.similarityThreshold,
       enableRewrite: evalBot.enableRewriteByDefault,
       bot: evalBot,
+      hydeModeOverride: hydeModeRequested,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         response = ev.response;
@@ -336,6 +349,8 @@ export async function runEvalRow(args: {
       judge_parse_error: true,
       judge_cost_usd: 0,
       judge_latency_ms: 0,
+      hyde_mode_requested: hydeModeRequested,
+      hyde_mode_actual: hydeModeActual,
     };
   }
 
@@ -369,6 +384,8 @@ export async function runEvalRow(args: {
     judge_parse_error: judge.parseError,
     judge_cost_usd: judge.costUsd,
     judge_latency_ms: judge.latencyMs,
+    hyde_mode_requested: hydeModeRequested,
+    hyde_mode_actual: hydeModeActual,
   };
 }
 

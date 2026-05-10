@@ -11,12 +11,16 @@
 //   npm run eval:run                    # alle versies × alle vragen
 //   npm run eval:run -- --versions=v0.1,v0.3
 //   npm run eval:run -- --slugs=wat-doet-chatmanta,fallback-gedrag
+//   npm run eval:run -- --versions=v0.4 --hyde-mode=off       # forceer HyDE uit
+//   npm run eval:run -- --versions=v0.4 --hyde-mode=upfront   # forceer upfront
+//   npm run eval:run -- --versions=v0.4 --hyde-mode=selective # forceer selective
 
 import { createClient } from '@supabase/supabase-js';
 import { performance } from 'node:perf_hooks';
 
 import { runEvalRow, withConcurrency, type EvalQuestion, type EvalRunRow } from '../lib/v0/server/eval';
 import { BOTS, BOT_VERSIONS_ORDERED, resolveBot } from '../lib/v0/server/bots';
+import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
 
 const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
 const CONCURRENCY = 5;
@@ -37,8 +41,22 @@ function parseListArg(name: string): string[] | null {
   return null;
 }
 
+function parseStringArg(name: string): string | null {
+  for (const arg of process.argv.slice(2)) {
+    const m = arg.match(new RegExp(`^--${name}=(.+)$`));
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
 const versionsFilter = parseListArg('versions');
 const slugsFilter = parseListArg('slugs');
+const hydeModeArg = parseStringArg('hyde-mode');
+const hydeMode: HydeModeRequest = hydeModeArg
+  ? (isHydeModeRequest(hydeModeArg)
+      ? hydeModeArg
+      : (fail(`Onbekende --hyde-mode: ${hydeModeArg}. Bekend: auto, off, upfront, selective.`) as never))
+  : 'auto';
 
 const versions = versionsFilter ?? BOT_VERSIONS_ORDERED;
 for (const v of versions) {
@@ -95,6 +113,7 @@ console.log(`  versies      : ${versions.join(', ')}`);
 console.log(`  vragen       : ${questions.length}${slugsFilter ? ` (gefilterd op slug)` : ''}`);
 console.log(`  jobs         : ${jobs.length}`);
 console.log(`  concurrency  : ${CONCURRENCY}`);
+console.log(`  hyde-mode    : ${hydeMode}${hydeMode === 'auto' ? ' (volgt bot-config)' : ' (override)'}`);
 console.log('');
 
 // ---------------------------------------------------------------------------
@@ -114,6 +133,7 @@ const rows = await withConcurrency<Job, EvalRunRow | null>(jobs, CONCURRENCY, as
       organizationId: DEV_ORG_ID,
       question: job.question,
       bot,
+      hydeMode,
     });
     const { error: insErr } = await sb.from('eval_runs').insert(row);
     if (insErr) {

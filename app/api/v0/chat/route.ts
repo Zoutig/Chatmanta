@@ -9,11 +9,14 @@
 import { NextResponse } from 'next/server';
 import {
   runRagQueryStreaming,
+  resolveHydeMode,
+  isHydeModeRequest,
   type ChatHistoryTurn,
   type ChatResponse,
+  type HydeModeRequest,
 } from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
-import { logQuery, logBlockedQuery } from '@/lib/v0/server/log';
+import { logQuery, logBlockedQuery, type HydeMeta } from '@/lib/v0/server/log';
 import { normalizeStyle } from '@/lib/v0/style';
 import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
@@ -34,6 +37,7 @@ type Body = {
   history?: unknown;
   tone?: unknown;
   length?: unknown;
+  hydeMode?: unknown;
 };
 
 function parseHistory(input: unknown): ChatHistoryTurn[] {
@@ -86,8 +90,16 @@ export async function POST(req: Request) {
   if (!question.trim()) {
     return NextResponse.json({ error: 'question is required' }, { status: 400 });
   }
+  // HyDE-modus override (v0.5 evaluatie-toggle). Onbekende waarde of niet
+  // gestuurd → 'auto' (= volg bot-versie config).
+  const hydeModeRequested: HydeModeRequest = isHydeModeRequest(body.hydeMode)
+    ? body.hydeMode
+    : 'auto';
 
   const bot = resolveBot(version);
+  // Resolve direct na bot-resolve: nodig voor logging van fallback/blocked
+  // (die geen extras hebben). Pipeline gebruikt dezelfde resolve intern.
+  const hydeModeActual = resolveHydeMode(bot, hydeModeRequested);
 
   // v0.4 security gate #2 — prompt-injection detector.
   // 'log-only' mode (default): we registreren de match en gaan door.
@@ -145,6 +157,7 @@ export async function POST(req: Request) {
     tone,
     length,
     organizationId,
+    hydeModeOverride: hydeModeRequested,
   });
 
   const encoder = new TextEncoder();
@@ -202,7 +215,15 @@ export async function POST(req: Request) {
         const injectionInfo = injection.detected
           ? { detected: true, pattern: injection.pattern?.name ?? null }
           : undefined;
-        logQuery(question, finalResponse, injectionInfo, organizationId).catch(() => undefined);
+        // Smalltalk shortcuit vóór HyDE — actual=null voor die kind. Voor
+        // answer/fallback gebruiken we de resolved mode uit de pipeline-input.
+        const hydeMeta: HydeMeta = {
+          requested: hydeModeRequested,
+          actual: finalResponse.kind === 'smalltalk' ? null : hydeModeActual,
+        };
+        logQuery(question, finalResponse, injectionInfo, organizationId, hydeMeta).catch(
+          () => undefined,
+        );
       }
     },
   });
