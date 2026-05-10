@@ -1,10 +1,12 @@
 // V0 latency snapshot — read-only DB-laag voor de Latency-tab in de UI.
 //
 // Twee data-paden:
-//   1. Per-window p50/p95/p99 per bot_version. Voor '24h' en '7d' fetchen we
-//      raw rijen uit query_log binnen het window en berekenen percentielen
-//      in JS (de bestaande view v_latency_summary aggregeert all-history,
-//      heeft geen window). Voor 'all' lezen we de view.
+//   1. Per-window p50/p95/p99 per bot_version. Altijd raw rows uit query_log
+//      + JS-percentile, ook voor window='all'. De bestaande view
+//      v_latency_summary projecteert geen organization_id en zou onder de
+//      service-role client (RLS-bypass) data van alle orgs mixen — niet wat
+//      we willen in V0.4 multi-org. JS-aggregate over hooguit een paar
+//      honderd rijen per org is verwaarloosbaar qua kosten.
 //   2. Top-10 slowest queries in het window (vraag + total_ms + bot_version).
 //
 // Service-role client — de aanroepende server-action MOET requireV0Auth()
@@ -148,36 +150,9 @@ export async function getLatencySnapshot(
         ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
         : null;
 
-  // Aggregaten — voor 'all' uit view, anders raw + JS-percentile.
+  // Aggregaten — altijd raw query_log + JS-percentile (zie file-header voor
+  // waarom v_latency_summary view niet bruikbaar is onder service-role).
   const aggPromise = (async (): Promise<LatencyAggregate[]> => {
-    if (window === 'all') {
-      const { data, error } = await client
-        .from('v_latency_summary')
-        .select(
-          `bot_version, n,
-           p50_total_ms, p95_total_ms, p99_total_ms,
-           p50_embedding_ms, p95_embedding_ms,
-           p50_retrieval_ms, p95_retrieval_ms,
-           p50_rerank_ms, p95_rerank_ms,
-           p50_generation_ms, p95_generation_ms`,
-        );
-      if (error) throw new Error(`v_latency_summary select: ${error.message}`);
-      return (data ?? []).map((r) => ({
-        botVersion: r.bot_version as string,
-        n: Number(r.n ?? 0),
-        p50TotalMs: r.p50_total_ms === null ? null : Number(r.p50_total_ms),
-        p95TotalMs: r.p95_total_ms === null ? null : Number(r.p95_total_ms),
-        p99TotalMs: r.p99_total_ms === null ? null : Number(r.p99_total_ms),
-        p50EmbeddingMs: r.p50_embedding_ms === null ? null : Number(r.p50_embedding_ms),
-        p95EmbeddingMs: r.p95_embedding_ms === null ? null : Number(r.p95_embedding_ms),
-        p50RetrievalMs: r.p50_retrieval_ms === null ? null : Number(r.p50_retrieval_ms),
-        p95RetrievalMs: r.p95_retrieval_ms === null ? null : Number(r.p95_retrieval_ms),
-        p50RerankMs: r.p50_rerank_ms === null ? null : Number(r.p50_rerank_ms),
-        p95RerankMs: r.p95_rerank_ms === null ? null : Number(r.p95_rerank_ms),
-        p50GenerationMs: r.p50_generation_ms === null ? null : Number(r.p50_generation_ms),
-        p95GenerationMs: r.p95_generation_ms === null ? null : Number(r.p95_generation_ms),
-      }));
-    }
     let q = client
       .from('query_log')
       .select('bot_version, embedding_ms, retrieval_ms, rerank_ms, generation_ms, total_ms')
