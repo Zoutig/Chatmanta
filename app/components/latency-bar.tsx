@@ -16,20 +16,21 @@ import type { PhaseTimings } from '@/lib/v0/server/rag';
 // triggert een type-error.
 type PhaseDisplayKey = Exclude<keyof PhaseTimings, 'total_ms'>;
 
-// Kleuren — consistent met het mockup en de Latency-tab.
+// Kleuren — Tokyo Night uitgebreid, mode-aware via CSS-vars in globals.css.
+// 12 unieke tints; dark = default, light = override op html:not(.dark).
 const PHASE_COLOR: Record<PhaseDisplayKey, string> = {
-  embedding_ms: '#7aa2f7',
-  retrieval_ms: '#9ece6a',
-  rerank_ms: '#e0af68',
-  generation_ms: '#f06e8c',
-  preprocess_ms: '#bb9af7',
-  cache_lookup_ms: '#7dcfff',
-  decompose_ms: '#bb9af7',
-  hyde_ms: '#bb9af7',
-  expand_ms: '#bb9af7',
-  verify_ms: '#a9b1d6',
-  followups_ms: '#a9b1d6',
-  cascade_ms: '#a9b1d6',
+  embedding_ms: 'var(--phase-embedding)',
+  retrieval_ms: 'var(--phase-retrieval)',
+  rerank_ms: 'var(--phase-rerank)',
+  generation_ms: 'var(--phase-generation)',
+  preprocess_ms: 'var(--phase-preprocess)',
+  cache_lookup_ms: 'var(--phase-cache-lookup)',
+  decompose_ms: 'var(--phase-decompose)',
+  hyde_ms: 'var(--phase-hyde)',
+  expand_ms: 'var(--phase-expand)',
+  verify_ms: 'var(--phase-verify)',
+  followups_ms: 'var(--phase-followups)',
+  cascade_ms: 'var(--phase-cascade)',
 };
 
 const PHASE_LABEL: Record<PhaseDisplayKey, string> = {
@@ -111,7 +112,7 @@ export function LatencyBar({ phaseTimings }: { phaseTimings: PhaseTimings | unde
                 <span
                   key={p.key}
                   className="latency-stacked-seg"
-                  style={{ width: `${pct}%`, background: PHASE_COLOR[p.key] ?? '#a9b1d6' }}
+                  style={{ width: `${pct}%`, background: PHASE_COLOR[p.key] ?? 'var(--phase-cascade)' }}
                   title={`${PHASE_LABEL[p.key] ?? p.key}: ${formatMs(p.ms)} (${pct.toFixed(0)}%)`}
                 />
               );
@@ -122,7 +123,7 @@ export function LatencyBar({ phaseTimings }: { phaseTimings: PhaseTimings | unde
               <span key={p.key} className="latency-legend-item">
                 <span
                   className="latency-legend-swatch"
-                  style={{ background: PHASE_COLOR[p.key] ?? '#a9b1d6' }}
+                  style={{ background: PHASE_COLOR[p.key] ?? 'var(--phase-cascade)' }}
                   aria-hidden="true"
                 />
                 <span className="latency-legend-label">
