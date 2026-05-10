@@ -36,10 +36,12 @@ Deze keuzes zijn gemaakt en zou je niet zelf moeten heroverwegen. Wijken hiervan
 - **Multi-tenancy by design**: `organization_id NOT NULL` op élke klantdata-tabel; uitzonderingen alleen `users` en `audit_logs`.
 - **RLS overal**: bij elke nieuwe tabel hoort RLS aan + policies in dezelfde migration. Niet later.
 - **Service-role discipline (SA-5)**: `supabaseAdmin` alleen via wrappers in `lib/supabase/admin.ts`. Geen losse imports.
-- **Object-level access (SA-1)**: `requireXxxAccess(id)` voor elke server action met client-input ID — RLS alleen is niet genoeg bij service-role-paden.
+- **Object-level access (SA-1)**: `requireXxxAccess(id)` voor elke server action met client-input ID — RLS alleen is niet genoeg bij service-role-paden. *(Geldt vanaf V1 Phase 1; V0 heeft geen per-user identiteit en is bewust geen multi-tenant-veilige laag — zie noot onder.)*
 - **Vector search isolation**: `orgId` + `chatbotId` als verplichte (niet-optionele) parameters; soft-delete-filter via JOIN.
 - **Geen secrets in `NEXT_PUBLIC_*`** of in client components.
 - **Anti-hallucinatie boven volledigheid**: similarity threshold + fallback-pad zonder LLM-call bij geen relevante chunks.
+
+> **⚠️ V0 sandbox-disclaimer.** V0 (`/api/v0/*`, `lib/v0/*`, `app/actions/*` met `v0_active_org` cookie) draait op één gedeeld `V0_DEMO_PASSWORD` zonder per-user identiteit. De `v0_active_org` cookie en `?org=<slug>` query-param worden zonder authorisatie geaccepteerd — een ingelogde V0-bezoeker kan vrij switchen tussen alle KNOWN_ORGS en zo data lezen/schrijven/verwijderen via de service-role wrappers. Dit is bewust voor RAG-tuning met fake demo-data. **STOP NOOIT echte klantdata in een V0 org.** V1 Phase 1 (Supabase Auth + `organization_members` membership-check) vervangt dit model en activeert SA-1 voor productie.
 
 ## Wat WEL aan jouw oordeel is
 

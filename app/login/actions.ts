@@ -31,6 +31,11 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   });
 
   // Validate `next` is an internal path (avoid open-redirect).
-  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  // Chrome/Firefox normaliseren `/\` naar `//` → `/\evil.com` zou redirecten
+  // naar evil.com. Naast `//` dus ook `/\` blokkeren.
+  const safeNext =
+    next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')
+      ? next
+      : '/';
   redirect(safeNext);
 }

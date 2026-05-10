@@ -1,5 +1,21 @@
 // V0.4 multi-org sandbox — active-org resolutie en bekende fake orgs.
 //
+// ⚠️ SECURITY-MODEL — V0 IS GEEN MULTI-TENANT-VEILIGE LAAG ⚠️
+// ----------------------------------------------------------------------------
+// V0 heeft één gedeeld `V0_DEMO_PASSWORD` (zie auth-cookie.ts) — er is geen
+// per-user identiteit. De `v0_active_org` cookie is daarom NIET aan een user
+// gebonden en de `?org=<slug>` query-param wordt zonder authorisatie
+// geaccepteerd. Elke ingelogde V0-bezoeker kan vrij switchen tussen alle
+// KNOWN_ORGS slugs en zo data van andere "orgs" lezen/schrijven/verwijderen
+// via de service-role wrappers in rag.ts/threads.ts/log.ts.
+//
+// Dit is bewust — V0 is sandbox met fake demo-data voor RAG-tuning, niet
+// een multi-tenant productie-laag. ⛔ STOP NOOIT ECHTE KLANTDATA in een V0
+// org. De V1 hard rule "Object-level access (SA-1)" geldt hier expliciet
+// niet; V1 Phase 1 (Supabase Auth + organization_members membership-check)
+// vervangt deze hele resolver.
+// ----------------------------------------------------------------------------
+//
 // Bron-van-waarheid voor V0: hieronder staan stable UUIDs voor de 3
 // sandbox-orgs (acme-corp, globex-inc, initech) plus de bestaande DEV_ORG.
 // Deze UUIDs zijn deterministisch zodat re-seed scripts en test-runs
