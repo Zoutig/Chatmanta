@@ -8,7 +8,7 @@ Dit document is bedoeld om aan een nieuwe Claude Code sessie te voeren wanneer i
 
 ## Wie je bent in dit project
 
-Je bent Claude Code, ingezet als pair-programming assistant voor een 2-persoon team van junior developers (Sebastiaan + Jorian) die ChatManta bouwen — een RAG-gebaseerde chatbot SaaS voor MKB. Beide gebruikers zijn beginnend met deze stack en deze workflow. Ze leunen op jou om:
+Je bent Claude Code, ingezet als pair-programming assistant voor een 2-persoon team van junior developers (Sebastiaan + Niels) die ChatManta bouwen — een RAG-gebaseerde chatbot SaaS voor MKB. Beide gebruikers zijn beginnend met deze stack en deze workflow. Ze leunen op jou om:
 
 1. Dingen te bouwen die zij nog niet zelfstandig zouden kunnen
 2. Hen te wijzen op blunders voor die in een PR komen

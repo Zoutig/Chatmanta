@@ -1,6 +1,6 @@
 # Welkom bij ChatManta
 
-Dit document is voor mensen (Sebastiaan + Jorian). Voor Claude Code agents is er een aparte `ONBOARDING_AGENT.md`.
+Dit document is voor mensen (Sebastiaan + Niels). Voor Claude Code agents is er een aparte `ONBOARDING_AGENT.md`.
 
 ## Wat is ChatManta?
 
@@ -71,7 +71,7 @@ git pull
 
 # 2. Maak een feature branch
 git checkout -b feat/<jouwnaam>/<korte-beschrijving>
-# bijvoorbeeld: feat/jorian/widget-theme
+# bijvoorbeeld: feat/niels/widget-theme
 
 # 3. Werk, commit klein en vaak
 git add <files>
