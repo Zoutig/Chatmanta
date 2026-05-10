@@ -255,7 +255,11 @@ function ThreadItem({
         <span className="sep">·</span>
         <span className="ver">{thread.botVersion}</span>
         <span className="sep">·</span>
-        <span>{updated}</span>
+        {/* Relatieve tijd: server en client kunnen seconden uit elkaar lopen
+            ("14m" vs "13m"). Dit is geen echte mismatch — de waarde verandert
+            inherent met Date.now(). suppressHydrationWarning vertelt React dit
+            verschil te tolereren op deze ene span. */}
+        <span suppressHydrationWarning>{updated}</span>
       </div>
       <button
         type="button"
