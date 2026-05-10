@@ -2203,3 +2203,195 @@ body.body-fixed { overflow: hidden; }
   .app { grid-template-columns: 0 1fr 0; }
   .sidebar, .right-panel { display: none; }
 }
+
+/* ===== Latency-bar (inline waterfall onder assistant message) ===== */
+.latency-bar {
+  margin-top: 6px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.latency-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+}
+.latency-badge-button {
+  cursor: pointer;
+  font: inherit;
+}
+.latency-badge-button:hover {
+  border-color: var(--border-bright);
+}
+.latency-bar-detail {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg-soft, rgba(120, 200, 230, 0.04));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  max-width: 520px;
+}
+.latency-stacked {
+  display: flex;
+  height: 12px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--border);
+}
+.latency-stacked-seg {
+  display: block;
+  height: 100%;
+  transition: opacity 120ms ease;
+}
+.latency-stacked-seg:hover {
+  opacity: 0.85;
+}
+.latency-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 4px 10px;
+  margin-top: 8px;
+  font-size: 10px;
+}
+.latency-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.latency-legend-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+}
+.latency-legend-label {
+  color: var(--fg-muted);
+}
+.latency-legend-ms {
+  margin-left: auto;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Latency-tab (right-panel) ===== */
+.latency-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.latency-window-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 2px;
+  background: var(--bg-soft, rgba(120, 200, 230, 0.04));
+  border-radius: 4px;
+  width: fit-content;
+}
+.latency-window-toggle button {
+  background: transparent;
+  border: 0;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 10px;
+  color: var(--fg-muted);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.latency-window-toggle button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.latency-window-toggle button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.latency-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+  margin-bottom: 4px;
+}
+.latency-card {
+  padding: 10px 12px;
+  background: var(--bg-soft, rgba(120, 200, 230, 0.04));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+.latency-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.latency-card-version {
+  color: var(--accent);
+  font-weight: 500;
+}
+.latency-card-n {
+  color: var(--fg-faint);
+  font-size: 10px;
+}
+.latency-card-grid {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr;
+  gap: 3px 8px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.latency-card-grid-label {
+  color: var(--fg-faint);
+}
+.latency-card-grid-header {
+  color: var(--fg-faint);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.latency-slowest {
+  display: flex;
+  flex-direction: column;
+}
+.latency-slowest-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+}
+.latency-slowest-row:last-child {
+  border-bottom: 0;
+}
+.latency-slowest-q {
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.latency-slowest-ms {
+  font-variant-numeric: tabular-nums;
+  color: var(--err);
+}
+.latency-slowest-ms.warn {
+  color: var(--warn);
+}
+.latency-slowest-meta {
+  color: var(--fg-faint);
+  font-size: 9px;
+}
+.latency-empty {
+  color: var(--fg-faint);
+  font-size: 11px;
+  padding: 12px 0;
+  text-align: center;
+}
