@@ -2395,3 +2395,38 @@ body.body-fixed { overflow: hidden; }
   padding: 12px 0;
   text-align: center;
 }
+
+/* ==========================================================================
+   Latency phase colors — Tokyo Night uitgebreid, mode-aware.
+   12 distincte tints. Dark = default, light = override op html:not(.dark).
+   :where() gebruikt om PostCSS-quirk op bestaande :root selectors te vermijden.
+   ========================================================================== */
+:where(:root) {
+  --phase-preprocess: #ff9e64;
+  --phase-cache-lookup: #7dcfff;
+  --phase-decompose: #bb9af7;
+  --phase-hyde: #73daca;
+  --phase-expand: #c0caf5;
+  --phase-embedding: #7aa2f7;
+  --phase-retrieval: #9ece6a;
+  --phase-rerank: #e0af68;
+  --phase-generation: #f7768e;
+  --phase-verify: #b48ef0;
+  --phase-followups: #2ac3de;
+  --phase-cascade: #a9b1d6;
+}
+
+:where(html:not(.dark)) {
+  --phase-preprocess: #cc6f3c;
+  --phase-cache-lookup: #0db9d7;
+  --phase-decompose: #9854f1;
+  --phase-hyde: #1abc9c;
+  --phase-expand: #5a6ba8;
+  --phase-embedding: #2e69d9;
+  --phase-retrieval: #5c8a3a;
+  --phase-rerank: #a87432;
+  --phase-generation: #d63d5e;
+  --phase-verify: #7c4ed1;
+  --phase-followups: #0a8aa6;
+  --phase-cascade: #4a5670;
+}
