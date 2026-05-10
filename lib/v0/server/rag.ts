@@ -105,16 +105,27 @@ export type EmbedResult = {
   costUsd: number;
 };
 
+// V0.4 latency-cap: per-batch timeout 4s + max 1 retry. OpenAI SDK v6 doet de
+// retry zelf met exponential backoff op 429/5xx en op aborted timeouts. Zonder
+// timeout zagen we p99=5.4s en max=6.0s op embedding-calls, helemaal binnen
+// het kritieke pad. 4s + 1 retry = absolute worst-case ~8s, maar p99 zal naar
+// ~4-5s zakken (SDK retried snel op transiente fouten).
+const EMBED_TIMEOUT_MS = 4000;
+const EMBED_MAX_RETRIES = 1;
+
 export async function embedTexts(strings: string[]): Promise<EmbedResult> {
   if (strings.length === 0) return { vectors: [], tokens: 0, costUsd: 0 };
   const vectors: number[][] = [];
   let totalTokens = 0;
   for (let i = 0; i < strings.length; i += EMBED_BATCH_SIZE) {
     const batch = strings.slice(i, i + EMBED_BATCH_SIZE);
-    const resp = await openai().embeddings.create({
-      model: EMBED_MODEL,
-      input: batch,
-    });
+    const resp = await openai().embeddings.create(
+      {
+        model: EMBED_MODEL,
+        input: batch,
+      },
+      { timeout: EMBED_TIMEOUT_MS, maxRetries: EMBED_MAX_RETRIES },
+    );
     for (const item of resp.data) {
       if (item.embedding.length !== EMBED_DIM) {
         throw new Error(`expected ${EMBED_DIM}-dim, got ${item.embedding.length}`);
