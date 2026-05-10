@@ -72,7 +72,11 @@ type QueryLogRow = {
   // queries; true + pattern naam voor verdachte input.
   injection_detected: boolean;
   injection_pattern: string | null;
-  // v0.5 HyDE-modus logging (migration 0012). Allemaal optioneel — legacy
+  // v0.4 cache telemetry (migration 0012). True wanneer answer_cache een hit
+  // gaf en de pipeline vroeg-exit deed. False voor smalltalk/fallback/blocked
+  // en voor verse RAG-runs.
+  from_cache: boolean;
+  // v0.5 HyDE-modus logging (migration 0013). Allemaal optioneel — legacy
   // rijen krijgen NULL.
   hyde_mode_requested: HydeModeRequest | null;
   hyde_mode_actual: HydeModeResolved | null;
@@ -177,6 +181,7 @@ export async function logQuery(
     const totalMs = typeof t?.total_ms === 'number' ? t.total_ms : null;
     const hydeMs = typeof t?.hyde_ms === 'number' ? t.hyde_ms : null;
     const phaseTimings = t ?? null;
+    const fromCache = extras?.fromCache === true;
 
     const row: QueryLogRow =
       response.kind === 'smalltalk'
@@ -210,6 +215,7 @@ export async function logQuery(
             phase_timings_ms: null,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
+            from_cache: false,
             hyde_mode_requested: hydeModeRequested,
             // Smalltalk shortcuit vóór de HyDE-branch — actual is null.
             hyde_mode_actual: null,
@@ -252,6 +258,7 @@ export async function logQuery(
             phase_timings_ms: phaseTimings,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
+            from_cache: fromCache,
             hyde_mode_requested: hydeModeRequested,
             hyde_mode_actual: hydeModeActual,
             hyde_ms: hydeMs,
@@ -340,6 +347,7 @@ export async function logBlockedQuery(input: {
       phase_timings_ms: null,
       injection_detected: true,
       injection_pattern: input.injectionPattern,
+      from_cache: false,
       // Blocked queries draaien geen HyDE — actual = null. Requested kunnen
       // we nog niet koppelen (geen HydeMeta param hier; toevoegen kan later).
       hyde_mode_requested: null,

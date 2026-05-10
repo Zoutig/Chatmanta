@@ -105,16 +105,27 @@ export type EmbedResult = {
   costUsd: number;
 };
 
+// V0.4 latency-cap: per-batch timeout 4s + max 1 retry. OpenAI SDK v6 doet de
+// retry zelf met exponential backoff op 429/5xx en op aborted timeouts. Zonder
+// timeout zagen we p99=5.4s en max=6.0s op embedding-calls, helemaal binnen
+// het kritieke pad. 4s + 1 retry = absolute worst-case ~8s, maar p99 zal naar
+// ~4-5s zakken (SDK retried snel op transiente fouten).
+const EMBED_TIMEOUT_MS = 4000;
+const EMBED_MAX_RETRIES = 1;
+
 export async function embedTexts(strings: string[]): Promise<EmbedResult> {
   if (strings.length === 0) return { vectors: [], tokens: 0, costUsd: 0 };
   const vectors: number[][] = [];
   let totalTokens = 0;
   for (let i = 0; i < strings.length; i += EMBED_BATCH_SIZE) {
     const batch = strings.slice(i, i + EMBED_BATCH_SIZE);
-    const resp = await openai().embeddings.create({
-      model: EMBED_MODEL,
-      input: batch,
-    });
+    const resp = await openai().embeddings.create(
+      {
+        model: EMBED_MODEL,
+        input: batch,
+      },
+      { timeout: EMBED_TIMEOUT_MS, maxRetries: EMBED_MAX_RETRIES },
+    );
     for (const item of resp.data) {
       if (item.embedding.length !== EMBED_DIM) {
         throw new Error(`expected ${EMBED_DIM}-dim, got ${item.embedding.length}`);
@@ -440,7 +451,15 @@ async function retrieveChunksHybrid(
 
 // ---------------------------------------------------------------------------
 // Answer cache — embedding-based near-duplicate lookup. Hit threshold ~0.97.
+//
+// V0.4 latency-werk: we roepen de RPC nu met min_similarity=0 aan en filteren
+// de threshold in TS, zodat we bij een miss alsnog de top-1 similarity kunnen
+// loggen. Eerste latency-analyse vond 0/17 hits in productie inclusief 3×
+// dezelfde vraag — zonder best-sim-log is niet te zien of dat door (a) lege
+// cache, (b) te streng threshold, of (c) andere oorzaak komt.
 // ---------------------------------------------------------------------------
+const CACHE_HIT_THRESHOLD = 0.97;
+
 async function lookupCachedAnswer(
   queryVector: number[],
   botVersion: string,
@@ -451,20 +470,29 @@ async function lookupCachedAnswer(
     p_organization_id: organizationId,
     p_bot_version: botVersion,
     query_embedding: queryVector,
-    min_similarity: 0.97,
+    min_similarity: 0,
   });
   if (error) {
     console.warn('[cache] lookup failed:', error.message);
     return null;
   }
-  const hit = (data ?? [])[0];
-  if (!hit) return null;
+  const top = (data ?? [])[0] as { id: string; response_json: ChatResponse; similarity: number } | undefined;
+  if (!top) {
+    console.info(`[cache] miss — no candidates org=${organizationId} ver=${botVersion}`);
+    return null;
+  }
+  if (top.similarity < CACHE_HIT_THRESHOLD) {
+    console.info(
+      `[cache] miss — best_sim=${top.similarity.toFixed(3)} (need ≥${CACHE_HIT_THRESHOLD}) org=${organizationId} ver=${botVersion}`,
+    );
+    return null;
+  }
   // Bump hit_count fire-and-forget.
   sb.from('answer_cache')
     .update({ hit_count: undefined, last_hit_at: new Date().toISOString() })
-    .eq('id', hit.id)
+    .eq('id', top.id)
     .then(() => undefined);
-  return hit.response_json as ChatResponse;
+  return top.response_json;
 }
 
 async function writeCachedAnswer(
@@ -1074,6 +1102,19 @@ export type StreamEvent =
     }
   | { kind: 'answer-delta'; text: string }
   | { kind: 'answer-done'; response: ChatResponse }
+  // V0.4: followups draaien nu ná answer-done zodat de gebruiker het antwoord
+  // direct ziet i.p.v. ~0.8s te wachten. Dit event levert de followUps na
+  // (samen met de extra token/cost-deltas die nog niet in answer-done zaten).
+  | {
+      kind: 'followups-done';
+      followUps: string[];
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+    }
+  // V0.4: finale phaseTimingsMs nadat followups_ms is gemeten. Consumer moet
+  // hierop wachten vóór logQuery anders mist query_log de followups-fase.
+  | { kind: 'metrics-done'; phaseTimingsMs: PhaseTimings }
   | { kind: 'error'; message: string };
 
 export async function* runRagQueryStreaming(input: {
@@ -1130,15 +1171,39 @@ export async function* runRagQueryStreaming(input: {
   // decompose, follow-ups) gebruiken hun eigen task-specifieke prompts.
   const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
 
-  // 1. Pre-process (smalltalk shortcut + rewrite).
+  // V0.4 latency: bewaar de pre-cache embed-vector op outer scope zodat we
+  // hem kunnen hergebruiken bij de fire-and-forget cache-write na het
+  // antwoord (zie verderop). Spaart één embed-call (~1.2s) per request waar
+  // bot.cacheEnabled aan staat.
+  let cacheEmbedVector: number[] | null = null;
+
+  // 1+2. Pre-process & cache-embed — parallel.
+  //
+  // V0.4: preProcessInput(original) en embedTexts([original]) hangen beide
+  // alleen af van `original`, niet van elkaars output. We firen ze parallel
+  // om ~1s p50 te besparen (was preprocess + cache_lookup seriëel ≈ 2.1s,
+  // nu max ≈ 1.1s). Smalltalk-pad: cache-embed is dan wasted work — laat de
+  // promise stil aflopen via void/.catch om unhandled rejection te
+  // voorkomen.
+  //
+  // LET OP: preprocess_ms en cache_lookup_ms timers overlappen nu in wall-
+  // clock tijd, dus hun som > totaal. Gebruik total_ms voor gevoelde latency.
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
-  if (enableRewrite) {
+  let preCacheEmbedTokens = 0;
+  let preCacheEmbedCost = 0;
+
+  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, history) : null;
+  const cacheEmbedPromise = bot.cacheEnabled ? embedTexts([original]) : null;
+
+  if (preProcessPromise) {
     yield { kind: 'status', phase: 'preprocess' };
     const stopPp = tMark('preprocess_ms');
-    const pp = await preProcessInput(original, bot, history);
+    const pp = await preProcessPromise;
     stopPp();
     if (pp.kind === 'smalltalk') {
+      // Discard de parallel-gestarte cache-embed — voorkom unhandled rejection.
+      if (cacheEmbedPromise) void cacheEmbedPromise.catch(() => undefined);
       yield {
         kind: 'smalltalk',
         response: {
@@ -1164,19 +1229,18 @@ export async function* runRagQueryStreaming(input: {
   }
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
-  // 2. Cache lookup (v0.3+) — embed origineel, check answer_cache.
-  //    Hit threshold 0.97 ≈ near-duplicate vraag.
-  let preCacheEmbedTokens = 0;
-  let preCacheEmbedCost = 0;
-  if (bot.cacheEnabled) {
+  // Cache lookup — embed liep al parallel met preprocess; we awaiten alleen
+  // het resultaat (in de best case is hij al klaar).
+  if (cacheEmbedPromise) {
     yield { kind: 'status', phase: 'cache' };
     const stopCache = tMark('cache_lookup_ms');
     const stopEmbedCache = tMark('embedding_ms');
-    const cacheEmbed = await embedTexts([original]);
+    const cacheEmbed = await cacheEmbedPromise;
     stopEmbedCache();
     preCacheEmbedTokens = cacheEmbed.tokens;
     preCacheEmbedCost = cacheEmbed.costUsd;
-    const cached = await lookupCachedAnswer(cacheEmbed.vectors[0], bot.version, orgId);
+    cacheEmbedVector = cacheEmbed.vectors[0];
+    const cached = await lookupCachedAnswer(cacheEmbedVector, bot.version, orgId);
     stopCache();
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
@@ -1546,24 +1610,13 @@ export async function* runRagQueryStreaming(input: {
     stopVerify();
   }
 
-  // Follow-ups generatie (na het uiteindelijke antwoord, kan in parallel met
-  // cache write — maar simpel sequential voor nu).
-  if (bot.generateFollowUps) {
-    yield { kind: 'status', phase: 'followups' };
-    const stopFollowups = tMark('followups_ms');
-    try {
-      const fu = await generateFollowUps(original, finalAnswerText, bot);
-      followUps = fu.followUps;
-      followUpsInputTokens = fu.inputTokens;
-      followUpsOutputTokens = fu.outputTokens;
-      followUpsCost = fu.costUsd;
-    } catch (err) {
-      console.warn('[followups] failed:', err);
-    }
-    stopFollowups();
-  }
+  // V0.4: followups draaien hier nog NIET. We yielden eerst answer-done met
+  // alle data exclusief followups, daarna pas (na een aparte status+yield)
+  // de followups-done en metrics-done events. Dit haalt ~0.8s p50 van de
+  // time-to-final-answer voor de gebruiker — followups zijn UI-bonus, geen
+  // onderdeel van het kernantwoord.
 
-  const totalCost =
+  const totalCostBeforeFollowups =
     embedCost +
     preCacheEmbedCost +
     selectiveHyDEEmbedCost +
@@ -1574,10 +1627,29 @@ export async function* runRagQueryStreaming(input: {
     rerankCost +
     decomposeCost +
     hydeCost +
-    cascadeCost +
-    followUpsCost;
+    cascadeCost;
 
-  const finalResponse: ChatResponse = {
+  // phaseTimingsMs op answer-done — followups_ms ontbreekt nog (komt via
+  // metrics-done event nadat followups is gemeten). total_ms is hier de
+  // time-to-final-answer; metrics-done stuurt later de geüpdate total.
+  const phaseTimingsAtAnswer: PhaseTimings = {
+    embedding_ms: timings.embedding_ms ?? 0,
+    retrieval_ms: timings.retrieval_ms ?? 0,
+    generation_ms: timings.generation_ms ?? 0,
+    total_ms: Math.round(performance.now() - tPipelineStart),
+    ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
+    ...(timings.cache_lookup_ms !== undefined
+      ? { cache_lookup_ms: timings.cache_lookup_ms }
+      : {}),
+    ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
+    ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
+    ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
+    ...(timings.rerank_ms !== undefined ? { rerank_ms: timings.rerank_ms } : {}),
+    ...(timings.cascade_ms !== undefined ? { cascade_ms: timings.cascade_ms } : {}),
+    ...(timings.verify_ms !== undefined ? { verify_ms: timings.verify_ms } : {}),
+  };
+
+  const initialResponse: ChatResponse = {
     botVersion: bot.version,
     tone,
     length,
@@ -1593,20 +1665,18 @@ export async function* runRagQueryStreaming(input: {
       rerankInputTokens +
       cascadeInputTokens +
       decomposeInputTokens +
-      hydeInputTokens +
-      followUpsInputTokens,
+      hydeInputTokens,
     chatOutputTokens:
       chatOutputTokens +
       rerankOutputTokens +
       cascadeOutputTokens +
       decomposeOutputTokens +
-      hydeOutputTokens +
-      followUpsOutputTokens,
-    totalCostUsd: totalCost,
+      hydeOutputTokens,
+    totalCostUsd: totalCostBeforeFollowups,
     extras: {
       ...(confidence !== null ? { confidence } : {}),
       ...(cascadeUsed ? { cascadeUsed: true } : {}),
-      ...(followUps && followUps.length > 0 ? { followUps } : {}),
+      // followUps wordt apart geyield via 'followups-done' — niet hier.
       ...(subQueries.length > 1 ? { subQueries } : {}),
       ...(hydeDoc ? { hydeDocument: hydeDoc } : {}),
       // v0.4 retrieval-telemetry — top-1 sim vóór threshold + HyDE-augment,
@@ -1621,38 +1691,66 @@ export async function* runRagQueryStreaming(input: {
       ...(bot.claimVerification
         ? { claimVerificationThreshold: bot.claimVerificationThreshold }
         : {}),
-      // v0.4 latency profiling — finalize total + propagate full breakdown.
-      phaseTimingsMs: {
-        embedding_ms: timings.embedding_ms ?? 0,
-        retrieval_ms: timings.retrieval_ms ?? 0,
-        generation_ms: timings.generation_ms ?? 0,
-        total_ms: Math.round(performance.now() - tPipelineStart),
-        ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
-        ...(timings.cache_lookup_ms !== undefined
-          ? { cache_lookup_ms: timings.cache_lookup_ms }
-          : {}),
-        ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
-        ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
-        ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
-        ...(timings.rerank_ms !== undefined ? { rerank_ms: timings.rerank_ms } : {}),
-        ...(timings.cascade_ms !== undefined ? { cascade_ms: timings.cascade_ms } : {}),
-        ...(timings.verify_ms !== undefined ? { verify_ms: timings.verify_ms } : {}),
-        ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
-      },
+      phaseTimingsMs: phaseTimingsAtAnswer,
     },
   };
 
-  // Cache write (fire-and-forget) — alleen v0.3.
-  if (bot.cacheEnabled) {
-    // Embed origineel was al gedaan voor pre-cache lookup; hergebruik die.
-    // We hebben de vector niet apart bewaard, dus skip cache write als
-    // pre-cache embed niet draaide. Embed is goedkoop dus even opnieuw doen.
-    embedTexts([original])
-      .then((r) => writeCachedAnswer(original, r.vectors[0], bot.version, finalResponse, orgId))
-      .catch(() => undefined);
+  yield { kind: 'answer-done', response: initialResponse };
+
+  // Followups na de answer-done yield — gebruiker ziet antwoord al, followups
+  // verschijnen kort daarna in de UI via het followups-done event.
+  if (bot.generateFollowUps) {
+    yield { kind: 'status', phase: 'followups' };
+    const stopFollowups = tMark('followups_ms');
+    try {
+      const fu = await generateFollowUps(original, finalAnswerText, bot);
+      followUps = fu.followUps;
+      followUpsInputTokens = fu.inputTokens;
+      followUpsOutputTokens = fu.outputTokens;
+      followUpsCost = fu.costUsd;
+    } catch (err) {
+      console.warn('[followups] failed:', err);
+    }
+    stopFollowups();
+    yield {
+      kind: 'followups-done',
+      followUps: followUps ?? [],
+      inputTokens: followUpsInputTokens,
+      outputTokens: followUpsOutputTokens,
+      costUsd: followUpsCost,
+    };
   }
 
-  yield { kind: 'answer-done', response: finalResponse };
+  // Finale phaseTimingsMs — bevat nu ook followups_ms (als die ran). total_ms
+  // wordt opnieuw berekend zodat de followups-tijd erin meetelt.
+  const phaseTimingsFinal: PhaseTimings = {
+    ...phaseTimingsAtAnswer,
+    total_ms: Math.round(performance.now() - tPipelineStart),
+    ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
+  };
+  yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsFinal };
+
+  // Cache write (fire-and-forget) — v0.4: hergebruik de pre-cache embed
+  // vector ipv opnieuw embedden (~1.2s + cost-saving per request). Echte
+  // error-log ipv stille catch. We schrijven de COMPLETE response naar de
+  // cache (inclusief followups + finale timings), zodat een cache-hit later
+  // dezelfde UX levert als een verse RAG-run.
+  if (bot.cacheEnabled && cacheEmbedVector) {
+    const cachedResponse: ChatResponse = {
+      ...initialResponse,
+      chatInputTokens: initialResponse.chatInputTokens + followUpsInputTokens,
+      chatOutputTokens: initialResponse.chatOutputTokens + followUpsOutputTokens,
+      totalCostUsd: initialResponse.totalCostUsd + followUpsCost,
+      extras: {
+        ...initialResponse.extras,
+        ...(followUps && followUps.length > 0 ? { followUps } : {}),
+        phaseTimingsMs: phaseTimingsFinal,
+      },
+    };
+    writeCachedAnswer(original, cacheEmbedVector, bot.version, cachedResponse, orgId).catch(
+      (err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
