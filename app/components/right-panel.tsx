@@ -12,6 +12,7 @@ import { PromptView } from './prompt-view';
 import { ClaimsView } from './claims-view';
 import type { BotMeta } from './bot-dropdown';
 import type { Length, Tone } from '@/lib/v0/style-types';
+import type { HydeMode } from './use-hyde-mode';
 
 export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals' | 'latency';
 
@@ -25,6 +26,8 @@ export function RightPanel({
   onToneChange,
   length,
   onLengthChange,
+  hydeMode,
+  onHydeModeChange,
   rewriteOn,
   onToggleRewrite,
   botVersion,
@@ -45,6 +48,8 @@ export function RightPanel({
   onToneChange: (t: Tone) => void;
   length: Length;
   onLengthChange: (l: Length) => void;
+  hydeMode: HydeMode;
+  onHydeModeChange: (m: HydeMode) => void;
   rewriteOn: boolean;
   onToggleRewrite: () => void;
   botVersion: string;
@@ -153,6 +158,8 @@ export function RightPanel({
             onToneChange={onToneChange}
             length={length}
             onLengthChange={onLengthChange}
+            hydeMode={hydeMode}
+            onHydeModeChange={onHydeModeChange}
             rewriteOn={rewriteOn}
             onToggleRewrite={onToggleRewrite}
             botVersion={botVersion}

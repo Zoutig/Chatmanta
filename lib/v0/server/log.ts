@@ -8,7 +8,18 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEV_ORG_ID } from './rag';
-import type { ChatResponse } from './rag';
+import type { ChatResponse, HydeModeRequest, HydeModeResolved } from './rag';
+
+/**
+ * Per-call HyDE-modus telemetrie. Wordt door route.ts gepasst aan logQuery
+ * zodat ook fallback/blocked rijen (die geen ChatResponse.extras hebben) de
+ * gevraagde modus loggen. `actual` is null voor smalltalk/blocked omdat HyDE
+ * daar niet draait.
+ */
+export type HydeMeta = {
+  requested: HydeModeRequest;
+  actual: HydeModeResolved | null;
+};
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -61,6 +72,12 @@ type QueryLogRow = {
   // queries; true + pattern naam voor verdachte input.
   injection_detected: boolean;
   injection_pattern: string | null;
+  // v0.5 HyDE-modus logging (migration 0012). Allemaal optioneel — legacy
+  // rijen krijgen NULL.
+  hyde_mode_requested: HydeModeRequest | null;
+  hyde_mode_actual: HydeModeResolved | null;
+  hyde_ms: number | null;
+  hyde_document: string | null;
 };
 
 /**
@@ -128,6 +145,7 @@ export async function logQuery(
   response: ChatResponse,
   injection?: { detected: boolean; pattern: string | null },
   organizationId: string = DEV_ORG_ID,
+  hydeMeta?: HydeMeta,
 ): Promise<void> {
   try {
     // v0.4 retrieval-telemetry + claim verification uit extras (alleen
@@ -135,6 +153,11 @@ export async function logQuery(
     const extras = response.kind === 'answer' ? response.extras : undefined;
     const top1Sim = extras?.top1Sim ?? null;
     const hydeTriggered = extras?.hydeTriggered ?? false;
+    // HyDE-modus komt uit route (al bekend voor de pipeline draait). Voor
+    // smalltalk schrijft route.ts actual=null omdat HyDE daar niet draait.
+    const hydeModeRequested = hydeMeta?.requested ?? null;
+    const hydeModeActual = hydeMeta?.actual ?? null;
+    const hydeDocument = extras?.hydeDocument ?? null;
     const claimConfidence =
       typeof extras?.claimConfidence === 'number' && Number.isFinite(extras.claimConfidence)
         ? extras.claimConfidence
@@ -152,6 +175,7 @@ export async function logQuery(
     const rerankMs = typeof t?.rerank_ms === 'number' ? t.rerank_ms : null;
     const generationMs = typeof t?.generation_ms === 'number' ? t.generation_ms : null;
     const totalMs = typeof t?.total_ms === 'number' ? t.total_ms : null;
+    const hydeMs = typeof t?.hyde_ms === 'number' ? t.hyde_ms : null;
     const phaseTimings = t ?? null;
 
     const row: QueryLogRow =
@@ -186,6 +210,11 @@ export async function logQuery(
             phase_timings_ms: null,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
+            hyde_mode_requested: hydeModeRequested,
+            // Smalltalk shortcuit vóór de HyDE-branch — actual is null.
+            hyde_mode_actual: null,
+            hyde_ms: null,
+            hyde_document: null,
           }
         : {
             organization_id: organizationId,
@@ -223,6 +252,10 @@ export async function logQuery(
             phase_timings_ms: phaseTimings,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
+            hyde_mode_requested: hydeModeRequested,
+            hyde_mode_actual: hydeModeActual,
+            hyde_ms: hydeMs,
+            hyde_document: hydeDocument,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -307,6 +340,12 @@ export async function logBlockedQuery(input: {
       phase_timings_ms: null,
       injection_detected: true,
       injection_pattern: input.injectionPattern,
+      // Blocked queries draaien geen HyDE — actual = null. Requested kunnen
+      // we nog niet koppelen (geen HydeMeta param hier; toevoegen kan later).
+      hyde_mode_requested: null,
+      hyde_mode_actual: null,
+      hyde_ms: null,
+      hyde_document: null,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);

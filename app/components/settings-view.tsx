@@ -5,6 +5,17 @@ import { Icon } from './svg-icons';
 import type { BotMeta } from './bot-dropdown';
 import { StyleSegmented } from './style-segmented';
 import type { Length, Tone } from '@/lib/v0/style-types';
+import type { HydeMode } from './use-hyde-mode';
+
+const HYDE_MODES: readonly HydeMode[] = ['auto', 'off', 'upfront', 'selective'];
+const HYDE_LABELS: Record<HydeMode, string> = {
+  auto: 'Auto',
+  off: 'Geen',
+  upfront: 'Upfront',
+  selective: 'Selective',
+};
+const HYDE_HINT =
+  'Auto = volg bot-versie. Override wint altijd, ook over bots waar HyDE uit staat. Wordt per query gelogd voor evaluatie.';
 
 export function SettingsView({
   threshold,
@@ -13,6 +24,8 @@ export function SettingsView({
   onToneChange,
   length,
   onLengthChange,
+  hydeMode,
+  onHydeModeChange,
   rewriteOn,
   onToggleRewrite,
   botVersion,
@@ -25,6 +38,8 @@ export function SettingsView({
   onToneChange: (t: Tone) => void;
   length: Length;
   onLengthChange: (l: Length) => void;
+  hydeMode: HydeMode;
+  onHydeModeChange: (m: HydeMode) => void;
   rewriteOn: boolean;
   onToggleRewrite: () => void;
   botVersion: string;
@@ -86,6 +101,25 @@ export function SettingsView({
 
       <StyleSegmented kind="tone" value={tone} onChange={onToneChange} />
       <StyleSegmented kind="length" value={length} onChange={onLengthChange} />
+
+      <div className="settings-section">
+        <div className="settings-label">HyDE-modus</div>
+        <div className="threshold-presets" role="radiogroup" aria-label="HyDE-modus">
+          {HYDE_MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={hydeMode === m}
+              className={`threshold-preset${hydeMode === m ? ' active' : ''}`}
+              onClick={() => onHydeModeChange(m)}
+            >
+              <span className="threshold-preset-label">{HYDE_LABELS[m]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="slider-hint">{HYDE_HINT}</div>
+      </div>
 
       <div className="settings-section">
         <div className="settings-label">Pipeline-opties</div>

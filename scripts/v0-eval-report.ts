@@ -39,6 +39,7 @@ const { data: runRows, error: runErr } = await sb
      bot_cost_usd, bot_latency_ms,
      score_correctness, score_completeness, score_grounding,
      judge_reasoning, judge_parse_error, judge_cost_usd, judge_latency_ms,
+     hyde_mode_requested, hyde_mode_actual,
      created_at`,
   )
   .eq('organization_id', DEV_ORG_ID)
@@ -57,16 +58,31 @@ if (qErr) fail(`eval_questions select: ${qErr.message}`);
 const qById = new Map((qRows ?? []).map((q) => [q.id as string, q]));
 
 // ---------------------------------------------------------------------------
-// 2. Snapshot: voor elke (question_id, bot_version) → meest recente run.
+// 2. Snapshot: voor elke (question_id, bot_version, hyde_mode_actual) →
+//    meest recente run. Dedup-key bevat hyde_mode zodat 3-way A/B/C runs
+//    (off/upfront/selective) naast elkaar kunnen bestaan en in het rapport
+//    afzonderlijk getoond worden. Legacy rijen (van vóór migration 0012)
+//    krijgen hyde_mode_actual = '(legacy)' bucket.
 // ---------------------------------------------------------------------------
-const latestByPair = new Map<string, typeof runRows[number]>();
-for (const r of runRows) {
-  const key = `${r.question_id}::${r.bot_version}`;
-  if (!latestByPair.has(key)) latestByPair.set(key, r); // runRows is desc op created_at
+type RunRow = NonNullable<typeof runRows>[number];
+function modeKey(r: RunRow): string {
+  return (r.hyde_mode_actual as string | null) ?? '(legacy)';
 }
-const latestRuns = [...latestByPair.values()];
 
-const versions = [...new Set(latestRuns.map((r) => r.bot_version as string))].sort();
+const latestByTriple = new Map<string, RunRow>();
+for (const r of runRows) {
+  const key = `${r.question_id}::${r.bot_version}::${modeKey(r)}`;
+  if (!latestByTriple.has(key)) latestByTriple.set(key, r); // runRows is desc op created_at
+}
+const latestRuns = [...latestByTriple.values()];
+
+// Versie-modus combinaties die in de data voorkomen, gesorteerd. Dit zijn
+// de "kolommen" in summary + per-vraag tabellen.
+const versionModePairs = [
+  ...new Set(latestRuns.map((r) => `${r.bot_version}::${modeKey(r)}`)),
+].sort();
+
+const versionsForHeader = [...new Set(latestRuns.map((r) => r.bot_version as string))].sort();
 const questionIds = [...new Set(latestRuns.map((r) => r.question_id as string))];
 const questions = questionIds
   .map((id) => qById.get(id))
@@ -113,17 +129,18 @@ lines.push('');
 lines.push(`Snapshot van de meest-recente runs per (vraag × versie). Judge: ${latestRuns[0]?.judge_model ?? 'unknown'}.`);
 lines.push('');
 lines.push(`- Vragen: **${questions.length}**`);
-lines.push(`- Versies: **${versions.join(', ')}**`);
+lines.push(`- Versies: **${versionsForHeader.join(', ')}**`);
 lines.push(`- Totaal runs in DB: **${runRows.length}** (alle history bewaard)`);
 lines.push('');
 
-// 4a. Samenvatting per versie
-lines.push('## Samenvatting per versie');
+// 4a. Samenvatting per versie × hyde_mode
+lines.push('## Samenvatting per versie × hyde_mode');
 lines.push('');
-lines.push('| versie | correctness | completeness | grounding | overall | bot $ | judge $ | bot ms (avg) |');
-lines.push('|--------|-------------|--------------|-----------|---------|-------|---------|--------------|');
-for (const v of versions) {
-  const vRows = latestRuns.filter((r) => r.bot_version === v);
+lines.push('| versie | hyde_mode | n | correctness | completeness | grounding | overall | bot $ | judge $ | bot ms (avg) |');
+lines.push('|--------|-----------|---|-------------|--------------|-----------|---------|-------|---------|--------------|');
+for (const pair of versionModePairs) {
+  const [v, mode] = pair.split('::');
+  const vRows = latestRuns.filter((r) => r.bot_version === v && modeKey(r) === mode);
   const c = avgOf(vRows, (r) => r.score_correctness);
   const p = avgOf(vRows, (r) => r.score_completeness);
   const g = avgOf(vRows, (r) => r.score_grounding);
@@ -133,7 +150,7 @@ for (const v of versions) {
   const jCost = vRows.reduce((s, r) => s + Number(r.judge_cost_usd ?? 0), 0);
   const lat = avgOf(vRows, (r) => Number(r.bot_latency_ms ?? 0));
   lines.push(
-    `| ${v} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | $${jCost.toFixed(4)} | ${fmt(lat, 0)} |`,
+    `| ${v} | ${mode} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | $${jCost.toFixed(4)} | ${fmt(lat, 0)} |`,
   );
 }
 lines.push('');
@@ -158,25 +175,31 @@ for (const q of questions) {
     for (const f of q.gold_facts as string[]) lines.push(`- ${f}`);
   }
   lines.push('');
-  lines.push('| versie | C | P | G | kind | bot ms | bot $ |');
-  lines.push('|--------|---|---|---|------|--------|-------|');
-  for (const v of versions) {
-    const r = latestRuns.find((row) => row.question_id === q.id && row.bot_version === v);
+  lines.push('| versie | hyde_mode | C | P | G | kind | bot ms | bot $ |');
+  lines.push('|--------|-----------|---|---|---|------|--------|-------|');
+  for (const pair of versionModePairs) {
+    const [v, mode] = pair.split('::');
+    const r = latestRuns.find(
+      (row) => row.question_id === q.id && row.bot_version === v && modeKey(row) === mode,
+    );
     if (!r) {
-      lines.push(`| ${v} | — | — | — | — | — | — |`);
+      lines.push(`| ${v} | ${mode} | — | — | — | — | — | — |`);
       continue;
     }
     lines.push(
-      `| ${v} | ${fmtScore(r.score_correctness)} | ${fmtScore(r.score_completeness)} | ${fmtScore(r.score_grounding)} | ${r.bot_kind} | ${r.bot_latency_ms} | $${Number(r.bot_cost_usd ?? 0).toFixed(4)} |`,
+      `| ${v} | ${mode} | ${fmtScore(r.score_correctness)} | ${fmtScore(r.score_completeness)} | ${fmtScore(r.score_grounding)} | ${r.bot_kind} | ${r.bot_latency_ms} | $${Number(r.bot_cost_usd ?? 0).toFixed(4)} |`,
     );
   }
   lines.push('');
 
-  // Antwoorden + judge reasoning per versie (collapsible voor leesbaarheid).
-  for (const v of versions) {
-    const r = latestRuns.find((row) => row.question_id === q.id && row.bot_version === v);
+  // Antwoorden + judge reasoning per (versie × mode) — collapsible voor leesbaarheid.
+  for (const pair of versionModePairs) {
+    const [v, mode] = pair.split('::');
+    const r = latestRuns.find(
+      (row) => row.question_id === q.id && row.bot_version === v && modeKey(row) === mode,
+    );
     if (!r) continue;
-    lines.push(`<details><summary>${v} — bot answer + judge reasoning</summary>`);
+    lines.push(`<details><summary>${v} (hyde=${mode}) — bot answer + judge reasoning</summary>`);
     lines.push('');
     lines.push(`**Bot answer (${r.bot_kind}):**`);
     lines.push('');
@@ -194,17 +217,22 @@ for (const q of questions) {
 // ---------------------------------------------------------------------------
 const csvLines: string[] = [];
 csvLines.push(
-  'slug,difficulty,bot_version,correctness,completeness,grounding,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error',
+  'slug,difficulty,bot_version,hyde_mode_actual,hyde_mode_requested,correctness,completeness,grounding,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error',
 );
 for (const q of questions) {
-  for (const v of versions) {
-    const r = latestRuns.find((row) => row.question_id === q.id && row.bot_version === v);
+  for (const pair of versionModePairs) {
+    const [v, mode] = pair.split('::');
+    const r = latestRuns.find(
+      (row) => row.question_id === q.id && row.bot_version === v && modeKey(row) === mode,
+    );
     if (!r) continue;
     csvLines.push(
       [
         q.slug,
         q.difficulty,
         v,
+        mode,
+        (r.hyde_mode_requested as string | null) ?? '',
         r.score_correctness ?? '',
         r.score_completeness ?? '',
         r.score_grounding ?? '',
@@ -231,15 +259,16 @@ console.log(`✓ Markdown : ${mdPath}`);
 console.log(`✓ CSV      : ${csvPath}`);
 console.log('');
 console.log('Samenvatting:');
-for (const v of versions) {
-  const vRows = latestRuns.filter((r) => r.bot_version === v);
+for (const pair of versionModePairs) {
+  const [v, mode] = pair.split('::');
+  const vRows = latestRuns.filter((r) => r.bot_version === v && modeKey(r) === mode);
   const c = avgOf(vRows, (r) => r.score_correctness);
   const p = avgOf(vRows, (r) => r.score_completeness);
   const g = avgOf(vRows, (r) => r.score_grounding);
   const all = [c, p, g].filter((n): n is number => n !== null);
   const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
   console.log(
-    `  ${v.padEnd(7)}  C=${fmt(c)}  P=${fmt(p)}  G=${fmt(g)}  →  ${fmt(overall)}/5`,
+    `  ${v.padEnd(7)} ${mode.padEnd(11)}  C=${fmt(c)}  P=${fmt(p)}  G=${fmt(g)}  →  ${fmt(overall)}/5  (n=${vRows.length})`,
   );
 }
 }

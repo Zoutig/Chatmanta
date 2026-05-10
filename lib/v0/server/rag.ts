@@ -271,6 +271,34 @@ async function preProcessInput(
 // dat antwoord ipv (of naast) de vraag. Werkt vaak beter dan vraag-embedding
 // omdat hypothetische antwoorden lijken op de echte chunks in de corpus.
 // ---------------------------------------------------------------------------
+
+/**
+ * HyDE-modus die per query gekozen kan worden via UI-toggle of eval-script.
+ * 'auto' = volg bot-versie config, anders override (wint altijd, ook over
+ * bots waar useHyDE=false in config staat — dat is bewust voor evaluatie).
+ */
+export type HydeModeRequest = 'auto' | 'off' | 'upfront' | 'selective';
+export type HydeModeResolved = 'off' | 'upfront' | 'selective';
+
+const HYDE_MODE_VALUES: readonly HydeModeRequest[] = ['auto', 'off', 'upfront', 'selective'];
+export function isHydeModeRequest(v: unknown): v is HydeModeRequest {
+  return typeof v === 'string' && (HYDE_MODE_VALUES as readonly string[]).includes(v);
+}
+
+/**
+ * Leid de feitelijke HyDE-modus af. Bij 'auto' (default) volgt bot-config:
+ * useHyDE=false → 'off', useHyDE+selective → 'selective', useHyDE only →
+ * 'upfront'. Bij elke andere waarde wint de override.
+ */
+export function resolveHydeMode(
+  bot: BotConfig,
+  override?: HydeModeRequest,
+): HydeModeResolved {
+  if (override && override !== 'auto') return override;
+  if (!bot.useHyDE) return 'off';
+  return bot.selectiveHyDE ? 'selective' : 'upfront';
+}
+
 const HYDE_SYSTEM = `Je bent een hypothese-generator voor een vector-zoekmachine.
 
 Schrijf een KORTE, plausibel klinkende paragraaf (2-4 zinnen) die de gebruikersvraag zou kunnen beantwoorden — alsof je de informatie uit een bedrijfsdocument citeert. De inhoud mag verzonnen zijn, het doel is alleen dat de schrijfstijl en het onderwerp lijken op echte bron-documenten.
@@ -1058,11 +1086,18 @@ export async function* runRagQueryStreaming(input: {
   length?: Length;
   /** v0.4 multi-org: scope retrieval+cache naar deze org. Default DEV_ORG. */
   organizationId?: string;
+  /**
+   * Per-query HyDE-modus override (v0.5 evaluatie-toggle). 'auto' of undefined
+   * = volg bot-config. Override wint altijd, ook over bots met useHyDE=false.
+   */
+  hydeModeOverride?: HydeModeRequest;
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
   const tone: Tone = input.tone ?? DEFAULT_TONE;
   const length: Length = input.length ?? DEFAULT_LENGTH;
   const orgId = input.organizationId ?? DEV_ORG_ID;
+  const hydeModeRequested: HydeModeRequest = input.hydeModeOverride ?? 'auto';
+  const hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     yield { kind: 'error', message: 'threshold must be in [0, 1]' };
@@ -1189,10 +1224,11 @@ export async function* runRagQueryStreaming(input: {
     text: q,
     isHyde: false,
   }));
-  // v0.4 selective HyDE: alleen wanneer top-1 sim onder de trigger valt. Skip
-  // upfront generation; we voeren HyDE pas na de eerste retrieve uit.
-  const hydeUpfront = bot.useHyDE && !bot.selectiveHyDE;
-  if (hydeUpfront) {
+  // HyDE-mode is afgeleid van bot-config + optionele per-query override
+  // (zie resolveHydeMode). 'upfront' = altijd genereren vóór retrieve.
+  // 'selective' = pas genereren als top-1 sim onder de trigger valt (zie
+  // verderop). 'off' = nooit.
+  if (hydeModeActual === 'upfront') {
     yield { kind: 'status', phase: 'hyde' };
     const stopHyde = tMark('hyde_ms');
     // Eén HyDE-doc voor de eerste sub-query (de "main" intent) — meerdere
@@ -1260,10 +1296,10 @@ export async function* runRagQueryStreaming(input: {
   // Wordt gelogd ongeacht selective HyDE (interessante baseline-metriek).
   const top1SimInitial = topSim;
 
-  // v0.4 selective HyDE: trigger pas hier, ALS top-1 onder de drempel zat.
-  // Eén HyDE generate + embed + retrieve + merge. We zoeken NIET opnieuw met
-  // de andere queries (sub-queries / multi-query) want die hadden hun kans al.
-  if (bot.useHyDE && bot.selectiveHyDE && (topSim ?? 0) < bot.selectiveHyDETrigger) {
+  // Selective HyDE: trigger pas hier, ALS top-1 onder de drempel zat. Eén
+  // HyDE generate + embed + retrieve + merge. We zoeken NIET opnieuw met de
+  // andere queries (sub-queries / multi-query) want die hadden hun kans al.
+  if (hydeModeActual === 'selective' && (topSim ?? 0) < bot.selectiveHyDETrigger) {
     yield { kind: 'status', phase: 'hyde' };
     const stopHydeGen = tMark('hyde_ms');
     const hyde = await generateHydeDocument(subQueries[0], bot);
