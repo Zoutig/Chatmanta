@@ -99,12 +99,18 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     expect(bgBase).toBe('#a7f3d0');
   });
 
-  test('refined body bg gebruikt radial-gradient blobs', async ({ page }) => {
+  test('refined body bg gebruikt radial-gradient blobs + fixed attachment', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => {
       document.documentElement.setAttribute('data-style', 'refined');
     });
-    const bgImage = await page.evaluate(() => getComputedStyle(document.body).backgroundImage);
-    expect(bgImage).toContain('radial-gradient');
+    const bg = await page.evaluate(() => {
+      const s = getComputedStyle(document.body);
+      return { image: s.backgroundImage, attachment: s.backgroundAttachment };
+    });
+    expect(bg.image).toContain('radial-gradient');
+    // Multi-layer background → browser returns 'fixed, fixed, fixed, ...' (één keyword per layer).
+    // Classic body heeft géén background-attachment, dus die zou 'scroll' teruggeven → toContain discrimineert.
+    expect(bg.attachment).toContain('fixed');
   });
 });
