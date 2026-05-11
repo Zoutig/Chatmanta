@@ -36,16 +36,19 @@ export default async function globalSetup(_config: FullConfig) {
     return;
   }
 
+  const port = process.env.PLAYWRIGHT_PORT ?? '3000';
+  const baseUrl = `http://localhost:${port}`;
+
   const browser = await chromium.launch();
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  await page.goto('http://localhost:3000/login');
+  await page.goto(`${baseUrl}/login`);
   await page.fill('input[name="password"]', password);
   await page.click('button[type="submit"]');
 
   // Wait for redirect back to home
-  await page.waitForURL('http://localhost:3000/', { timeout: 15_000 });
+  await page.waitForURL(`${baseUrl}/`, { timeout: 15_000 });
 
   // Save the auth cookie so every test context can load it
   await context.storageState({ path: 'tests/.auth-state.json' });
