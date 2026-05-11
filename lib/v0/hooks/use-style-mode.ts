@@ -42,25 +42,54 @@ function applyToDom(mode: StyleMode): void {
   document.documentElement.setAttribute('data-style', mode);
 }
 
+// ─── Gedeelde module-store ───────────────────────────────────────────────
+// Belangrijk: zonder shared store hebben twee component-instances (bv.
+// ChatShell + OpmaakView) ELK een eigen useState. Als OpmaakView dan set()
+// aanroept, krijgt ChatShell geen update en re-rendert niet. Gevolg: Manta-
+// DOM blijft gemount terwijl `data-style="classic"` Manta-CSS strip — totale
+// layout-collaps. Door alle subscribers in een module-Set te bewaren en bij
+// set() alle setters tegelijk te triggeren, blijven alle hook-instances
+// synchroon.
+const subscribers = new Set<(m: StyleMode) => void>();
+let currentMode: StyleMode = DEFAULT_STYLE_MODE;
+
+function notify(mode: StyleMode): void {
+  currentMode = mode;
+  subscribers.forEach((fn) => fn(mode));
+}
+
 export function useStyleMode(): {
   mode: StyleMode;
   set: (m: StyleMode) => void;
 } {
-  // SSR: start met default. Boot-script in app/layout.tsx heeft data-style al
-  // op de DOM gezet voor de eerste paint, dus geen FOUC.
-  const [state, setState] = useState<StyleMode>(DEFAULT_STYLE_MODE);
+  // SSR: start met currentMode (default of laatst-gezet via een andere instance).
+  // Boot-script in app/layout.tsx heeft data-style al op de DOM gezet voor de
+  // eerste paint, dus geen FOUC.
+  const [state, setState] = useState<StyleMode>(currentMode);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- zelfde SSR-safe patroon als use-theme.ts / use-hyde-mode.ts: lazy initializer zou hydration-mismatch geven op aria-checked state in de SettingsView segmented control. */
+  /* eslint-disable react-hooks/set-state-in-effect -- SSR-safe sync: lazy initializer zou hydration-mismatch geven; module-state moet bij mount eenmaal naar React-state worden gepushed. */
   useEffect(() => {
+    // Lees localStorage + synchroniseer module-state op eerste mount.
     const stored = readStored();
-    if (stored) setState(stored);
+    if (stored && stored !== currentMode) {
+      currentMode = stored;
+    }
+    if (state !== currentMode) {
+      setState(currentMode);
+    }
+    subscribers.add(setState);
+    return () => {
+      subscribers.delete(setState);
+    };
+    // We willen alleen op mount subscriben, niet bij elke state-change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const set = useCallback((m: StyleMode) => {
-    setState(m);
     writeStored(m);
     applyToDom(m);
+    notify(m); // → triggert alle subscribers (alle useStyleMode-instances)
   }, []);
 
   return { mode: state, set };

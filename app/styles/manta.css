@@ -5,6 +5,55 @@
    Accent komt uit --manta-accent (FOUC-geboot in app/layout.tsx).
    ========================================================================== */
 
+/* --- Font override: alleen Inter + Plus Jakarta Sans in Manta-mode ----- */
+/* Door --font-mono te aliasen naar --font-sans krijgen alle bestaande
+   var(--font-mono)-usages (msg-meta, empty-card-label, slider-hint,
+   thread-meta, scores, kbd) automatisch Inter in Manta-modus. Classic en
+   Glass houden JetBrains Mono. */
+html[data-style="manta"] {
+  --font-mono: var(--font-sans);
+}
+
+/* --- Logo accent-tint: mark.png wordt overal accent-kleur via mask --- */
+/* Vereist /logo/mono-mark.png (een grijswaarden-variant van de manta-mark).
+   De originele PNG wordt verborgen en vervangen door een ::before-overlay
+   die background-color × mask-image gebruikt voor solid-accent rendering.
+   Bij accent-wissel kleurt automatisch alles mee. */
+html[data-style="manta"] .brand-mark,
+html[data-style="manta"] .msg-avatar,
+html[data-style="manta"] .topbar-mark,
+html[data-style="manta"] .empty-mark,
+html[data-style="manta"] .manta-sidebar-brand-mark {
+  position: relative;
+  background: transparent;
+}
+html[data-style="manta"] .brand-mark img,
+html[data-style="manta"] .msg-avatar img,
+html[data-style="manta"] .topbar-mark img,
+html[data-style="manta"] .empty-mark img,
+html[data-style="manta"] .manta-sidebar-brand-mark img {
+  opacity: 0;
+}
+html[data-style="manta"] .brand-mark::before,
+html[data-style="manta"] .msg-avatar::before,
+html[data-style="manta"] .topbar-mark::before,
+html[data-style="manta"] .empty-mark::before,
+html[data-style="manta"] .manta-sidebar-brand-mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--manta-accent);
+  -webkit-mask-image: url('/logo/mono-mark.png');
+  mask-image: url('/logo/mono-mark.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  pointer-events: none;
+}
+
 /* --- Manta tokens (light) ----------------------------------------------- */
 html:not(.dark)[data-style="manta"] {
   --manta-bg: #ffffff;

@@ -44,23 +44,43 @@ function applyToDom(accent: AccentColor): void {
   document.documentElement.style.setProperty('--manta-accent', accent);
 }
 
+// Zelfde shared-store-patroon als useStyleMode — meerdere hook-instances
+// moeten synchroon blijven anders re-rendert ChatShell niet bij toggle.
+const subscribers = new Set<(a: AccentColor) => void>();
+let currentAccent: AccentColor = DEFAULT_ACCENT;
+
+function notify(accent: AccentColor): void {
+  currentAccent = accent;
+  subscribers.forEach((fn) => fn(accent));
+}
+
 export function useAccent(): {
   accent: AccentColor;
   set: (a: AccentColor) => void;
 } {
-  const [state, setState] = useState<AccentColor>(DEFAULT_ACCENT);
+  const [state, setState] = useState<AccentColor>(currentAccent);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- zelfde SSR-safe patroon als use-style-mode.ts: lazy initializer zou hydration-mismatch geven op aria-checked state in de AccentPicker. */
+  /* eslint-disable react-hooks/set-state-in-effect -- zelfde SSR-safe sync als in use-style-mode; module-state moet eenmaal naar React-state worden gepushed bij mount. */
   useEffect(() => {
     const stored = readStored();
-    if (stored) setState(stored);
+    if (stored && stored !== currentAccent) {
+      currentAccent = stored;
+    }
+    if (state !== currentAccent) {
+      setState(currentAccent);
+    }
+    subscribers.add(setState);
+    return () => {
+      subscribers.delete(setState);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const set = useCallback((a: AccentColor) => {
-    setState(a);
     writeStored(a);
     applyToDom(a);
+    notify(a);
   }, []);
 
   return { accent: state, set };
