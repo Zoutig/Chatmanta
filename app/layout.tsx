@@ -25,13 +25,15 @@ const themeBootScript = `
   try {
     var k = 'chatmanta-theme';
     var c = localStorage.getItem(k);
-    if (c !== 'light' && c !== 'dark' && c !== 'system') c = 'system';
+    // Default voor nieuwe sessies: 'light' (volgt user-preference 2026-05-12).
+    if (c !== 'light' && c !== 'dark' && c !== 'system') c = 'light';
     var resolved = c;
     if (c === 'system') {
       resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     var root = document.documentElement;
     if (resolved === 'dark') root.classList.add('dark');
+    else root.classList.remove('dark');
     root.setAttribute('data-theme', resolved);
   } catch (e) {}
 })();

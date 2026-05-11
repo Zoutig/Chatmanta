@@ -113,6 +113,20 @@ export function ChatShell({
     return () => document.body.classList.remove('body-fixed');
   }, []);
 
+  // Wanneer de gebruiker terugschakelt van Manta naar Klassiek/Glass, reset
+  // de Manta-collapse-states. Anders blijft de eerstvolgende keer dat ze weer
+  // naar Manta switchen het sidebar/rail-panel ingeklapt staan zonder duidelijke
+  // reden, en kan de classic-render een korte mismatch tonen omdat het CSS-grid
+  // de extra .manta-*-collapsed className zou behouden.
+  /* eslint-disable react-hooks/set-state-in-effect -- synchroniseren van mode-specifieke UI-state met de globale styleMode-keuze; geen externe bron mogelijk zonder de hook-API te verbreden. */
+  useEffect(() => {
+    if (styleMode !== 'manta') {
+      setMantaLeftCollapsed(false);
+      setMantaRightCollapsed(false);
+    }
+  }, [styleMode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // Auto-scroll: na elke turn-mutatie naar de bodem.
   useEffect(() => {
     const el = convoRef.current;
@@ -484,8 +498,6 @@ export function ChatShell({
             turnCount={turns.length}
             botVersion={botVersion}
             bots={bots}
-            rightOpen={!mantaRightCollapsed}
-            onToggleRight={() => setMantaRightCollapsed((v) => !v)}
             leftCollapsed={mantaLeftCollapsed}
             onToggleLeft={() => setMantaLeftCollapsed((v) => !v)}
           />

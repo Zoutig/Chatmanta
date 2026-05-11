@@ -9,8 +9,6 @@ export function MantaTopbar({
   turnCount,
   botVersion,
   bots,
-  rightOpen,
-  onToggleRight,
   leftCollapsed,
   onToggleLeft,
 }: {
@@ -18,8 +16,6 @@ export function MantaTopbar({
   turnCount: number;
   botVersion: string;
   bots: BotMeta[];
-  rightOpen: boolean;
-  onToggleRight: () => void;
   leftCollapsed: boolean;
   onToggleLeft: () => void;
 }) {
@@ -50,16 +46,6 @@ export function MantaTopbar({
           <BotDropdown current={botVersion} bots={bots} />
         </div>
         <ThemeSwitch />
-        <button
-          type="button"
-          aria-pressed={rightOpen}
-          aria-label={rightOpen ? 'Paneel inklappen' : 'Paneel uitklappen'}
-          title={rightOpen ? 'Paneel inklappen' : 'Paneel uitklappen'}
-          className={`manta-topbar-icon-btn${rightOpen ? ' active' : ''}`}
-          onClick={onToggleRight}
-        >
-          <Icon name="panel-right" size={16} />
-        </button>
       </div>
     </header>
   );

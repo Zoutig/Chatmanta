@@ -28,6 +28,15 @@ html:not(.dark)[data-style="manta"] {
   --manta-teal-soft: color-mix(in oklab, var(--manta-accent, #009292) 8%, transparent);
   --manta-teal-tint: color-mix(in oklab, var(--manta-accent, #009292) 18%, transparent);
 
+  /* Alias bestaande --accent / --accent-glow / --accent-soft naar de Manta-keuze.
+     Hierdoor kleuren alle pre-bestaande styles (logs, citaties, pipeline-trail,
+     bot-pill, scrollbars) automatisch mee zonder dat we ze één voor één hoeven
+     te vervangen. Werkt alleen binnen html[data-style="manta"]. */
+  --accent: var(--manta-accent, #009292);
+  --accent-2: var(--manta-accent, #009292);
+  --accent-glow: color-mix(in oklab, var(--manta-accent, #009292) 25%, transparent);
+  --accent-soft: color-mix(in oklab, var(--manta-accent, #009292) 10%, transparent);
+
   --manta-r: 8px;
   --manta-r-md: 11px;
   --manta-r-lg: 14px;
@@ -61,6 +70,11 @@ html.dark[data-style="manta"] {
   --manta-teal-ink: color-mix(in oklab, var(--manta-accent, #009292) 80%, #fff 20%);
   --manta-teal-soft: color-mix(in oklab, var(--manta-accent, #009292) 14%, transparent);
   --manta-teal-tint: color-mix(in oklab, var(--manta-accent, #009292) 24%, transparent);
+
+  --accent: var(--manta-accent, #009292);
+  --accent-2: var(--manta-accent, #009292);
+  --accent-glow: color-mix(in oklab, var(--manta-accent, #009292) 30%, transparent);
+  --accent-soft: color-mix(in oklab, var(--manta-accent, #009292) 16%, transparent);
 
   --manta-r: 8px;
   --manta-r-md: 11px;
@@ -166,20 +180,18 @@ html[data-style="manta"] .manta-sidebar.collapsed .manta-sidebar-brand {
   padding: 0;
 }
 html[data-style="manta"] .manta-sidebar-brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  overflow: hidden;
+  width: 36px;
+  height: 22px;
   flex-shrink: 0;
-  background: var(--manta-teal);
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--manta-teal) 35%, transparent));
 }
 html[data-style="manta"] .manta-sidebar-brand-mark img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 html[data-style="manta"] .manta-sidebar-brand-text {
   font-family: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif;
@@ -314,7 +326,7 @@ html[data-style="manta"] .manta-sidebar-search input::placeholder {
   color: var(--manta-navy-muted);
 }
 html[data-style="manta"] .manta-sidebar-kbd {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   padding: 1px 4px;
   border: 1px solid var(--manta-navy-line-2);
@@ -333,7 +345,7 @@ html[data-style="manta"] .manta-sidebar-section-label {
   align-items: center;
 }
 html[data-style="manta"] .manta-sidebar-section-count {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-weight: 500;
 }
 
@@ -424,7 +436,7 @@ html[data-style="manta"] .manta-usage-strip {
   gap: 6px;
   font-size: 10.5px;
   color: var(--manta-navy-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -562,7 +574,7 @@ html[data-style="manta"] .manta-org-row-name {
 html[data-style="manta"] .manta-org-row-slug {
   font-size: 10.5px;
   color: var(--manta-navy-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 html[data-style="manta"] .manta-org-row-check {
   color: var(--manta-teal);
@@ -622,7 +634,7 @@ html[data-style="manta"] .manta-topbar-title {
 html[data-style="manta"] .manta-topbar-meta {
   font-size: 11.5px;
   color: var(--manta-ink-dim);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 html[data-style="manta"] .manta-topbar-right {
   display: flex;
@@ -828,7 +840,7 @@ html[data-style="manta"] .manta-composer-spacer {
 html[data-style="manta"] .manta-composer-counter {
   font-size: 11px;
   color: var(--manta-ink-dim);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 html[data-style="manta"] .manta-composer-hint {
   margin-top: 8px;
@@ -838,7 +850,7 @@ html[data-style="manta"] .manta-composer-hint {
   font-size: 10.5px;
   color: var(--manta-ink-dim);
   text-align: center;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: 0.02em;
 }
 
@@ -946,7 +958,7 @@ html[data-style="manta"] .manta-threshold-popover-label {
   color: var(--manta-ink-muted);
 }
 html[data-style="manta"] .manta-threshold-popover-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   color: var(--manta-ink);
   font-weight: 600;
@@ -983,7 +995,7 @@ html[data-style="manta"] .manta-threshold-preset.active {
   color: var(--manta-teal-ink);
 }
 html[data-style="manta"] .manta-threshold-preset-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;
   color: var(--manta-ink);

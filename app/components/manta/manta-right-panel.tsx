@@ -5,6 +5,7 @@ import type { ChatResponse, DocSummary } from '@/lib/v0/server/rag';
 import { SourcesView } from '../sources-view';
 import { DocsView } from '../docs-view';
 import { SettingsView } from '../settings-view';
+import { OpmaakView } from '../opmaak-view';
 import { EmbedView } from '../embed-view';
 import { EvalsView } from '../evals-view';
 import { LatencyView } from '../latency-view';
@@ -89,6 +90,19 @@ function buildTabs(sourceCount: number, claimCount: number, docCount: number): R
             fill="none"
             strokeLinecap="round"
           />
+        </g>
+      ),
+    },
+    {
+      id: 'opmaak',
+      label: 'Opmaak',
+      group: 'Configuratie',
+      icon: (
+        <g>
+          <circle cx="5" cy="5" r="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          <circle cx="11" cy="5" r="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          <circle cx="5" cy="11" r="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          <circle cx="11" cy="11" r="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
         </g>
       ),
     },
@@ -279,6 +293,7 @@ export function MantaRightPanel({
                 botFlags={botFlags}
               />
             ) : null}
+            {tab === 'opmaak' ? <OpmaakView /> : null}
             {tab === 'prompt' ? (
               <PromptView
                 botVersion={botVersion}

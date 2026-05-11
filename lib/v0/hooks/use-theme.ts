@@ -8,14 +8,14 @@ export type ResolvedTheme = 'light' | 'dark';
 const STORAGE_KEY = 'chatmanta-theme';
 
 function readChoice(): ThemeChoice {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof window === 'undefined') return 'light';
   try {
     const v = window.localStorage.getItem(STORAGE_KEY);
     if (v === 'light' || v === 'dark' || v === 'system') return v;
   } catch {
-    // localStorage kan ontoegankelijk zijn (private browsing); val terug op system
+    // localStorage kan ontoegankelijk zijn (private browsing); val terug op light
   }
-  return 'system';
+  return 'light';
 }
 
 function resolveTheme(choice: ThemeChoice): ResolvedTheme {
@@ -37,9 +37,9 @@ export function useTheme(): {
   resolved: ResolvedTheme;
   set: (c: ThemeChoice) => void;
 } {
-  // SSR: start met 'system'. Inline FOUC-script in layout.tsx heeft de DOM
-  // al voor ons gezet, dus initial render flickert niet.
-  const [choice, setChoice] = useState<ThemeChoice>('system');
+  // SSR: start met 'light' (matched de FOUC-script default). De inline script
+  // in layout.tsx heeft de DOM al voor ons gezet, dus initial render flickert niet.
+  const [choice, setChoice] = useState<ThemeChoice>('light');
   const [resolved, setResolved] = useState<ResolvedTheme>('light');
 
   // Eerste mount: lees opgeslagen voorkeur en resolve.
