@@ -7,6 +7,7 @@ import type { ThreadSummary } from '@/lib/v0/server/threads';
 import type { AllTimeUsage } from '@/lib/v0/server/log';
 import type { OrgOption } from './chat-shell';
 import { setActiveOrgAction } from '../actions/active-org';
+import { logoutAction } from '../actions/logout';
 
 export function Sidebar({
   threads,
@@ -154,6 +155,13 @@ function OrgSwitcher({
     });
   }
 
+  function handleLogout() {
+    startTransition(async () => {
+      await logoutAction();
+      // logoutAction redirect()'t naar /login — code hieronder draait niet meer.
+    });
+  }
+
   return (
     <div className="org-switcher" ref={containerRef}>
       <button
@@ -175,7 +183,7 @@ function OrgSwitcher({
       </button>
 
       {open ? (
-        <div className="org-switcher-popover" role="listbox">
+        <div className="org-switcher-popover" role="menu">
           <div className="org-switcher-label">Wissel organisatie</div>
           {options.map((o) => {
             const isActive = o.slug === activeSlug;
@@ -183,8 +191,8 @@ function OrgSwitcher({
               <button
                 key={o.slug}
                 type="button"
-                role="option"
-                aria-selected={isActive}
+                role="menuitemradio"
+                aria-checked={isActive}
                 className={`org-switcher-row${isActive ? ' active' : ''}`}
                 onClick={() => pick(o.slug)}
                 disabled={pending}
@@ -202,6 +210,23 @@ function OrgSwitcher({
               </button>
             );
           })}
+
+          <div className="org-switcher-divider" role="separator" />
+
+          <button
+            type="button"
+            role="menuitem"
+            className="org-switcher-row org-switcher-row-logout"
+            onClick={handleLogout}
+            disabled={pending}
+          >
+            <span className="org-switcher-row-icon" aria-hidden="true">
+              <Icon name="log-out" size={14} />
+            </span>
+            <span className="org-switcher-row-text">
+              <span className="org-switcher-row-name">Uitloggen</span>
+            </span>
+          </button>
         </div>
       ) : null}
     </div>
