@@ -467,6 +467,24 @@ body.body-fixed { overflow: hidden; }
   display: flex;
   flex-shrink: 0;
 }
+.org-switcher-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 4px;
+}
+.org-switcher-row-icon {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+.org-switcher-row-logout:hover {
+  background: color-mix(in oklab, var(--err) 18%, transparent);
+}
+.org-switcher-row-logout:hover .org-switcher-row-name,
+.org-switcher-row-logout:hover .org-switcher-row-icon {
+  color: var(--err);
+}
 
 /* ==========================================================================
    Main / topbar
