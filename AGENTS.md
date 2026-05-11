@@ -112,6 +112,29 @@ Bij recente code-wijzigingen: lees `graphify-out/GRAPH_REPORT.md` voor structure
 
 **De hook doet géén `git pull` automatisch** — dat zou ongevraagd mergeconflicten kunnen veroorzaken. Vraag de gebruiker of pull veilig is voor je het uitvoert.
 
+**Parallelle CC-sessies — gebruik altijd worktrees:**
+
+Sebastiaan draait regelmatig meerdere Claude Code sessies tegelijk. Als twee sessies hetzelfde working-directory delen, racen ze op `git status`, branch-checkouts en working-tree edits — niet hypothetisch, dit is daadwerkelijk gebeurd.
+
+Default-regel: **één CC-sessie per working-directory**. Voor parallel werk gebruik je `git worktree`:
+
+```powershell
+# Per parallelle taak een eigen folder + branch:
+git worktree add ../chatmanta-<doel> feat/seb/<branch>
+cd ../chatmanta-<doel>
+claude
+```
+
+Als agent: bij sessie-start check je of er een ander CC-proces actief is via `.claude/scheduled_tasks.lock` — als die file bestaat met een PID die niet de jouwe is, draait er een tweede sessie op deze working-directory. STOP en vraag de gebruiker:
+1. Of die andere sessie nog actief is (kan stale lock zijn)
+2. Of je naar een worktree moet switchen voor je verder gaat
+
+Indicaties dat een parallel-sessie tussendoor heeft gewerkt: branch-checkout die je niet zelf deed, commits in `git log` die je niet kent, untracked files in onverwachte mappen. Bij twijfel: `git reflog -20` toont je wat er gebeurd is.
+
+CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill — gebruik die voor automatische worktree-aanmaak bij dispatched subagents.
+
+**Per-worktree caveats** (voor mensen): elke worktree heeft eigen `node_modules`, eigen `.next/`, géén automatische `.env.local` (die is gitignored — kopieer hem zelf), en eigen dev-server-poort (gebruik `next dev -p 3001` voor de tweede). Memory-store van CC is per working-directory dus niet gedeeld tussen worktrees.
+
 **Voor je begint te bouwen:**
 - Maak een feature branch: `git checkout -b feat/<naam>/<beschrijving>` (bv. `feat/seb/widget-theme`). Nooit direct op `main`.
 - Branches kort houden — een branch die langer dan 2-3 dagen leeft = mergeconflict-risico
