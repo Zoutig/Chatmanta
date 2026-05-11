@@ -68,6 +68,52 @@ html:not(.dark) {
   --accent-fg: #ffffff;
 }
 
+/* ==========================================================================
+   Style mode: REFINED — opt-in via Settings-tab.
+   Override alleen wat verandert; al het andere erft van Classic (:root /
+   html:not(.dark)). Tokens hier; selectieve regelovrrides eronder.
+   ========================================================================== */
+
+/* Refined + dark — gedempte borders, minder cyan-glow. */
+html.dark[data-style="refined"] {
+  --border: rgba(120, 200, 230, 0.06);
+  --border-strong: rgba(120, 200, 230, 0.18);
+  --accent-glow: rgba(77, 214, 232, 0.20);
+  --accent-soft: rgba(77, 214, 232, 0.10);
+}
+
+/* Refined + light — zachtere petrol-accent, betere contrast op witte bg. */
+html:not(.dark)[data-style="refined"] {
+  --accent: #0e7c9a;
+  --accent-glow: rgba(14, 124, 154, 0.18);
+  --accent-soft: rgba(14, 124, 154, 0.08);
+  --border-strong: rgba(20, 60, 90, 0.18);
+  --fg-muted: #3f5868;
+}
+
+/* Refined — ambient body-gradient gedempt (beide themes). */
+html[data-style="refined"] body {
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 0%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, color-mix(in oklab, var(--accent-2) 4%, transparent), transparent 60%),
+    var(--bg);
+}
+
+/* Refined — AI-avatar zonder glow, brand-mark subtieler. */
+html[data-style="refined"] .msg-avatar { filter: none; }
+html[data-style="refined"] .brand-mark {
+  filter: drop-shadow(0 0 6px var(--accent-glow));
+}
+
+/* Refined — user-bubble rustiger: cyan-tint i.p.v. surface, geen extra shadow. */
+html[data-style="refined"] .msg-user-bubble {
+  background: var(--accent-soft);
+  border-color: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+/* Refined — meer ruimte tussen turns in de conversatie. */
+html[data-style="refined"] .conversation-inner { gap: 40px; }
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
