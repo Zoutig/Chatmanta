@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type StyleMode = 'classic' | 'refined';
+export type StyleMode = 'classic' | 'glass';
 
 export const DEFAULT_STYLE_MODE: StyleMode = 'classic';
 const STORAGE_KEY = 'chatmanta-style';
-const VALID: readonly StyleMode[] = ['classic', 'refined'];
+const VALID: readonly StyleMode[] = ['classic', 'glass'];
 
 function isStyleMode(v: unknown): v is StyleMode {
   return typeof v === 'string' && (VALID as readonly string[]).includes(v);
@@ -17,6 +17,11 @@ function readStored(): StyleMode | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
+    // Migratie: 'refined' was de v1-naam vóór de rename naar 'glass'.
+    if (raw === 'refined') {
+      window.localStorage.setItem(STORAGE_KEY, 'glass');
+      return 'glass';
+    }
     return isStyleMode(raw) ? raw : null;
   } catch {
     return null;

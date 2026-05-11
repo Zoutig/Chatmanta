@@ -1,4 +1,6 @@
-# V0 Refined v2 "Manta" — full visual redesign
+# V0 Glass "Manta" — full visual redesign
+
+> **Naming note:** This spec was written under the working name "Refined v2". After visual review the mode was renamed to **Glass** (toggle label "Glass", `data-style="glass"`, `StyleMode = 'classic' | 'glass'`). The body of this spec retains historical references to "Refined v2" in section headers and rationale; treat any "Refined v2" mention here as equivalent to "Glass". Migration shim in `useStyleMode` + boot-script promotes any pre-rename `'refined'` localStorage value to `'glass'`.
 
 **Status:** Spec. Supersedes the *visual* parts of `2026-05-11-v0-abyss-refined-style-toggle-design.md`.
 **Owner:** Sebastiaan (`@Zoutig`).

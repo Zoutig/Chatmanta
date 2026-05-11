@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const STORAGE_KEY = 'chatmanta-style';
 
-test.describe('V0 style mode toggle (Classic/Refined)', () => {
+test.describe('V0 style mode toggle (Classic/Glass)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.evaluate((k) => window.localStorage.removeItem(k), STORAGE_KEY);
@@ -23,15 +23,15 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     const radiogroup = page.getByRole('radiogroup', { name: /opmaak/i });
     await expect(radiogroup).toBeVisible();
 
-    const refined = radiogroup.getByRole('radio', { name: /refined/i });
-    await refined.click();
+    const glass = radiogroup.getByRole('radio', { name: /glass/i });
+    await glass.click();
 
     const html = page.locator('html');
-    await expect(html).toHaveAttribute('data-style', 'refined');
+    await expect(html).toHaveAttribute('data-style', 'glass');
 
     // Persistence over reload
     await page.reload();
-    await expect(html).toHaveAttribute('data-style', 'refined');
+    await expect(html).toHaveAttribute('data-style', 'glass');
 
     // Terug naar Klassiek
     await page.getByRole('tab', { name: 'Instellingen' }).click();
@@ -40,14 +40,14 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
   });
 
   test('no FOUC — initial paint matches stored choice', async ({ page }) => {
-    // Set refined eerst
+    // Set glass eerst
     await page.goto('/');
-    await page.evaluate(() => window.localStorage.setItem('chatmanta-style', 'refined'));
+    await page.evaluate(() => window.localStorage.setItem('chatmanta-style', 'glass'));
 
-    // Hard-reload met cache-bust; data-style moet 'refined' zijn vóór React hydrateert.
+    // Hard-reload met cache-bust; data-style moet 'glass' zijn vóór React hydrateert.
     await page.goto('/?cb=' + Date.now());
     const html = page.locator('html');
-    await expect(html).toHaveAttribute('data-style', 'refined');
+    await expect(html).toHaveAttribute('data-style', 'glass');
   });
 
   test('corrupte localStorage valt terug op classic', async ({ page }) => {
@@ -71,13 +71,13 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     await expect(aiBody).toHaveClass(/msg-ai-bubble/);
   });
 
-  test('dark + refined heeft Bioluminescent Abyss base-bg #02050d', async ({ page }) => {
+  test('dark + glass heeft Bioluminescent Abyss base-bg #02050d', async ({ page }) => {
     await page.goto('/');
-    // Zet dark + refined
+    // Zet dark + glass
     await page.evaluate(() => {
       document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-style', 'refined');
-      window.localStorage.setItem('chatmanta-style', 'refined');
+      document.documentElement.setAttribute('data-style', 'glass');
+      window.localStorage.setItem('chatmanta-style', 'glass');
     });
     // Read computed --bg-base via CSS var op html
     const bgBase = await page.evaluate(() =>
@@ -86,12 +86,12 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     expect(bgBase).toBe('#02050d');
   });
 
-  test('light + refined heeft Reef Pop base-bg #a7f3d0', async ({ page }) => {
+  test('light + glass heeft Reef Pop base-bg #a7f3d0', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => {
       document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-style', 'refined');
-      window.localStorage.setItem('chatmanta-style', 'refined');
+      document.documentElement.setAttribute('data-style', 'glass');
+      window.localStorage.setItem('chatmanta-style', 'glass');
     });
     const bgBase = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim()
@@ -99,10 +99,10 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     expect(bgBase).toBe('#a7f3d0');
   });
 
-  test('refined body bg gebruikt radial-gradient blobs + fixed attachment', async ({ page }) => {
+  test('glass body bg gebruikt radial-gradient blobs + fixed attachment', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => {
-      document.documentElement.setAttribute('data-style', 'refined');
+      document.documentElement.setAttribute('data-style', 'glass');
     });
     const bg = await page.evaluate(() => {
       const s = getComputedStyle(document.body);
@@ -115,11 +115,11 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
   });
 
   // Helper — verify that a CSS rule exists in the loaded stylesheets that mentions
-  // `data-style` (= refined-scope) AND a class selector AND a property. Asserts the
+  // `data-style` (= glass-scope) AND a class selector AND a property. Asserts the
   // rule exists in CSSOM, bypassing the need for the element to render on the
   // current page (composer, bubbles, avatar only render after an active chat).
   // Uses substring matching robust to CSSOM quote-normalization variants.
-  async function refinedRuleExists(
+  async function glassRuleExists(
     page: import('@playwright/test').Page,
     classSelector: string,
     propertyContains: string,
@@ -153,31 +153,31 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
   // niet betrouwbaar — voor sommige selectors mist de property uit `rule.style.cssText`
   // ondanks dat de regel correct in de geserveerde CSS staat. Visuele smoke (Task 10)
   // dekt de feitelijke render. Skip tot CSSOM-quirk root cause bekend is.
-  test.skip('refined: topbar/sidebar/composer hebben frosted-glass CSS-regels', async ({ page }) => {
+  test.skip('glass: topbar/sidebar/composer hebben frosted-glass CSS-regels', async ({ page }) => {
     await page.goto('/');
     for (const cls of ['.topbar', '.sidebar', '.composer']) {
-      const ok = await refinedRuleExists(page, cls, 'backdrop-filter');
-      expect(ok, `Refined-rule met backdrop-filter voor ${cls} ontbreekt in CSSOM`).toBe(true);
+      const ok = await glassRuleExists(page, cls, 'backdrop-filter');
+      expect(ok, `Glass-rule met backdrop-filter voor ${cls} ontbreekt in CSSOM`).toBe(true);
     }
   });
 
-  test.skip('refined: user + AI bubbles hebben frosted-glass CSS-regels', async ({ page }) => {
+  test.skip('glass: user + AI bubbles hebben frosted-glass CSS-regels', async ({ page }) => {
     await page.goto('/');
-    const userOk = await refinedRuleExists(page, '.msg-user-bubble', 'backdrop-filter');
-    expect(userOk, '.msg-user-bubble Refined-regel ontbreekt').toBe(true);
-    const aiOk = await refinedRuleExists(page, '.msg-ai-bubble', 'backdrop-filter');
-    expect(aiOk, '.msg-ai-bubble Refined-regel ontbreekt').toBe(true);
+    const userOk = await glassRuleExists(page, '.msg-user-bubble', 'backdrop-filter');
+    expect(userOk, '.msg-user-bubble Glass-regel ontbreekt').toBe(true);
+    const aiOk = await glassRuleExists(page, '.msg-ai-bubble', 'backdrop-filter');
+    expect(aiOk, '.msg-ai-bubble Glass-regel ontbreekt').toBe(true);
   });
 
-  test('refined: AI avatar krijgt radial gradient CSS-regel', async ({ page }) => {
+  test('glass: AI avatar krijgt radial gradient CSS-regel', async ({ page }) => {
     await page.goto('/');
-    const ok = await refinedRuleExists(page, '.msg-avatar', 'radial-gradient');
-    expect(ok, '.msg-avatar Refined-regel met radial-gradient ontbreekt').toBe(true);
+    const ok = await glassRuleExists(page, '.msg-avatar', 'radial-gradient');
+    expect(ok, '.msg-avatar Glass-regel met radial-gradient ontbreekt').toBe(true);
   });
 
-  test('refined: primary actie-knoppen zijn pill-shaped', async ({ page }) => {
+  test('glass: primary actie-knoppen zijn pill-shaped', async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => document.documentElement.setAttribute('data-style', 'refined'));
+    await page.evaluate(() => document.documentElement.setAttribute('data-style', 'glass'));
     const br = await page.evaluate(() => {
       const el = document.querySelector('.btn-new');
       return el ? getComputedStyle(el).borderRadius : '';

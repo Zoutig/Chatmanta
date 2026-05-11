@@ -69,14 +69,15 @@ html:not(.dark) {
 }
 
 /* ==========================================================================
-   Style mode: REFINED v2 "Manta" — opt-in via Settings-tab.
-   Aparte visuele identiteit: cinematic glass + ocean palette.
+   Style mode: GLASS "Manta" — opt-in via Settings-tab.
+   Aparte visuele identiteit: cinematic frosted glass + ocean palette.
    Dark = Bioluminescent Abyss, Light = Reef Pop.
+   Was eerder "Refined v2" — hernoemd naar "Glass" tijdens visuele review.
    Zie docs/superpowers/specs/2026-05-11-v0-refined-v2-manta-redesign.md
    ========================================================================== */
 
-/* Refined + dark — Bioluminescent Abyss tokens. */
-html.dark[data-style="refined"] {
+/* Glass + dark — Bioluminescent Abyss tokens. */
+html.dark[data-style="glass"] {
   --bg-base: #02050d;
   --glow-1-color: rgba(8, 145, 178, 0.55);
   --glow-2-color: rgba(244, 114, 182, 0.32);
@@ -99,8 +100,8 @@ html.dark[data-style="refined"] {
   --r-pill: 999px;
 }
 
-/* Refined + light — Reef Pop tokens (vibrant aqua/teal met frosted glass). */
-html:not(.dark)[data-style="refined"] {
+/* Glass + light — Reef Pop tokens (vibrant aqua/teal met frosted glass). */
+html:not(.dark)[data-style="glass"] {
   --bg-base: #a7f3d0;
   --glow-1-color: rgba(34, 211, 238, 0.85);
   --glow-2-color: rgba(20, 184, 166, 0.80);
@@ -125,8 +126,8 @@ html:not(.dark)[data-style="refined"] {
   --r-pill: 999px;
 }
 
-/* Refined v2 — body gradient-blob background (dark). */
-html.dark[data-style="refined"] body {
+/* Glass — body gradient-blob background (dark). */
+html.dark[data-style="glass"] body {
   background:
     radial-gradient(circle 600px at 12% 22%, var(--glow-1-color), transparent 65%),
     radial-gradient(circle 500px at 92% 80%, var(--glow-2-color), transparent 65%),
@@ -135,8 +136,8 @@ html.dark[data-style="refined"] body {
   background-attachment: fixed;
 }
 
-/* Refined v2 — body gradient-blob background (light). */
-html:not(.dark)[data-style="refined"] body {
+/* Glass — body gradient-blob background (light). */
+html:not(.dark)[data-style="glass"] body {
   background:
     radial-gradient(circle 600px at 12% 22%, var(--glow-1-color), transparent 65%),
     radial-gradient(circle 500px at 92% 80%, var(--glow-2-color), transparent 65%),
@@ -146,36 +147,36 @@ html:not(.dark)[data-style="refined"] body {
   background-attachment: fixed;
 }
 
-/* Refined v2 — topbar als frosted glass panel. */
-html[data-style="refined"] .topbar {
+/* Glass — topbar als frosted glass panel. */
+html[data-style="glass"] .topbar {
   background: var(--glass-tint-2);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--glass-border);
 }
 
-/* Refined v2 — sidebar als frosted glass panel. */
-html[data-style="refined"] .sidebar {
+/* Glass — sidebar als frosted glass panel. */
+html[data-style="glass"] .sidebar {
   background: var(--glass-tint-2);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-right: 1px solid var(--glass-border);
 }
 
-/* Refined v2 — composer als frosted glass panel. */
-html[data-style="refined"] .composer {
+/* Glass — composer als frosted glass panel. */
+html[data-style="glass"] .composer {
   background: var(--glass-tint-2);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
 }
-html[data-style="refined"] .composer:focus-within {
+html[data-style="glass"] .composer:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* Refined v2 — user message bubble als frosted glass. */
-html[data-style="refined"] .msg-user-bubble {
+/* Glass — user message bubble als frosted glass. */
+html[data-style="glass"] .msg-user-bubble {
   background: var(--glass-tint-2);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -186,8 +187,8 @@ html[data-style="refined"] .msg-user-bubble {
   padding: 10px 14px;
 }
 
-/* Refined v2 — AI message bubble als zachtere frosted glass. */
-html[data-style="refined"] .msg-ai-bubble {
+/* Glass — AI message bubble als zachtere frosted glass. */
+html[data-style="glass"] .msg-ai-bubble {
   background: var(--glass-tint);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -198,32 +199,32 @@ html[data-style="refined"] .msg-ai-bubble {
   padding: 12px 16px;
 }
 
-/* Refined v2 — wat meer ademruimte tussen turns. */
-html[data-style="refined"] .conversation-inner { gap: 48px; }
+/* Glass — wat meer ademruimte tussen turns. */
+html[data-style="glass"] .conversation-inner { gap: 48px; }
 
-/* Refined v2 — AI avatar als gradient orb met glow (dark). */
-html.dark[data-style="refined"] .msg-avatar {
+/* Glass — AI avatar als gradient orb met glow (dark). */
+html.dark[data-style="glass"] .msg-avatar {
   background: radial-gradient(circle at 30% 30%, #f0abfc 0%, #5fe1f0 50%, #0c4a6e 100%);
   box-shadow: 0 0 14px rgba(244, 114, 182, 0.45);
   border-radius: 50%;
   filter: none;
 }
 
-/* Refined v2 — AI avatar als gradient orb met glow (light). */
-html:not(.dark)[data-style="refined"] .msg-avatar {
+/* Glass — AI avatar als gradient orb met glow (light). */
+html:not(.dark)[data-style="glass"] .msg-avatar {
   background: radial-gradient(circle at 30% 30%, #5fe1f0 0%, #0e7c9a 60%, #042f2e 100%);
   box-shadow: 0 0 14px rgba(14, 124, 154, 0.40);
   border-radius: 50%;
   filter: none;
 }
 
-/* Refined v2 — brand-mark: subtle bioluminescent glow in dark. */
-html.dark[data-style="refined"] .brand-mark {
+/* Glass — brand-mark: subtle bioluminescent glow in dark. */
+html.dark[data-style="glass"] .brand-mark {
   filter: drop-shadow(0 0 12px rgba(244, 114, 182, 0.40));
 }
 
-/* Refined v2 — brand-mark: frosted tile in light. */
-html:not(.dark)[data-style="refined"] .brand-mark {
+/* Glass — brand-mark: frosted tile in light. */
+html:not(.dark)[data-style="glass"] .brand-mark {
   background: var(--glass-tint-2);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -233,9 +234,9 @@ html:not(.dark)[data-style="refined"] .brand-mark {
   filter: none;
 }
 
-/* Refined v2 — primary button (dark): witte frosted pill. */
-html.dark[data-style="refined"] .btn-new,
-html.dark[data-style="refined"] .composer-send {
+/* Glass — primary button (dark): witte frosted pill. */
+html.dark[data-style="glass"] .btn-new,
+html.dark[data-style="glass"] .composer-send {
   background: rgba(255, 255, 255, 0.18);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -246,15 +247,15 @@ html.dark[data-style="refined"] .composer-send {
   transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
               filter 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-html.dark[data-style="refined"] .btn-new:hover,
-html.dark[data-style="refined"] .composer-send:hover {
+html.dark[data-style="glass"] .btn-new:hover,
+html.dark[data-style="glass"] .composer-send:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);
 }
 
-/* Refined v2 — primary button (light): teal gradient pill. */
-html:not(.dark)[data-style="refined"] .btn-new,
-html:not(.dark)[data-style="refined"] .composer-send {
+/* Glass — primary button (light): teal gradient pill. */
+html:not(.dark)[data-style="glass"] .btn-new,
+html:not(.dark)[data-style="glass"] .composer-send {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border: none;
   color: #ffffff;
@@ -263,15 +264,15 @@ html:not(.dark)[data-style="refined"] .composer-send {
   transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
               filter 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-html:not(.dark)[data-style="refined"] .btn-new:hover,
-html:not(.dark)[data-style="refined"] .composer-send:hover {
+html:not(.dark)[data-style="glass"] .btn-new:hover,
+html:not(.dark)[data-style="glass"] .composer-send:hover {
   filter: brightness(1.06);
   transform: translateY(-1px);
 }
 
-/* Refined v2 — ghost-style action chips (msg-action, followup-chip). */
-html[data-style="refined"] .msg-action,
-html[data-style="refined"] .followup-chip {
+/* Glass — ghost-style action chips (msg-action, followup-chip). */
+html[data-style="glass"] .msg-action,
+html[data-style="glass"] .followup-chip {
   background: transparent;
   border: 1px solid var(--glass-border);
   color: var(--accent);
@@ -279,46 +280,46 @@ html[data-style="refined"] .followup-chip {
   transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1),
               border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-html[data-style="refined"] .msg-action:hover,
-html[data-style="refined"] .followup-chip:hover {
+html[data-style="glass"] .msg-action:hover,
+html[data-style="glass"] .followup-chip:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
 
-/* Refined v2 — subtle pulse op AI avatar tijdens streaming.
+/* Glass — subtle pulse op AI avatar tijdens streaming.
    Streaming-state wordt al via .msg-assistant.is-streaming class gemarkeerd?
    Zo niet, voorlopig de animation op msg-avatar in alle msg-assistant states zetten
    met opacity-pulse zodat het zelden opvalt wanneer er geen stream is. */
-@keyframes refined-avatar-pulse {
+@keyframes glass-avatar-pulse {
   0%, 100% { transform: scale(1.0); }
   50%      { transform: scale(1.04); }
 }
-html[data-style="refined"] .msg-assistant.is-streaming .msg-avatar,
-html[data-style="refined"] .msg-assistant:has(.streaming-cursor) .msg-avatar {
-  animation: refined-avatar-pulse 1.6s ease-in-out infinite;
+html[data-style="glass"] .msg-assistant.is-streaming .msg-avatar,
+html[data-style="glass"] .msg-assistant:has(.streaming-cursor) .msg-avatar {
+  animation: glass-avatar-pulse 1.6s ease-in-out infinite;
 }
 
 /* a11y — respecteer prefers-reduced-motion: schakel pulse uit. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-style="refined"] .msg-avatar {
+  html[data-style="glass"] .msg-avatar {
     animation: none !important;
   }
-  html[data-style="refined"] .btn-new,
-  html[data-style="refined"] .composer-send,
-  html[data-style="refined"] .msg-action,
-  html[data-style="refined"] .followup-chip {
+  html[data-style="glass"] .btn-new,
+  html[data-style="glass"] .composer-send,
+  html[data-style="glass"] .msg-action,
+  html[data-style="glass"] .followup-chip {
     transition: none !important;
   }
 }
 
 /* a11y — respecteer prefers-reduced-transparency: solid fallback. */
 @media (prefers-reduced-transparency: reduce) {
-  html[data-style="refined"] .topbar,
-  html[data-style="refined"] .sidebar,
-  html[data-style="refined"] .composer,
-  html[data-style="refined"] .msg-user-bubble,
-  html[data-style="refined"] .msg-ai-bubble,
-  html[data-style="refined"] .brand-mark {
+  html[data-style="glass"] .topbar,
+  html[data-style="glass"] .sidebar,
+  html[data-style="glass"] .composer,
+  html[data-style="glass"] .msg-user-bubble,
+  html[data-style="glass"] .msg-ai-bubble,
+  html[data-style="glass"] .brand-mark {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: var(--bg-elev, var(--bg-base)) !important;

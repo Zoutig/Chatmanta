@@ -38,7 +38,12 @@ const themeBootScript = `
   try {
     var k = 'chatmanta-style';
     var s = localStorage.getItem(k);
-    if (s !== 'classic' && s !== 'refined') s = 'classic';
+    // Migratie: 'refined' was de v1-naam vóór de rename naar 'glass'.
+    if (s === 'refined') {
+      s = 'glass';
+      try { localStorage.setItem(k, s); } catch (e) {}
+    }
+    if (s !== 'classic' && s !== 'glass') s = 'classic';
     document.documentElement.setAttribute('data-style', s);
   } catch (e) {}
 })();

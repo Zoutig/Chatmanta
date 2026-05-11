@@ -18,13 +18,13 @@ const HYDE_LABELS: Record<HydeMode, string> = {
 const HYDE_HINT =
   'Auto = volg bot-versie. Override wint altijd, ook over bots waar HyDE uit staat. Wordt per query gelogd voor evaluatie.';
 
-const STYLE_MODES: readonly StyleMode[] = ['classic', 'refined'];
+const STYLE_MODES: readonly StyleMode[] = ['classic', 'glass'];
 const STYLE_LABELS: Record<StyleMode, string> = {
   classic: 'Klassiek',
-  refined: 'Refined',
+  glass: 'Glass',
 };
 const STYLE_HINT =
-  'Klassiek = huidige opmaak. Refined = de nieuwe rustigere stijl. Wissel om beide te ervaren tijdens de A/B-test.';
+  'Klassiek = huidige opmaak. Glass = cinematic frosted-glass identiteit (Manta). Wissel om beide te ervaren tijdens de A/B-test.';
 
 export function SettingsView({
   threshold,
