@@ -70,49 +70,101 @@ html:not(.dark) {
 
 /* ==========================================================================
    Style mode: REFINED — opt-in via Settings-tab.
-   Override alleen wat verandert; al het andere erft van Classic (:root /
-   html:not(.dark)). Tokens hier; selectieve regelovrrides eronder.
+   Override tokens + selectieve component-regels onder dezelfde [data-style="refined"]
+   prefix. Bedoeld om duidelijk anders te voelen dan Classic: vlakker, strakker,
+   meer ademruimte, gedurfder accent.
    ========================================================================== */
 
-/* Refined + dark — gedempte borders, minder cyan-glow. */
+/* Refined + dark — herkalibreerde palet: warmer navy, helderder fg-muted,
+   strakker borders, geen cyan-glow op surfaces. */
 html.dark[data-style="refined"] {
-  --border: rgba(120, 200, 230, 0.06);
-  --border-strong: rgba(120, 200, 230, 0.18);
-  --accent-glow: rgba(77, 214, 232, 0.20);
-  --accent-soft: rgba(77, 214, 232, 0.10);
+  --bg: #060f1a;
+  --bg-elev: #0c1828;
+  --bg-elev-2: #122236;
+  --border: rgba(150, 200, 220, 0.10);
+  --border-strong: rgba(150, 200, 220, 0.22);
+  --accent: #5fe1f0;
+  --accent-glow: rgba(95, 225, 240, 0.15);
+  --accent-soft: rgba(95, 225, 240, 0.14);
+  --fg-muted: #a3bccd;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 10px;
 }
 
-/* Refined + light — zachtere petrol-accent, betere contrast op witte bg. */
+/* Refined + light — zachtere petrol-accent, hogere contrast op witte bg,
+   meer huid in fg-muted. */
 html:not(.dark)[data-style="refined"] {
+  --bg: #fbfcfd;
   --accent: #0e7c9a;
-  --accent-glow: rgba(14, 124, 154, 0.18);
-  --accent-soft: rgba(14, 124, 154, 0.08);
-  --border-strong: rgba(20, 60, 90, 0.18);
+  --accent-glow: rgba(14, 124, 154, 0.16);
+  --accent-soft: rgba(14, 124, 154, 0.10);
+  --border: rgba(20, 60, 90, 0.10);
+  --border-strong: rgba(20, 60, 90, 0.20);
   --fg-muted: #3f5868;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 10px;
 }
 
-/* Refined — ambient body-gradient gedempt (beide themes). */
+/* Refined — vlakke achtergrond, geen ambient gradient. */
 html[data-style="refined"] body {
-  background:
-    radial-gradient(ellipse 70% 50% at 20% 0%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 100% 100%, color-mix(in oklab, var(--accent-2) 4%, transparent), transparent 60%),
-    var(--bg);
+  background: var(--bg);
+}
+
+/* Refined — sidebar vlak en opaak, geen gradient overlay. */
+html[data-style="refined"] .sidebar {
+  background: var(--bg-elev);
+  backdrop-filter: none;
 }
 
 /* Refined — AI-avatar zonder glow, brand-mark subtieler. */
 html[data-style="refined"] .msg-avatar { filter: none; }
-html[data-style="refined"] .brand-mark {
-  filter: drop-shadow(0 0 6px var(--accent-glow));
-}
+html[data-style="refined"] .brand-mark { filter: none; }
 
-/* Refined — user-bubble rustiger: cyan-tint i.p.v. surface, geen extra shadow. */
-html[data-style="refined"] .msg-user-bubble {
+/* Refined — user-bubble: gedurfd accent-border, accent-fg in dark. */
+html.dark[data-style="refined"] .msg-user-bubble {
   background: var(--accent-soft);
-  border-color: color-mix(in oklab, var(--accent) 22%, transparent);
+  border: 1.5px solid color-mix(in oklab, var(--accent) 60%, transparent);
+  color: var(--fg);
+  border-bottom-right-radius: var(--r-md);
+}
+html:not(.dark)[data-style="refined"] .msg-user-bubble {
+  background: var(--accent);
+  border: 1.5px solid var(--accent);
+  color: #ffffff;
+  border-bottom-right-radius: var(--r-md);
 }
 
 /* Refined — meer ruimte tussen turns in de conversatie. */
-html[data-style="refined"] .conversation-inner { gap: 40px; }
+html[data-style="refined"] .conversation-inner { gap: 56px; }
+
+/* Refined — composer strakker, geen surface-tint. */
+html[data-style="refined"] .composer {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+}
+html[data-style="refined"] .composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Refined — topbar opaak met duidelijke onderlijn. */
+html[data-style="refined"] .topbar {
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: none;
+}
+
+/* Refined — meta-labels meer breathing room qua tracking. */
+html[data-style="refined"] .msg-meta,
+html[data-style="refined"] .topbar-meta,
+html[data-style="refined"] .brand-tag {
+  letter-spacing: 0.10em;
+}
+
+/* Refined — answer body line-height ruimer, body font iets groter. */
+html[data-style="refined"] .msg-body { line-height: 1.7; font-size: 14.5px; }
 
 @theme inline {
   --color-background: var(--bg);
