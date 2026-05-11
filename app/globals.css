@@ -99,6 +99,32 @@ html.dark[data-style="refined"] {
   --r-pill: 999px;
 }
 
+/* Refined + light — Reef Pop tokens (vibrant aqua/teal met frosted glass). */
+html:not(.dark)[data-style="refined"] {
+  --bg-base: #a7f3d0;
+  --glow-1-color: rgba(34, 211, 238, 0.85);
+  --glow-2-color: rgba(20, 184, 166, 0.80);
+  --glow-3-color: rgba(95, 225, 240, 0.70);
+  --glow-4-color: rgba(167, 243, 208, 0.45);
+  --bg: var(--bg-base);
+  --fg: #042f2e;
+  --fg-muted: rgba(4, 47, 46, 0.55);
+  --fg-faint: rgba(4, 47, 46, 0.35);
+  --accent: #0e7c9a;
+  --accent-2: #0f766e;
+  --accent-glow: rgba(14, 124, 154, 0.30);
+  --accent-soft: rgba(14, 124, 154, 0.10);
+  --glass-tint: rgba(255, 255, 255, 0.30);
+  --glass-tint-2: rgba(255, 255, 255, 0.55);
+  --glass-blur: blur(24px) saturate(1.4);
+  --glass-blur-strong: blur(28px) saturate(1.4);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --shadow-soft: 0 8px 28px rgba(8, 90, 90, 0.18);
+  --r-bubble: 18px;
+  --r-anchor: 4px;
+  --r-pill: 999px;
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);

@@ -85,4 +85,17 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     );
     expect(bgBase).toBe('#02050d');
   });
+
+  test('light + refined heeft Reef Pop base-bg #a7f3d0', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-style', 'refined');
+      window.localStorage.setItem('chatmanta-style', 'refined');
+    });
+    const bgBase = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim()
+    );
+    expect(bgBase).toBe('#a7f3d0');
+  });
 });
