@@ -1,7 +1,7 @@
 'use client';
 
 import { Icon } from '../svg-icons';
-import { ThemeSwitch } from '../theme-switch';
+import { AnimatedThemeToggler } from '../ui/animated-theme-toggler';
 import { BotDropdown, type BotMeta } from '../bot-dropdown';
 
 export function MantaTopbar({
@@ -45,7 +45,7 @@ export function MantaTopbar({
         <div className="manta-bot-pill">
           <BotDropdown current={botVersion} bots={bots} />
         </div>
-        <ThemeSwitch />
+        <AnimatedThemeToggler />
       </div>
     </header>
   );

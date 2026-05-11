@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type StyleMode = 'classic' | 'glass' | 'manta';
+export type StyleMode = 'classic' | 'manta';
 
 export const DEFAULT_STYLE_MODE: StyleMode = 'manta';
 const STORAGE_KEY = 'chatmanta-style';
-const VALID: readonly StyleMode[] = ['classic', 'glass', 'manta'];
+const VALID: readonly StyleMode[] = ['classic', 'manta'];
 
 function isStyleMode(v: unknown): v is StyleMode {
   return typeof v === 'string' && (VALID as readonly string[]).includes(v);
@@ -17,10 +17,12 @@ function readStored(): StyleMode | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    // Migratie: 'refined' was de v1-naam vóór de rename naar 'glass'.
-    if (raw === 'refined') {
-      window.localStorage.setItem(STORAGE_KEY, 'glass');
-      return 'glass';
+    // Migratie: 'refined' (V0-naam) en 'glass' (latere rename) zijn beide
+    // verwijderd uit de UI omdat Tailwind v4 PostCSS de Glass-CSS uit
+    // globals.css silent stript. Mappen naar 'classic'.
+    if (raw === 'refined' || raw === 'glass') {
+      window.localStorage.setItem(STORAGE_KEY, 'classic');
+      return 'classic';
     }
     return isStyleMode(raw) ? raw : null;
   } catch {

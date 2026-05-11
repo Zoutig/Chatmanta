@@ -41,14 +41,15 @@ const themeBootScript = `
   try {
     var k = 'chatmanta-style';
     var s = localStorage.getItem(k);
-    // Migratie: 'refined' was de v1-naam vóór de rename naar 'glass'.
-    if (s === 'refined') {
-      s = 'glass';
+    // Migratie: 'refined' en 'glass' beide → 'classic'. Glass-CSS werd door
+    // Tailwind v4 PostCSS uit de bundle gestript waardoor het visueel gelijk
+    // werd aan Classic; optie is verwijderd uit de UI.
+    if (s === 'refined' || s === 'glass') {
+      s = 'classic';
       try { localStorage.setItem(k, s); } catch (e) {}
     }
-    // Default voor nieuwe sessies = 'manta' (de nieuwe opmaak).
-    // Bestaande keuzes (classic/glass) blijven intact.
-    if (s !== 'classic' && s !== 'glass' && s !== 'manta') s = 'manta';
+    // Default voor nieuwe sessies = 'manta'. Bestaande classic-keuze blijft.
+    if (s !== 'classic' && s !== 'manta') s = 'manta';
     document.documentElement.setAttribute('data-style', s);
   } catch (e) {}
 })();

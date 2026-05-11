@@ -4,14 +4,13 @@ import { useTheme, type ThemeChoice } from '@/lib/v0/hooks/use-theme';
 import { useStyleMode, type StyleMode } from '@/lib/v0/hooks/use-style-mode';
 import { useAccent, ACCENT_OPTIONS } from '@/lib/v0/hooks/use-accent';
 
-const STYLE_MODES: readonly StyleMode[] = ['classic', 'glass', 'manta'];
+const STYLE_MODES: readonly StyleMode[] = ['classic', 'manta'];
 const STYLE_LABELS: Record<StyleMode, string> = {
   classic: 'Klassiek',
-  glass: 'Glass',
   manta: 'Manta',
 };
 const STYLE_HINT =
-  'Manta = nieuwe opmaak met aurora-achtergrond en animaties. Klassiek + Glass = oude varianten.';
+  'Manta = nieuwe opmaak met aurora-achtergrond en animaties. Klassiek = oude variant.';
 
 const THEME_CHOICES: readonly ThemeChoice[] = ['light', 'dark', 'system'];
 const THEME_LABELS: Record<ThemeChoice, string> = {
