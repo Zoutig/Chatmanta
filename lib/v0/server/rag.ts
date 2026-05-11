@@ -798,7 +798,18 @@ export type ChatSource = {
   id?: string;
   filename: string | null;
   similarity: number;
+  /** Small-chunk excerpt (~240 chars) — gebruikt voor precision-highlighting
+      in de UI ("welke zin precies matchte"). Blijft de "kern-match" indicator. */
   contentExcerpt: string;
+  /**
+   * v0.5: Parent-chunk excerpt (~800 chars) — wat de answer-LLM daadwerkelijk
+   * als context kreeg (mits parent-document retrieval aanstond én de chunk een
+   * parent had). Null wanneer de chunk geen parent_chunk_id heeft of de
+   * parent-content niet gehydrateerd kon worden. De judge in eval.ts en de
+   * sources-tab in de UI prefereren dit veld boven contentExcerpt om
+   * eerlijk te beoordelen wat de LLM zag.
+   */
+  parentExcerpt?: string | null;
 };
 
 export type ChatRewriteInfo = {
@@ -910,16 +921,34 @@ export type ChatResponse =
     });
 
 const EXCERPT_CHARS = 240;
+const PARENT_EXCERPT_CHARS = 800;
 
 function toSource(c: RetrievedChunk): ChatSource {
+  const contentExcerpt =
+    c.content.length > EXCERPT_CHARS
+      ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
+      : c.content;
+  // Parent-content is alleen aanwezig als bot.parentDocumentRetrieval=true
+  // EN de chunk een gehydrateerde parent had. In de huidige codebase wordt
+  // parent_content op de RetrievedChunk gezet door retrieveChunks(withParents)
+  // / retrieveChunksHybrid(withParents) of door hydrateParentContent() (zie
+  // regel ~768). Null of undefined → we slaan parentExcerpt over zodat oude
+  // responses (zonder dit veld) backward-compat blijven.
+  let parentExcerpt: string | null | undefined = undefined;
+  if (typeof c.parent_content === 'string' && c.parent_content.length > 0) {
+    parentExcerpt =
+      c.parent_content.length > PARENT_EXCERPT_CHARS
+        ? c.parent_content.slice(0, PARENT_EXCERPT_CHARS).trimEnd() + '…'
+        : c.parent_content;
+  } else if (c.parent_content === null) {
+    parentExcerpt = null;
+  }
   return {
     id: c.id,
     filename: c.filename,
     similarity: c.similarity,
-    contentExcerpt:
-      c.content.length > EXCERPT_CHARS
-        ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
-        : c.content,
+    contentExcerpt,
+    ...(parentExcerpt !== undefined ? { parentExcerpt } : {}),
   };
 }
 
