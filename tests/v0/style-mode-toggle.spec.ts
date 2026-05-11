@@ -125,4 +125,19 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
       expect(bf, `${sel} backdrop-filter`).toContain('blur');
     }
   });
+
+  test('refined: user + AI bubbles hebben frosted glass + asymmetric radius', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => document.documentElement.setAttribute('data-style', 'refined'));
+    const userBf = await page.evaluate(() => {
+      const el = document.querySelector('.msg-user-bubble');
+      return el ? getComputedStyle(el).backdropFilter : '';
+    });
+    expect(userBf).toContain('blur');
+    const aiBf = await page.evaluate(() => {
+      const el = document.querySelector('.msg-ai-bubble');
+      return el ? getComputedStyle(el).backdropFilter : '';
+    });
+    expect(aiBf).toContain('blur');
+  });
 });
