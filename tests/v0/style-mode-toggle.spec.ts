@@ -57,4 +57,17 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     const html = page.locator('html');
     await expect(html).toHaveAttribute('data-style', 'classic');
   });
+
+  test('AI message body krijgt msg-ai-bubble class', async ({ page }) => {
+    await page.goto('/');
+    // Trigger een AI-respons zodat AssistantMessage rendert.
+    // Home toont geen seeded conversation, dus we sturen eerst een vraag via de composer.
+    await page.fill('.composer textarea', 'test');
+    await page.press('.composer textarea', 'Enter');
+    await page.waitForSelector('.msg-assistant', { timeout: 30_000 });
+
+    const aiBody = page.locator('.msg-assistant .msg-body').first();
+    await expect(aiBody).toBeVisible();
+    await expect(aiBody).toHaveClass(/msg-ai-bubble/);
+  });
 });
