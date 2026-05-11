@@ -285,6 +285,46 @@ html[data-style="refined"] .followup-chip:hover {
   border-color: var(--accent);
 }
 
+/* Refined v2 — subtle pulse op AI avatar tijdens streaming.
+   Streaming-state wordt al via .msg-assistant.is-streaming class gemarkeerd?
+   Zo niet, voorlopig de animation op msg-avatar in alle msg-assistant states zetten
+   met opacity-pulse zodat het zelden opvalt wanneer er geen stream is. */
+@keyframes refined-avatar-pulse {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.04); }
+}
+html[data-style="refined"] .msg-assistant.is-streaming .msg-avatar,
+html[data-style="refined"] .msg-assistant:has(.streaming-cursor) .msg-avatar {
+  animation: refined-avatar-pulse 1.6s ease-in-out infinite;
+}
+
+/* a11y — respecteer prefers-reduced-motion: schakel pulse uit. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="refined"] .msg-avatar {
+    animation: none !important;
+  }
+  html[data-style="refined"] .btn-new,
+  html[data-style="refined"] .composer-send,
+  html[data-style="refined"] .msg-action,
+  html[data-style="refined"] .followup-chip {
+    transition: none !important;
+  }
+}
+
+/* a11y — respecteer prefers-reduced-transparency: solid fallback. */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-style="refined"] .topbar,
+  html[data-style="refined"] .sidebar,
+  html[data-style="refined"] .composer,
+  html[data-style="refined"] .msg-user-bubble,
+  html[data-style="refined"] .msg-ai-bubble,
+  html[data-style="refined"] .brand-mark {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--bg-elev, var(--bg-base)) !important;
+  }
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
