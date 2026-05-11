@@ -125,6 +125,27 @@ html:not(.dark)[data-style="refined"] {
   --r-pill: 999px;
 }
 
+/* Refined v2 — body gradient-blob background (dark). */
+html.dark[data-style="refined"] body {
+  background:
+    radial-gradient(circle 600px at 12% 22%, var(--glow-1-color), transparent 65%),
+    radial-gradient(circle 500px at 92% 80%, var(--glow-2-color), transparent 65%),
+    radial-gradient(circle 700px at 65% 0%, var(--glow-3-color), transparent 65%),
+    var(--bg-base);
+  background-attachment: fixed;
+}
+
+/* Refined v2 — body gradient-blob background (light). */
+html:not(.dark)[data-style="refined"] body {
+  background:
+    radial-gradient(circle 600px at 12% 22%, var(--glow-1-color), transparent 65%),
+    radial-gradient(circle 500px at 92% 80%, var(--glow-2-color), transparent 65%),
+    radial-gradient(circle 700px at 65% 0%, var(--glow-3-color), transparent 65%),
+    radial-gradient(circle 380px at 50% 50%, var(--glow-4-color), transparent 70%),
+    var(--bg-base);
+  background-attachment: fixed;
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);

@@ -98,4 +98,13 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     );
     expect(bgBase).toBe('#a7f3d0');
   });
+
+  test('refined body bg gebruikt radial-gradient blobs', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-style', 'refined');
+    });
+    const bgImage = await page.evaluate(() => getComputedStyle(document.body).backgroundImage);
+    expect(bgImage).toContain('radial-gradient');
+  });
 });
