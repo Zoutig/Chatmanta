@@ -140,4 +140,17 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     });
     expect(aiBf).toContain('blur');
   });
+
+  test('refined: AI avatar krijgt radial gradient + glow', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => document.documentElement.setAttribute('data-style', 'refined'));
+    const av = await page.evaluate(() => {
+      const el = document.querySelector('.msg-avatar');
+      return el
+        ? { bg: getComputedStyle(el).backgroundImage, shadow: getComputedStyle(el).boxShadow }
+        : null;
+    });
+    expect(av?.bg).toContain('radial-gradient');
+    expect(av?.shadow).not.toBe('none');
+  });
 });

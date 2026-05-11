@@ -201,6 +201,38 @@ html[data-style="refined"] .msg-ai-bubble {
 /* Refined v2 — wat meer ademruimte tussen turns. */
 html[data-style="refined"] .conversation-inner { gap: 48px; }
 
+/* Refined v2 — AI avatar als gradient orb met glow (dark). */
+html.dark[data-style="refined"] .msg-avatar {
+  background: radial-gradient(circle at 30% 30%, #f0abfc 0%, #5fe1f0 50%, #0c4a6e 100%);
+  box-shadow: 0 0 14px rgba(244, 114, 182, 0.45);
+  border-radius: 50%;
+  filter: none;
+}
+
+/* Refined v2 — AI avatar als gradient orb met glow (light). */
+html:not(.dark)[data-style="refined"] .msg-avatar {
+  background: radial-gradient(circle at 30% 30%, #5fe1f0 0%, #0e7c9a 60%, #042f2e 100%);
+  box-shadow: 0 0 14px rgba(14, 124, 154, 0.40);
+  border-radius: 50%;
+  filter: none;
+}
+
+/* Refined v2 — brand-mark: subtle bioluminescent glow in dark. */
+html.dark[data-style="refined"] .brand-mark {
+  filter: drop-shadow(0 0 12px rgba(244, 114, 182, 0.40));
+}
+
+/* Refined v2 — brand-mark: frosted tile in light. */
+html:not(.dark)[data-style="refined"] .brand-mark {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 2px 4px;
+  filter: none;
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
