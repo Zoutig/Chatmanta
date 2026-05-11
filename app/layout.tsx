@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
+import './styles/manta.css';
 
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
 const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'] });
@@ -43,8 +44,20 @@ const themeBootScript = `
       s = 'glass';
       try { localStorage.setItem(k, s); } catch (e) {}
     }
-    if (s !== 'classic' && s !== 'glass') s = 'classic';
+    // Default voor nieuwe sessies = 'manta' (de nieuwe opmaak).
+    // Bestaande keuzes (classic/glass) blijven intact.
+    if (s !== 'classic' && s !== 'glass' && s !== 'manta') s = 'manta';
     document.documentElement.setAttribute('data-style', s);
+  } catch (e) {}
+})();
+(function() {
+  try {
+    var k = 'chatmanta-accent';
+    var a = localStorage.getItem(k);
+    var valid = { '#00CC9B': 1, '#009292': 1, '#01637E': 1, '#024D50': 1 };
+    if (!a || !valid[a]) a = '#009292';
+    document.documentElement.setAttribute('data-accent', a);
+    document.documentElement.style.setProperty('--manta-accent', a);
   } catch (e) {}
 })();
 `;

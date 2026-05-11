@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type StyleMode = 'classic' | 'glass';
+export type StyleMode = 'classic' | 'glass' | 'manta';
 
-export const DEFAULT_STYLE_MODE: StyleMode = 'classic';
+export const DEFAULT_STYLE_MODE: StyleMode = 'manta';
 const STORAGE_KEY = 'chatmanta-style';
-const VALID: readonly StyleMode[] = ['classic', 'glass'];
+const VALID: readonly StyleMode[] = ['classic', 'glass', 'manta'];
 
 function isStyleMode(v: unknown): v is StyleMode {
   return typeof v === 'string' && (VALID as readonly string[]).includes(v);

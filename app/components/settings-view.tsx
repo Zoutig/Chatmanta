@@ -7,6 +7,7 @@ import { StyleSegmented } from './style-segmented';
 import type { Length, Tone } from '@/lib/v0/style-types';
 import type { HydeMode } from './use-hyde-mode';
 import { useStyleMode, type StyleMode } from '@/lib/v0/hooks/use-style-mode';
+import { useAccent, ACCENT_OPTIONS } from '@/lib/v0/hooks/use-accent';
 
 const HYDE_MODES: readonly HydeMode[] = ['auto', 'off', 'upfront', 'selective'];
 const HYDE_LABELS: Record<HydeMode, string> = {
@@ -18,13 +19,14 @@ const HYDE_LABELS: Record<HydeMode, string> = {
 const HYDE_HINT =
   'Auto = volg bot-versie. Override wint altijd, ook over bots waar HyDE uit staat. Wordt per query gelogd voor evaluatie.';
 
-const STYLE_MODES: readonly StyleMode[] = ['classic', 'glass'];
+const STYLE_MODES: readonly StyleMode[] = ['classic', 'glass', 'manta'];
 const STYLE_LABELS: Record<StyleMode, string> = {
   classic: 'Klassiek',
   glass: 'Glass',
+  manta: 'Manta',
 };
 const STYLE_HINT =
-  'Klassiek = huidige opmaak. Glass = cinematic frosted-glass identiteit (Manta). Wissel om beide te ervaren tijdens de A/B-test.';
+  'Manta = nieuwe opmaak met aurora-achtergrond en animaties. Klassiek + Glass = oude varianten — gebruik de schakelaar om terug te gaan.';
 
 export function SettingsView({
   threshold,
@@ -63,11 +65,12 @@ export function SettingsView({
   const router = useRouter();
   const current = bots.find((b) => b.version === botVersion);
   const { mode: styleMode, set: setStyleMode } = useStyleMode();
+  const { accent, set: setAccent } = useAccent();
 
   return (
     <div>
       <div className="settings-section">
-        <div className="settings-label">Opmaak (A/B-test)</div>
+        <div className="settings-label">Opmaak</div>
         <div className="threshold-presets" role="radiogroup" aria-label="Opmaak">
           {STYLE_MODES.map((m) => (
             <button
@@ -84,6 +87,30 @@ export function SettingsView({
         </div>
         <div className="slider-hint" style={{ marginTop: 8 }}>{STYLE_HINT}</div>
       </div>
+
+      {styleMode === 'manta' ? (
+        <div className="settings-section">
+          <div className="settings-label">Accent-kleur</div>
+          <div className="manta-accent-picker" role="radiogroup" aria-label="Accent-kleur">
+            {ACCENT_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={accent === o.value}
+                aria-label={o.label}
+                title={o.label}
+                className={`manta-accent-swatch${accent === o.value ? ' active' : ''}`}
+                style={{ background: o.value }}
+                onClick={() => setAccent(o.value)}
+              />
+            ))}
+          </div>
+          <div className="slider-hint" style={{ marginTop: 8 }}>
+            Vier teal-varianten. Common Teal is de default — pas aan naar smaak.
+          </div>
+        </div>
+      ) : null}
 
       <div className="settings-section">
         <div className="settings-label">Bot-versie</div>
