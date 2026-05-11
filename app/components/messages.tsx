@@ -425,7 +425,7 @@ export function AssistantMessage({
         </details>
       ) : null}
 
-      <div className="msg-body">
+      <div className="msg-body msg-ai-bubble">
         {stillThinking ? (
           <p style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>
             <span

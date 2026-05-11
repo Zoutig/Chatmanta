@@ -6,6 +6,7 @@ import type { BotMeta } from './bot-dropdown';
 import { StyleSegmented } from './style-segmented';
 import type { Length, Tone } from '@/lib/v0/style-types';
 import type { HydeMode } from './use-hyde-mode';
+import { useStyleMode, type StyleMode } from '@/lib/v0/hooks/use-style-mode';
 
 const HYDE_MODES: readonly HydeMode[] = ['auto', 'off', 'upfront', 'selective'];
 const HYDE_LABELS: Record<HydeMode, string> = {
@@ -16,6 +17,14 @@ const HYDE_LABELS: Record<HydeMode, string> = {
 };
 const HYDE_HINT =
   'Auto = volg bot-versie. Override wint altijd, ook over bots waar HyDE uit staat. Wordt per query gelogd voor evaluatie.';
+
+const STYLE_MODES: readonly StyleMode[] = ['classic', 'glass'];
+const STYLE_LABELS: Record<StyleMode, string> = {
+  classic: 'Klassiek',
+  glass: 'Glass',
+};
+const STYLE_HINT =
+  'Klassiek = huidige opmaak. Glass = cinematic frosted-glass identiteit (Manta). Wissel om beide te ervaren tijdens de A/B-test.';
 
 export function SettingsView({
   threshold,
@@ -53,9 +62,29 @@ export function SettingsView({
 }) {
   const router = useRouter();
   const current = bots.find((b) => b.version === botVersion);
+  const { mode: styleMode, set: setStyleMode } = useStyleMode();
 
   return (
     <div>
+      <div className="settings-section">
+        <div className="settings-label">Opmaak (A/B-test)</div>
+        <div className="threshold-presets" role="radiogroup" aria-label="Opmaak">
+          {STYLE_MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={styleMode === m}
+              className={`threshold-preset${styleMode === m ? ' active' : ''}`}
+              onClick={() => setStyleMode(m)}
+            >
+              <span className="threshold-preset-label">{STYLE_LABELS[m]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="slider-hint" style={{ marginTop: 8 }}>{STYLE_HINT}</div>
+      </div>
+
       <div className="settings-section">
         <div className="settings-label">Bot-versie</div>
         <div className="select-wrap">

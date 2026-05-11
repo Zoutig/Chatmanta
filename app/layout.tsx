@@ -16,8 +16,9 @@ export const metadata: Metadata = {
   description: 'V0 RAG demo — Jorion Solutions.',
 };
 
-// Inline FOUC-prevention: zet <html class="dark"> + data-theme synchroon op basis
-// van localStorage of OS-prefered-color-scheme. Houden we klein en synchroon.
+// Inline FOUC-prevention: zet <html class="dark"> + data-theme + data-style
+// synchroon vóór React hydrateert. Twee onafhankelijke IIFE's zodat een fout
+// in de ene block de andere niet blokkeert.
 const themeBootScript = `
 (function() {
   try {
@@ -31,6 +32,19 @@ const themeBootScript = `
     var root = document.documentElement;
     if (resolved === 'dark') root.classList.add('dark');
     root.setAttribute('data-theme', resolved);
+  } catch (e) {}
+})();
+(function() {
+  try {
+    var k = 'chatmanta-style';
+    var s = localStorage.getItem(k);
+    // Migratie: 'refined' was de v1-naam vóór de rename naar 'glass'.
+    if (s === 'refined') {
+      s = 'glass';
+      try { localStorage.setItem(k, s); } catch (e) {}
+    }
+    if (s !== 'classic' && s !== 'glass') s = 'classic';
+    document.documentElement.setAttribute('data-style', s);
   } catch (e) {}
 })();
 `;

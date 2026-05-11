@@ -68,6 +68,264 @@ html:not(.dark) {
   --accent-fg: #ffffff;
 }
 
+/* ==========================================================================
+   Style mode: GLASS "Manta" — opt-in via Settings-tab.
+   Aparte visuele identiteit: cinematic frosted glass + ocean palette.
+   Dark = Bioluminescent Abyss, Light = Reef Pop.
+   Was eerder "Refined v2" — hernoemd naar "Glass" tijdens visuele review.
+   Zie docs/superpowers/specs/2026-05-11-v0-refined-v2-manta-redesign.md
+   ========================================================================== */
+
+/* Glass + dark — Bioluminescent Abyss tokens. */
+html.dark[data-style="glass"] {
+  --bg-base: #02050d;
+  --glow-1-color: rgba(8, 145, 178, 0.55);
+  --glow-2-color: rgba(244, 114, 182, 0.32);
+  --glow-3-color: rgba(34, 211, 238, 0.30);
+  --bg: var(--bg-base);
+  --fg: #e8f4ff;
+  --fg-muted: rgba(180, 220, 255, 0.55);
+  --fg-faint: rgba(180, 220, 255, 0.35);
+  --accent: #5fe1f0;
+  --accent-2: #f0abfc;
+  --accent-glow: rgba(95, 225, 240, 0.30);
+  --accent-soft: rgba(95, 225, 240, 0.14);
+  --glass-tint: rgba(180, 220, 255, 0.06);
+  --glass-tint-2: rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(40px) saturate(1.6);
+  --glass-border: rgba(180, 220, 255, 0.16);
+  --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --r-bubble: 18px;
+  --r-anchor: 4px;
+  --r-pill: 999px;
+}
+
+/* Glass + light — Reef Pop tokens (vibrant aqua/teal met frosted glass). */
+html:not(.dark)[data-style="glass"] {
+  --bg-base: #a7f3d0;
+  --glow-1-color: rgba(34, 211, 238, 0.85);
+  --glow-2-color: rgba(20, 184, 166, 0.80);
+  --glow-3-color: rgba(95, 225, 240, 0.70);
+  --glow-4-color: rgba(167, 243, 208, 0.45);
+  --bg: var(--bg-base);
+  --fg: #042f2e;
+  --fg-muted: rgba(4, 47, 46, 0.55);
+  --fg-faint: rgba(4, 47, 46, 0.35);
+  --accent: #0e7c9a;
+  --accent-2: #0f766e;
+  --accent-glow: rgba(14, 124, 154, 0.30);
+  --accent-soft: rgba(14, 124, 154, 0.10);
+  --glass-tint: rgba(255, 255, 255, 0.30);
+  --glass-tint-2: rgba(255, 255, 255, 0.55);
+  --glass-blur: blur(24px) saturate(1.4);
+  --glass-blur-strong: blur(28px) saturate(1.4);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --shadow-soft: 0 8px 28px rgba(8, 90, 90, 0.18);
+  --r-bubble: 18px;
+  --r-anchor: 4px;
+  --r-pill: 999px;
+}
+
+/* Glass — body gradient-blob background (dark). */
+html.dark[data-style="glass"] body {
+  background:
+    radial-gradient(circle 600px at 12% 22%, var(--glow-1-color), transparent 65%),
+    radial-gradient(circle 500px at 92% 80%, var(--glow-2-color), transparent 65%),
+    radial-gradient(circle 700px at 65% 0%, var(--glow-3-color), transparent 65%),
+    var(--bg-base);
+  background-attachment: fixed;
+}
+
+/* Glass — body gradient-blob background (light). */
+html:not(.dark)[data-style="glass"] body {
+  background:
+    radial-gradient(circle 600px at 12% 22%, var(--glow-1-color), transparent 65%),
+    radial-gradient(circle 500px at 92% 80%, var(--glow-2-color), transparent 65%),
+    radial-gradient(circle 700px at 65% 0%, var(--glow-3-color), transparent 65%),
+    radial-gradient(circle 380px at 50% 50%, var(--glow-4-color), transparent 70%),
+    var(--bg-base);
+  background-attachment: fixed;
+}
+
+/* Glass — topbar als frosted glass panel. */
+html[data-style="glass"] .topbar {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* Glass — sidebar als frosted glass panel. */
+html[data-style="glass"] .sidebar {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
+}
+
+/* Glass — composer als frosted glass panel. */
+html[data-style="glass"] .composer {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+}
+html[data-style="glass"] .composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Glass — user message bubble als frosted glass. */
+html[data-style="glass"] .msg-user-bubble {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  color: var(--fg);
+  border-radius: var(--r-bubble) var(--r-bubble) var(--r-anchor) var(--r-bubble);
+  box-shadow: var(--shadow-soft);
+  padding: 10px 14px;
+}
+
+/* Glass — AI message bubble als zachtere frosted glass. */
+html[data-style="glass"] .msg-ai-bubble {
+  background: var(--glass-tint);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  color: var(--fg);
+  border-radius: var(--r-bubble) var(--r-bubble) var(--r-bubble) var(--r-anchor);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 16px;
+}
+
+/* Glass — wat meer ademruimte tussen turns. */
+html[data-style="glass"] .conversation-inner { gap: 48px; }
+
+/* Glass — AI avatar als gradient orb met glow (dark). */
+html.dark[data-style="glass"] .msg-avatar {
+  background: radial-gradient(circle at 30% 30%, #f0abfc 0%, #5fe1f0 50%, #0c4a6e 100%);
+  box-shadow: 0 0 14px rgba(244, 114, 182, 0.45);
+  border-radius: 50%;
+  filter: none;
+}
+
+/* Glass — AI avatar als gradient orb met glow (light). */
+html:not(.dark)[data-style="glass"] .msg-avatar {
+  background: radial-gradient(circle at 30% 30%, #5fe1f0 0%, #0e7c9a 60%, #042f2e 100%);
+  box-shadow: 0 0 14px rgba(14, 124, 154, 0.40);
+  border-radius: 50%;
+  filter: none;
+}
+
+/* Glass — brand-mark: subtle bioluminescent glow in dark. */
+html.dark[data-style="glass"] .brand-mark {
+  filter: drop-shadow(0 0 12px rgba(244, 114, 182, 0.40));
+}
+
+/* Glass — brand-mark: frosted tile in light. */
+html:not(.dark)[data-style="glass"] .brand-mark {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 2px 4px;
+  filter: none;
+}
+
+/* Glass — primary button (dark): witte frosted pill. */
+html.dark[data-style="glass"] .btn-new,
+html.dark[data-style="glass"] .composer-send {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(180, 220, 255, 0.28);
+  color: #ffffff;
+  border-radius: var(--r-pill);
+  box-shadow: none;
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
+              filter 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+html.dark[data-style="glass"] .btn-new:hover,
+html.dark[data-style="glass"] .composer-send:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+/* Glass — primary button (light): teal gradient pill. */
+html:not(.dark)[data-style="glass"] .btn-new,
+html:not(.dark)[data-style="glass"] .composer-send {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: none;
+  color: #ffffff;
+  border-radius: var(--r-pill);
+  box-shadow: 0 4px 16px var(--accent-glow);
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
+              filter 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+html:not(.dark)[data-style="glass"] .btn-new:hover,
+html:not(.dark)[data-style="glass"] .composer-send:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+/* Glass — ghost-style action chips (msg-action, followup-chip). */
+html[data-style="glass"] .msg-action,
+html[data-style="glass"] .followup-chip {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--accent);
+  border-radius: var(--r-pill);
+  transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+html[data-style="glass"] .msg-action:hover,
+html[data-style="glass"] .followup-chip:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Glass — subtle pulse op AI avatar tijdens streaming.
+   Streaming-state wordt al via .msg-assistant.is-streaming class gemarkeerd?
+   Zo niet, voorlopig de animation op msg-avatar in alle msg-assistant states zetten
+   met opacity-pulse zodat het zelden opvalt wanneer er geen stream is. */
+@keyframes glass-avatar-pulse {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.04); }
+}
+html[data-style="glass"] .msg-assistant.is-streaming .msg-avatar,
+html[data-style="glass"] .msg-assistant:has(.streaming-cursor) .msg-avatar {
+  animation: glass-avatar-pulse 1.6s ease-in-out infinite;
+}
+
+/* a11y — respecteer prefers-reduced-motion: schakel pulse uit. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="glass"] .msg-avatar {
+    animation: none !important;
+  }
+  html[data-style="glass"] .btn-new,
+  html[data-style="glass"] .composer-send,
+  html[data-style="glass"] .msg-action,
+  html[data-style="glass"] .followup-chip {
+    transition: none !important;
+  }
+}
+
+/* a11y — respecteer prefers-reduced-transparency: solid fallback. */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-style="glass"] .topbar,
+  html[data-style="glass"] .sidebar,
+  html[data-style="glass"] .composer,
+  html[data-style="glass"] .msg-user-bubble,
+  html[data-style="glass"] .msg-ai-bubble,
+  html[data-style="glass"] .brand-mark {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--bg-elev, var(--bg-base)) !important;
+  }
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
