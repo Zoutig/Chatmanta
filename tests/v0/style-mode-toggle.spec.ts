@@ -70,4 +70,19 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     await expect(aiBody).toBeVisible();
     await expect(aiBody).toHaveClass(/msg-ai-bubble/);
   });
+
+  test('dark + refined heeft Bioluminescent Abyss base-bg #02050d', async ({ page }) => {
+    await page.goto('/');
+    // Zet dark + refined
+    await page.evaluate(() => {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-style', 'refined');
+      window.localStorage.setItem('chatmanta-style', 'refined');
+    });
+    // Read computed --bg-base via CSS var op html
+    const bgBase = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim()
+    );
+    expect(bgBase).toBe('#02050d');
+  });
 });
