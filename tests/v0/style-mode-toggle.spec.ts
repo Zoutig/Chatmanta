@@ -153,4 +153,15 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     expect(av?.bg).toContain('radial-gradient');
     expect(av?.shadow).not.toBe('none');
   });
+
+  test('refined: primary actie-knoppen zijn pill-shaped', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => document.documentElement.setAttribute('data-style', 'refined'));
+    const br = await page.evaluate(() => {
+      const el = document.querySelector('.btn-new');
+      return el ? getComputedStyle(el).borderRadius : '';
+    });
+    // 999px wordt door browser teruggegeven als grote pixel-waarde (bv. "999px")
+    expect(br).toMatch(/^9?\d{2,}px$|^999px$/);
+  });
 });
