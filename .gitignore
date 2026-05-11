@@ -45,6 +45,8 @@ next-env.d.ts
 # .claude/: shared files (settings.json + hooks/) WEL committen voor team-consistentie
 .claude/settings.local.json
 .claude/.cache/
+.claude/scheduled_tasks.lock
+.claude/worktrees/
 graphify-out/
 .superpowers/
 
