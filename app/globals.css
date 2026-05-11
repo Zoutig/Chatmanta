@@ -146,6 +146,34 @@ html:not(.dark)[data-style="refined"] body {
   background-attachment: fixed;
 }
 
+/* Refined v2 — topbar als frosted glass panel. */
+html[data-style="refined"] .topbar {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* Refined v2 — sidebar als frosted glass panel. */
+html[data-style="refined"] .sidebar {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
+}
+
+/* Refined v2 — composer als frosted glass panel. */
+html[data-style="refined"] .composer {
+  background: var(--glass-tint-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+}
+html[data-style="refined"] .composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);

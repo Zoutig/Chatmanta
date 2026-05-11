@@ -113,4 +113,16 @@ test.describe('V0 style mode toggle (Classic/Refined)', () => {
     // Classic body heeft géén background-attachment, dus die zou 'scroll' teruggeven → toContain discrimineert.
     expect(bg.attachment).toContain('fixed');
   });
+
+  test('refined: topbar/sidebar/composer hebben frosted glass', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => document.documentElement.setAttribute('data-style', 'refined'));
+    for (const sel of ['.topbar', '.sidebar', '.composer']) {
+      const bf = await page.evaluate((s) => {
+        const el = document.querySelector(s);
+        return el ? getComputedStyle(el).backdropFilter : '';
+      }, sel);
+      expect(bf, `${sel} backdrop-filter`).toContain('blur');
+    }
+  });
 });
