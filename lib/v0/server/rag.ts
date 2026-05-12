@@ -16,6 +16,7 @@ import OpenAI from 'openai';
 import type { BotConfig } from './bots';
 import { buildSystemPrompt } from '../style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
+import { costForModelUsd } from '../../ai/llm';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -252,12 +253,22 @@ async function preProcessInput(
   history: ChatHistoryTurn[] = [],
 ): Promise<PreProcessResult> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS);
-  const userMessage = trimmed.length === 0
-    ? original
-    : `${formatHistoryBlock(trimmed)}HUIDIGE INPUT: ${original}`;
+  const hasHistory = trimmed.length > 0;
+  const userMessage = hasHistory
+    ? `${formatHistoryBlock(trimmed)}HUIDIGE INPUT: ${original}`
+    : original;
+  // V0.5: prepend multi-turn-addon (STAP 0 context-resolutie) ALLEEN bij
+  // history-aanwezigheid. Single-turn queries krijgen de base prompt zonder
+  // STAP 0 — voorkomt prompt-overload op adversarial cases (zie eval Run 3
+  // analyse: grounding-dip op false-premise / out-of-corpus / typo cases was
+  // gekoppeld aan langere prompt). v0.1-v0.4 hebben addon='' dus geen effect.
+  const systemPrompt =
+    hasHistory && bot.preProcessMultiTurnAddon.length > 0
+      ? `${bot.preProcessMultiTurnAddon}\n\n${bot.preProcessSystem}`
+      : bot.preProcessSystem;
   const result = await chatComplete({
     model: bot.chatModel,
-    system: bot.preProcessSystem,
+    system: systemPrompt,
     user: userMessage,
     temperature: V0_RAG_DEFAULTS.REWRITE_TEMPERATURE,
     maxTokens: V0_RAG_DEFAULTS.REWRITE_MAX_TOKENS,
@@ -458,7 +469,11 @@ async function retrieveChunksHybrid(
 // dezelfde vraag — zonder best-sim-log is niet te zien of dat door (a) lege
 // cache, (b) te streng threshold, of (c) andere oorzaak komt.
 // ---------------------------------------------------------------------------
-const CACHE_HIT_THRESHOLD = 0.97;
+// v0.5 — 0.97 was te streng (test-set 17 vragen → 0 hits). 0.93 = "zelfde
+// vraag-ish" volgens text-embedding-3-small op NL-tekst. Bij regressie
+// (false-hits) snel terug naar 0.95. Hit + miss top-1-sim wordt nu beide
+// gelogd zodat we de optimale waarde later op echte data kunnen bisecten.
+const CACHE_HIT_THRESHOLD = 0.93;
 
 async function lookupCachedAnswer(
   queryVector: number[],
@@ -487,6 +502,9 @@ async function lookupCachedAnswer(
     );
     return null;
   }
+  console.info(
+    `[cache] HIT — top_sim=${top.similarity.toFixed(3)} (≥${CACHE_HIT_THRESHOLD}) org=${organizationId} ver=${botVersion} id=${top.id}`,
+  );
   // Bump hit_count fire-and-forget.
   sb.from('answer_cache')
     .update({ hit_count: undefined, last_hit_at: new Date().toISOString() })
@@ -798,14 +816,18 @@ export type ChatSource = {
   id?: string;
   filename: string | null;
   similarity: number;
+  /** Small-chunk excerpt (~240 chars) — gebruikt voor precision-highlighting
+      in de UI ("welke zin precies matchte"). Blijft de "kern-match" indicator. */
   contentExcerpt: string;
   /**
-   * Parent-chunk excerpt (~1500 chars) wanneer parent-document retrieval
-   * actief was. UI gebruikt `contentExcerpt` voor precision; de eval-judge
-   * krijgt deze parent doorgespeeld zodat hij dezelfde context ziet als
-   * de LLM en grounding eerlijk kan beoordelen.
+   * v0.5: Parent-chunk excerpt (~800 chars) — wat de answer-LLM daadwerkelijk
+   * als context kreeg (mits parent-document retrieval aanstond én de chunk een
+   * parent had). Null wanneer de chunk geen parent_chunk_id heeft of de
+   * parent-content niet gehydrateerd kon worden. De judge in eval.ts en de
+   * sources-tab in de UI prefereren dit veld boven contentExcerpt om
+   * eerlijk te beoordelen wat de LLM zag.
    */
-  parentExcerpt?: string;
+  parentExcerpt?: string | null;
 };
 
 export type ChatRewriteInfo = {
@@ -866,6 +888,30 @@ export type V03Extras = {
    * generation_ms,total_ms} kolommen plus phase_timings_ms (jsonb).
    */
   phaseTimingsMs?: PhaseTimings;
+  /**
+   * v0.5: route-category van het antwoord. 'search' = normale RAG-answer met
+   * sources. 'general' = re-classifier zei "algemene kennis" en we hebben een
+   * disclaimer-antwoord gegenereerd zonder retrieval. Wordt gelogd in
+   * query_log.category zodat eval/UI weten welk pad de query nam.
+   *
+   * 'off_topic' en 'smalltalk' verschijnen NIET hier — die zijn aparte
+   * ChatResponse.kind-waarden ('fallback' resp. 'smalltalk').
+   */
+  category?: 'search' | 'general';
+  /**
+   * v0.5: latency-budget telemetrie. Aanwezig wanneer minimaal één optionele
+   * fase werd overgeslagen omdat de cumulative elapsed time de
+   * bot.latencyBudgetMs drempel passeerde. Veld leeg/afwezig = budget niet
+   * overschreden (= geen skip).
+   */
+  latencyBudgetExceeded?: {
+    /** Cumulative elapsed time in ms toen de eerste skip plaatsvond. */
+    elapsed: number;
+    /** Budget-drempel in ms (= bot.latencyBudgetMs op moment van de run). */
+    budgetMs: number;
+    /** Lijst van fase-namen die zijn overgeslagen (volgorde = chronologisch). */
+    skipped: string[];
+  };
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -917,23 +963,33 @@ export type ChatResponse =
     });
 
 const EXCERPT_CHARS = 240;
-const PARENT_EXCERPT_CHARS = 1500;
+const PARENT_EXCERPT_CHARS = 800;
 
 function toSource(c: RetrievedChunk): ChatSource {
-  const parent = c.parent_content ?? null;
+  const contentExcerpt =
+    c.content.length > EXCERPT_CHARS
+      ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
+      : c.content;
+  // Parent-content is alleen aanwezig als bot.parentDocumentRetrieval=true
+  // EN de chunk een gehydrateerde parent had. Null of undefined → we slaan
+  // parentExcerpt over zodat oude responses (zonder dit veld) backward-compat
+  // blijven. Onderscheid: null = hydratie geprobeerd maar gefaald;
+  // undefined = geen parent_chunk_id (geen parent-doc-retrieval actief).
+  let parentExcerpt: string | null | undefined = undefined;
+  if (typeof c.parent_content === 'string' && c.parent_content.length > 0) {
+    parentExcerpt =
+      c.parent_content.length > PARENT_EXCERPT_CHARS
+        ? c.parent_content.slice(0, PARENT_EXCERPT_CHARS).trimEnd() + '…'
+        : c.parent_content;
+  } else if (c.parent_content === null) {
+    parentExcerpt = null;
+  }
   return {
     id: c.id,
     filename: c.filename,
     similarity: c.similarity,
-    contentExcerpt:
-      c.content.length > EXCERPT_CHARS
-        ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
-        : c.content,
-    parentExcerpt: parent
-      ? parent.length > PARENT_EXCERPT_CHARS
-        ? parent.slice(0, PARENT_EXCERPT_CHARS).trimEnd() + '…'
-        : parent
-      : undefined,
+    contentExcerpt,
+    ...(parentExcerpt !== undefined ? { parentExcerpt } : {}),
   };
 }
 
@@ -1119,16 +1175,29 @@ export type StreamEvent =
   // V0.4: followups draaien nu ná answer-done zodat de gebruiker het antwoord
   // direct ziet i.p.v. ~0.8s te wachten. Dit event levert de followUps na
   // (samen met de extra token/cost-deltas die nog niet in answer-done zaten).
+  // V0.5: error-veld optioneel — gevuld bij timeout of LLM-fout zodat
+  // monitoring de failure-mode kan onderscheiden van "nooit aangeroepen".
   | {
       kind: 'followups-done';
       followUps: string[];
       inputTokens: number;
       outputTokens: number;
       costUsd: number;
+      error?: string;
     }
   // V0.4: finale phaseTimingsMs nadat followups_ms is gemeten. Consumer moet
   // hierop wachten vóór logQuery anders mist query_log de followups-fase.
   | { kind: 'metrics-done'; phaseTimingsMs: PhaseTimings }
+  // V0.5 claim-regenerate: bij verifiedRatio < bot.claimRegenerateThreshold
+  // draaien we een tweede answer-LLM-call met stricter prompt. Het resultaat
+  // vervangt de eerder gestreamede answer in de UI. Wordt tussen answer-done
+  // en metrics-done geyield (cache-write krijgt het regenerate-antwoord).
+  | {
+      kind: 'replacement';
+      response: ChatResponse;
+      reason: 'claim-regenerate';
+      regeneratedVerifiedRatio: number | null;
+    }
   | { kind: 'error'; message: string };
 
 export async function* runRagQueryStreaming(input: {
@@ -1178,6 +1247,21 @@ export async function* runRagQueryStreaming(input: {
       const dt = Math.round(performance.now() - start);
       timings[key] = ((timings[key] as number | undefined) ?? 0) + dt;
     };
+  };
+  // V0.5 latency-budgeting: bij bot.latencyBudgetEnabled wordt elke optionele
+  // fase pas uitgevoerd als de cumulative elapsed onder bot.latencyBudgetMs
+  // zit. Skipped fases worden gelogd in `skippedPhases` (komt mee in extras).
+  // Bij !latencyBudgetEnabled (v0.1-v0.4): withinBudget() retourneert altijd
+  // true — gedrag identiek aan voorheen.
+  const skippedPhases: string[] = [];
+  const elapsedMs = (): number => Math.round(performance.now() - tPipelineStart);
+  const withinBudget = (): boolean => {
+    if (!bot.latencyBudgetEnabled) return true;
+    return elapsedMs() < bot.latencyBudgetMs;
+  };
+  const markSkipped = (phase: string): false => {
+    skippedPhases.push(phase);
+    return false;
   };
 
   // Bouw de samengestelde system prompt één keer; gebruikt door main answer-call
@@ -1282,7 +1366,7 @@ export async function* runRagQueryStreaming(input: {
   let decomposeCost = 0;
   let decomposeInputTokens = 0;
   let decomposeOutputTokens = 0;
-  if (bot.queryDecomposition) {
+  if (bot.queryDecomposition && (withinBudget() || markSkipped('queryDecomposition'))) {
     yield { kind: 'status', phase: 'decompose' };
     const stopDec = tMark('decompose_ms');
     const dec = await decomposeQuery(queryForEmbed, bot);
@@ -1323,7 +1407,7 @@ export async function* runRagQueryStreaming(input: {
 
   // Multi-query expansion (alleen bot.multiQueryCount > 1; v0.2 pad).
   let mq;
-  if (bot.multiQueryCount > 1) {
+  if (bot.multiQueryCount > 1 && (withinBudget() || markSkipped('multiQueryExpand'))) {
     yield { kind: 'status', phase: 'expand' };
     const stopExp = tMark('expand_ms');
     mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
@@ -1415,6 +1499,188 @@ export async function* runRagQueryStreaming(input: {
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   if (aboveThreshold.length === 0) {
+    // V0.5: tweede-stage re-classifier wanneer bot.generalKnowledgeEnabled.
+    // We weten nu dat retrieval géén relevante chunks gaf — de vraag is dus
+    // ofwel algemene kennis binnen het domein (GENERAL) of buiten het domein
+    // (OFF_TOPIC) of een specifiek detail dat we eerlijk niet kennen
+    // (FALLBACK).
+    //
+    // Bij !generalKnowledgeEnabled (v0.1-v0.4) gedragen we ons exact zoals
+    // voorheen: vaste FALLBACK_MESSAGE, geen LLM-call.
+    if (bot.generalKnowledgeEnabled) {
+      const { reclassifyAfterZeroHits } = await import('./reclassify');
+      const rc = await reclassifyAfterZeroHits(original, bot);
+      const reclassifyTokensIn = rc.inputTokens;
+      const reclassifyTokensOut = rc.outputTokens;
+      const reclassifyCost = rc.costUsd;
+
+      if (rc.category === 'general') {
+        yield { kind: 'status', phase: 'answer' };
+        const generalSystem = `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. De gebruiker stelt een algemene-kennis-vraag binnen ons domein (MKB, SaaS, AI, RAG, chatbots, klantcontact, ondernemerschap, marketing).
+
+Geef een KORT antwoord — maximaal 3 zinnen — over wat dit onderwerp is. Schrijf in dezelfde taal als de vraag (default Nederlands).
+
+BEGIN je antwoord ALTIJD met deze exacte zin: "Even kort: dit valt buiten onze specifieke documentatie, maar in het algemeen…"
+
+EINDIG je antwoord ALTIJD met: "Wil je weten hoe ChatManta hier specifiek mee omgaat? Vraag gerust."
+
+Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlotte antwoord. Schrijf alsof je het zelf weet.`;
+        yield {
+          kind: 'answer-start',
+          botVersion: bot.version,
+          sources: [],
+          rewrite: rewriteInfo,
+          threshold,
+        };
+        let genAccText = '';
+        let genChatInputTokens = 0;
+        let genChatOutputTokens = 0;
+        let genChatCostUsd = 0;
+        const stopGenerationGen = tMark('generation_ms');
+        try {
+          const stream = await openai().chat.completions.create({
+            model: bot.chatModel,
+            temperature: bot.chatTemperature,
+            max_tokens: 200,
+            stream: true,
+            stream_options: { include_usage: true },
+            messages: [
+              { role: 'system', content: generalSystem },
+              { role: 'user', content: original },
+            ],
+          });
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) {
+              genAccText += delta;
+              yield { kind: 'answer-delta', text: delta };
+            }
+            if (chunk.usage) {
+              genChatInputTokens = chunk.usage.prompt_tokens ?? 0;
+              genChatOutputTokens = chunk.usage.completion_tokens ?? 0;
+              genChatCostUsd =
+                (genChatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
+                (genChatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+            }
+          }
+        } catch (err) {
+          stopGenerationGen();
+          yield {
+            kind: 'error',
+            message: `general-knowledge stream failed: ${err instanceof Error ? err.message : 'unknown'}`,
+          };
+          return;
+        }
+        stopGenerationGen();
+
+        const phaseTimingsGen: PhaseTimings = {
+          embedding_ms: timings.embedding_ms ?? 0,
+          retrieval_ms: timings.retrieval_ms ?? 0,
+          generation_ms: timings.generation_ms ?? 0,
+          total_ms: Math.round(performance.now() - tPipelineStart),
+          ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
+          ...(timings.cache_lookup_ms !== undefined
+            ? { cache_lookup_ms: timings.cache_lookup_ms }
+            : {}),
+          ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
+          ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
+          ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
+        };
+
+        const generalResponse: ChatResponse = {
+          botVersion: bot.version,
+          tone,
+          length,
+          kind: 'answer',
+          answer: genAccText.trim(),
+          rewrite: rewriteInfo,
+          sources: [],
+          threshold,
+          embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
+          chatInputTokens: genChatInputTokens + reclassifyTokensIn,
+          chatOutputTokens: genChatOutputTokens + reclassifyTokensOut,
+          totalCostUsd:
+            embedCost +
+            preCacheEmbedCost +
+            selectiveHyDEEmbedCost +
+            rewriteCost +
+            expansionCost +
+            hydeCost +
+            decomposeCost +
+            reclassifyCost +
+            genChatCostUsd,
+          extras: {
+            category: 'general',
+            ...(top1SimInitial !== null ? { top1Sim: top1SimInitial } : {}),
+            phaseTimingsMs: phaseTimingsGen,
+          },
+        };
+        yield { kind: 'answer-done', response: generalResponse };
+        yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsGen };
+        return;
+      }
+
+      if (rc.category === 'off_topic') {
+        const OFF_TOPIC_REFUSAL =
+          'Ik help met vragen rondom ChatManta en aanverwante onderwerpen — denk aan MKB-tech, chatbots, klantcontact. Wat wil je weten?';
+        yield {
+          kind: 'fallback',
+          response: {
+            botVersion: bot.version,
+            tone,
+            length,
+            kind: 'fallback',
+            answer: OFF_TOPIC_REFUSAL,
+            reason: 'OFF_TOPIC re-classify — vraag buiten domein',
+            topSimilarity: topSim,
+            rewrite: rewriteInfo,
+            sources: allSources,
+            threshold,
+            embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
+            totalCostUsd:
+              embedCost +
+              preCacheEmbedCost +
+              selectiveHyDEEmbedCost +
+              rewriteCost +
+              expansionCost +
+              hydeCost +
+              decomposeCost +
+              reclassifyCost,
+          },
+        };
+        return;
+      }
+
+      // rc.category === 'fallback' → val door naar de gewone FALLBACK_MESSAGE.
+      yield {
+        kind: 'fallback',
+        response: {
+          botVersion: bot.version,
+          tone,
+          length,
+          kind: 'fallback',
+          answer: FALLBACK_MESSAGE,
+          reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}); re-classify=fallback.`,
+          topSimilarity: topSim,
+          rewrite: rewriteInfo,
+          sources: allSources,
+          threshold,
+          embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
+          totalCostUsd:
+            embedCost +
+            preCacheEmbedCost +
+            selectiveHyDEEmbedCost +
+            rewriteCost +
+            expansionCost +
+            hydeCost +
+            decomposeCost +
+            reclassifyCost,
+        },
+      };
+      return;
+    }
+
+    // Legacy pad (v0.1-v0.4): vaste fallback zoals voorheen.
     yield {
       kind: 'fallback',
       response: {
@@ -1448,7 +1714,7 @@ export async function* runRagQueryStreaming(input: {
   let rerankInputTokens = 0;
   let rerankOutputTokens = 0;
   let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
-  if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
+  if (bot.rerank === 'llm' && aboveThreshold.length > 1 && (withinBudget() || markSkipped('rerank'))) {
     yield { kind: 'status', phase: 'rerank' };
     const stopRerank = tMark('rerank_ms');
     const candidates = aboveThreshold.slice(0, V0_RAG_DEFAULTS.MAX_RERANK_INPUT);
@@ -1559,7 +1825,8 @@ export async function* runRagQueryStreaming(input: {
       bot.cascadeOnLowConfidence &&
       confidence !== null &&
       confidence < 0.5 &&
-      bot.cascadeModel !== bot.chatModel
+      bot.cascadeModel !== bot.chatModel &&
+      (withinBudget() || markSkipped('cascade'))
     ) {
       yield { kind: 'status', phase: 'cascade' };
       const stopCascade = tMark('cascade_ms');
@@ -1576,13 +1843,14 @@ export async function* runRagQueryStreaming(input: {
         confidence = reparsed.confidence ?? confidence;
         cascadeInputTokens = stronger.inputTokens;
         cascadeOutputTokens = stronger.outputTokens;
-        // Cascade gebruikt een ander model — bereken cost via OpenAI std rates
-        // voor gpt-4o (USD per 1M). Hardcoded omdat het een bewuste fallback is.
-        const GPT4O_IN = 2.5,
-          GPT4O_OUT = 10.0;
-        cascadeCost =
-          (stronger.inputTokens / 1_000_000) * GPT4O_IN +
-          (stronger.outputTokens / 1_000_000) * GPT4O_OUT;
+        // Cascade gebruikt bot.cascadeModel — kost wordt opgezocht in de
+        // centrale MODEL_COSTS_USD-tabel (lib/ai/llm.ts). Onbekend model
+        // → 0 met warn (zie costForModelUsd).
+        cascadeCost = costForModelUsd(
+          bot.cascadeModel,
+          stronger.inputTokens,
+          stronger.outputTokens,
+        );
         cascadeUsed = true;
       } catch (err) {
         console.warn('[cascade] failed, keeping initial answer:', err);
@@ -1598,7 +1866,7 @@ export async function* runRagQueryStreaming(input: {
   let claimVerifyEmbedCost = 0;
   let claimsList: ClaimVerificationData[] | undefined;
   let claimConfidence: number | undefined;
-  if (bot.claimVerification) {
+  if (bot.claimVerification && (withinBudget() || markSkipped('claimVerification'))) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
     try {
@@ -1705,25 +1973,134 @@ export async function* runRagQueryStreaming(input: {
       ...(bot.claimVerification
         ? { claimVerificationThreshold: bot.claimVerificationThreshold }
         : {}),
+      // V0.5 latency-budget — alleen aanwezig als minimaal één fase werd
+      // overgeslagen. Bij empty skippedPhases = budget niet overschreden.
+      ...(skippedPhases.length > 0
+        ? {
+            latencyBudgetExceeded: {
+              elapsed: elapsedMs(),
+              budgetMs: bot.latencyBudgetMs,
+              skipped: [...skippedPhases],
+            },
+          }
+        : {}),
       phaseTimingsMs: phaseTimingsAtAnswer,
     },
   };
 
   yield { kind: 'answer-done', response: initialResponse };
 
+  // V0.5 claim-regenerate: bij verifiedRatio < threshold, regenereer met
+  // stricter prompt. Max één extra poging. Het regenerate-antwoord vervangt
+  // het oorspronkelijke via een 'replacement' event; cache krijgt het
+  // regenerate-antwoord (= wat de gebruiker uiteindelijk zag).
+  let activeResponse: Extract<ChatResponse, { kind: 'answer' }> = initialResponse as Extract<
+    ChatResponse,
+    { kind: 'answer' }
+  >;
+  let activeAnswerText = finalAnswerText;
+  let regenerateInputTokens = 0;
+  let regenerateOutputTokens = 0;
+  let regenerateCost = 0;
+  let regenerateRatio: number | null = null;
+  let regenerateClaims: ClaimVerificationData[] | undefined;
+  if (
+    bot.claimRegenerateEnabled &&
+    typeof claimConfidence === 'number' &&
+    Number.isFinite(claimConfidence) &&
+    claimConfidence < bot.claimRegenerateThreshold &&
+    claimsList && claimsList.length > 0 &&
+    (withinBudget() || markSkipped('claimRegenerate'))
+  ) {
+    const REGENERATE_SYSTEM_ADDON = `
+
+[REGENERATE-REGEL — alleen voor deze tweede poging]
+Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of bijna letterlijk in de aangeleverde chunks staan. Bij twijfel of een feit echt in de context staat: laat het feit weg. Liever een korter, voorzichtiger antwoord dan een antwoord met onverifieerbare claims.`;
+    try {
+      const stricter = await chatComplete({
+        model: bot.chatModel,
+        system: styledSystemPrompt + REGENERATE_SYSTEM_ADDON,
+        user: userPrompt,
+        temperature: Math.max(0.0, bot.chatTemperature - 0.2),
+        maxTokens: V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      });
+      regenerateInputTokens = stricter.inputTokens;
+      regenerateOutputTokens = stricter.outputTokens;
+      regenerateCost = stricter.costUsd;
+      const reparsedRegen = parseV03Output(stricter.text);
+      activeAnswerText = reparsedRegen.answer || stricter.text.trim();
+
+      try {
+        const { verifyClaims } = await import('./claims');
+        const chunkInputs2 = final.slice(0, used).map((c) => ({
+          id: c.id,
+          text: c.parent_content ?? c.content,
+        }));
+        const verifyResult2 = await verifyClaims({
+          answerText: activeAnswerText,
+          chunks: chunkInputs2,
+          threshold: bot.claimVerificationThreshold,
+        });
+        regenerateRatio = Number.isFinite(verifyResult2.confidence)
+          ? verifyResult2.confidence
+          : null;
+        if (verifyResult2.claims.length > 0) regenerateClaims = verifyResult2.claims;
+      } catch (err) {
+        console.warn('[regenerate verify] failed:', err);
+      }
+
+      const regenExtras = {
+        ...(activeResponse.extras ?? {}),
+        ...(regenerateClaims ? { claims: regenerateClaims } : {}),
+        ...(regenerateRatio !== null ? { claimConfidence: regenerateRatio } : {}),
+      };
+      activeResponse = {
+        ...activeResponse,
+        answer: activeAnswerText,
+        chatInputTokens: activeResponse.chatInputTokens + regenerateInputTokens,
+        chatOutputTokens: activeResponse.chatOutputTokens + regenerateOutputTokens,
+        totalCostUsd: activeResponse.totalCostUsd + regenerateCost,
+        extras: regenExtras,
+      };
+      yield {
+        kind: 'replacement',
+        response: activeResponse,
+        reason: 'claim-regenerate',
+        regeneratedVerifiedRatio: regenerateRatio,
+      };
+    } catch (err) {
+      console.warn('[claim-regenerate] failed, keeping initial answer:', err);
+    }
+  }
+
   // Followups na de answer-done yield — gebruiker ziet antwoord al, followups
   // verschijnen kort daarna in de UI via het followups-done event.
-  if (bot.generateFollowUps) {
+  // V0.5: hard timeout op 5s zodat een trage OpenAI-call niet de finale
+  // metrics-done blokkeert. Bij timeout of throw → emit followups-done met
+  // lege array + error-string.
+  if (bot.generateFollowUps && (withinBudget() || markSkipped('followups'))) {
     yield { kind: 'status', phase: 'followups' };
     const stopFollowups = tMark('followups_ms');
+    let followupsError: string | null = null;
     try {
-      const fu = await generateFollowUps(original, finalAnswerText, bot);
+      const FOLLOWUPS_TIMEOUT_MS = 5_000;
+      const timeoutSignal = new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`followups timeout (${FOLLOWUPS_TIMEOUT_MS}ms)`)),
+          FOLLOWUPS_TIMEOUT_MS,
+        );
+      });
+      const fu = await Promise.race([
+        generateFollowUps(original, finalAnswerText, bot),
+        timeoutSignal,
+      ]);
       followUps = fu.followUps;
       followUpsInputTokens = fu.inputTokens;
       followUpsOutputTokens = fu.outputTokens;
       followUpsCost = fu.costUsd;
     } catch (err) {
-      console.warn('[followups] failed:', err);
+      followupsError = err instanceof Error ? err.message : 'unknown';
+      console.warn('[followups] failed:', followupsError);
     }
     stopFollowups();
     yield {
@@ -1732,6 +2109,7 @@ export async function* runRagQueryStreaming(input: {
       inputTokens: followUpsInputTokens,
       outputTokens: followUpsOutputTokens,
       costUsd: followUpsCost,
+      ...(followupsError ? { error: followupsError } : {}),
     };
   }
 
@@ -1751,12 +2129,12 @@ export async function* runRagQueryStreaming(input: {
   // dezelfde UX levert als een verse RAG-run.
   if (bot.cacheEnabled && cacheEmbedVector) {
     const cachedResponse: ChatResponse = {
-      ...initialResponse,
-      chatInputTokens: initialResponse.chatInputTokens + followUpsInputTokens,
-      chatOutputTokens: initialResponse.chatOutputTokens + followUpsOutputTokens,
-      totalCostUsd: initialResponse.totalCostUsd + followUpsCost,
+      ...activeResponse,
+      chatInputTokens: activeResponse.chatInputTokens + followUpsInputTokens,
+      chatOutputTokens: activeResponse.chatOutputTokens + followUpsOutputTokens,
+      totalCostUsd: activeResponse.totalCostUsd + followUpsCost,
       extras: {
-        ...initialResponse.extras,
+        ...activeResponse.extras,
         ...(followUps && followUps.length > 0 ? { followUps } : {}),
         phaseTimingsMs: phaseTimingsFinal,
       },

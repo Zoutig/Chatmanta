@@ -24,7 +24,13 @@ import { BOTS, BOT_VERSIONS_ORDERED, EVAL_DEFAULT_VERSIONS, resolveBot } from '.
 import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
 
 const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
-const CONCURRENCY = 5;
+// V0.5 — verlaagd van 5 naar 2 omdat de uitgebreidere judge-prompt (Task 7
+// route_correct + meta_talk_present metrics) langere judge-calls geeft, en
+// 5 parallel × ~3k tokens vlogen vroeger over gpt-4o TPM-limit van 30k/min.
+// Bij 2 parallel blijft ruim binnen budget → geen judge-parse failures meer.
+// Trade-off: eval-run duurt ~2x langer (8-12 min ipv 4 min) maar geeft
+// betrouwbare scores.
+const CONCURRENCY = 2;
 
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
@@ -92,7 +98,7 @@ const sb = createClient(url!, key!, {
 let qBuilder = sb
   .from('eval_questions')
   .select(
-    `id, slug, question, gold_answer, gold_facts, tags, difficulty,
+    `id, slug, question, gold_answer, gold_facts, tags, difficulty, category,
      question_type, expected_kind, must_not_contain, ideal_source_filenames,
      conversation_history`,
   )

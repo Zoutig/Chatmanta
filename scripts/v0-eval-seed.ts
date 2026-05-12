@@ -33,6 +33,10 @@ type SeedQuestion = {
   gold_facts: string[];
   tags: string[];
   difficulty: 'easy' | 'medium' | 'hard';
+  /** v0.5: verwacht bot-gedrag voor route-correctness eval. Optioneel —
+      cases zonder category krijgen NULL in de DB (judge meet route_correct
+      dan niet). */
+  category?: 'search' | 'general' | 'off_topic' | 'smalltalk';
   // v2 fields (optional in JSON, defaulted when absent)
   question_type?: QuestionType;
   expected_kind?: 'answer' | 'fallback' | 'smalltalk' | null;
@@ -96,6 +100,13 @@ for (const q of parsed.questions) {
   if (!['easy', 'medium', 'hard'].includes(q.difficulty)) {
     fail(`slug=${q.slug}: difficulty moet easy|medium|hard zijn (kreeg "${q.difficulty}")`);
   }
+  if (q.category !== undefined) {
+    if (!['search', 'general', 'off_topic', 'smalltalk'].includes(q.category)) {
+      fail(
+        `slug=${q.slug}: category moet search|general|off_topic|smalltalk zijn (kreeg "${q.category}")`,
+      );
+    }
+  }
   if (q.question_type !== undefined && !VALID_QUESTION_TYPES.has(q.question_type)) {
     fail(`slug=${q.slug}: question_type onbekend: "${q.question_type}"`);
   }
@@ -153,6 +164,7 @@ async function main(): Promise<void> {
       gold_facts: q.gold_facts,
       tags: q.tags,
       difficulty: q.difficulty,
+      category: q.category ?? null,
       question_type: q.question_type ?? 'factual',
       expected_kind: q.expected_kind ?? null,
       must_not_contain: q.must_not_contain ?? [],

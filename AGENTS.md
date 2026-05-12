@@ -60,15 +60,22 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 
 ## Stack
 
+### V0 (huidig — pre-prod RAG-leerplatform)
+
 **Geïnstalleerd & in gebruik:**
 - Next.js 16.2 App Router + TypeScript + shadcn/ui + Tailwind v4
 - React 19.2
+- OpenAI `gpt-4o-mini` (chat / pre-process / rerank / HyDE / decompose / followups)
+- OpenAI `gpt-4o` (eval-judge + low-confidence cascade)
+- OpenAI `text-embedding-3-small` (1536 dim)
 - Supabase (Postgres + Auth + Storage + pgvector), West Europe region
-- Anthropic Claude Haiku 4.5 als enige actieve LLM (OpenAI als technische fallback in `callLLM()`-laag, niet klant-zichtbaar)
-- OpenAI text-embedding-3-small (1536 dim)
 - Vercel hosting + Cron — productie-project `chatmanta-nosp`, domein `www.chatmanta.nl` (primary) + apex redirect
+- Anthropic SDK is geïnstalleerd in `package.json` maar in V0 ongebruikt — verwarrend; negeer voor V0-werk.
 
-**Gepland (nog niet in `package.json`, niet importen alsof ze er al zijn):**
+### V1 (gepland — Phase 4 van het Bouwplan)
+
+- Anthropic Claude Haiku 4.5 als primair, met OpenAI als technische fallback in `callLLM()`-laag (niet klant-zichtbaar)
+- Migratie-grens: nieuwe LLM-laag in `lib/ai/llm.ts` met provider-abstractie (`MODEL_COSTS` voor EUR-billing; V0 gebruikt naast deze tabel een eigen `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`)
 - Firecrawl — Phase 5 (website crawler, max 50 pagina's per crawl)
 - Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
 
@@ -83,7 +90,7 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 **Eval-pipeline (RAG-validatie):**
 - `npm run eval:run-all` — seed → run → report; gebruik dit om RAG-wijzigingen meetbaar te valideren vóór een PR
 - Losse stappen: `eval:seed`, `eval:run`, `eval:report`
-- ⚠️ Bekend meet-artefact: eval-judge ziet small-chunk excerpts terwijl de LLM `parent_content` kreeg — lichte grounding-dips tussen versies kunnen meet-artefact zijn, niet bot-regressie. Vergelijk altijd het volledige rapport, niet één score.
+- ⚠️ V0.5 fix: judge gebruikt nu `parentExcerpt` (~800 chars) ipv small-chunk excerpts — eerlijker grounding-meting. Zie `lib/v0/server/eval.ts` `buildJudgeUserPrompt`.
 
 **Migrations:**
 - Eigen tooling, géén `supabase db push`: `npm run migrate`, `migrate:status`, `migrate:bootstrap`
