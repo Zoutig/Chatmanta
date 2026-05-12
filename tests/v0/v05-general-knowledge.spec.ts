@@ -16,7 +16,7 @@ test.describe('V0.5 — general-knowledge router', () => {
     await page.goto(V05_URL);
 
     // Zorg dat we op v0.5 zitten — bot-dropdown moet het laten zien.
-    await expect(page.locator('body')).toContainText(/v0\.5/);
+    await expect(page.locator('body')).toContainText(/v0\.5/i);
 
     // Stel de vraag via de composer.
     const composer = page.getByRole('textbox', { name: /stel een vraag|composer|bericht/i }).first();
@@ -45,7 +45,7 @@ test.describe('V0.5 — general-knowledge router', () => {
     page,
   }) => {
     await page.goto(V05_URL);
-    await expect(page.locator('body')).toContainText(/v0\.5/);
+    await expect(page.locator('body')).toContainText(/v0\.5/i);
 
     const composer = page.getByRole('textbox', { name: /stel een vraag|composer|bericht/i }).first();
     await composer.fill('Schrijf een gedicht over zalmen');
