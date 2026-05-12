@@ -7,8 +7,10 @@
 // expliciete cookie check toevoegen — V0 accepteert proxy alleen.
 //
 // Limits: 200KB per upload (server-side enforced), .txt/.md extension only.
-// Geen rate limiting in V0 (Upstash komt in V1 Phase 6); password-gate is
-// de primaire kostenbarriere.
+// Mutaties (ingest + delete) zijn rate-limited via checkMutationLimit —
+// defense-in-depth tegen iemand met de v0-auth cookie die in een loop
+// embeddings of deletes triggert. Lees zijn (refreshDocs) is bewust niet
+// gelimiteerd: geen cost, geen mutatie.
 
 import { revalidatePath } from 'next/cache';
 import {
@@ -18,6 +20,7 @@ import {
   type DocSummary,
   type IngestResult,
 } from '@/lib/v0/server/rag';
+import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 
 const MAX_FILE_BYTES = 200 * 1024;
 const ALLOWED_EXTS = new Set(['txt', 'md']);
@@ -31,6 +34,10 @@ export async function ingestAction(
   _prev: IngestActionState,
   formData: FormData,
 ): Promise<IngestActionState> {
+  const limit = await checkMutationLimit();
+  if (!limit.allowed) {
+    return { kind: 'error', message: limit.message };
+  }
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) {
     return { kind: 'error', message: 'Geen bestand geselecteerd.' };
@@ -69,6 +76,10 @@ export async function ingestAction(
 }
 
 export async function removeDocAction(docId: string): Promise<{ ok: boolean; error?: string }> {
+  const limit = await checkMutationLimit();
+  if (!limit.allowed) {
+    return { ok: false, error: limit.message };
+  }
   try {
     await deleteDoc(docId);
     revalidatePath('/');

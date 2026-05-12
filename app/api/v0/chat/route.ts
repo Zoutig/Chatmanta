@@ -58,7 +58,7 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
 export async function POST(req: Request) {
   // v0.4 security gate #1 — rate limit per IP. Faalt door als bucket overstroomt.
   const ip = getClientIp(req);
-  const rl = getRateLimiter().check(ip);
+  const rl = await getRateLimiter().check(ip);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'rate limit exceeded', retryAfterSec: rl.retryAfterSec },

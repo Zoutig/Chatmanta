@@ -20,6 +20,7 @@ import {
 } from '@/lib/v0/server/threads';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
+import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 
 export async function commitTurnAction(input: {
   threadId: string | null;
@@ -52,6 +53,14 @@ export async function getThreadAction(
 export async function deleteThreadAction(
   threadId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // commitTurnAction krijgt geen rate-limit: hij wordt door de client gefired
+  // na een succesvolle chat-response, en de chat-endpoint heeft zelf al een
+  // strenger limiet. Delete is wél destructief en kan zonder chat — daarom
+  // wel hier afdekken.
+  const limit = await checkMutationLimit();
+  if (!limit.allowed) {
+    return { ok: false, error: limit.message };
+  }
   try {
     const { id: organizationId } = await getActiveOrgFromCookies();
     await deleteThreadImpl(threadId, organizationId);
