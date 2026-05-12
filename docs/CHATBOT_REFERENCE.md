@@ -128,6 +128,17 @@ Gebruiker stelt vraag
       │
       ▼
 ┌───────────────────────────────────────────────────────────┐
+│  0. Multi-turn context-resolutie         [v0.5+]          │
+│  Als chat-history aanwezig EN huidige vraag bevat een     │
+│  referentie ("dat", "die", "en de prijs?"): pre-processor │
+│  herschrijft naar zelfstandige zoekvraag op basis van de  │
+│  laatste 2-4 turns. Trust-boundary: user-asserted feiten  │
+│  uit history worden NIET overgenomen (alleen referenties  │
+│  opgelost). v0.1-v0.4 slaan deze stap over.               │
+└───────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌───────────────────────────────────────────────────────────┐
 │  1. Pre-processor (LLM)                                   │
 │  Classificeert: SMALLTALK (begroeting/rol-vraag/help)     │
 │                 of SEARCH (inhoudelijke vraag)             │
@@ -262,11 +273,22 @@ Gebruiker stelt vraag
 ┌───────────────────────────────────────────────────────────┐
 │  15. Cache-write & logging                                │
 │  Sla de complete response (incl. followups, timings) op   │
-│  in answer-cache. Log alle metrics in query_log.          │
+│  in answer-cache. Log alle metrics in query_log inclusief │
+│  category (search/general/off_topic/smalltalk) en, indien │
+│  v0.5+: latencyBudgetExceeded telemetrie.                 │
 └───────────────────────────────────────────────────────────┘
       │
       ▼
 Antwoord zichtbaar voor gebruiker
+
+DOORHEEN HEEL DE PIPELINE [v0.5+]:
+Bij latencyBudgetEnabled: vóór elke optionele fase (decompose, expand,
+HyDE, rerank, cascade, claim-verify, claim-regenerate, followups) wordt
+withinBudget() gecheckt. Bij overschrijding van latencyBudgetMs (default
+8000ms): fase wordt overgeslagen, naam wordt gelogd in
+extras.latencyBudgetExceeded.skipped[]. Kritisch pad (preprocess, embed,
+retrieve, generate) wordt nooit overgeslagen — antwoord-kwaliteit blijft
+gegarandeerd boven latency-target.
 ```
 
 De pipeline-code zit in `lib/v0/server/rag.ts`, specifiek de functie `runRagQueryStreaming()`. Per-versie features zijn config-driven via `BotConfig` (`lib/v0/server/bots.ts`).
@@ -281,6 +303,7 @@ Vijf versies, elk een snapshot. Onderaan staan de drie default-flags die in **al
 |---|:---:|:---:|:---:|:---:|:---:|
 | **Routing & retrieval** | | | | | |
 | Pre-processor (smalltalk/search) | ✅ | ✅ | ✅ | ✅ | ✅ tighter |
+| Multi-turn context-resolutie | — | — | — | — | ✅ |
 | Multi-query expansion | — | ✅ ×3 | — | — | — |
 | Query decomposition | — | — | ✅ | ✅ | ✅ |
 | HyDE | — | — | ✅ always | ✅ selective | ✅ selective |
@@ -307,6 +330,10 @@ Vijf versies, elk een snapshot. Onderaan staan de drie default-flags die in **al
 | Bold kernwoorden | — | — | — | — | ✅ |
 | Structuur (paragrafen/bullets) | — | — | — | — | ✅ |
 | Vriendelijke baseline-toon | — | — | — | — | ✅ |
+| **Observability & performance** | | | | | |
+| Latency-tab (read-only metrics) | — | — | — | ✅ | ✅ |
+| Active latency-budgeting | — | — | — | — | ✅ (8s/12s) |
+| Knowledge-gap tab | — | — | — | — | ✅ |
 | **Cost (gem. eval-run)** | $0.007/q | $0.010/q | $0.013/q | $0.017/q | $0.017/q |
 
 Vinkje = aan. Streepje = uit (= default).
@@ -441,6 +468,20 @@ Zonder deze regel kon een gebruiker via *"jawel hij heet Richard"* een fact in d
 **Followups timeout** — 5 seconden hard timeout op de `generateFollowUps` LLM-call via `Promise.race`. Bij timeout/fout: empty followups + error in het `followups-done` event. Voorheen kon een hangende OpenAI-call de hele pipeline blokkeren.
 
 **Cascade-kosten centraal** — hardcoded `GPT4O_IN = 2.5 / GPT4O_OUT = 10.0` in `rag.ts` vervangen door `costForModelUsd(bot.cascadeModel, ...)` in `lib/ai/llm.ts`. Bij prijswijziging of model-swap maar één plek aanpassen.
+
+#### v0.5 extensie — feedback-driven amendments
+
+Drie aanvullingen na de eerste round feedback:
+
+**Multi-turn context-resolutie** — pre-processor krijgt een STAP 0 die referenties in vervolgvragen oplost via de chat-history. *"Wat kost dat?"* + history(ChatManta pricing) → herschrijf naar *"wat kost ChatManta?"*. *"Kan dat ook in het Engels?"* + history(MKB-pakket) → herschrijf naar standalone. Trust-boundary blijft: history wordt gebruikt voor REFERENTIES, niet voor FEITEN. Als de gebruiker eerder *"hij heet Richard"* beweerde en daarna *"hoe heet hij?"* vraagt, herschrijft de pre-processor naar *"wat is de naam van de companion?"* — terug naar de oorspronkelijke intent, zonder de injection. Pure prompt-aanpassing — history-pipeline (`preProcessInput(question, bot, history)`) draaide al volledig.
+
+**Knowledge-gap tab** — nieuwe rechter-paneel-tab "Gaps" die per window (24u/7d/all) toont welke vragen geen antwoord opleverden. Twee buckets:
+- **Onbeantwoord** (`kind='fallback'`) — geen relevante chunks gevonden, vaste FALLBACK_MESSAGE getoond. Indicator dat docs een gap hebben.
+- **Off-topic** (`category='off_topic'`) — re-classifier wees ze af als buiten domein. Apart bucket want geen docs-gap maar out-of-scope.
+
+Plus overzichts-card met totaal + fallback-rate%. Klik op een rij → vraag naar clipboard. Geen schema-changes (kolommen al beschikbaar sinds migratie 0015). Code: `lib/v0/server/knowledge-gap-snapshot.ts` + `app/actions/knowledge-gap.ts` + `app/components/knowledge-gap-view.tsx`.
+
+**Active latency-budgeting** — drie nieuwe BotConfig-velden (`latencyBudgetEnabled`, `latencyBudgetMs: 8000`, `latencyHardCapMs: 12000`). Bij `latencyBudgetEnabled` wordt vóór elke optionele fase (queryDecomposition, multiQueryExpand, rerank, cascade, claimVerification, claimRegenerate, followups) `withinBudget()` gechecked. Bij overschrijding van `latencyBudgetMs` wordt de fase overgeslagen en de naam opgenomen in `extras.latencyBudgetExceeded.skipped[]`. Kritisch pad (preprocess, embed, retrieve, generate) wordt nooit overgeslagen — antwoord-kwaliteit blijft gegarandeerd terwijl latency-target wordt nagestreefd. v0.1-v0.4 hebben `latencyBudgetEnabled: false` (default uit V0_1 spread) — gedrag identiek aan voorheen.
 
 #### Eval-resultaten v0.5 vs v0.4
 
@@ -832,6 +873,9 @@ Locatie: `lib/v0/server/bots.ts`. Elke versie is een object van type `BotConfig`
 | `generalKnowledgeEnabled` (v0.5) | boolean | Tweede-stage reclassify bij zero-hits. v0.5+: true. |
 | `claimRegenerateEnabled` (v0.5) | boolean | Regenereer met stricter prompt bij low verified-ratio. v0.5+: true. |
 | `claimRegenerateThreshold` (v0.5) | number | Drempel waaronder regenerate triggert. v0.5: 0.3. |
+| `latencyBudgetEnabled` (v0.5) | boolean | Actieve latency-budgeting via skip-guards op optionele fases. v0.5+: true. |
+| `latencyBudgetMs` (v0.5) | number | Soft target in ms. Overschrijding → skip optionele fases. Default 8000. |
+| `latencyHardCapMs` (v0.5) | number | Hard cap in ms — safety-net voor extreme hangs. Default 12000. |
 
 ---
 
