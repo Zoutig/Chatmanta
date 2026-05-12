@@ -176,12 +176,12 @@ function MantaThreadItem({
       }}
       aria-current={active ? 'page' : undefined}
     >
-      <div className="manta-thread-title">{thread.title}</div>
       <div className="manta-thread-meta">
         <span suppressHydrationWarning>
           {turns} {turns === 1 ? 'turn' : 'turns'} · {updated}
         </span>
       </div>
+      <div className="manta-thread-title">{thread.title}</div>
       <button
         type="button"
         className="manta-thread-delete"

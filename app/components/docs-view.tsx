@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from 'reac
 import { ingestAction, removeDocAction, type IngestActionState } from '../actions/docs';
 import type { DocSummary } from '@/lib/v0/server/rag';
 import { Icon } from './svg-icons';
+import { Button as Button1 } from './ui/button-1';
 
 const initialState: IngestActionState = { kind: 'idle' };
 
@@ -32,24 +33,30 @@ export function DocsView({ docs }: { docs: DocSummary[] }) {
             className="upload-input"
             onChange={() => formRef.current?.requestSubmit()}
           />
-          <button
-            type="button"
-            className="btn-secondary"
-            style={{ flex: 1, justifyContent: 'center' }}
-            onClick={() => inputRef.current?.click()}
+          <Button1
+            type="secondary"
+            size="medium"
+            shape="square"
+            loading={pending}
             disabled={pending}
+            onClick={() => inputRef.current?.click()}
+            className="flex-1"
+            prefix={!pending ? <Icon name="upload" size={12} /> : undefined}
           >
-            <Icon name="upload" size={12} /> {pending ? 'Bezig…' : 'Upload .txt / .md'}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            title="Crawl website (komt in V1)"
+            Upload .txt / .md
+          </Button1>
+          <Button1
+            type="secondary"
+            size="medium"
+            shape="square"
             disabled
-            style={{ opacity: 0.5, cursor: 'not-allowed' }}
+            title="Crawl website (komt in V1)"
+            className="opacity-50 cursor-not-allowed"
+            svgOnly
+            aria-label="Crawl website"
           >
             <Icon name="globe" size={12} />
-          </button>
+          </Button1>
         </div>
       </form>
 

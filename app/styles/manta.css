@@ -429,7 +429,7 @@ html[data-style="manta"] .manta-sidebar-empty {
 }
 
 html[data-style="manta"] .manta-thread-item {
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   margin-bottom: 1px;
@@ -448,6 +448,7 @@ html[data-style="manta"] .manta-thread-title {
   font-size: 12.5px;
   font-weight: 500;
   color: var(--manta-navy-ink);
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -457,9 +458,11 @@ html[data-style="manta"] .manta-thread-item.active .manta-thread-title {
   font-weight: 600;
 }
 html[data-style="manta"] .manta-thread-meta {
-  font-size: 10.5px;
+  font-size: 9.5px;
   color: var(--manta-navy-muted);
-  margin-top: 2px;
+  margin-bottom: 1px;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 html[data-style="manta"] .manta-thread-delete {
   position: absolute;
@@ -1073,15 +1076,14 @@ html[data-style="manta"] .manta-threshold-preset-label {
   color: var(--manta-ink-muted);
 }
 
-/* --- Send button — shadcn Button outer + ChevronRight overlay -----------
-   Button-base via components/ui/button.tsx (accent via --primary).
-   Animatie: chevron schuift rechts op hover, een ghost-chevron faded
-   tegelijk in op de oorspronkelijke positie → "wegvliegen"-effect. */
+/* --- Send button — Button1 outer + ArrowRight suffix + shimmer ---------
+   Vercel-Geist Button (button-1.tsx variant=manta → bg-[var(--primary)]).
+   Animatie: arrow slidet 4 px rechts op hover + shimmer-sweep over de knop. */
 html[data-style="manta"] [data-manta-send] {
+  position: relative;
   transition: transform 0.2s ease, box-shadow 0.3s ease, filter 0.3s ease;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 1px 2px rgba(10, 15, 23, 0.08),
     0 6px 16px -4px color-mix(in oklab, var(--primary) 38%, transparent);
 }
@@ -1089,8 +1091,7 @@ html[data-style="manta"] [data-manta-send]:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.04);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
     0 2px 4px rgba(10, 15, 23, 0.12),
     0 10px 24px -4px color-mix(in oklab, var(--primary) 60%, transparent);
 }
@@ -1098,50 +1099,47 @@ html[data-style="manta"] [data-manta-send]:active:not(:disabled) {
   transform: translateY(0);
 }
 
-/* Right-side overlay (= bg-primary-foreground/15 zonder Tailwind utility-
-   detection issue), fungeert als visuele "send-affordance". */
-html[data-style="manta"] .manta-send-overlay {
-  background: color-mix(in oklab, var(--primary-foreground, #fff) 15%, transparent);
-  border-top-right-radius: 0.5rem;
-  border-bottom-right-radius: 0.5rem;
-  color: var(--primary-foreground, #fff);
-  transition: background 0.25s ease;
+/* Pijl-suffix — schuift rechts op hover. */
+html[data-style="manta"] .manta-send-arrow {
+  margin-left: 2px;
+  opacity: 0.85;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
-html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-overlay {
-  background: color-mix(in oklab, var(--primary-foreground, #fff) 22%, transparent);
-}
-
-/* Echte chevron — schuift rechts op hover + iets feller. */
-html[data-style="manta"] .manta-send-chevron {
-  opacity: 0.75;
-  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-              opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1);
-}
-html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-chevron {
-  transform: translateX(5px);
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-arrow {
+  transform: translateX(4px);
   opacity: 1;
 }
-html[data-style="manta"] [data-manta-send]:active:not(:disabled) .manta-send-chevron {
-  transform: translateX(8px);
-  opacity: 0;
+html[data-style="manta"] [data-manta-send]:active:not(:disabled) .manta-send-arrow {
+  transform: translateX(7px);
+  opacity: 0.8;
 }
 
-/* Ghost chevron — absolute op de original positie, faded in op hover. */
-html[data-style="manta"] .manta-send-chevron-ghost {
+/* Shimmer-sweep — witte diagonale glans veegt over de knop op hover.
+   Gebruikt ::before zodat 'ie als overlay binnen de knop blijft. */
+html[data-style="manta"] [data-manta-send]::before {
+  content: '';
   position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%) skewX(-18deg);
   opacity: 0;
-  transform: translateX(0);
-  transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
-              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
+  transition: opacity 0.15s ease;
 }
-html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-chevron-ghost {
-  opacity: 0.35;
-  transform: translateX(0);
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled)::before {
+  opacity: 1;
+  animation: manta-send-shimmer 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-html[data-style="manta"] [data-manta-send]:active:not(:disabled) .manta-send-chevron-ghost {
-  opacity: 0.6;
-  transform: translateX(2px);
-  transition-duration: 0.12s;
+@keyframes manta-send-shimmer {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(240%) skewX(-18deg); }
 }
 
 /* --- Right panel (activity-rail + content) ----------------------------- */
@@ -1325,6 +1323,14 @@ html[data-style="manta"] .manta-right-body {
   html[data-style="manta"] .manta-right-panel {
     display: none;
   }
+}
+
+/* --- Inline typing in een bestaande bubble (vervangt "Denkt aan het
+   nadenken…" wanneer model `<thinking>` streamt zonder `<answer>`). */
+html[data-style="manta"] .manta-bubble-typing {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 4px;
 }
 
 /* --- Empty-state voorbeeld-cards (Manta-only) ------------------------ */

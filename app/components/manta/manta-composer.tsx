@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Icon } from '../svg-icons';
-import { Button } from '../ui/button';
+import { Button as Button1 } from '../ui/button-1';
 import type { Length, Tone } from '@/lib/v0/style-types';
 
 const MAX_CHARS = 1000;
@@ -86,30 +86,28 @@ export function MantaComposer({
           <span className="manta-composer-counter">
             {value.length} / {MAX_CHARS}
           </span>
-          <Button
-            type="button"
-            size="default"
+          <Button1
+            type="manta"
+            size="medium"
+            shape="square"
             data-manta-send
             disabled={!value.trim() || pending}
+            loading={pending}
             onClick={submit}
             aria-label="Verstuur"
             title="Verstuur (↵)"
-            className="relative pe-12 h-9 group/send"
-          >
-            <span>Verstuur</span>
-            <span
-              className="manta-send-overlay pointer-events-none absolute inset-y-0 end-0 flex w-9 items-center justify-center"
-              aria-hidden="true"
-            >
-              <ChevronRight className="manta-send-chevron" size={16} strokeWidth={2.2} />
-              <ChevronRight
-                className="manta-send-chevron-ghost"
-                size={16}
+            className="relative overflow-hidden group/send"
+            suffix={
+              <ArrowRight
+                className="manta-send-arrow"
+                size={14}
                 strokeWidth={2.2}
                 aria-hidden="true"
               />
-            </span>
-          </Button>
+            }
+          >
+            Verstuur
+          </Button1>
         </div>
       </div>
       <div className="manta-composer-hint">
