@@ -13,6 +13,19 @@ import { createClient } from '@supabase/supabase-js';
 
 const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
 
+type HistoryTurn = { role: 'user' | 'assistant'; content: string };
+
+type QuestionType =
+  | 'factual'
+  | 'multi_hop'
+  | 'out_of_corpus'
+  | 'false_premise'
+  | 'prompt_injection'
+  | 'typo'
+  | 'planted_fact'
+  | 'smalltalk'
+  | 'ambiguous';
+
 type SeedQuestion = {
   slug: string;
   question: string;
@@ -24,7 +37,27 @@ type SeedQuestion = {
       cases zonder category krijgen NULL in de DB (judge meet route_correct
       dan niet). */
   category?: 'search' | 'general' | 'off_topic' | 'smalltalk';
+  // v2 fields (optional in JSON, defaulted when absent)
+  question_type?: QuestionType;
+  expected_kind?: 'answer' | 'fallback' | 'smalltalk' | null;
+  must_not_contain?: string[];
+  ideal_source_filenames?: string[];
+  conversation_history?: HistoryTurn[];
 };
+
+const VALID_QUESTION_TYPES: ReadonlySet<QuestionType> = new Set([
+  'factual',
+  'multi_hop',
+  'out_of_corpus',
+  'false_premise',
+  'prompt_injection',
+  'typo',
+  'planted_fact',
+  'smalltalk',
+  'ambiguous',
+]);
+
+const VALID_EXPECTED_KINDS = new Set(['answer', 'fallback', 'smalltalk']);
 
 type SeedFile = {
   _meta?: Record<string, unknown>;
@@ -74,6 +107,32 @@ for (const q of parsed.questions) {
       );
     }
   }
+  if (q.question_type !== undefined && !VALID_QUESTION_TYPES.has(q.question_type)) {
+    fail(`slug=${q.slug}: question_type onbekend: "${q.question_type}"`);
+  }
+  if (q.expected_kind !== undefined && q.expected_kind !== null && !VALID_EXPECTED_KINDS.has(q.expected_kind)) {
+    fail(`slug=${q.slug}: expected_kind moet answer|fallback|smalltalk|null zijn`);
+  }
+  if (q.must_not_contain !== undefined && !Array.isArray(q.must_not_contain)) {
+    fail(`slug=${q.slug}: must_not_contain moet een array zijn`);
+  }
+  if (q.ideal_source_filenames !== undefined && !Array.isArray(q.ideal_source_filenames)) {
+    fail(`slug=${q.slug}: ideal_source_filenames moet een array zijn`);
+  }
+  if (q.conversation_history !== undefined) {
+    if (!Array.isArray(q.conversation_history)) {
+      fail(`slug=${q.slug}: conversation_history moet een array zijn`);
+    }
+    for (const [i, turn] of q.conversation_history.entries()) {
+      if (!turn || typeof turn !== 'object') fail(`slug=${q.slug}: conversation_history[${i}] is geen object`);
+      if (turn.role !== 'user' && turn.role !== 'assistant') {
+        fail(`slug=${q.slug}: conversation_history[${i}].role moet user|assistant zijn`);
+      }
+      if (typeof turn.content !== 'string' || !turn.content.trim()) {
+        fail(`slug=${q.slug}: conversation_history[${i}].content moet niet-lege string zijn`);
+      }
+    }
+  }
 }
 
 async function main(): Promise<void> {
@@ -106,6 +165,11 @@ async function main(): Promise<void> {
       tags: q.tags,
       difficulty: q.difficulty,
       category: q.category ?? null,
+      question_type: q.question_type ?? 'factual',
+      expected_kind: q.expected_kind ?? null,
+      must_not_contain: q.must_not_contain ?? [],
+      ideal_source_filenames: q.ideal_source_filenames ?? [],
+      conversation_history: q.conversation_history ?? [],
     };
 
     if (existing) {

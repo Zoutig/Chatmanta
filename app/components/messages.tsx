@@ -7,6 +7,7 @@ import { LatencyBar } from './latency-bar';
 import type { ChatResponse, PipelinePhase } from '@/lib/v0/server/rag';
 import { chipLabel, summarizeClaims, type GroundedSummary } from '@/lib/v0/claim-display';
 import { ClaimsList } from './claims-view';
+import { TypingLoader } from './ui/loader';
 
 const PHASE_LABELS: Record<PipelinePhase, string> = {
   cache: 'Geheugen raadplegen',
@@ -449,20 +450,9 @@ export function AssistantMessage({
 
       <div className="msg-body msg-ai-bubble">
         {stillThinking ? (
-          <p style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                marginRight: 6,
-              }}
-            >
-              Denkt
-            </span>
-            aan het nadenken…
-          </p>
+          <div className="manta-bubble-typing" aria-label="Aan het nadenken">
+            <TypingLoader size="md" />
+          </div>
         ) : (
           <>
             <MessageBody
@@ -504,6 +494,7 @@ export function AssistantMessage({
                   type="button"
                   className="followup-chip"
                   onClick={() => onFollowUp(q)}
+                  style={{ ['--i' as string]: String(i) } as React.CSSProperties}
                 >
                   <span style={{ color: 'var(--accent)', marginRight: 6 }}>↗</span>
                   {q}

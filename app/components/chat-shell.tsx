@@ -25,6 +25,13 @@ import { RightPanel, type RightTab } from './right-panel';
 import type { BotMeta } from './bot-dropdown';
 import { useStyle } from './use-style';
 import { useHydeMode } from './use-hyde-mode';
+import { useStyleMode } from '@/lib/v0/hooks/use-style-mode';
+import { MantaSidebar } from './manta/manta-sidebar';
+import { MantaTopbar } from './manta/manta-topbar';
+import { MantaComposer } from './manta/manta-composer';
+import { MantaRightPanel } from './manta/manta-right-panel';
+import { MantaAurora } from './manta/manta-aurora';
+import { TypingLoader } from './ui/loader';
 
 type Turn = {
   user: string;
@@ -77,10 +84,16 @@ export function ChatShell({
   const [rewriteOn, setRewriteOn] = useState(defaultEnableRewrite);
   const { tone, length, setTone, setLength } = useStyle();
   const { hydeMode, setHydeMode } = useHydeMode();
+  const { mode: styleMode } = useStyleMode();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [activeCite, setActiveCite] = useState<number | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>('sources');
   const [rightOpen, setRightOpen] = useState(true);
+  // Manta-mode: collapse-states voor zowel linker sidebar als rechter rail.
+  // Worden alleen gebruikt als styleMode === 'manta'; in classic/glass blijven
+  // de bestaande width-tokens leidend.
+  const [mantaLeftCollapsed, setMantaLeftCollapsed] = useState(false);
+  const [mantaRightCollapsed, setMantaRightCollapsed] = useState(false);
   const [, startTransition] = useTransition();
   const convoRef = useRef<HTMLDivElement>(null);
 
@@ -101,6 +114,20 @@ export function ChatShell({
     document.body.classList.add('body-fixed');
     return () => document.body.classList.remove('body-fixed');
   }, []);
+
+  // Wanneer de gebruiker terugschakelt van Manta naar Klassiek/Glass, reset
+  // de Manta-collapse-states. Anders blijft de eerstvolgende keer dat ze weer
+  // naar Manta switchen het sidebar/rail-panel ingeklapt staan zonder duidelijke
+  // reden, en kan de classic-render een korte mismatch tonen omdat het CSS-grid
+  // de extra .manta-*-collapsed className zou behouden.
+  /* eslint-disable react-hooks/set-state-in-effect -- synchroniseren van mode-specifieke UI-state met de globale styleMode-keuze; geen externe bron mogelijk zonder de hook-API te verbreden. */
+  useEffect(() => {
+    if (styleMode !== 'manta') {
+      setMantaLeftCollapsed(false);
+      setMantaRightCollapsed(false);
+    }
+  }, [styleMode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Auto-scroll: na elke turn-mutatie naar de bodem.
   useEffect(() => {
@@ -416,6 +443,129 @@ export function ChatShell({
       ? 'Nieuw gesprek'
       : turns[0].user.slice(0, 80) + (turns[0].user.length > 80 ? '…' : ''));
 
+  const conversationBlock = (
+    <>
+      {turns.length === 0 ? (
+        <EmptyState
+          onPick={ask}
+          docCount={docs.length}
+          chunkCount={totalChunks}
+          seed={examplesSeed}
+        />
+      ) : (
+        <div className="conversation-inner">
+          {turns.map((t, i) => {
+            const isLast = i === turns.length - 1;
+            return (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <UserMessage content={t.user} />
+                {t.error ? (
+                  <ErrorMessage message={t.error} />
+                ) : t.response ? (
+                  <AssistantMessage
+                    response={t.response}
+                    streamingText={t.streamingText}
+                    pending={isLast && pending}
+                    livePhase={null}
+                    activeCite={isLast ? activeCite : null}
+                    onCiteClick={onCiteClick}
+                    onFollowUp={ask}
+                    onRegenerate={isLast && !pending ? onRegenerate : undefined}
+                    replacementReason={t.replacementReason}
+                  />
+                ) : (
+                  <PendingPlaceholder phase={t.livePhase} botVersion={botVersion} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  if (styleMode === 'manta') {
+    const appClass = [
+      'app',
+      mantaLeftCollapsed ? 'manta-left-collapsed' : '',
+      mantaRightCollapsed ? 'manta-right-collapsed' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return (
+      <div className={appClass}>
+        <MantaSidebar
+          threads={threads}
+          activeThreadId={activeThreadId}
+          onSelectThread={onSelectThread}
+          onDeleteThread={onDeleteThread}
+          usage={allTimeUsage}
+          onNewChat={onNewChat}
+          activeOrgSlug={activeOrgSlug}
+          availableOrgs={availableOrgs}
+          collapsed={mantaLeftCollapsed}
+          onToggleCollapsed={() => setMantaLeftCollapsed((v) => !v)}
+        />
+
+        <main className="manta-main">
+          <MantaTopbar
+            title={title}
+            turnCount={turns.length}
+            botVersion={botVersion}
+            bots={bots}
+            leftCollapsed={mantaLeftCollapsed}
+            onToggleLeft={() => setMantaLeftCollapsed((v) => !v)}
+          />
+
+          <MantaAurora />
+
+          <div className="manta-content">
+            <div className="manta-conversation conversation" ref={convoRef}>
+              {conversationBlock}
+            </div>
+
+            <MantaComposer
+              onSend={ask}
+              pending={pending}
+              threshold={threshold}
+              onThresholdChange={setThreshold}
+              tone={tone}
+              onToneChange={setTone}
+              length={length}
+              onLengthChange={setLength}
+            />
+          </div>
+        </main>
+
+        <MantaRightPanel
+          tab={rightTab}
+          onTabChange={setRightTab}
+          collapsed={mantaRightCollapsed}
+          onToggleCollapsed={() => setMantaRightCollapsed((v) => !v)}
+          response={latestResponse}
+          threshold={threshold}
+          onThreshold={setThreshold}
+          tone={tone}
+          onToneChange={setTone}
+          length={length}
+          onLengthChange={setLength}
+          hydeMode={hydeMode}
+          onHydeModeChange={setHydeMode}
+          rewriteOn={rewriteOn}
+          onToggleRewrite={() => setRewriteOn((v) => !v)}
+          botVersion={botVersion}
+          botSystemPrompt={botSystemPrompt}
+          bots={bots}
+          botFlags={botFlags}
+          activeCite={activeCite}
+          onCiteClick={onCiteClick}
+          docs={docs}
+          activeOrgId={activeOrgId}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <Sidebar
@@ -440,42 +590,7 @@ export function ChatShell({
         />
 
         <div className="conversation" ref={convoRef}>
-          {turns.length === 0 ? (
-            <EmptyState
-              onPick={ask}
-              docCount={docs.length}
-              chunkCount={totalChunks}
-              seed={examplesSeed}
-            />
-          ) : (
-            <div className="conversation-inner">
-              {turns.map((t, i) => {
-                const isLast = i === turns.length - 1;
-                return (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                    <UserMessage content={t.user} />
-                    {t.error ? (
-                      <ErrorMessage message={t.error} />
-                    ) : t.response ? (
-                      <AssistantMessage
-                        response={t.response}
-                        streamingText={t.streamingText}
-                        pending={isLast && pending}
-                        livePhase={null}
-                        activeCite={isLast ? activeCite : null}
-                        onCiteClick={onCiteClick}
-                        onFollowUp={ask}
-                        onRegenerate={isLast && !pending ? onRegenerate : undefined}
-                        replacementReason={t.replacementReason}
-                      />
-                    ) : (
-                      <PendingPlaceholder phase={t.livePhase} botVersion={botVersion} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {conversationBlock}
         </div>
 
         <Composer
@@ -573,7 +688,20 @@ function PendingPlaceholder({
           <span>{botVersion}</span>
         </div>
       </div>
-      {phase ? <PhaseLineFromPlaceholder phase={phase} /> : null}
+      {/* Typing-dots als primaire feedback dat de bot werkt; pipeline-phase
+          klein eronder zodat we tijdens RAG-tuning nog zien waar 'ie is. */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          paddingLeft: 2,
+          marginTop: 4,
+        }}
+      >
+        <TypingLoader size="lg" />
+        {phase ? <PhaseLineFromPlaceholder phase={phase} /> : null}
+      </div>
     </div>
   );
 }
@@ -597,17 +725,15 @@ function PhaseLineFromPlaceholder({ phase }: { phase: PipelinePhase }) {
     verify: 'Antwoord verifiëren',
   };
   return (
-    <div
-      className="pipeline-trail"
+    <span
       style={{
-        background: 'var(--accent-soft)',
-        borderColor: 'color-mix(in oklab, var(--accent) 25%, transparent)',
-        color: 'var(--accent)',
+        fontSize: 11.5,
+        color: 'var(--fg-dim)',
+        letterSpacing: '0.01em',
       }}
     >
-      <span className="ripple-dot" />
-      <span style={{ fontWeight: 500 }}>{labels[phase]}…</span>
-    </div>
+      {labels[phase]}…
+    </span>
   );
 }
 

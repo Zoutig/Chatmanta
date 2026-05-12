@@ -6,7 +6,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # ChatManta — agent-context
 
-ChatManta is een website-chatbot SaaS van Jorion Solutions. Knowledge-bot voor MKB op basis van RAG over websitecontent + documenten. Pre-build (V1).
+ChatManta is een website-chatbot SaaS van Jorion Solutions. Knowledge-bot voor MKB op basis van RAG over websitecontent + documenten.
+
+**Status (mei 2026):** V0 draait als actief RAG-leerplatform — multi-org sandbox met fake demo-data, eval-pipeline, parent chunks, HyDE, hybrid search, claim-verifications, latency-profiling, cache-telemetry. 14 migrations live (`0001_core_tenancy` t/m `0014_v0_hyde_mode_logging`). V1 (Supabase Auth + productie-multi-tenancy) is nog niet gestart — nieuwe features landen als nieuwe V0 bot-versie tenzij Sebastiaan expliciet zegt "we starten V1".
 
 ## Hoe je met dit project werkt
 
@@ -60,21 +62,42 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 
 ### V0 (huidig — pre-prod RAG-leerplatform)
 
-- Next.js 14+ App Router + TypeScript + shadcn/ui + Tailwind
+**Geïnstalleerd & in gebruik:**
+- Next.js 16.2 App Router + TypeScript + shadcn/ui + Tailwind v4
 - React 19.2
 - OpenAI `gpt-4o-mini` (chat / pre-process / rerank / HyDE / decompose / followups)
 - OpenAI `gpt-4o` (eval-judge + low-confidence cascade)
 - OpenAI `text-embedding-3-small` (1536 dim)
 - Supabase (Postgres + Auth + Storage + pgvector), West Europe region
-- Vercel hosting + Cron — productie-project `chatmanta-nosp`, domein `www.chatmanta.nl`
+- Vercel hosting + Cron — productie-project `chatmanta-nosp`, domein `www.chatmanta.nl` (primary) + apex redirect
 - Anthropic SDK is geïnstalleerd in `package.json` maar in V0 ongebruikt — verwarrend; negeer voor V0-werk.
 
 ### V1 (gepland — Phase 4 van het Bouwplan)
 
-- Anthropic Claude Haiku 4.5 als primair, met OpenAI als technische fallback
+- Anthropic Claude Haiku 4.5 als primair, met OpenAI als technische fallback in `callLLM()`-laag (niet klant-zichtbaar)
 - Migratie-grens: nieuwe LLM-laag in `lib/ai/llm.ts` met provider-abstractie (`MODEL_COSTS` voor EUR-billing; V0 gebruikt naast deze tabel een eigen `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`)
 - Firecrawl — Phase 5 (website crawler, max 50 pagina's per crawl)
 - Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
+
+**Bekende valkuilen in de stack:**
+- **Tailwind v4 PostCSS-pipeline**: nieuwe properties op bestaande selectors in `app/globals.css` worden soms silent gedropt. Bypass: inline `style={{...}}` of een lokaal `<style>`-tag in het component dat de property nodig heeft.
+
+## Operationele commando's & V0-empirie
+
+**V0-empirie (overrides blueprint-default):**
+- Similarity threshold ≈ **0.4**, niet de blueprint-default 0.7. Voor `text-embedding-3-small` + NL is 0.7 te streng — V0-testing heeft dit empirisch laten zien. Blueprint sectie 1.5 zegt zelf "valideren via testset", dus 0.7 is een startwaarde, geen wet.
+
+**Eval-pipeline (RAG-validatie):**
+- `npm run eval:run-all` — seed → run → report; gebruik dit om RAG-wijzigingen meetbaar te valideren vóór een PR
+- Losse stappen: `eval:seed`, `eval:run`, `eval:report`
+- ⚠️ V0.5 fix: judge gebruikt nu `parentExcerpt` (~800 chars) ipv small-chunk excerpts — eerlijker grounding-meting. Zie `lib/v0/server/eval.ts` `buildJudgeUserPrompt`.
+
+**Migrations:**
+- Eigen tooling, géén `supabase db push`: `npm run migrate`, `migrate:status`, `migrate:bootstrap`
+- Files in `supabase/migrations/NNNN_*.sql`, strikt volgnummer; nieuwe migration = RLS-policies in dezelfde file
+
+**V0-scripts (snel demo-data manipuleren):**
+- `v0:ingest`, `v0:chat`, `v0:list`, `v0:reset`, `v0:tune`, `v0:reingest-parents`, `v0:seed-orgs`, `v0:test-org-isolation` — zie `package.json`
 
 ## Bouwfase-volgorde
 
@@ -98,9 +121,9 @@ Bouw geen vooruit-werk uit een latere fase. Definition of Done van vorige fase m
 - Als je iets niet zeker weet: zeg dat en stel een verifieerbare check voor
 - Bij library-versies en npm-packages: lees `node_modules/<pkg>/README` of recente docs voor je veronderstelt hoe de API eruitziet — Next.js, Supabase en Vercel AI SDK veranderen snel
 
-## Werken in een team van twee
+## Werkstroom & parallelle sessies
 
-Twee developers (Sebastiaan + Niels, beide junior) bouwen aan deze codebase. Voorkom mergeconflicten en zorg dat de andere agent + persoon je werk kunnen volgen.
+Sebastiaan (`@Zoutig` op GitHub) werkt momenteel **solo** aan deze codebase. AGENTS.md verwijst soms naar "team" / "collega" — dat is voorlopig hypothetisch; behandel alle review-afspraken als zelf-reviews tenzij anders gezegd. De afspraken hieronder draaien vooral om **parallel werken met meerdere CC-sessies tegelijk**, want dat gebeurt regelmatig en gaat zonder worktrees mis.
 
 > **Voor een nieuwe Claude Code sessie**: lees `docs/ONBOARDING_AGENT.md` om volledig op te starten.
 > **Voor mensen**: `docs/ONBOARDING.md` heeft de setup-instructies.
@@ -146,13 +169,13 @@ CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill
 **Per-worktree caveats** (voor mensen): elke worktree heeft eigen `node_modules`, eigen `.next/`, géén automatische `.env.local` (die is gitignored — kopieer hem zelf), en eigen dev-server-poort (gebruik `next dev -p 3001` voor de tweede). Memory-store van CC is per working-directory dus niet gedeeld tussen worktrees.
 
 **Voor je begint te bouwen:**
-- Maak een feature branch: `git checkout -b feat/<naam>/<beschrijving>` (bv. `feat/seb/widget-theme`). Nooit direct op `main`.
+- Maak een feature branch: `git checkout -b feat/seb/<beschrijving>` (bv. `feat/seb/widget-theme`). Nooit direct op `main`.
 - Branches kort houden — een branch die langer dan 2-3 dagen leeft = mergeconflict-risico
-- Twijfel of een file ook door collega bewerkt wordt? Vraag de gebruiker, of check `git log --all --since="2 days" -- <file>`
+- ⚠️ Parallelle CC-sessies kunnen tussen tool calls door op een andere branch zijn beland. Direct vóór elke commit `git rev-parse --abbrev-ref HEAD` checken om er zeker van te zijn dat je nog op de juiste branch staat.
 
 **Voor je een PR maakt:**
 - Vul `.github/pull_request_template.md` volledig in. Dit is wat de reviewer + zijn agent leest om context te krijgen — schrijf het voor een collega die niet bij je gesprek was.
-- Run `graphify update .` bij nieuwe files of grote refactors, en commit de updated graph mee
+- Run `graphify update .` bij nieuwe files of grote refactors (output is gitignored — alleen lokaal up-to-date houden, niet committen)
 - Check of je geen V1 hard rules schendt (zie boven)
 - PR aanmaken met `gh pr create` — gebruik de template (gh detecteert die automatisch)
 
@@ -162,6 +185,6 @@ CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill
 - Afspraak: gebruik `--no-verify` alleen voor noodgevallen waarbij je het uitlegt in de commit message.
 - Review is *niet* afgedwongen, maar de afspraak is: vraag collega om te kijken voor je merget.
 
-**Voor agents specifiek (Sebastiaan + Niels' Claude Code):**
+**Voor agents specifiek:**
 - Krijg je een `[BLOCKED]` melding bij `git push`? Goed — je probeerde direct op main te pushen. Maak een feature branch en push opnieuw.
 - Probeer NOOIT `git push --no-verify` zonder dat de gebruiker er expliciet om vraagt. Dit ondermijnt de hele bescherming.

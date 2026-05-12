@@ -971,11 +971,10 @@ function toSource(c: RetrievedChunk): ChatSource {
       ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
       : c.content;
   // Parent-content is alleen aanwezig als bot.parentDocumentRetrieval=true
-  // EN de chunk een gehydrateerde parent had. In de huidige codebase wordt
-  // parent_content op de RetrievedChunk gezet door retrieveChunks(withParents)
-  // / retrieveChunksHybrid(withParents) of door hydrateParentContent() (zie
-  // regel ~768). Null of undefined → we slaan parentExcerpt over zodat oude
-  // responses (zonder dit veld) backward-compat blijven.
+  // EN de chunk een gehydrateerde parent had. Null of undefined → we slaan
+  // parentExcerpt over zodat oude responses (zonder dit veld) backward-compat
+  // blijven. Onderscheid: null = hydratie geprobeerd maar gefaald;
+  // undefined = geen parent_chunk_id (geen parent-doc-retrieval actief).
   let parentExcerpt: string | null | undefined = undefined;
   if (typeof c.parent_content === 'string' && c.parent_content.length > 0) {
     parentExcerpt =

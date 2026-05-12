@@ -58,3 +58,6 @@ graphify-out/
 /playwright-report/
 /playwright/.cache/
 tests/.auth-state.json
+
+# ad-hoc debug scripts (browser automation, one-off diagnostics)
+/tmp/
