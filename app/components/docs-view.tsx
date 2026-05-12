@@ -34,7 +34,7 @@ export function DocsView({ docs }: { docs: DocSummary[] }) {
             onChange={() => formRef.current?.requestSubmit()}
           />
           <Button1
-            type="secondary"
+            type="tertiary"
             size="medium"
             shape="square"
             loading={pending}
@@ -46,7 +46,7 @@ export function DocsView({ docs }: { docs: DocSummary[] }) {
             Upload .txt / .md
           </Button1>
           <Button1
-            type="secondary"
+            type="tertiary"
             size="medium"
             shape="square"
             disabled

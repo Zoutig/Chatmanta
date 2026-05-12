@@ -560,6 +560,29 @@ body.body-fixed { overflow: hidden; }
   opacity: 0.85;
 }
 .thread-item.active .thread-meta .ver { opacity: 1; }
+
+/* --- Thread-item polish: typografie + ademruimte (overrides lines 509-554) - */
+.thread-item {
+  padding: 11px 32px 11px 14px;
+  gap: 4px;
+  margin: 2px 0;
+}
+.thread-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.thread-meta {
+  font-size: 9.5px;
+  opacity: 0.7;
+  letter-spacing: 0.05em;
+}
+.threads-label {
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  padding: 10px 12px 8px;
+}
+
 .thread-delete {
   appearance: none;
   position: absolute;
@@ -818,6 +841,13 @@ body.body-fixed { overflow: hidden; }
   transition: all 0.12s ease;
 }
 .bot-pill:hover { border-color: var(--border-strong); background: var(--surface-3); }
+/* Focus indicator zonder halo: alleen border-color naar accent — geen outline,
+   geen box-shadow. Keyboard users zien de pill-rand wisselen van kleur. */
+.bot-pill:focus { outline: none; }
+.bot-pill:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
 .bot-pill::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
