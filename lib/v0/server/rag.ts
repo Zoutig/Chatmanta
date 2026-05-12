@@ -878,6 +878,16 @@ export type V03Extras = {
    * generation_ms,total_ms} kolommen plus phase_timings_ms (jsonb).
    */
   phaseTimingsMs?: PhaseTimings;
+  /**
+   * v0.5: route-category van het antwoord. 'search' = normale RAG-answer met
+   * sources. 'general' = re-classifier zei "algemene kennis" en we hebben een
+   * disclaimer-antwoord gegenereerd zonder retrieval. Wordt gelogd in
+   * query_log.category zodat eval/UI weten welk pad de query nam.
+   *
+   * 'off_topic' en 'smalltalk' verschijnen NIET hier — die zijn aparte
+   * ChatResponse.kind-waarden ('fallback' resp. 'smalltalk').
+   */
+  category?: 'search' | 'general';
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -1441,6 +1451,188 @@ export async function* runRagQueryStreaming(input: {
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   if (aboveThreshold.length === 0) {
+    // V0.5: tweede-stage re-classifier wanneer bot.generalKnowledgeEnabled.
+    // We weten nu dat retrieval géén relevante chunks gaf — de vraag is dus
+    // ofwel algemene kennis binnen het domein (GENERAL) of buiten het domein
+    // (OFF_TOPIC) of een specifiek detail dat we eerlijk niet kennen
+    // (FALLBACK).
+    //
+    // Bij !generalKnowledgeEnabled (v0.1-v0.4) gedragen we ons exact zoals
+    // voorheen: vaste FALLBACK_MESSAGE, geen LLM-call.
+    if (bot.generalKnowledgeEnabled) {
+      const { reclassifyAfterZeroHits } = await import('./reclassify');
+      const rc = await reclassifyAfterZeroHits(original, bot);
+      const reclassifyTokensIn = rc.inputTokens;
+      const reclassifyTokensOut = rc.outputTokens;
+      const reclassifyCost = rc.costUsd;
+
+      if (rc.category === 'general') {
+        yield { kind: 'status', phase: 'answer' };
+        const generalSystem = `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. De gebruiker stelt een algemene-kennis-vraag binnen ons domein (MKB, SaaS, AI, RAG, chatbots, klantcontact, ondernemerschap, marketing).
+
+Geef een KORT antwoord — maximaal 3 zinnen — over wat dit onderwerp is. Schrijf in dezelfde taal als de vraag (default Nederlands).
+
+BEGIN je antwoord ALTIJD met deze exacte zin: "Even kort: dit valt buiten onze specifieke documentatie, maar in het algemeen…"
+
+EINDIG je antwoord ALTIJD met: "Wil je weten hoe ChatManta hier specifiek mee omgaat? Vraag gerust."
+
+Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlotte antwoord. Schrijf alsof je het zelf weet.`;
+        yield {
+          kind: 'answer-start',
+          botVersion: bot.version,
+          sources: [],
+          rewrite: rewriteInfo,
+          threshold,
+        };
+        let genAccText = '';
+        let genChatInputTokens = 0;
+        let genChatOutputTokens = 0;
+        let genChatCostUsd = 0;
+        const stopGenerationGen = tMark('generation_ms');
+        try {
+          const stream = await openai().chat.completions.create({
+            model: bot.chatModel,
+            temperature: bot.chatTemperature,
+            max_tokens: 200,
+            stream: true,
+            stream_options: { include_usage: true },
+            messages: [
+              { role: 'system', content: generalSystem },
+              { role: 'user', content: original },
+            ],
+          });
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) {
+              genAccText += delta;
+              yield { kind: 'answer-delta', text: delta };
+            }
+            if (chunk.usage) {
+              genChatInputTokens = chunk.usage.prompt_tokens ?? 0;
+              genChatOutputTokens = chunk.usage.completion_tokens ?? 0;
+              genChatCostUsd =
+                (genChatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
+                (genChatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+            }
+          }
+        } catch (err) {
+          stopGenerationGen();
+          yield {
+            kind: 'error',
+            message: `general-knowledge stream failed: ${err instanceof Error ? err.message : 'unknown'}`,
+          };
+          return;
+        }
+        stopGenerationGen();
+
+        const phaseTimingsGen: PhaseTimings = {
+          embedding_ms: timings.embedding_ms ?? 0,
+          retrieval_ms: timings.retrieval_ms ?? 0,
+          generation_ms: timings.generation_ms ?? 0,
+          total_ms: Math.round(performance.now() - tPipelineStart),
+          ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
+          ...(timings.cache_lookup_ms !== undefined
+            ? { cache_lookup_ms: timings.cache_lookup_ms }
+            : {}),
+          ...(timings.decompose_ms !== undefined ? { decompose_ms: timings.decompose_ms } : {}),
+          ...(timings.hyde_ms !== undefined ? { hyde_ms: timings.hyde_ms } : {}),
+          ...(timings.expand_ms !== undefined ? { expand_ms: timings.expand_ms } : {}),
+        };
+
+        const generalResponse: ChatResponse = {
+          botVersion: bot.version,
+          tone,
+          length,
+          kind: 'answer',
+          answer: genAccText.trim(),
+          rewrite: rewriteInfo,
+          sources: [],
+          threshold,
+          embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
+          chatInputTokens: genChatInputTokens + reclassifyTokensIn,
+          chatOutputTokens: genChatOutputTokens + reclassifyTokensOut,
+          totalCostUsd:
+            embedCost +
+            preCacheEmbedCost +
+            selectiveHyDEEmbedCost +
+            rewriteCost +
+            expansionCost +
+            hydeCost +
+            decomposeCost +
+            reclassifyCost +
+            genChatCostUsd,
+          extras: {
+            category: 'general',
+            ...(top1SimInitial !== null ? { top1Sim: top1SimInitial } : {}),
+            phaseTimingsMs: phaseTimingsGen,
+          },
+        };
+        yield { kind: 'answer-done', response: generalResponse };
+        yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsGen };
+        return;
+      }
+
+      if (rc.category === 'off_topic') {
+        const OFF_TOPIC_REFUSAL =
+          'Ik help met vragen rondom ChatManta en aanverwante onderwerpen — denk aan MKB-tech, chatbots, klantcontact. Wat wil je weten?';
+        yield {
+          kind: 'fallback',
+          response: {
+            botVersion: bot.version,
+            tone,
+            length,
+            kind: 'fallback',
+            answer: OFF_TOPIC_REFUSAL,
+            reason: 'OFF_TOPIC re-classify — vraag buiten domein',
+            topSimilarity: topSim,
+            rewrite: rewriteInfo,
+            sources: allSources,
+            threshold,
+            embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
+            totalCostUsd:
+              embedCost +
+              preCacheEmbedCost +
+              selectiveHyDEEmbedCost +
+              rewriteCost +
+              expansionCost +
+              hydeCost +
+              decomposeCost +
+              reclassifyCost,
+          },
+        };
+        return;
+      }
+
+      // rc.category === 'fallback' → val door naar de gewone FALLBACK_MESSAGE.
+      yield {
+        kind: 'fallback',
+        response: {
+          botVersion: bot.version,
+          tone,
+          length,
+          kind: 'fallback',
+          answer: FALLBACK_MESSAGE,
+          reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}); re-classify=fallback.`,
+          topSimilarity: topSim,
+          rewrite: rewriteInfo,
+          sources: allSources,
+          threshold,
+          embedTokens: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens,
+          totalCostUsd:
+            embedCost +
+            preCacheEmbedCost +
+            selectiveHyDEEmbedCost +
+            rewriteCost +
+            expansionCost +
+            hydeCost +
+            decomposeCost +
+            reclassifyCost,
+        },
+      };
+      return;
+    }
+
+    // Legacy pad (v0.1-v0.4): vaste fallback zoals voorheen.
     yield {
       kind: 'fallback',
       response: {

@@ -19,3 +19,9 @@ COMMENT ON COLUMN public.eval_runs.score_route_correct IS
 
 COMMENT ON COLUMN public.eval_runs.score_meta_talk_present IS
   'V0.5 — bevat het antwoord "uit de context blijkt"-stijl meta-talk? Boolean per antwoord.';
+
+ALTER TABLE public.query_log
+  ADD COLUMN IF NOT EXISTS category text NULL;
+
+COMMENT ON COLUMN public.query_log.category IS
+  'V0.5 — route-category van de query: search, general, off_topic, smalltalk, of NULL (legacy). Gebruikt voor eval/UI om general-knowledge-antwoorden te onderscheiden van normale RAG-search.';

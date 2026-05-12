@@ -82,6 +82,9 @@ type QueryLogRow = {
   hyde_mode_actual: HydeModeResolved | null;
   hyde_ms: number | null;
   hyde_document: string | null;
+  // v0.5 route-category (migratie 0015). NULL voor legacy. Distinguishes
+  // 'general' (re-classifier disclaimer-antwoord) van normale 'search' RAG.
+  category: 'search' | 'general' | 'off_topic' | 'smalltalk' | null;
 };
 
 /**
@@ -155,6 +158,19 @@ export async function logQuery(
     // v0.4 retrieval-telemetry + claim verification uit extras (alleen
     // aanwezig op answer-kind); smalltalk en fallback krijgen defaults.
     const extras = response.kind === 'answer' ? response.extras : undefined;
+
+    // v0.5 route-category: distinguishes de weg die een query nam.
+    const category: 'search' | 'general' | 'off_topic' | 'smalltalk' | null =
+      response.kind === 'smalltalk'
+        ? 'smalltalk'
+        : response.kind === 'answer'
+        ? (extras?.category ?? 'search')
+        : response.kind === 'fallback'
+        ? response.reason?.startsWith('OFF_TOPIC')
+          ? 'off_topic'
+          : null
+        : null;
+
     const top1Sim = extras?.top1Sim ?? null;
     const hydeTriggered = extras?.hydeTriggered ?? false;
     // HyDE-modus komt uit route (al bekend voor de pipeline draait). Voor
@@ -221,6 +237,7 @@ export async function logQuery(
             hyde_mode_actual: null,
             hyde_ms: null,
             hyde_document: null,
+            category: 'smalltalk' as const,
           }
         : {
             organization_id: organizationId,
@@ -263,6 +280,7 @@ export async function logQuery(
             hyde_mode_actual: hydeModeActual,
             hyde_ms: hydeMs,
             hyde_document: hydeDocument,
+            category,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -354,6 +372,7 @@ export async function logBlockedQuery(input: {
       hyde_mode_actual: null,
       hyde_ms: null,
       hyde_document: null,
+      category: null,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);
