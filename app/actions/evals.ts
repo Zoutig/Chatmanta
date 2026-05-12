@@ -13,15 +13,12 @@
 
 import { getEvalSnapshot, type EvalSnapshot } from '@/lib/v0/server/evals-snapshot';
 import { requireV0Auth } from './_auth';
+import { actionTry, type ActionResult } from '@/lib/errors/action';
 
-export async function getEvalSnapshotAction(): Promise<
-  { ok: true; snapshot: EvalSnapshot } | { ok: false; error: string }
-> {
-  try {
+export async function getEvalSnapshotAction(): Promise<ActionResult<{ snapshot: EvalSnapshot }>> {
+  return actionTry(async () => {
     await requireV0Auth();
     const snapshot = await getEvalSnapshot();
-    return { ok: true, snapshot };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'snapshot failed' };
-  }
+    return { snapshot };
+  });
 }

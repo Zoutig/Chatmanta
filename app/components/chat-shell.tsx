@@ -10,6 +10,7 @@ import type {
   PipelinePhase,
   StreamEvent,
 } from '@/lib/v0/server/rag';
+import { fromWire, type AppErrorCode } from '@/lib/errors/app-error';
 import type { ThreadSummary } from '@/lib/v0/server/threads';
 import type { AllTimeUsage } from '@/lib/v0/server/log';
 import {
@@ -34,12 +35,22 @@ import { MantaRightPanel } from './manta/manta-right-panel';
 import { MantaAurora } from './manta/manta-aurora';
 import { TypingLoader } from './ui/loader';
 
+// Gestructureerde error-state op een Turn: bij voorkeur een AppErrorCode (UI
+// mapt naar vriendelijke tekst), met optioneel een correlation-ID. `message`
+// dekt UI-eigen fouten die geen API-code hebben ('Geen antwoord opgeslagen').
+type TurnError = {
+  code?: AppErrorCode;
+  message?: string;
+  requestId?: string;
+  retryAfterSec?: number;
+};
+
 type Turn = {
   user: string;
   response: ChatResponse | null;
   streamingText: string | null;
   livePhase: PipelinePhase | null;
-  error: string | null;
+  error: TurnError | null;
   replacementReason: string | null;
 };
 
@@ -227,8 +238,17 @@ export function ChatShell({
             }),
           });
           if (!res.ok || !res.body) {
+            // Parse de error-body als JSON; valt terug op INTERNAL als de
+            // server niet-2xx return zonder onze standaard shape.
             const text = await res.text().catch(() => '');
-            throw new Error(`HTTP ${res.status} — ${text || 'no body'}`);
+            let parsed: unknown = null;
+            try {
+              parsed = text ? JSON.parse(text) : null;
+            } catch {
+              parsed = null;
+            }
+            const wire = fromWire(parsed);
+            throw Object.assign(new Error(`HTTP ${res.status}`), { __wire: wire });
           }
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
@@ -328,7 +348,16 @@ export function ChatShell({
                 };
                 updateLastTurn({ response: final });
               } else if (event.kind === 'error') {
-                throw new Error(event.message);
+                // Stream-error met code + requestId — gooi met meta zodat de
+                // catch hieronder de gestructureerde shape kan tonen.
+                throw Object.assign(new Error(event.code), {
+                  __wire: {
+                    code: event.code,
+                    retryAfterSec: event.retryAfterSec,
+                    // requestId wordt door route.ts toegevoegd vóór enqueue.
+                    requestId: (event as { requestId?: string }).requestId,
+                  },
+                });
               }
             }
           }
@@ -339,8 +368,15 @@ export function ChatShell({
             void persistTurn(trimmed, final);
           }
         } catch (err) {
+          // Twee bronnen: HTTP-non-2xx pad en NDJSON `error`-event. Beide gooien
+          // een Error met `__wire` (code + requestId + retryAfterSec). Onbekend
+          // → val terug op INTERNAL.
+          const wire =
+            err && typeof err === 'object' && '__wire' in err
+              ? ((err as { __wire: unknown }).__wire as TurnError)
+              : { code: 'INTERNAL' as const };
           updateLastTurn({
-            error: err instanceof Error ? err.message : 'Onbekende fout',
+            error: wire,
             livePhase: null,
             streamingText: null,
           });
@@ -385,7 +421,7 @@ export function ChatShell({
             response: null,
             streamingText: null,
             livePhase: null,
-            error: 'Geen antwoord opgeslagen voor deze vraag.',
+            error: { message: 'Geen antwoord opgeslagen voor deze vraag.' },
             replacementReason: null,
           });
         }
@@ -408,7 +444,7 @@ export function ChatShell({
         response: null,
         streamingText: null,
         livePhase: null,
-        error: 'Geen antwoord opgeslagen voor deze vraag.',
+        error: { message: 'Geen antwoord opgeslagen voor deze vraag.' },
         replacementReason: null,
       });
     }
@@ -437,6 +473,15 @@ export function ChatShell({
     const last = turnsRef.current[turnsRef.current.length - 1];
     if (!last || !last.response) return;
     // Pop laatste turn, vraag opnieuw met dezelfde input.
+    setTurns((prev) => prev.slice(0, -1));
+    ask(last.user);
+  }, [ask]);
+
+  // Retry na error: andere precondities dan onRegenerate (response is null bij
+  // error). Pop de laatste turn en stel dezelfde vraag opnieuw.
+  const onRetry = useCallback(() => {
+    const last = turnsRef.current[turnsRef.current.length - 1];
+    if (!last) return;
     setTurns((prev) => prev.slice(0, -1));
     ask(last.user);
   }, [ask]);
@@ -472,7 +517,13 @@ export function ChatShell({
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <UserMessage content={t.user} />
                 {t.error ? (
-                  <ErrorMessage message={t.error} />
+                  <ErrorMessage
+                    code={t.error.code}
+                    message={t.error.message}
+                    requestId={t.error.requestId}
+                    retryAfterSec={t.error.retryAfterSec}
+                    onRetry={isLast && !pending ? onRetry : undefined}
+                  />
                 ) : t.response ? (
                   <AssistantMessage
                     response={t.response}

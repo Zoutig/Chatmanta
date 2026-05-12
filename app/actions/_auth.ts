@@ -17,11 +17,12 @@
 
 import { cookies } from 'next/headers';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
+import { AppError } from '@/lib/errors/app-error';
 
 export async function requireV0Auth(): Promise<void> {
   const jar = await cookies();
   const value = jar.get(AUTH_COOKIE.name)?.value;
   if (!verifyAuthCookieValue(value)) {
-    throw new Error('unauthorized');
+    throw new AppError('AUTH_REQUIRED', { message: 'V0 auth cookie missing or invalid' });
   }
 }

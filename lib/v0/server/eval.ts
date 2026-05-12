@@ -492,7 +492,9 @@ export async function runEvalRow(args: {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         response = ev.response;
       } else if (ev.kind === 'error') {
-        streamErr = ev.message;
+        // V0.5 errors zijn code-based; bewaar de code als technische tag voor
+        // eval_runs. Eval-judge zelf gebruikt 'response' (= null bij error).
+        streamErr = ev.code;
       }
     }
   } catch (err) {

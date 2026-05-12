@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type { User } from '@supabase/supabase-js';
+import { AppError } from '@/lib/errors/app-error';
 
 // Auth helpers for server-side route protection. Use these at the top of
 // every Server Component, Server Action, and Route Handler that needs an
@@ -9,15 +10,6 @@ import type { User } from '@supabase/supabase-js';
 // These helpers read the user's session from cookies (via `lib/supabase/server.ts`)
 // — subject to RLS, no service-role bypass. For privileged service-role work
 // after these checks pass, use the wrappers in `lib/supabase/admin.ts`.
-
-class AuthorizationError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'AuthorizationError';
-    this.status = status;
-  }
-}
 
 /**
  * Require the request to come from an authenticated user.
@@ -50,10 +42,10 @@ export async function requireOrgMember(orgId: string): Promise<User> {
     .maybeSingle();
 
   if (error) {
-    throw new AuthorizationError(`Membership lookup failed: ${error.message}`, 500);
+    throw new AppError('INTERNAL', { message: `Membership lookup failed: ${error.message}` });
   }
   if (!membership) {
-    throw new AuthorizationError('Forbidden: not a member of this organization', 403);
+    throw new AppError('AUTH_FORBIDDEN', { message: 'not a member of this organization' });
   }
   return user;
 }
@@ -76,12 +68,10 @@ export async function requireJorionAdmin(): Promise<User> {
     .maybeSingle();
 
   if (error) {
-    throw new AuthorizationError(`User lookup failed: ${error.message}`, 500);
+    throw new AppError('INTERNAL', { message: `User lookup failed: ${error.message}` });
   }
   if (!profile?.is_jorion_admin) {
-    throw new AuthorizationError('Forbidden: Jorion-admin role required', 403);
+    throw new AppError('AUTH_FORBIDDEN', { message: 'Jorion-admin role required' });
   }
   return user;
 }
-
-export { AuthorizationError };

@@ -1294,11 +1294,98 @@ body.body-fixed { overflow: hidden; }
   border: 1px solid color-mix(in oklab, var(--err) 35%, transparent);
   background: color-mix(in oklab, var(--err) 8%, transparent);
   color: var(--err);
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: var(--r-md);
   font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.msg-error .label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 8px; }
+.msg-error-head { display: flex; align-items: center; gap: 8px; }
+.msg-error .label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.msg-error-title { font-weight: 600; font-size: 13px; }
+.msg-error-body { color: color-mix(in oklab, var(--err) 70%, var(--fg)); line-height: 1.45; }
+.msg-error-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; gap: 12px; }
+.msg-error-retry {
+  background: color-mix(in oklab, var(--err) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--err) 40%, transparent);
+  color: var(--err);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+.msg-error-retry:hover { background: color-mix(in oklab, var(--err) 22%, transparent); }
+.msg-error-id {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: color-mix(in oklab, var(--err) 50%, var(--muted));
+  letter-spacing: 0.02em;
+  user-select: all;
+}
+
+/* Next.js error-boundary + 404 — full-page fallback. */
+.app-error-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.app-error-card {
+  max-width: 480px;
+  width: 100%;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: 28px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.app-error-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--err);
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in oklab, var(--err) 35%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--err) 8%, transparent);
+}
+.app-error-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+.app-error-body { color: var(--fg-muted); line-height: 1.5; font-size: 14px; }
+.app-error-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
+.app-error-retry {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.app-error-retry:hover { background: color-mix(in oklab, var(--accent) 85%, white); }
+.app-error-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+  letter-spacing: 0.02em;
+  user-select: all;
+}
 
 /* ==========================================================================
    Composer

@@ -21,51 +21,42 @@ import {
 import type { ChatResponse } from '@/lib/v0/server/rag';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
+import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 
 export async function commitTurnAction(input: {
   threadId: string | null;
   userContent: string;
   response: ChatResponse;
   botVersion: string;
-}): Promise<{ ok: true; summary: ThreadSummary } | { ok: false; error: string }> {
-  try {
+}): Promise<ActionResult<{ summary: ThreadSummary }>> {
+  return actionTry(async () => {
     const { id: organizationId } = await getActiveOrgFromCookies();
     const { summary } = await commitTurnImpl({ ...input, organizationId });
-    return { ok: true, summary };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'commit failed' };
-  }
+    return { summary };
+  });
 }
 
 export async function getThreadAction(
   threadId: string,
-): Promise<{ ok: true; detail: ThreadDetail } | { ok: false; error: string }> {
-  try {
+): Promise<ActionResult<{ detail: ThreadDetail }>> {
+  return actionTry(async () => {
     const { id: organizationId } = await getActiveOrgFromCookies();
     const detail = await getThreadImpl(threadId, organizationId);
-    if (!detail) return { ok: false, error: 'Thread niet gevonden' };
-    return { ok: true, detail };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'load failed' };
-  }
+    if (!detail) fail('NOT_FOUND', 'thread not found');
+    return { detail };
+  });
 }
 
-export async function deleteThreadAction(
-  threadId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function deleteThreadAction(threadId: string): Promise<ActionResult> {
   // commitTurnAction krijgt geen rate-limit: hij wordt door de client gefired
   // na een succesvolle chat-response, en de chat-endpoint heeft zelf al een
   // strenger limiet. Delete is wél destructief en kan zonder chat — daarom
   // wel hier afdekken.
-  const limit = await checkMutationLimit();
-  if (!limit.allowed) {
-    return { ok: false, error: limit.message };
-  }
-  try {
+  return actionTry(async () => {
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
     const { id: organizationId } = await getActiveOrgFromCookies();
     await deleteThreadImpl(threadId, organizationId);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'delete failed' };
-  }
+    return {};
+  });
 }
