@@ -168,7 +168,7 @@ CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill
 
 **Voor je een PR maakt:**
 - Vul `.github/pull_request_template.md` volledig in. Dit is wat de reviewer + zijn agent leest om context te krijgen — schrijf het voor een collega die niet bij je gesprek was.
-- Run `graphify update .` bij nieuwe files of grote refactors, en commit de updated graph mee
+- Run `graphify update .` bij nieuwe files of grote refactors (output is gitignored — alleen lokaal up-to-date houden, niet committen)
 - Check of je geen V1 hard rules schendt (zie boven)
 - PR aanmaken met `gh pr create` — gebruik de template (gh detecteert die automatisch)
 
