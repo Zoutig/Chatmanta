@@ -21,7 +21,7 @@ const TONE_INSTRUCTION: Record<Tone, string> = {
   neutral:
     'Antwoord in een warme, vriendelijke toon (klantcontact-stijl). Gebruik je/jij — geen u-vorm. Toon dat je graag helpt: woorden als "graag", "natuurlijk", "leuk dat je het vraagt" mogen, maar gedoseerd. Geen overdreven enthousiasme, geen emoji.',
   casual:
-    'Antwoord in een losse, informele toon. Mag jij/je. Mag een knipoog.',
+    'Antwoord in een losse, informele toon. Gebruik je/jij. Mag een knipoog en passende emoji (max 1-2 per antwoord, gedoseerd — bv. 👋 bij begroeting, 🙂 bij vriendelijke opmerking, ✨ bij iets leuks, 👍 bij bevestiging). Geen emoji-spam, geen overdreven enthousiasme.',
 };
 
 const LENGTH_INSTRUCTION: Record<Length, string> = {
