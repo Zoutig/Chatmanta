@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../svg-icons';
+import { Button } from '../ui/button';
 import type { Length, Tone } from '@/lib/v0/style-types';
 
 const MAX_CHARS = 1000;
@@ -84,36 +85,43 @@ export function MantaComposer({
           <span className="manta-composer-counter">
             {value.length} / {MAX_CHARS}
           </span>
-          <button
+          <Button
             type="button"
-            className="manta-send"
+            size="default"
+            data-manta-send
             disabled={!value.trim() || pending}
             onClick={submit}
             aria-label="Verstuur"
             title="Verstuur (↵)"
+            className="relative pe-12 h-9 group/send"
           >
-            <span className="manta-send-bg" aria-hidden="true" />
-            <span className="manta-send-inner">
-              <span className="manta-send-text">Verstuur</span>
-              <span className="manta-send-icons" aria-hidden="true">
-                {[6, 5, 4, 3, 2, 1, 0].map((p) => (
-                  <span
-                    key={p}
-                    className="manta-send-icon"
-                    style={{ ['--index-parent' as string]: String(p) } as React.CSSProperties}
-                  >
-                    {[2, 1, 0, 1, 2].map((v, i) => (
-                      <span
-                        key={i}
-                        className="manta-send-dot"
-                        style={{ ['--index' as string]: String(v) } as React.CSSProperties}
-                      />
-                    ))}
-                  </span>
-                ))}
-              </span>
+            <span>Verstuur</span>
+            <span
+              className="manta-send-icons pointer-events-none absolute inset-y-0 end-0 flex w-9 items-center justify-center"
+              aria-hidden="true"
+              style={{
+                backgroundColor: 'color-mix(in oklab, var(--primary-foreground) 18%, transparent)',
+                borderTopRightRadius: 'var(--radius, 0.5rem)',
+                borderBottomRightRadius: 'var(--radius, 0.5rem)',
+              }}
+            >
+              {[6, 5, 4, 3, 2, 1, 0].map((p) => (
+                <span
+                  key={p}
+                  className="manta-send-icon"
+                  style={{ ['--index-parent' as string]: String(p) } as React.CSSProperties}
+                >
+                  {[2, 1, 0, 1, 2].map((v, i) => (
+                    <span
+                      key={i}
+                      className="manta-send-dot"
+                      style={{ ['--index' as string]: String(v) } as React.CSSProperties}
+                    />
+                  ))}
+                </span>
+              ))}
             </span>
-          </button>
+          </Button>
         </div>
       </div>
       <div className="manta-composer-hint">

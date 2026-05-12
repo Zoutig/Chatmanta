@@ -31,6 +31,7 @@ import { MantaTopbar } from './manta/manta-topbar';
 import { MantaComposer } from './manta/manta-composer';
 import { MantaRightPanel } from './manta/manta-right-panel';
 import { MantaAurora } from './manta/manta-aurora';
+import { TypingLoader } from './ui/loader';
 
 type Turn = {
   user: string;
@@ -673,7 +674,20 @@ function PendingPlaceholder({
           <span>{botVersion}</span>
         </div>
       </div>
-      {phase ? <PhaseLineFromPlaceholder phase={phase} /> : null}
+      {/* Typing-dots als primaire feedback dat de bot werkt; pipeline-phase
+          klein eronder zodat we tijdens RAG-tuning nog zien waar 'ie is. */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          paddingLeft: 2,
+          marginTop: 4,
+        }}
+      >
+        <TypingLoader size="lg" />
+        {phase ? <PhaseLineFromPlaceholder phase={phase} /> : null}
+      </div>
     </div>
   );
 }
@@ -697,17 +711,15 @@ function PhaseLineFromPlaceholder({ phase }: { phase: PipelinePhase }) {
     verify: 'Antwoord verifiëren',
   };
   return (
-    <div
-      className="pipeline-trail"
+    <span
       style={{
-        background: 'var(--accent-soft)',
-        borderColor: 'color-mix(in oklab, var(--accent) 25%, transparent)',
-        color: 'var(--accent)',
+        fontSize: 11.5,
+        color: 'var(--fg-dim)',
+        letterSpacing: '0.01em',
       }}
     >
-      <span className="ripple-dot" />
-      <span style={{ fontWeight: 500 }}>{labels[phase]}…</span>
-    </div>
+      {labels[phase]}…
+    </span>
   );
 }
 

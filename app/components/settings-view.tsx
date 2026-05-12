@@ -6,13 +6,14 @@ import type { BotMeta } from './bot-dropdown';
 import { StyleSegmented } from './style-segmented';
 import type { Length, Tone } from '@/lib/v0/style-types';
 import type { HydeMode } from './use-hyde-mode';
-const HYDE_MODES: readonly HydeMode[] = ['auto', 'off', 'upfront', 'selective'];
-const HYDE_LABELS: Record<HydeMode, string> = {
-  auto: 'Auto',
-  off: 'Geen',
-  upfront: 'Upfront',
-  selective: 'Selective',
-};
+import { SegmentedRadio } from './ui/segmented-radio';
+
+const HYDE_OPTIONS: ReadonlyArray<{ value: HydeMode; label: string }> = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'off', label: 'Geen' },
+  { value: 'upfront', label: 'Upfront' },
+  { value: 'selective', label: 'Selective' },
+];
 const HYDE_HINT =
   'Auto = volg bot-versie. Override wint altijd, ook over bots waar HyDE uit staat. Wordt per query gelogd voor evaluatie.';
 
@@ -103,20 +104,12 @@ export function SettingsView({
 
       <div className="settings-section">
         <div className="settings-label">HyDE-modus</div>
-        <div className="threshold-presets" role="radiogroup" aria-label="HyDE-modus">
-          {HYDE_MODES.map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={hydeMode === m}
-              className={`threshold-preset${hydeMode === m ? ' active' : ''}`}
-              onClick={() => onHydeModeChange(m)}
-            >
-              <span className="threshold-preset-label">{HYDE_LABELS[m]}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedRadio
+          label="HyDE-modus"
+          value={hydeMode}
+          options={HYDE_OPTIONS}
+          onChange={onHydeModeChange}
+        />
         <div className="slider-hint">{HYDE_HINT}</div>
       </div>
 

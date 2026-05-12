@@ -482,6 +482,7 @@ export function AssistantMessage({
                   type="button"
                   className="followup-chip"
                   onClick={() => onFollowUp(q)}
+                  style={{ ['--i' as string]: String(i) } as React.CSSProperties}
                 >
                   <span style={{ color: 'var(--accent)', marginRight: 6 }}>↗</span>
                   {q}

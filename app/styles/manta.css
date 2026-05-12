@@ -86,6 +86,14 @@ html:not(.dark)[data-style="manta"] {
   --accent-glow: color-mix(in oklab, var(--manta-accent, #009292) 25%, transparent);
   --accent-soft: color-mix(in oklab, var(--manta-accent, #009292) 10%, transparent);
 
+  /* shadcn Button tokens overschrijven met Manta-accent */
+  --primary: var(--manta-accent, #009292);
+  --primary-foreground: #ffffff;
+  --background: var(--manta-bg);
+  --foreground: var(--manta-ink);
+  --ring: var(--manta-accent, #009292);
+  --border: var(--manta-border);
+
   --manta-r: 8px;
   --manta-r-md: 11px;
   --manta-r-lg: 14px;
@@ -124,6 +132,14 @@ html.dark[data-style="manta"] {
   --accent-2: var(--manta-accent, #009292);
   --accent-glow: color-mix(in oklab, var(--manta-accent, #009292) 30%, transparent);
   --accent-soft: color-mix(in oklab, var(--manta-accent, #009292) 16%, transparent);
+
+  /* shadcn Button tokens overschrijven met Manta-accent (dark) */
+  --primary: var(--manta-accent, #009292);
+  --primary-foreground: #ffffff;
+  --background: var(--manta-bg);
+  --foreground: var(--manta-ink);
+  --ring: var(--manta-accent, #009292);
+  --border: var(--manta-border);
 
   --manta-r: 8px;
   --manta-r-md: 11px;
@@ -1057,80 +1073,43 @@ html[data-style="manta"] .manta-threshold-preset-label {
   color: var(--manta-ink-muted);
 }
 
-/* --- Send button (button05 arrow-dots cascade) ------------------------- */
-html[data-style="manta"] .manta-send {
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: stretch;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: var(--manta-r-md);
-  background: transparent;
-  cursor: pointer;
-  color: #fff;
-  transition: transform 0.2s ease;
-  font-family: var(--font-sans);
-}
-html[data-style="manta"] .manta-send:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-html[data-style="manta"] .manta-send:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-html[data-style="manta"] .manta-send:active:not(:disabled) {
-  transform: translateY(0);
-}
-html[data-style="manta"] .manta-send-bg {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--manta-r-md);
-  background: linear-gradient(180deg, var(--manta-teal), var(--manta-teal-ink));
-  border: 1px solid var(--manta-teal-ink);
+/* --- Send button — shadcn Button outer + cascading dot-chevrons inner --
+   De Button-styling komt uit components/ui/button.tsx (variant=default,
+   accent-binding via --primary). Hieronder alleen de extra hover-lift en
+   de dot-cascade animatie. */
+html[data-style="manta"] [data-manta-send] {
+  transition: transform 0.2s ease, box-shadow 0.3s ease, filter 0.3s ease;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
-    0 1px 2px rgba(10, 15, 23, 0.1),
-    0 6px 16px -4px color-mix(in oklab, var(--manta-teal) 45%, transparent);
-  transition: filter 0.3s ease, box-shadow 0.3s ease;
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.10),
+    0 1px 2px rgba(10, 15, 23, 0.08),
+    0 6px 16px -4px color-mix(in oklab, var(--primary) 38%, transparent);
 }
-html[data-style="manta"] .manta-send:hover:not(:disabled) .manta-send-bg {
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled) {
+  transform: translateY(-1px);
   filter: brightness(1.04);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
     inset 0 -1px 0 rgba(0, 0, 0, 0.14),
     0 2px 4px rgba(10, 15, 23, 0.12),
-    0 10px 24px -4px color-mix(in oklab, var(--manta-teal) 65%, transparent);
+    0 10px 24px -4px color-mix(in oklab, var(--primary) 60%, transparent);
 }
-html[data-style="manta"] .manta-send-inner {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  height: 100%;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #fff;
+html[data-style="manta"] [data-manta-send]:active:not(:disabled) {
+  transform: translateY(0);
 }
-html[data-style="manta"] .manta-send-text {
-  position: relative;
-  z-index: 1;
-}
+
+/* Cascade-dots: 7 chevrons schuiven diagonaal naar rechts op hover. */
 html[data-style="manta"] .manta-send-icons {
   position: relative;
-  display: inline-block;
-  width: 14px;
+  width: 18px;
   height: 14px;
   overflow: hidden;
+  color: var(--primary-foreground, #fff);
 }
 html[data-style="manta"] .manta-send-icon {
   position: absolute;
   top: 0;
-  left: 0;
+  left: 2px;
   width: 14px;
   height: 14px;
   display: flex;
@@ -1138,19 +1117,19 @@ html[data-style="manta"] .manta-send-icon {
   align-items: flex-start;
   justify-content: center;
   gap: 1px;
-  transform: translateX(calc((var(--index-parent) - 0) * -120%));
+  transform: translateX(calc((var(--index-parent, 0) - 0) * -120%));
   transition: transform 0.6s cubic-bezier(0.6, 0.2, 0.2, 1);
-  transition-delay: calc(var(--index-parent) * 0.05s);
+  transition-delay: calc(var(--index-parent, 0) * 0.05s);
 }
-html[data-style="manta"] .manta-send:hover:not(:disabled) .manta-send-icon {
-  transform: translateX(calc((6 - var(--index-parent)) * 120%));
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-icon {
+  transform: translateX(calc((6 - var(--index-parent, 0)) * 120%));
 }
 html[data-style="manta"] .manta-send-dot {
   width: 2.4px;
   height: 2.4px;
   border-radius: 50%;
   background: currentColor;
-  transform: translateX(calc((2 - var(--index)) * 2.5px));
+  transform: translateX(calc((2 - var(--index, 0)) * 2.5px));
 }
 
 /* --- Right panel (activity-rail + content) ----------------------------- */
@@ -1334,6 +1313,54 @@ html[data-style="manta"] .manta-right-body {
   html[data-style="manta"] .manta-right-panel {
     display: none;
   }
+}
+
+/* --- Chat entry-animaties (Manta-only) ------------------------------- */
+/* Bubble komt smooth omhoog ipv te ploppen. */
+@keyframes manta-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+html[data-style="manta"] .msg-assistant .msg-ai-bubble,
+html[data-style="manta"] .msg-user-bubble {
+  animation: manta-bubble-in 350ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transform-origin: top left;
+}
+html[data-style="manta"] .msg-user-bubble {
+  transform-origin: top right;
+}
+
+/* Streaming "new chunk" fade-in: nieuwe tekst krijgt korte fade.
+   Werkt samen met <StreamingText> in messages.tsx die elke chunk in een
+   eigen span met data-manta-chunk-new wraps. */
+@keyframes manta-token-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+html[data-style="manta"] .manta-token-new {
+  animation: manta-token-in 220ms ease-out backwards;
+}
+
+/* Follow-up chips cascaderen in. --i wordt per chip ge-set via JSX. */
+@keyframes manta-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+html[data-style="manta"] .followup-chip {
+  animation: manta-chip-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 
 @media (prefers-reduced-motion: reduce) {
