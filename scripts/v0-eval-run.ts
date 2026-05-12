@@ -8,7 +8,8 @@
 // een half uur duurt.
 //
 // Usage:
-//   npm run eval:run                    # alle versies × alle vragen
+//   npm run eval:run                    # default: alleen 2 nieuwste versies (cost-cap)
+//   npm run eval:run -- --all           # alle versies (volledige sweep — duur)
 //   npm run eval:run -- --versions=v0.1,v0.3
 //   npm run eval:run -- --slugs=wat-doet-chatmanta,fallback-gedrag
 //   npm run eval:run -- --versions=v0.4 --hyde-mode=off       # forceer HyDE uit
@@ -19,11 +20,17 @@ import { createClient } from '@supabase/supabase-js';
 import { performance } from 'node:perf_hooks';
 
 import { runEvalRow, withConcurrency, type EvalQuestion, type EvalRunRow } from '../lib/v0/server/eval';
-import { BOTS, BOT_VERSIONS_ORDERED, resolveBot } from '../lib/v0/server/bots';
+import { BOTS, BOT_VERSIONS_ORDERED, EVAL_DEFAULT_VERSIONS, resolveBot } from '../lib/v0/server/bots';
 import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
 
 const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
-const CONCURRENCY = 5;
+// V0.5 — verlaagd van 5 naar 2 omdat de uitgebreidere judge-prompt (Task 7
+// route_correct + meta_talk_present metrics) langere judge-calls geeft, en
+// 5 parallel × ~3k tokens vlogen vroeger over gpt-4o TPM-limit van 30k/min.
+// Bij 2 parallel blijft ruim binnen budget → geen judge-parse failures meer.
+// Trade-off: eval-run duurt ~2x langer (8-12 min ipv 4 min) maar geeft
+// betrouwbare scores.
+const CONCURRENCY = 2;
 
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
@@ -58,13 +65,16 @@ if (runsArg && (!Number.isFinite(runsCount) || runsCount < 1)) {
   fail(`--smoke moet zonder = staan; --runs moet een positief geheel getal zijn (kreeg "${runsArg}")`);
 }
 const smokeMode = process.argv.includes('--smoke');
+const allVersions = process.argv.includes('--all');
 const hydeMode: HydeModeRequest = hydeModeArg
   ? (isHydeModeRequest(hydeModeArg)
       ? hydeModeArg
       : (fail(`Onbekende --hyde-mode: ${hydeModeArg}. Bekend: auto, off, upfront, selective.`) as never))
   : 'auto';
 
-const versions = versionsFilter ?? BOT_VERSIONS_ORDERED;
+// Default: alleen de twee nieuwste versies — bespaart ~50% judge-cost per run.
+// --versions= wint van --all; --all wint van de default.
+const versions = versionsFilter ?? (allVersions ? BOT_VERSIONS_ORDERED : EVAL_DEFAULT_VERSIONS);
 for (const v of versions) {
   if (!(v in BOTS)) fail(`Onbekende bot-versie: ${v}. Bekend: ${BOT_VERSIONS_ORDERED.join(', ')}`);
 }
@@ -88,7 +98,7 @@ const sb = createClient(url!, key!, {
 let qBuilder = sb
   .from('eval_questions')
   .select(
-    `id, slug, question, gold_answer, gold_facts, tags, difficulty,
+    `id, slug, question, gold_answer, gold_facts, tags, difficulty, category,
      question_type, expected_kind, must_not_contain, ideal_source_filenames,
      conversation_history`,
   )
@@ -135,8 +145,13 @@ for (const v of versions) {
 }
 
 const t0 = performance.now();
+const versionsMode = versionsFilter
+  ? ' (--versions filter)'
+  : allVersions
+    ? ' (--all sweep)'
+    : ' (default: 2 nieuwste — voor volledige sweep: --all)';
 console.log(`--- V0 Eval Run ---`);
-console.log(`  versies      : ${versions.join(', ')}`);
+console.log(`  versies      : ${versions.join(', ')}${versionsMode}`);
 const qFilter = slugsFilter ? ' (gefilterd op slug)' : smokeMode ? ' (smoke subset — 1 per question_type)' : '';
 console.log(`  vragen       : ${questions.length}${qFilter}`);
 console.log(`  runs/cell    : ${runsCount}${runsCount > 1 ? ' (multi-run voor variance)' : ''}`);

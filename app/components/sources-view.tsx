@@ -107,7 +107,6 @@ function SourceCard({
     </div>
   );
 }
-
 export function SourcesView({
   response,
   threshold,

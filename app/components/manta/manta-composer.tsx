@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { Icon } from '../svg-icons';
 import { Button as Button1 } from '../ui/button-1';
 import type { Length, Tone } from '@/lib/v0/style-types';
@@ -81,39 +81,32 @@ export function MantaComposer({
             disabled={pending}
             aria-label="Bericht"
           />
-          {value.length === 0 ? <span className="manta-composer-cursor" aria-hidden="true" /> : null}
-        </div>
-
-        <div className="manta-composer-actions">
-          <MantaThresholdPill threshold={threshold} onChange={onThresholdChange} />
-          <ToneLengthPill kind="tone" value={tone} onChange={onToneChange} />
-          <ToneLengthPill kind="length" value={length} onChange={onLengthChange} />
-          <span className="manta-composer-spacer" />
-          <span className="manta-composer-counter">
-            {value.length} / {MAX_CHARS}
-          </span>
           <Button1
             type="manta"
-            size="medium"
+            size="large"
             shape="square"
+            svgOnly
             data-manta-send
             disabled={pending}
             loading={pending}
             onClick={submit}
             aria-label="Verstuur"
             title="Verstuur (↵)"
-            className="relative overflow-hidden group/send"
-            suffix={
-              <ArrowRight
-                className="manta-send-arrow"
-                size={14}
-                strokeWidth={2.2}
-                aria-hidden="true"
-              />
-            }
+            className="relative overflow-hidden group/send shrink-0"
           >
-            Verstuur
+            <ArrowUp
+              className="manta-send-arrow"
+              size={20}
+              strokeWidth={2.4}
+              aria-hidden="true"
+            />
           </Button1>
+        </div>
+
+        <div className="manta-composer-actions">
+          <MantaThresholdPill threshold={threshold} onChange={onThresholdChange} />
+          <ToneLengthPill kind="tone" value={tone} onChange={onToneChange} />
+          <ToneLengthPill kind="length" value={length} onChange={onLengthChange} />
         </div>
       </div>
       <div className="manta-composer-hint">

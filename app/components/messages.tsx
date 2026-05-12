@@ -316,6 +316,7 @@ export function AssistantMessage({
   onCiteClick,
   onFollowUp,
   onRegenerate,
+  replacementReason,
 }: {
   response: ChatResponse;
   streamingText: string | null;
@@ -325,6 +326,7 @@ export function AssistantMessage({
   onCiteClick: (idx: number) => void;
   onFollowUp: (q: string) => void;
   onRegenerate?: () => void;
+  replacementReason?: string | null;
 }) {
   // V0.3: tijdens stream kan tekst <thinking>/<answer>/<confidence> bevatten.
   const parsedStreaming = streamingText !== null ? parseStreamingV03(streamingText) : null;
@@ -424,6 +426,26 @@ export function AssistantMessage({
             ))}
           </div>
         </details>
+      ) : null}
+
+      {replacementReason ? (
+        <div
+          style={{
+            fontSize: '0.78rem',
+            padding: '6px 10px',
+            borderRadius: 6,
+            background: 'color-mix(in oklab, var(--accent) 12%, transparent)',
+            color: 'var(--accent)',
+            marginBottom: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          aria-live="polite"
+        >
+          <span aria-hidden>↻</span>
+          <span>{replacementReason}</span>
+        </div>
       ) : null}
 
       <div className="msg-body msg-ai-bubble">
