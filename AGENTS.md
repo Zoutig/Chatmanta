@@ -56,15 +56,25 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 - **Testen, comments, error-messages** — naar wat de situatie vraagt
 - **Concrete drempels** waar de blueprint een default geeft die "valideren via testset" zegt — bijv. similarity threshold 0.7, chunk size 500, top-K 5: dat zijn startwaarden, geen wetten
 
-## Stack (V1)
+## Stack
+
+### V0 (huidig — pre-prod RAG-leerplatform)
 
 - Next.js 14+ App Router + TypeScript + shadcn/ui + Tailwind
+- React 19.2
+- OpenAI `gpt-4o-mini` (chat / pre-process / rerank / HyDE / decompose / followups)
+- OpenAI `gpt-4o` (eval-judge + low-confidence cascade)
+- OpenAI `text-embedding-3-small` (1536 dim)
 - Supabase (Postgres + Auth + Storage + pgvector), West Europe region
-- Anthropic Claude Haiku 4.5 als enige actieve LLM (OpenAI als technische fallback in `callLLM()`-laag, niet klant-zichtbaar)
-- OpenAI text-embedding-3-small (1536 dim)
-- Firecrawl (max 50 pagina's per crawl)
-- Vercel hosting + Cron
-- Sentry + UptimeRobot + Upstash Ratelimit + Resend
+- Vercel hosting + Cron — productie-project `chatmanta-nosp`, domein `www.chatmanta.nl`
+- Anthropic SDK is geïnstalleerd in `package.json` maar in V0 ongebruikt — verwarrend; negeer voor V0-werk.
+
+### V1 (gepland — Phase 4 van het Bouwplan)
+
+- Anthropic Claude Haiku 4.5 als primair, met OpenAI als technische fallback
+- Migratie-grens: nieuwe LLM-laag in `lib/ai/llm.ts` met provider-abstractie (`MODEL_COSTS` voor EUR-billing; V0 gebruikt naast deze tabel een eigen `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`)
+- Firecrawl — Phase 5 (website crawler, max 50 pagina's per crawl)
+- Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
 
 ## Bouwfase-volgorde
 
