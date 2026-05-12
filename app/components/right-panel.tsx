@@ -5,6 +5,7 @@ import type { ChatResponse, DocSummary } from '@/lib/v0/server/rag';
 import { SourcesView } from './sources-view';
 import { DocsView } from './docs-view';
 import { SettingsView } from './settings-view';
+import { OpmaakView } from './opmaak-view';
 import { EmbedView } from './embed-view';
 import { EvalsView } from './evals-view';
 import { LatencyView } from './latency-view';
@@ -14,7 +15,16 @@ import type { BotMeta } from './bot-dropdown';
 import type { Length, Tone } from '@/lib/v0/style-types';
 import type { HydeMode } from './use-hyde-mode';
 
-export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals' | 'latency';
+export type RightTab =
+  | 'sources'
+  | 'claims'
+  | 'docs'
+  | 'settings'
+  | 'opmaak'
+  | 'prompt'
+  | 'embed'
+  | 'evals'
+  | 'latency';
 
 export function RightPanel({
   tab,
@@ -124,6 +134,9 @@ export function RightPanel({
         <Tab tab="settings" active={tab === 'settings'} onClick={onTabChange}>
           Instellingen
         </Tab>
+        <Tab tab="opmaak" active={tab === 'opmaak'} onClick={onTabChange}>
+          Opmaak
+        </Tab>
         <Tab tab="prompt" active={tab === 'prompt'} onClick={onTabChange}>
           Prompt
         </Tab>
@@ -167,6 +180,7 @@ export function RightPanel({
             botFlags={botFlags}
           />
         ) : null}
+        {tab === 'opmaak' ? <OpmaakView /> : null}
         {tab === 'prompt' ? (
           <PromptView
             botVersion={botVersion}

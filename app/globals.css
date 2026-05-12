@@ -29,6 +29,14 @@
   --accent-soft: #4dd6e818;
   --accent-fg: #050b14;
 
+  /* shadcn-Button tokens (dark default). Zie commentaar in html:not(.dark). */
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
+  --background: var(--bg-elev);
+  --foreground: var(--fg);
+  --ring: var(--accent);
+  --border: var(--border-strong);
+
   --warn: #f0b86e;
   --err: #f06e8c;
   --ok: #7be0a3;
@@ -66,6 +74,16 @@ html:not(.dark) {
   --accent-glow: #0891b230;
   --accent-soft: #0891b210;
   --accent-fg: #ffffff;
+
+  /* shadcn-Button tokens — gebruikt door app/components/ui/button.tsx via
+     bg-[var(--primary)] etc. In Manta-scope wordt --primary geherbind
+     aan --manta-accent zodat de Button automatisch meekleurt. */
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
+  --background: var(--bg-elev);
+  --foreground: var(--fg);
+  --ring: var(--accent);
+  --border: var(--border-strong);
 }
 
 /* ==========================================================================
@@ -2008,6 +2026,18 @@ body.body-fixed { overflow: hidden; }
   to { opacity: 1; transform: translateY(0); }
 }
 .slide-in { animation: slideIn 0.25s ease-out backwards; }
+
+/* Typing-dots animation (gebruikt door <TypingLoader>). */
+@keyframes manta-typing {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-2px); opacity: 1; }
+}
+
+/* Vercel-Geist fade-spin (gebruikt door <Spinner> in button-1). */
+@keyframes fade-spin {
+  0% { opacity: 0.15; }
+  100% { opacity: 1; }
+}
 
 @keyframes phaseRipple {
   0% { transform: scale(1); opacity: 0.6; }

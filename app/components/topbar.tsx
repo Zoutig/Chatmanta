@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { Icon } from './svg-icons';
-import { ThemeSwitch } from './theme-switch';
+import { AnimatedThemeToggler } from './ui/animated-theme-toggler';
 import { BotDropdown, type BotMeta } from './bot-dropdown';
 
 export function Topbar({
@@ -37,7 +37,7 @@ export function Topbar({
       <div className="topbar-right">
         <BotDropdown current={botVersion} bots={bots} />
         <div style={{ width: 6 }} />
-        <ThemeSwitch />
+        <AnimatedThemeToggler />
         <button
           type="button"
           aria-pressed={rightOpen}
