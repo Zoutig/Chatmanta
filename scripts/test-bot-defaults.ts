@@ -24,6 +24,11 @@ assert.equal(v05.claimVerification, true, 'v0.5 moet claimVerification=true (van
 
 assert.match(v05.systemPrompt, /Vermijd meta-talk over je interne bronnen/);
 assert.doesNotMatch(v05.systemPrompt, /VERBODEN in je antwoord/);
+// V0.5 trust-boundary tegen user-fact-injection (chat-history poisoning)
+assert.match(v05.systemPrompt, /TRUST-BOUNDARY/);
+assert.match(v05.systemPrompt, /eerdere uitspraken van de gebruiker.*NIET als feiten/);
+assert.match(v05.preProcessSystem, /KRITIEKE UITSLUITING/);
+assert.match(v05.preProcessSystem, /FEIT beweert/);
 
 assert.equal(LATEST_BOT_VERSION, 'v0.5', 'LATEST_BOT_VERSION moet v0.5 zijn');
 assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5']);
