@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { Icon } from '../svg-icons';
 import { Button } from '../ui/button';
 import type { Length, Tone } from '@/lib/v0/style-types';
@@ -97,29 +98,16 @@ export function MantaComposer({
           >
             <span>Verstuur</span>
             <span
-              className="manta-send-icons pointer-events-none absolute inset-y-0 end-0 flex w-9 items-center justify-center"
+              className="manta-send-overlay pointer-events-none absolute inset-y-0 end-0 flex w-9 items-center justify-center"
               aria-hidden="true"
-              style={{
-                backgroundColor: 'color-mix(in oklab, var(--primary-foreground) 18%, transparent)',
-                borderTopRightRadius: 'var(--radius, 0.5rem)',
-                borderBottomRightRadius: 'var(--radius, 0.5rem)',
-              }}
             >
-              {[6, 5, 4, 3, 2, 1, 0].map((p) => (
-                <span
-                  key={p}
-                  className="manta-send-icon"
-                  style={{ ['--index-parent' as string]: String(p) } as React.CSSProperties}
-                >
-                  {[2, 1, 0, 1, 2].map((v, i) => (
-                    <span
-                      key={i}
-                      className="manta-send-dot"
-                      style={{ ['--index' as string]: String(v) } as React.CSSProperties}
-                    />
-                  ))}
-                </span>
-              ))}
+              <ChevronRight className="manta-send-chevron" size={16} strokeWidth={2.2} />
+              <ChevronRight
+                className="manta-send-chevron-ghost"
+                size={16}
+                strokeWidth={2.2}
+                aria-hidden="true"
+              />
             </span>
           </Button>
         </div>

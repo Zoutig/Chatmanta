@@ -1073,10 +1073,10 @@ html[data-style="manta"] .manta-threshold-preset-label {
   color: var(--manta-ink-muted);
 }
 
-/* --- Send button — shadcn Button outer + cascading dot-chevrons inner --
-   De Button-styling komt uit components/ui/button.tsx (variant=default,
-   accent-binding via --primary). Hieronder alleen de extra hover-lift en
-   de dot-cascade animatie. */
+/* --- Send button — shadcn Button outer + ChevronRight overlay -----------
+   Button-base via components/ui/button.tsx (accent via --primary).
+   Animatie: chevron schuift rechts op hover, een ghost-chevron faded
+   tegelijk in op de oorspronkelijke positie → "wegvliegen"-effect. */
 html[data-style="manta"] [data-manta-send] {
   transition: transform 0.2s ease, box-shadow 0.3s ease, filter 0.3s ease;
   box-shadow:
@@ -1098,38 +1098,50 @@ html[data-style="manta"] [data-manta-send]:active:not(:disabled) {
   transform: translateY(0);
 }
 
-/* Cascade-dots: 7 chevrons schuiven diagonaal naar rechts op hover. */
-html[data-style="manta"] .manta-send-icons {
-  position: relative;
-  width: 18px;
-  height: 14px;
-  overflow: hidden;
+/* Right-side overlay (= bg-primary-foreground/15 zonder Tailwind utility-
+   detection issue), fungeert als visuele "send-affordance". */
+html[data-style="manta"] .manta-send-overlay {
+  background: color-mix(in oklab, var(--primary-foreground, #fff) 15%, transparent);
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
   color: var(--primary-foreground, #fff);
+  transition: background 0.25s ease;
 }
-html[data-style="manta"] .manta-send-icon {
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-overlay {
+  background: color-mix(in oklab, var(--primary-foreground, #fff) 22%, transparent);
+}
+
+/* Echte chevron — schuift rechts op hover + iets feller. */
+html[data-style="manta"] .manta-send-chevron {
+  opacity: 0.75;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-chevron {
+  transform: translateX(5px);
+  opacity: 1;
+}
+html[data-style="manta"] [data-manta-send]:active:not(:disabled) .manta-send-chevron {
+  transform: translateX(8px);
+  opacity: 0;
+}
+
+/* Ghost chevron — absolute op de original positie, faded in op hover. */
+html[data-style="manta"] .manta-send-chevron-ghost {
   position: absolute;
-  top: 0;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 1px;
-  transform: translateX(calc((var(--index-parent, 0) - 0) * -120%));
-  transition: transform 0.6s cubic-bezier(0.6, 0.2, 0.2, 1);
-  transition-delay: calc(var(--index-parent, 0) * 0.05s);
+  opacity: 0;
+  transform: translateX(0);
+  transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
 }
-html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-icon {
-  transform: translateX(calc((6 - var(--index-parent, 0)) * 120%));
+html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-chevron-ghost {
+  opacity: 0.35;
+  transform: translateX(0);
 }
-html[data-style="manta"] .manta-send-dot {
-  width: 2.4px;
-  height: 2.4px;
-  border-radius: 50%;
-  background: currentColor;
-  transform: translateX(calc((2 - var(--index, 0)) * 2.5px));
+html[data-style="manta"] [data-manta-send]:active:not(:disabled) .manta-send-chevron-ghost {
+  opacity: 0.6;
+  transform: translateX(2px);
+  transition-duration: 0.12s;
 }
 
 /* --- Right panel (activity-rail + content) ----------------------------- */
@@ -1315,12 +1327,60 @@ html[data-style="manta"] .manta-right-body {
   }
 }
 
+/* --- Empty-state voorbeeld-cards (Manta-only) ------------------------ */
+/* Subtiel accent-tintje zodat tekst leesbaar is op witte chat-bg. */
+html:not(.dark)[data-style="manta"] .empty-card {
+  background: color-mix(in oklab, var(--manta-accent) 4%, var(--manta-bg-soft));
+  border: 1px solid color-mix(in oklab, var(--manta-accent) 12%, var(--manta-border));
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+html:not(.dark)[data-style="manta"] .empty-card:hover {
+  background: color-mix(in oklab, var(--manta-accent) 8%, var(--manta-bg-soft));
+  border-color: color-mix(in oklab, var(--manta-accent) 24%, var(--manta-border));
+  transform: translateY(-1px);
+}
+html.dark[data-style="manta"] .empty-card {
+  background: color-mix(in oklab, var(--manta-accent) 7%, var(--manta-bg-soft));
+  border: 1px solid color-mix(in oklab, var(--manta-accent) 16%, var(--manta-border));
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+html.dark[data-style="manta"] .empty-card:hover {
+  background: color-mix(in oklab, var(--manta-accent) 12%, var(--manta-bg-soft));
+  border-color: color-mix(in oklab, var(--manta-accent) 28%, var(--manta-border));
+  transform: translateY(-1px);
+}
+
+/* --- Chat-bubbel visuele styling (Manta-only) ----------------------- */
+/* AI-antwoord krijgt een duidelijk chat-cloud uiterlijk ipv platte tekst. */
+html:not(.dark)[data-style="manta"] .msg-ai-bubble {
+  background: color-mix(in oklab, var(--manta-accent) 4%, var(--manta-bg-soft));
+  border: 1px solid color-mix(in oklab, var(--manta-accent) 14%, var(--manta-border));
+  border-radius: 16px;
+  border-top-left-radius: 4px;
+  padding: 12px 16px;
+  box-shadow:
+    0 1px 0 rgba(10, 15, 23, 0.02),
+    0 4px 16px -8px color-mix(in oklab, var(--manta-accent) 22%, transparent);
+  max-width: calc(100% - 24px);
+}
+html.dark[data-style="manta"] .msg-ai-bubble {
+  background: color-mix(in oklab, var(--manta-accent) 6%, var(--manta-bg-soft));
+  border: 1px solid color-mix(in oklab, var(--manta-accent) 16%, var(--manta-border));
+  border-radius: 16px;
+  border-top-left-radius: 4px;
+  padding: 12px 16px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.20),
+    0 6px 18px -8px color-mix(in oklab, var(--manta-accent) 28%, transparent);
+  max-width: calc(100% - 24px);
+}
+
 /* --- Chat entry-animaties (Manta-only) ------------------------------- */
-/* Bubble komt smooth omhoog ipv te ploppen. */
+/* Bubble komt smooth omhoog ipv te ploppen — langzamer + zachter dan rd5. */
 @keyframes manta-bubble-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.97);
+    transform: translateY(16px) scale(0.95);
   }
   to {
     opacity: 1;
@@ -1329,16 +1389,15 @@ html[data-style="manta"] .manta-right-body {
 }
 html[data-style="manta"] .msg-assistant .msg-ai-bubble,
 html[data-style="manta"] .msg-user-bubble {
-  animation: manta-bubble-in 350ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-  transform-origin: top left;
+  animation: manta-bubble-in 450ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transform-origin: bottom left;
 }
 html[data-style="manta"] .msg-user-bubble {
-  transform-origin: top right;
+  transform-origin: bottom right;
 }
 
-/* Streaming "new chunk" fade-in: nieuwe tekst krijgt korte fade.
-   Werkt samen met <StreamingText> in messages.tsx die elke chunk in een
-   eigen span met data-manta-chunk-new wraps. */
+/* Streaming "new chunk" fade-in. Optioneel — momenteel niet actief, klaar
+   voor toekomstig <StreamingText>-pattern. */
 @keyframes manta-token-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -1347,11 +1406,11 @@ html[data-style="manta"] .manta-token-new {
   animation: manta-token-in 220ms ease-out backwards;
 }
 
-/* Follow-up chips cascaderen in. --i wordt per chip ge-set via JSX. */
+/* Follow-up chips cascaderen in — langer + opvallender stagger. */
 @keyframes manta-chip-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.96);
+    transform: translateY(12px) scale(0.92);
   }
   to {
     opacity: 1;
@@ -1359,8 +1418,8 @@ html[data-style="manta"] .manta-token-new {
   }
 }
 html[data-style="manta"] .followup-chip {
-  animation: manta-chip-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-  animation-delay: calc(var(--i, 0) * 60ms);
+  animation: manta-chip-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms);
 }
 
 @media (prefers-reduced-motion: reduce) {

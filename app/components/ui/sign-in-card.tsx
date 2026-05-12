@@ -56,41 +56,41 @@ export function SignInCard({ next }: { next: string }) {
 
       {/* Subtle noise overlay */}
       <div
-        className="absolute inset-0 opacity-[0.03] mix-blend-soft-light pointer-events-none"
+        className="absolute inset-0 opacity-[0.04] mix-blend-soft-light pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-          backgroundSize: '200px 200px',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+          backgroundSize: '140px 140px',
         }}
       />
 
-      {/* Top + bottom radial glows */}
+      {/* Top + bottom radial glows — kleinere blurs voorkomen color-banding */}
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[120vh] h-[60vh] rounded-b-[50%] blur-[80px]"
-        style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 20%, transparent)' }}
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[120vh] h-[45vh] rounded-b-[50%] blur-[40px]"
+        style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 28%, transparent)' }}
       />
       <motion.div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[100vh] h-[60vh] rounded-b-full blur-[60px]"
-        style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 18%, transparent)' }}
-        animate={{ opacity: [0.15, 0.3, 0.15], scale: [0.98, 1.02, 0.98] }}
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[100vh] h-[45vh] rounded-b-full blur-[32px]"
+        style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 24%, transparent)' }}
+        animate={{ opacity: [0.18, 0.32, 0.18], scale: [0.97, 1.03, 0.97] }}
         transition={{ duration: 8, repeat: Infinity, repeatType: 'mirror' }}
       />
       <motion.div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[90vh] h-[90vh] rounded-t-full blur-[60px]"
-        style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 20%, transparent)' }}
-        animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.1, 1] }}
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[90vh] h-[70vh] rounded-t-full blur-[36px]"
+        style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 26%, transparent)' }}
+        animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.08, 1] }}
         transition={{ duration: 6, repeat: Infinity, repeatType: 'mirror', delay: 1 }}
       />
 
-      {/* Animated white glow-spots */}
-      <div className="absolute left-1/4 top-1/4 w-96 h-96 bg-white/5 rounded-full blur-[100px] animate-pulse opacity-40" />
-      <div className="absolute right-1/4 bottom-1/4 w-96 h-96 bg-white/5 rounded-full blur-[100px] animate-pulse delay-1000 opacity-40" />
+      {/* Animated white glow-spots — kleinere blur + lagere opacity */}
+      <div className="absolute left-1/4 top-1/4 w-80 h-80 bg-white/5 rounded-full blur-[56px] animate-pulse opacity-30" />
+      <div className="absolute right-1/4 bottom-1/4 w-80 h-80 bg-white/5 rounded-full blur-[56px] animate-pulse delay-1000 opacity-30" />
 
       {/* Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
-        className="w-full max-w-sm relative z-10 px-4"
+        className="w-full max-w-md relative z-10 px-4"
         style={{ perspective: 1500 }}
       >
         <motion.div
