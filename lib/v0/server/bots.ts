@@ -110,6 +110,27 @@ export type BotConfig = {
    * meer retries. Negeerd als claimRegenerateEnabled=false.
    */
   claimRegenerateThreshold: number;
+  /**
+   * v0.5: actieve latency-budgeting in de streaming-pipeline. Bij true wordt
+   * de cumulative elapsed time per fase gecheckt; optionele dure stappen
+   * (rerank, claim-verify, claim-regenerate, followups, query expansion,
+   * decompose, HyDE) worden overgeslagen wanneer elapsed >= latencyBudgetMs.
+   * Bij false: gedrag identiek aan v0.4 (geen skip). Default false.
+   */
+  latencyBudgetEnabled: boolean;
+  /**
+   * v0.5: target-budget in ms voor de full pipeline. Overschrijding triggert
+   * skip van optionele fases (zie latencyBudgetEnabled). 8000 = 8s, conform
+   * de spec p95 SLA. Geen effect als latencyBudgetEnabled=false.
+   */
+  latencyBudgetMs: number;
+  /**
+   * v0.5: harde cap waarna we — als nog niet in een streaming-fase — direct
+   * terugvallen op een latency-fallback response (kind='fallback', reason
+   * 'latency hard cap'). Geen partial answer. 12000 = 12s = 1.5x het soft
+   * budget. Geen effect als latencyBudgetEnabled=false.
+   */
+  latencyHardCapMs: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -144,6 +165,9 @@ const V0_1: BotConfig = {
   generalKnowledgeEnabled: false,
   claimRegenerateEnabled: false,
   claimRegenerateThreshold: 0.5,
+  latencyBudgetEnabled: false,
+  latencyBudgetMs: 8000,
+  latencyHardCapMs: 12000,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
@@ -416,6 +440,14 @@ const V0_5: BotConfig = {
   // <30% van claims geverifieerd is (= heel zwakke ondersteuning). Hoger blijft
   // initial-answer staan.
   claimRegenerateThreshold: 0.3,
+  // V0.5 latency-budgeting AAN — optionele dure stappen (rerank, claim-verify,
+  // claim-regenerate, followups, query expansion/decompose, HyDE) worden
+  // overgeslagen wanneer cumulative elapsed >= latencyBudgetMs. Hard-cap als
+  // safety-net bij echte hang-cases. V0_1 default false — gedrag-identiek
+  // aan v0.4 voor oudere versies.
+  latencyBudgetEnabled: true,
+  latencyBudgetMs: 8000,
+  latencyHardCapMs: 12000,
   systemPrompt: `Je bent een vriendelijke, behulpzame klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon (baseline — wordt verfijnd door de STIJL-suffix onderaan):

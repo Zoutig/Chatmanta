@@ -888,6 +888,20 @@ export type V03Extras = {
    * ChatResponse.kind-waarden ('fallback' resp. 'smalltalk').
    */
   category?: 'search' | 'general';
+  /**
+   * v0.5: latency-budget telemetrie. Aanwezig wanneer minimaal één optionele
+   * fase werd overgeslagen omdat de cumulative elapsed time de
+   * bot.latencyBudgetMs drempel passeerde. Veld leeg/afwezig = budget niet
+   * overschreden (= geen skip).
+   */
+  latencyBudgetExceeded?: {
+    /** Cumulative elapsed time in ms toen de eerste skip plaatsvond. */
+    elapsed: number;
+    /** Budget-drempel in ms (= bot.latencyBudgetMs op moment van de run). */
+    budgetMs: number;
+    /** Lijst van fase-namen die zijn overgeslagen (volgorde = chronologisch). */
+    skipped: string[];
+  };
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -1225,6 +1239,21 @@ export async function* runRagQueryStreaming(input: {
       timings[key] = ((timings[key] as number | undefined) ?? 0) + dt;
     };
   };
+  // V0.5 latency-budgeting: bij bot.latencyBudgetEnabled wordt elke optionele
+  // fase pas uitgevoerd als de cumulative elapsed onder bot.latencyBudgetMs
+  // zit. Skipped fases worden gelogd in `skippedPhases` (komt mee in extras).
+  // Bij !latencyBudgetEnabled (v0.1-v0.4): withinBudget() retourneert altijd
+  // true — gedrag identiek aan voorheen.
+  const skippedPhases: string[] = [];
+  const elapsedMs = (): number => Math.round(performance.now() - tPipelineStart);
+  const withinBudget = (): boolean => {
+    if (!bot.latencyBudgetEnabled) return true;
+    return elapsedMs() < bot.latencyBudgetMs;
+  };
+  const markSkipped = (phase: string): false => {
+    skippedPhases.push(phase);
+    return false;
+  };
 
   // Bouw de samengestelde system prompt één keer; gebruikt door main answer-call
   // en (v0.3) cascade-call. Pre-processor en helper-LLM-calls (rerank, hyde,
@@ -1328,7 +1357,7 @@ export async function* runRagQueryStreaming(input: {
   let decomposeCost = 0;
   let decomposeInputTokens = 0;
   let decomposeOutputTokens = 0;
-  if (bot.queryDecomposition) {
+  if (bot.queryDecomposition && (withinBudget() || markSkipped('queryDecomposition'))) {
     yield { kind: 'status', phase: 'decompose' };
     const stopDec = tMark('decompose_ms');
     const dec = await decomposeQuery(queryForEmbed, bot);
@@ -1369,7 +1398,7 @@ export async function* runRagQueryStreaming(input: {
 
   // Multi-query expansion (alleen bot.multiQueryCount > 1; v0.2 pad).
   let mq;
-  if (bot.multiQueryCount > 1) {
+  if (bot.multiQueryCount > 1 && (withinBudget() || markSkipped('multiQueryExpand'))) {
     yield { kind: 'status', phase: 'expand' };
     const stopExp = tMark('expand_ms');
     mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
@@ -1676,7 +1705,7 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
   let rerankInputTokens = 0;
   let rerankOutputTokens = 0;
   let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
-  if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
+  if (bot.rerank === 'llm' && aboveThreshold.length > 1 && (withinBudget() || markSkipped('rerank'))) {
     yield { kind: 'status', phase: 'rerank' };
     const stopRerank = tMark('rerank_ms');
     const candidates = aboveThreshold.slice(0, V0_RAG_DEFAULTS.MAX_RERANK_INPUT);
@@ -1787,7 +1816,8 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
       bot.cascadeOnLowConfidence &&
       confidence !== null &&
       confidence < 0.5 &&
-      bot.cascadeModel !== bot.chatModel
+      bot.cascadeModel !== bot.chatModel &&
+      (withinBudget() || markSkipped('cascade'))
     ) {
       yield { kind: 'status', phase: 'cascade' };
       const stopCascade = tMark('cascade_ms');
@@ -1827,7 +1857,7 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
   let claimVerifyEmbedCost = 0;
   let claimsList: ClaimVerificationData[] | undefined;
   let claimConfidence: number | undefined;
-  if (bot.claimVerification) {
+  if (bot.claimVerification && (withinBudget() || markSkipped('claimVerification'))) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
     try {
@@ -1934,6 +1964,17 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
       ...(bot.claimVerification
         ? { claimVerificationThreshold: bot.claimVerificationThreshold }
         : {}),
+      // V0.5 latency-budget — alleen aanwezig als minimaal één fase werd
+      // overgeslagen. Bij empty skippedPhases = budget niet overschreden.
+      ...(skippedPhases.length > 0
+        ? {
+            latencyBudgetExceeded: {
+              elapsed: elapsedMs(),
+              budgetMs: bot.latencyBudgetMs,
+              skipped: [...skippedPhases],
+            },
+          }
+        : {}),
       phaseTimingsMs: phaseTimingsAtAnswer,
     },
   };
@@ -1959,7 +2000,8 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
     typeof claimConfidence === 'number' &&
     Number.isFinite(claimConfidence) &&
     claimConfidence < bot.claimRegenerateThreshold &&
-    claimsList && claimsList.length > 0
+    claimsList && claimsList.length > 0 &&
+    (withinBudget() || markSkipped('claimRegenerate'))
   ) {
     const REGENERATE_SYSTEM_ADDON = `
 
@@ -2027,7 +2069,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   // V0.5: hard timeout op 5s zodat een trage OpenAI-call niet de finale
   // metrics-done blokkeert. Bij timeout of throw → emit followups-done met
   // lege array + error-string.
-  if (bot.generateFollowUps) {
+  if (bot.generateFollowUps && (withinBudget() || markSkipped('followups'))) {
     yield { kind: 'status', phase: 'followups' };
     const stopFollowups = tMark('followups_ms');
     let followupsError: string | null = null;
