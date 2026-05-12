@@ -56,12 +56,23 @@ export type EvalQuestion = {
   gold_facts: string[];
   tags: string[];
   difficulty: 'easy' | 'medium' | 'hard';
+  /**
+   * v0.5: verwacht bot-gedrag voor route-correctness eval. NULL voor oude
+   * cases die nog niet hercategoriseerd zijn. Judge-prompt valt terug op
+   * "geen verwachting" wanneer null.
+   */
+  category?: 'search' | 'general' | 'off_topic' | 'smalltalk' | null;
 };
 
 export type JudgeScores = {
   correctness: number | null;
   completeness: number | null;
   grounding: number | null;
+  /** v0.5: was de route (smalltalk/search/general/off_topic) correct? Null
+      als de question.category onbekend was (geen verwachting). */
+  routeCorrect: boolean | null;
+  /** v0.5: bevat het antwoord meta-talk "uit de context blijkt"-stijl? */
+  metaTalkPresent: boolean | null;
   reasoning: string;
   parseError: boolean;
   inputTokens: number;
@@ -83,6 +94,8 @@ export type EvalRunRow = {
   score_correctness: number | null;
   score_completeness: number | null;
   score_grounding: number | null;
+  score_route_correct: boolean | null;
+  score_meta_talk_present: boolean | null;
   judge_reasoning: string;
   judge_parse_error: boolean;
   judge_cost_usd: number;
@@ -97,9 +110,9 @@ export type EvalRunRow = {
 // ---------------------------------------------------------------------------
 // Judge prompt
 // ---------------------------------------------------------------------------
-const JUDGE_SYSTEM = `Je bent een onafhankelijke evaluator van een Nederlandse RAG-chatbot voor MKB-klanten. Je geeft drie scores van 0-5 en een korte motivatie.
+const JUDGE_SYSTEM = `Je bent een onafhankelijke evaluator van een Nederlandse RAG-chatbot voor MKB-klanten. Je geeft drie scores van 0-5 PLUS twee booleans, en een korte motivatie.
 
-DRIE DIMENSIES:
+DRIE DIMENSIES (0-5):
 
 1. correctness (0-5): klopt het bot-antwoord met het gold_answer?
    - 5: feitelijk volledig correct, geen tegenspraak.
@@ -112,19 +125,36 @@ DRIE DIMENSIES:
    - Anders proportioneel: 5 = alle facts terug te vinden, 4 = één mist, 3 = twee missen, 2 = drie missen, 1 = vier+ missen, 0 = geen enkele fact terug.
 
 3. grounding (0-5): worden alleen feiten genoemd die uit de bot-sources volgen?
-   - 5: elk feit traceerbaar naar een source, geen hallucinatie, geen meta-talk ("uit de context blijkt", "in de documenten staat" etc).
+   - 5: elk feit traceerbaar naar een source, geen hallucinatie, geen meta-talk.
    - 3: één klein feit niet in sources of subtiele meta-talk.
    - 1: meerdere niet-onderbouwde feiten.
    - 0: hallucinatie van specifieke claims (bedragen, namen, percentages, datums).
    - SPECIAAL — smalltalk-antwoord (bot_kind="smalltalk", geen sources): grounding=5 (geen feiten te onderbouwen).
    - SPECIAAL — fallback-antwoord (bot_kind="fallback"): grounding=5 (refusal = geen claims om ungroundedly te asserten).
 
+TWEE BOOLEANS (true/false):
+
+4. route_correct (boolean): klopt de bot-route met de verwachte CATEGORY?
+   - Als CATEGORY = "search": bot moet kind=answer of fallback geven met sources. Smalltalk = false.
+   - Als CATEGORY = "general": bot moet kind=answer geven met een ALGEMENE uitleg + een disclaimer ("buiten onze specifieke documentatie"). Een refusal (FALLBACK_MESSAGE) = false. Een normaal in-docs antwoord met sources = false.
+   - Als CATEGORY = "off_topic": bot moet een polite refusal geven die NIET het verzonnen specifiek antwoord op het off-topic onderwerp bevat. Een gedicht over zalmen = false. "Ik help met vragen rond ChatManta…" = true.
+   - Als CATEGORY = "smalltalk": bot_kind moet "smalltalk" zijn. Anders = false.
+   - Als CATEGORY ontbreekt of "(geen verwachting)": geef null (niet meten).
+
+5. meta_talk_present (boolean): bevat het antwoord meta-talk-stijl?
+   - true wanneer het antwoord zinnen bevat als "uit de context blijkt", "volgens de documenten", "in deze passage staat", "op basis van de informatie", "zoals beschreven in".
+   - false wanneer het antwoord de feiten direct verwerkt zonder meta-verwijzing.
+   - Natuurlijke nuance ("Onze documentatie beschrijft…") = false, dat is GEEN meta-talk.
+   - Voor smalltalk/fallback waar geen sources zijn: meet dit alleen als het antwoord zinnen bevat over interne bronnen.
+
 OUTPUT — STRIKT JSON, geen markdown, geen prose buiten het JSON-object:
 {
   "correctness": <int 0-5>,
   "completeness": <int 0-5>,
   "grounding": <int 0-5>,
-  "reasoning": "<2-4 zinnen Nederlands — noem specifiek welke gold_facts ontbraken of welke claims niet in de sources te vinden waren>"
+  "route_correct": <bool of null>,
+  "meta_talk_present": <bool>,
+  "reasoning": "<2-4 zinnen Nederlands — noem specifiek welke gold_facts ontbraken of welke claims niet in de sources te vinden waren, en of er meta-talk was>"
 }`;
 
 function buildJudgeUserPrompt(args: {
@@ -146,18 +176,34 @@ function buildJudgeUserPrompt(args: {
     sources = response.sources;
   }
 
+  // V0.5: prefereer parentExcerpt boven contentExcerpt — de judge ziet dan
+  // dezelfde tekst die de answer-LLM kreeg (parent ~800 chars ipv small chunk
+  // ~240). Bij missing parentExcerpt (oudere bot/cache, of chunk zonder
+  // parent_chunk_id) val terug op contentExcerpt. Bij parentExcerpt===null
+  // (hydratie-fail) ook fallback.
   const sourceLines = sources.length === 0
     ? '(geen sources — bot deed geen retrieval)'
     : sources
-        .map((s, i) => `[${i + 1}] ${s.filename ?? 'onbekend'}: ${s.contentExcerpt}`)
+        .map((s, i) => {
+          const text = s.parentExcerpt ? s.parentExcerpt : s.contentExcerpt;
+          return `[${i + 1}] ${s.filename ?? 'onbekend'}: ${text}`;
+        })
         .join('\n');
 
   const factsBlock = question.gold_facts.length === 0
     ? '(leeg — score completeness puur op de strekking van gold_answer)'
     : question.gold_facts.map((f) => `- ${f}`).join('\n');
 
+  const categoryBlock =
+    question.category === undefined || question.category === null
+      ? '(geen verwachting — route_correct mag null)'
+      : question.category;
+
   return `VRAAG (difficulty=${question.difficulty}):
 ${question.question}
+
+CATEGORY:
+${categoryBlock}
 
 GOLD_ANSWER:
 ${question.gold_answer}
@@ -173,7 +219,7 @@ ${sourceLines}
 BOT_ANSWER:
 ${botAnswer}
 
-Beoordeel volgens de drie dimensies. Geef alleen JSON terug.`;
+Beoordeel volgens de drie 0-5-dimensies + twee booleans. Geef alleen JSON terug.`;
 }
 
 function clampScore(n: unknown): number | null {
@@ -216,6 +262,8 @@ export async function runJudge(args: {
       correctness: null,
       completeness: null,
       grounding: null,
+      routeCorrect: null,
+      metaTalkPresent: null,
       reasoning: `judge API error: ${err instanceof Error ? err.message : 'unknown'}`,
       parseError: true,
       inputTokens: 0,
@@ -240,6 +288,8 @@ export async function runJudge(args: {
       correctness: null,
       completeness: null,
       grounding: null,
+      routeCorrect: null,
+      metaTalkPresent: null,
       reasoning: `judge parse error — raw: ${raw.slice(0, 300)}`,
       parseError: true,
       inputTokens,
@@ -253,6 +303,18 @@ export async function runJudge(args: {
   const correctness = clampScore(obj.correctness);
   const completeness = clampScore(obj.completeness);
   const grounding = clampScore(obj.grounding);
+  // v0.5: nieuwe booleans. route_correct mag null zijn (geen verwachting);
+  // meta_talk_present is verplicht boolean — null = parse-error.
+  const routeCorrectRaw = obj.route_correct;
+  const routeCorrect =
+    routeCorrectRaw === null
+      ? null
+      : typeof routeCorrectRaw === 'boolean'
+      ? routeCorrectRaw
+      : null;
+  const metaTalkRaw = obj.meta_talk_present;
+  const metaTalkPresent =
+    typeof metaTalkRaw === 'boolean' ? metaTalkRaw : null;
   const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : '';
 
   if (correctness === null || completeness === null || grounding === null) {
@@ -260,6 +322,8 @@ export async function runJudge(args: {
       correctness,
       completeness,
       grounding,
+      routeCorrect,
+      metaTalkPresent,
       reasoning: reasoning || `judge produced invalid scores in JSON: ${raw.slice(0, 300)}`,
       parseError: true,
       inputTokens,
@@ -273,6 +337,8 @@ export async function runJudge(args: {
     correctness,
     completeness,
     grounding,
+    routeCorrect,
+    metaTalkPresent,
     reasoning,
     parseError: false,
     inputTokens,
@@ -345,6 +411,8 @@ export async function runEvalRow(args: {
       score_correctness: 0,
       score_completeness: 0,
       score_grounding: 0,
+      score_route_correct: null,
+      score_meta_talk_present: null,
       judge_reasoning: 'bot threw exception — niet beoordeeld door judge',
       judge_parse_error: true,
       judge_cost_usd: 0,
@@ -380,6 +448,8 @@ export async function runEvalRow(args: {
     score_correctness: judge.correctness,
     score_completeness: judge.completeness,
     score_grounding: judge.grounding,
+    score_route_correct: judge.routeCorrect,
+    score_meta_talk_present: judge.metaTalkPresent,
     judge_reasoning: judge.reasoning,
     judge_parse_error: judge.parseError,
     judge_cost_usd: judge.costUsd,

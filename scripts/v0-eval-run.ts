@@ -81,7 +81,7 @@ const sb = createClient(url!, key!, {
 // ---------------------------------------------------------------------------
 let qBuilder = sb
   .from('eval_questions')
-  .select('id, slug, question, gold_answer, gold_facts, tags, difficulty')
+  .select('id, slug, question, gold_answer, gold_facts, tags, difficulty, category')
   .eq('organization_id', DEV_ORG_ID)
   .order('slug');
 
