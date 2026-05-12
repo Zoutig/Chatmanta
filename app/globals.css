@@ -841,11 +841,13 @@ body.body-fixed { overflow: hidden; }
   transition: all 0.12s ease;
 }
 .bot-pill:hover { border-color: var(--border-strong); background: var(--surface-3); }
+/* Focus indicator zonder halo: alleen border-color naar accent — geen outline,
+   geen box-shadow. Keyboard users zien de pill-rand wisselen van kleur. */
+.bot-pill:focus { outline: none; }
 .bot-pill:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--accent) 65%, transparent);
-  outline-offset: 2px;
+  border-color: var(--accent);
+  background: var(--surface-3);
 }
-.bot-pill:focus:not(:focus-visible) { outline: none; }
 .bot-pill::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
