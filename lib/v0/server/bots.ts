@@ -89,6 +89,14 @@ export type BotConfig = {
    * lijn met de blueprint similarity threshold. Validatie via eval-corpus.
    */
   claimVerificationThreshold: number;
+  /**
+   * Eval budget — max gemiddelde bot-latency in ms voor de eval-runner. Bij
+   * overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
+   * omdat v0.4 met cascade nooit dezelfde latency haalt als v0.1.
+   */
+  evalBudgetMs: number;
+  /** Eval budget — max gemiddelde bot-cost in USD per query. */
+  evalBudgetUsd: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -120,6 +128,8 @@ const V0_1: BotConfig = {
   selectiveHyDETrigger: 0.5,
   claimVerification: false,
   claimVerificationThreshold: 0.7,
+  evalBudgetMs: 2500,
+  evalBudgetUsd: 0.0010,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
@@ -175,6 +185,8 @@ const V0_2: BotConfig = {
     'Zelfde persona als v0.1, maar genereert 3 zoekvragen-varianten en herrangschikt de chunks met een extra LLM-pass. Hogere kosten, betere recall en precision op vage vragen.',
   multiQueryCount: 3,
   rerank: 'llm',
+  evalBudgetMs: 3500,
+  evalBudgetUsd: 0.0020,
 };
 
 // ---------------------------------------------------------------------------
@@ -204,6 +216,8 @@ const V0_3: BotConfig = {
   cascadeOnLowConfidence: true,
   cascadeModel: 'gpt-4o',
   cacheEnabled: true,
+  evalBudgetMs: 7000,
+  evalBudgetUsd: 0.0050,
   // V0.3 antwoord-prompt: vraagt structured output met citations + confidence.
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
@@ -267,6 +281,8 @@ const V0_4: BotConfig = {
   parentDocumentRetrieval: true,
   selectiveHyDE: true,
   selectiveHyDETrigger: 0.5,
+  evalBudgetMs: 6000,
+  evalBudgetUsd: 0.0045,
   // useHyDE blijft true: het BETEKENT nu "HyDE is beschikbaar"; selectiveHyDE
   // bepaalt of die beschikbaarheid daadwerkelijk getriggerd wordt per query.
   claimVerification: true,
