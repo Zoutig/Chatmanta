@@ -47,7 +47,13 @@ export function MantaComposer({
 
   function submit() {
     const v = value.trim();
-    if (!v || pending) return;
+    if (pending) return;
+    if (!v) {
+      // Bij lege input: focus de textarea ipv de Verstuur-knop disabled tonen
+      // (verwarrend voor user, cursor leest als 'verboden').
+      taRef.current?.focus();
+      return;
+    }
     onSend(v);
     setValue('');
   }
@@ -91,7 +97,7 @@ export function MantaComposer({
             size="medium"
             shape="square"
             data-manta-send
-            disabled={!value.trim() || pending}
+            disabled={pending}
             loading={pending}
             onClick={submit}
             aria-label="Verstuur"
