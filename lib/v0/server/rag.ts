@@ -1142,12 +1142,15 @@ export type StreamEvent =
   // V0.4: followups draaien nu ná answer-done zodat de gebruiker het antwoord
   // direct ziet i.p.v. ~0.8s te wachten. Dit event levert de followUps na
   // (samen met de extra token/cost-deltas die nog niet in answer-done zaten).
+  // V0.5: error-veld optioneel — gevuld bij timeout of LLM-fout zodat
+  // monitoring de failure-mode kan onderscheiden van "nooit aangeroepen".
   | {
       kind: 'followups-done';
       followUps: string[];
       inputTokens: number;
       outputTokens: number;
       costUsd: number;
+      error?: string;
     }
   // V0.4: finale phaseTimingsMs nadat followups_ms is gemeten. Consumer moet
   // hierop wachten vóór logQuery anders mist query_log de followups-fase.
@@ -1737,17 +1740,32 @@ export async function* runRagQueryStreaming(input: {
 
   // Followups na de answer-done yield — gebruiker ziet antwoord al, followups
   // verschijnen kort daarna in de UI via het followups-done event.
+  // V0.5: hard timeout op 5s zodat een trage OpenAI-call niet de finale
+  // metrics-done blokkeert. Bij timeout of throw → emit followups-done met
+  // lege array + error-string.
   if (bot.generateFollowUps) {
     yield { kind: 'status', phase: 'followups' };
     const stopFollowups = tMark('followups_ms');
+    let followupsError: string | null = null;
     try {
-      const fu = await generateFollowUps(original, finalAnswerText, bot);
+      const FOLLOWUPS_TIMEOUT_MS = 5_000;
+      const timeoutSignal = new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`followups timeout (${FOLLOWUPS_TIMEOUT_MS}ms)`)),
+          FOLLOWUPS_TIMEOUT_MS,
+        );
+      });
+      const fu = await Promise.race([
+        generateFollowUps(original, finalAnswerText, bot),
+        timeoutSignal,
+      ]);
       followUps = fu.followUps;
       followUpsInputTokens = fu.inputTokens;
       followUpsOutputTokens = fu.outputTokens;
       followUpsCost = fu.costUsd;
     } catch (err) {
-      console.warn('[followups] failed:', err);
+      followupsError = err instanceof Error ? err.message : 'unknown';
+      console.warn('[followups] failed:', followupsError);
     }
     stopFollowups();
     yield {
@@ -1756,6 +1774,7 @@ export async function* runRagQueryStreaming(input: {
       inputTokens: followUpsInputTokens,
       outputTokens: followUpsOutputTokens,
       costUsd: followUpsCost,
+      ...(followupsError ? { error: followupsError } : {}),
     };
   }
 
