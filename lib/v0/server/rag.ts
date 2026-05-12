@@ -799,6 +799,13 @@ export type ChatSource = {
   filename: string | null;
   similarity: number;
   contentExcerpt: string;
+  /**
+   * Parent-chunk excerpt (~1500 chars) wanneer parent-document retrieval
+   * actief was. UI gebruikt `contentExcerpt` voor precision; de eval-judge
+   * krijgt deze parent doorgespeeld zodat hij dezelfde context ziet als
+   * de LLM en grounding eerlijk kan beoordelen.
+   */
+  parentExcerpt?: string;
 };
 
 export type ChatRewriteInfo = {
@@ -910,8 +917,10 @@ export type ChatResponse =
     });
 
 const EXCERPT_CHARS = 240;
+const PARENT_EXCERPT_CHARS = 1500;
 
 function toSource(c: RetrievedChunk): ChatSource {
+  const parent = c.parent_content ?? null;
   return {
     id: c.id,
     filename: c.filename,
@@ -920,6 +929,11 @@ function toSource(c: RetrievedChunk): ChatSource {
       c.content.length > EXCERPT_CHARS
         ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
         : c.content,
+    parentExcerpt: parent
+      ? parent.length > PARENT_EXCERPT_CHARS
+        ? parent.slice(0, PARENT_EXCERPT_CHARS).trimEnd() + '…'
+        : parent
+      : undefined,
   };
 }
 

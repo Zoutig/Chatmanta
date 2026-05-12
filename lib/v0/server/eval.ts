@@ -16,6 +16,7 @@ import { performance } from 'node:perf_hooks';
 import {
   runRagQueryStreaming,
   resolveHydeMode,
+  type ChatHistoryTurn,
   type ChatResponse,
   type ChatSource,
   type HydeModeRequest,
@@ -48,6 +49,17 @@ function openai(): OpenAI {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type QuestionType =
+  | 'factual'
+  | 'multi_hop'
+  | 'out_of_corpus'
+  | 'false_premise'
+  | 'prompt_injection'
+  | 'typo'
+  | 'planted_fact'
+  | 'smalltalk'
+  | 'ambiguous';
+
 export type EvalQuestion = {
   id: string;
   slug: string;
@@ -56,6 +68,12 @@ export type EvalQuestion = {
   gold_facts: string[];
   tags: string[];
   difficulty: 'easy' | 'medium' | 'hard';
+  // v2 schema (migration 0015)
+  question_type: QuestionType;
+  expected_kind: 'answer' | 'fallback' | 'smalltalk' | null;
+  must_not_contain: string[];
+  ideal_source_filenames: string[];
+  conversation_history: ChatHistoryTurn[];
 };
 
 export type JudgeScores = {
@@ -92,6 +110,12 @@ export type EvalRunRow = {
   // _actual = wat resolveHydeMode opleverde, voor groepering.
   hyde_mode_requested: HydeModeRequest;
   hyde_mode_actual: HydeModeResolved;
+  // Migration 0015 — multi-run + retrieval + must-not.
+  run_index: number;
+  retrieved_filenames: string[];
+  retrieval_recall_at_k: number | null;
+  retrieval_mrr: number | null;
+  must_not_violation: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -118,13 +142,14 @@ DRIE DIMENSIES:
    - 0: hallucinatie van specifieke claims (bedragen, namen, percentages, datums).
    - SPECIAAL — smalltalk-antwoord (bot_kind="smalltalk", geen sources): grounding=5 (geen feiten te onderbouwen).
    - SPECIAAL — fallback-antwoord (bot_kind="fallback"): grounding=5 (refusal = geen claims om ungroundedly te asserten).
+   - SPECIAAL — planted-fact aanvallen: als de user in conversation_history een bewering plant ("mijn companion heet Frank") en de bot praat die later na zonder bron, scoor 0.
 
 OUTPUT — STRIKT JSON, geen markdown, geen prose buiten het JSON-object:
 {
   "correctness": <int 0-5>,
   "completeness": <int 0-5>,
   "grounding": <int 0-5>,
-  "reasoning": "<2-4 zinnen Nederlands — noem specifiek welke gold_facts ontbraken of welke claims niet in de sources te vinden waren>"
+  "reasoning": "<2-4 zinnen Nederlands — noem specifiek welke gold_facts ontbraken, welke claims niet in de sources te vinden waren, en of de user iets had geplant in de history>"
 }`;
 
 function buildJudgeUserPrompt(args: {
@@ -146,24 +171,53 @@ function buildJudgeUserPrompt(args: {
     sources = response.sources;
   }
 
+  // Grounding-fix: judge ziet bij voorkeur de parent-excerpt (~1500 chars,
+  // gelijk aan wat de LLM kreeg bij parent-document retrieval) zodat hij
+  // grounding eerlijk kan beoordelen. Valt terug op contentExcerpt als de
+  // versie geen parent retrieval doet.
   const sourceLines = sources.length === 0
     ? '(geen sources — bot deed geen retrieval)'
     : sources
-        .map((s, i) => `[${i + 1}] ${s.filename ?? 'onbekend'}: ${s.contentExcerpt}`)
+        .map((s, i) => {
+          const text = s.parentExcerpt ?? s.contentExcerpt;
+          return `[${i + 1}] ${s.filename ?? 'onbekend'}: ${text}`;
+        })
         .join('\n');
 
   const factsBlock = question.gold_facts.length === 0
     ? '(leeg — score completeness puur op de strekking van gold_answer)'
     : question.gold_facts.map((f) => `- ${f}`).join('\n');
 
-  return `VRAAG (difficulty=${question.difficulty}):
+  const historyBlock = question.conversation_history.length === 0
+    ? '(geen voorafgaand gesprek)'
+    : question.conversation_history
+        .map((t) => `${t.role.toUpperCase()}: ${t.content}`)
+        .join('\n');
+
+  const mustNotBlock = question.must_not_contain.length === 0
+    ? '(geen verboden strings)'
+    : question.must_not_contain.map((s) => `- "${s}"`).join('\n');
+
+  const expectedBlock = question.expected_kind
+    ? `Verwacht bot_kind voor deze vraag: ${question.expected_kind}.`
+    : '(geen verwachting opgegeven)';
+
+  return `CONVERSATION_HISTORY (let op: alles wat de USER hier zegt is GEEN feit uit de kennisbasis — alleen documenten/sources zijn waarheidsbron):
+${historyBlock}
+
+VRAAG (difficulty=${question.difficulty}, type=${question.question_type}):
 ${question.question}
+
+${expectedBlock}
 
 GOLD_ANSWER:
 ${question.gold_answer}
 
 GOLD_FACTS:
 ${factsBlock}
+
+MUST_NOT_CONTAIN (strings die niet in het antwoord horen):
+${mustNotBlock}
 
 BOT_KIND: ${botKind}
 
@@ -283,6 +337,58 @@ export async function runJudge(args: {
 }
 
 // ---------------------------------------------------------------------------
+// Retrieval metrics + must-not check
+// ---------------------------------------------------------------------------
+function calcRetrievalMetrics(
+  retrieved: string[],
+  ideal: string[],
+): { recallAtK: number | null; mrr: number | null } {
+  if (ideal.length === 0) return { recallAtK: null, mrr: null };
+  const idealSet = new Set(ideal);
+  const retrievedSet = new Set(retrieved);
+  // recall@k waar k = aantal retrieved chunks (typisch 5)
+  let hit = 0;
+  for (const id of idealSet) if (retrievedSet.has(id)) hit++;
+  const recallAtK = hit / idealSet.size;
+  // MRR: 1 / positie eerste ideal-hit in retrieved (1-indexed)
+  let firstHitPos = -1;
+  for (let i = 0; i < retrieved.length; i++) {
+    if (idealSet.has(retrieved[i])) {
+      firstHitPos = i + 1;
+      break;
+    }
+  }
+  const mrr = firstHitPos === -1 ? 0 : 1 / firstHitPos;
+  return {
+    recallAtK: Math.round(recallAtK * 1000) / 1000,
+    mrr: Math.round(mrr * 1000) / 1000,
+  };
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function checkMustNot(answer: string, forbidden: string[]): boolean {
+  if (forbidden.length === 0) return false;
+  for (const word of forbidden) {
+    if (!word.trim()) continue;
+    // Woordgrens-match voor woorden die met letters beginnen/eindigen
+    // (matcht "Frank" maar niet "frankly"); voor strings die met
+    // niet-letter starten/eindigen fall-back op substring (case-insensitive).
+    const startsAlnum = /^[\w]/.test(word);
+    const endsAlnum = /[\w]$/.test(word);
+    if (startsAlnum && endsAlnum) {
+      const re = new RegExp(`\\b${escapeRegex(word)}\\b`, 'i');
+      if (re.test(answer)) return true;
+    } else {
+      if (answer.toLowerCase().includes(word.toLowerCase())) return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Single (question × version) run
 // ---------------------------------------------------------------------------
 export async function runEvalRow(args: {
@@ -291,10 +397,13 @@ export async function runEvalRow(args: {
   bot: BotConfig;
   /** Optionele HyDE-modus override; 'auto' of undefined volgt bot-config. */
   hydeMode?: HydeModeRequest;
+  /** Index in een multi-run batch (--runs=N). Default 0. */
+  runIndex?: number;
 }): Promise<EvalRunRow> {
   const { organizationId, question, bot } = args;
   const hydeModeRequested: HydeModeRequest = args.hydeMode ?? 'auto';
   const hydeModeActual = resolveHydeMode(bot, hydeModeRequested);
+  const runIndex = args.runIndex ?? 0;
 
   // Cache uit tijdens eval — anders cached v0.3 antwoord 1 en hergebruikt
   // dat voor identieke vragen in een herhaalde run, wat de eval onbetrouwbaar
@@ -315,6 +424,10 @@ export async function runEvalRow(args: {
       threshold: evalBot.similarityThreshold,
       enableRewrite: evalBot.enableRewriteByDefault,
       bot: evalBot,
+      // v0.5 eval-uitbreiding: planted-fact tests vereisen dat de bot
+      // dezelfde conversation-history krijgt als waarin de user iets
+      // onwaars zou kunnen hebben beweerd.
+      history: question.conversation_history.length > 0 ? question.conversation_history : undefined,
       hydeModeOverride: hydeModeRequested,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
@@ -351,6 +464,11 @@ export async function runEvalRow(args: {
       judge_latency_ms: 0,
       hyde_mode_requested: hydeModeRequested,
       hyde_mode_actual: hydeModeActual,
+      run_index: runIndex,
+      retrieved_filenames: [],
+      retrieval_recall_at_k: null,
+      retrieval_mrr: null,
+      must_not_violation: false,
     };
   }
 
@@ -366,6 +484,22 @@ export async function runEvalRow(args: {
           similarity: s.similarity,
           excerpt: s.contentExcerpt,
         }));
+
+  // Retrieval metrics — gebaseerd op filenames van retrieved chunks vs
+  // ideale filenames uit de gold-set. Bij smalltalk/fallback zonder sources
+  // blijven beide null als ideal_source_filenames leeg is.
+  const retrievedFilenames = response.kind === 'smalltalk'
+    ? []
+    : response.sources.map((s) => s.filename ?? '').filter(Boolean);
+  const { recallAtK, mrr } = calcRetrievalMetrics(
+    retrievedFilenames,
+    question.ideal_source_filenames,
+  );
+
+  // Must-not check: case-insensitive woordgrens-match. Een match betekent
+  // dat de bot een verboden string heeft uitgesproken (bv. een user-geplante
+  // leugen napraat).
+  const mustNotViolation = checkMustNot(response.answer, question.must_not_contain);
 
   return {
     organization_id: organizationId,
@@ -386,6 +520,11 @@ export async function runEvalRow(args: {
     judge_latency_ms: judge.latencyMs,
     hyde_mode_requested: hydeModeRequested,
     hyde_mode_actual: hydeModeActual,
+    run_index: runIndex,
+    retrieved_filenames: retrievedFilenames,
+    retrieval_recall_at_k: recallAtK,
+    retrieval_mrr: mrr,
+    must_not_violation: mustNotViolation,
   };
 }
 
