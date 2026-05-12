@@ -1,28 +1,34 @@
-// Verifieert dat alle bestaande v0.1-v0.4 bots de nieuwe v0.5-velden hebben
-// op false/false/0.5 (default).
+// Verifieert dat v0.1-v0.4 de v0.5-velden geërfd hebben op false/false/0.5
+// (append-only respect) en dat v0.5 zelf de flags WEL op true/true/0.5 heeft.
 // Run: npx tsx scripts/test-bot-defaults.ts
 
 import { strict as assert } from 'node:assert';
-import { BOTS, BOT_VERSIONS_ORDERED } from '../lib/v0/server/bots';
+import { BOTS, BOT_VERSIONS_ORDERED, LATEST_BOT_VERSION } from '../lib/v0/server/bots';
 
-for (const v of BOT_VERSIONS_ORDERED) {
+const legacyVersions = ['v0.1', 'v0.2', 'v0.3', 'v0.4'];
+for (const v of legacyVersions) {
   const bot = BOTS[v];
-  assert.equal(
-    bot.generalKnowledgeEnabled,
-    false,
-    `${v} moet generalKnowledgeEnabled=false hebben (default uit V0_1 spread)`,
-  );
-  assert.equal(
-    bot.claimRegenerateEnabled,
-    false,
-    `${v} moet claimRegenerateEnabled=false hebben`,
-  );
-  assert.equal(
-    bot.claimRegenerateThreshold,
-    0.5,
-    `${v} moet claimRegenerateThreshold=0.5 hebben`,
-  );
+  assert.ok(bot, `${v} ontbreekt uit BOTS-registry`);
+  assert.equal(bot.generalKnowledgeEnabled, false, `${v} append-only: generalKnowledgeEnabled moet false zijn`);
+  assert.equal(bot.claimRegenerateEnabled, false, `${v} append-only: claimRegenerateEnabled moet false zijn`);
+  assert.equal(bot.claimRegenerateThreshold, 0.5, `${v} append-only: claimRegenerateThreshold moet 0.5 zijn`);
 }
 
-console.log(`✓ Alle ${BOT_VERSIONS_ORDERED.length} bots hebben de v0.5 defaults correct geërfd:`);
-for (const v of BOT_VERSIONS_ORDERED) console.log(`  - ${v}`);
+const v05 = BOTS['v0.5'];
+assert.ok(v05, 'v0.5 ontbreekt uit BOTS-registry');
+assert.equal(v05.generalKnowledgeEnabled, true, 'v0.5 moet generalKnowledgeEnabled=true hebben');
+assert.equal(v05.claimRegenerateEnabled, true, 'v0.5 moet claimRegenerateEnabled=true hebben');
+assert.equal(v05.claimRegenerateThreshold, 0.5, 'v0.5 moet claimRegenerateThreshold=0.5 hebben');
+assert.equal(v05.parentDocumentRetrieval, true, 'v0.5 moet parentDocumentRetrieval=true (van v0.4) hebben');
+assert.equal(v05.claimVerification, true, 'v0.5 moet claimVerification=true (van v0.4) hebben');
+
+assert.match(v05.systemPrompt, /Vermijd meta-talk over je interne bronnen/);
+assert.doesNotMatch(v05.systemPrompt, /VERBODEN in je antwoord/);
+
+assert.equal(LATEST_BOT_VERSION, 'v0.5', 'LATEST_BOT_VERSION moet v0.5 zijn');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5']);
+
+console.log(`✓ Legacy v0.1-v0.4 hebben de v0.5-velden op default (false/false/0.5)`);
+console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
+console.log(`✓ v0.5 systemPrompt heeft soft word-ban (geen zwartelijst)`);
+console.log(`✓ LATEST_BOT_VERSION = v0.5, BOT_VERSIONS_ORDERED bevat v0.5`);
