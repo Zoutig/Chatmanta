@@ -8,13 +8,14 @@ import { SettingsView } from './settings-view';
 import { EmbedView } from './embed-view';
 import { EvalsView } from './evals-view';
 import { LatencyView } from './latency-view';
+import { KnowledgeGapView } from './knowledge-gap-view';
 import { PromptView } from './prompt-view';
 import { ClaimsView } from './claims-view';
 import type { BotMeta } from './bot-dropdown';
 import type { Length, Tone } from '@/lib/v0/style-types';
 import type { HydeMode } from './use-hyde-mode';
 
-export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals' | 'latency';
+export type RightTab = 'sources' | 'claims' | 'docs' | 'settings' | 'prompt' | 'embed' | 'evals' | 'latency' | 'gaps';
 
 export function RightPanel({
   tab,
@@ -136,6 +137,9 @@ export function RightPanel({
         <Tab tab="latency" active={tab === 'latency'} onClick={onTabChange}>
           Latency
         </Tab>
+        <Tab tab="gaps" active={tab === 'gaps'} onClick={onTabChange}>
+          Gaps
+        </Tab>
       </div>
       <div className="right-content">
         {tab === 'sources' ? (
@@ -178,6 +182,7 @@ export function RightPanel({
         {tab === 'embed' ? <EmbedView botVersion={botVersion} /> : null}
         {tab === 'evals' ? <EvalsView /> : null}
         {tab === 'latency' ? <LatencyView organizationId={activeOrgId} /> : null}
+        {tab === 'gaps' ? <KnowledgeGapView organizationId={activeOrgId} /> : null}
       </div>
     </aside>
   );
