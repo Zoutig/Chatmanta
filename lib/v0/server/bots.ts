@@ -410,7 +410,12 @@ const V0_5: BotConfig = {
     'v0.4 + general-knowledge router (binnen domein) + claim-regenerate bij verifiedRatio<0.5 + soft word-ban + parent-excerpt fix in eval + cache 0.93 + cascade-cost lookup + followups 5s timeout.',
   generalKnowledgeEnabled: true,
   claimRegenerateEnabled: true,
-  claimRegenerateThreshold: 0.5,
+  // V0.5 tune: 0.3 ipv 0.5 — eerste eval-run liet zien dat regenerate op te
+  // veel queries triggerde, met als bijwerking lichte completeness-drops omdat
+  // de stricter prompt feiten weglaat. 0.3 betekent: alleen regenereren als
+  // <30% van claims geverifieerd is (= heel zwakke ondersteuning). Hoger blijft
+  // initial-answer staan.
+  claimRegenerateThreshold: 0.3,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:

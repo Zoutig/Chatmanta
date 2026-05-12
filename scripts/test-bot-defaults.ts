@@ -18,7 +18,7 @@ const v05 = BOTS['v0.5'];
 assert.ok(v05, 'v0.5 ontbreekt uit BOTS-registry');
 assert.equal(v05.generalKnowledgeEnabled, true, 'v0.5 moet generalKnowledgeEnabled=true hebben');
 assert.equal(v05.claimRegenerateEnabled, true, 'v0.5 moet claimRegenerateEnabled=true hebben');
-assert.equal(v05.claimRegenerateThreshold, 0.5, 'v0.5 moet claimRegenerateThreshold=0.5 hebben');
+assert.equal(v05.claimRegenerateThreshold, 0.3, 'v0.5 moet claimRegenerateThreshold=0.3 hebben (post-tune van 0.5)');
 assert.equal(v05.parentDocumentRetrieval, true, 'v0.5 moet parentDocumentRetrieval=true (van v0.4) hebben');
 assert.equal(v05.claimVerification, true, 'v0.5 moet claimVerification=true (van v0.4) hebben');
 
