@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { ChatResponse } from '@/lib/v0/server/rag';
+import type { ChatResponse, ChatSource } from '@/lib/v0/server/rag';
 
 export function SourcesView({
   response,
@@ -74,7 +74,7 @@ export function SourcesView({
               <div className="source-file">{s.filename ?? '(geen filename)'}</div>
               <div className="source-sim">{s.similarity.toFixed(3)}</div>
             </div>
-            <div className="source-excerpt">{s.contentExcerpt}</div>
+            <SourceBody source={s} />
             <div className="sim-meter">
               <div className="sim-meter-fill" style={{ width: `${s.similarity * 100}%` }} />
               <div
@@ -86,6 +86,41 @@ export function SourcesView({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * V0.5 source-body: toont parentExcerpt als beschikbaar (wat de LLM zag), met
+ * een kleine "kern-match"-strook eronder met de small-chunk contentExcerpt.
+ * Wanneer parentExcerpt afwezig (oude bot, chunk zonder parent), val terug op
+ * alleen contentExcerpt — geen "kern-match"-label want er is geen
+ * onderscheid.
+ */
+function SourceBody({ source }: { source: ChatSource }) {
+  const hasParent =
+    typeof source.parentExcerpt === 'string' && source.parentExcerpt.length > 0;
+  if (!hasParent) {
+    return <div className="source-excerpt">{source.contentExcerpt}</div>;
+  }
+  return (
+    <div className="source-excerpt source-excerpt-parent">
+      <div className="source-excerpt-parent-text">{source.parentExcerpt}</div>
+      <div className="source-kern-match">
+        <span
+          style={{
+            display: 'inline-block',
+            fontSize: '0.7rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            color: 'var(--fg-faint)',
+            marginRight: 8,
+          }}
+        >
+          kern-match
+        </span>
+        <span style={{ color: 'var(--fg)' }}>{source.contentExcerpt}</span>
+      </div>
     </div>
   );
 }
