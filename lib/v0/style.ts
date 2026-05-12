@@ -19,7 +19,7 @@ const TONE_INSTRUCTION: Record<Tone, string> = {
   formal:
     'Antwoord in een formele, zakelijke toon. Gebruik u-vorm waar passend.',
   neutral:
-    'Antwoord in een neutrale, professioneel-vriendelijke toon (de standaard).',
+    'Antwoord in een warme, vriendelijke toon (klantcontact-stijl). Gebruik je/jij — geen u-vorm. Toon dat je graag helpt: woorden als "graag", "natuurlijk", "leuk dat je het vraagt" mogen, maar gedoseerd. Geen overdreven enthousiasme, geen emoji.',
   casual:
     'Antwoord in een losse, informele toon. Mag jij/je. Mag een knipoog.',
 };
