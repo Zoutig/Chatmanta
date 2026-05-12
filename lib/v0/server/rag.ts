@@ -17,6 +17,21 @@ import type { BotConfig } from './bots';
 import { buildSystemPrompt } from '../style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
 import { costForModelUsd } from '../../ai/llm';
+import { AppError, type AppErrorCode } from '../../errors/app-error';
+
+// OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
+// title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
+function classifyLlmError(err: unknown): 'LLM_TIMEOUT' | 'LLM_UNAVAILABLE' {
+  if (err && typeof err === 'object') {
+    const name = (err as { name?: unknown }).name;
+    const msg = (err as { message?: unknown }).message;
+    const text = `${typeof name === 'string' ? name : ''} ${typeof msg === 'string' ? msg : ''}`.toLowerCase();
+    if (text.includes('timeout') || text.includes('timed out') || text.includes('aborted')) {
+      return 'LLM_TIMEOUT';
+    }
+  }
+  return 'LLM_UNAVAILABLE';
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -62,7 +77,7 @@ let _openai: OpenAI | null = null;
 function openai(): OpenAI {
   if (_openai) return _openai;
   const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error('OPENAI_API_KEY missing');
+  if (!key) throw new AppError('INTERNAL', { message: 'OPENAI_API_KEY missing' });
   _openai = new OpenAI({ apiKey: key });
   return _openai;
 }
@@ -72,7 +87,7 @@ function supabase(): SupabaseClient {
   if (_supabase) return _supabase;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
+  if (!url || !key) throw new AppError('INTERNAL', { message: 'Supabase env vars missing' });
   _supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -129,7 +144,9 @@ export async function embedTexts(strings: string[]): Promise<EmbedResult> {
     );
     for (const item of resp.data) {
       if (item.embedding.length !== EMBED_DIM) {
-        throw new Error(`expected ${EMBED_DIM}-dim, got ${item.embedding.length}`);
+        throw new AppError('EMBED_FAILED', {
+          message: `expected ${EMBED_DIM}-dim, got ${item.embedding.length}`,
+        });
       }
       vectors.push(item.embedding);
     }
@@ -1053,11 +1070,13 @@ export async function runRagQuery({
   length?: Length;
 }): Promise<ChatResponse> {
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
-    throw new Error('threshold must be in [0, 1]');
+    throw new AppError('INPUT_INVALID', { message: 'threshold must be in [0, 1]' });
   }
   const original = question.trim();
-  if (original.length === 0) throw new Error('question is empty');
-  if (original.length > 1000) throw new Error('question too long (max 1000 chars)');
+  if (original.length === 0) throw new AppError('INPUT_INVALID', { message: 'question is empty' });
+  if (original.length > 1000) {
+    throw new AppError('INPUT_INVALID', { message: 'question too long (max 1000 chars)' });
+  }
 
   const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
 
@@ -1242,7 +1261,7 @@ export type StreamEvent =
       reason: 'claim-regenerate';
       regeneratedVerifiedRatio: number | null;
     }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; code: AppErrorCode; retryAfterSec?: number };
 
 export async function* runRagQueryStreaming(input: {
   question: string;
@@ -1268,16 +1287,16 @@ export async function* runRagQueryStreaming(input: {
   const hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
-    yield { kind: 'error', message: 'threshold must be in [0, 1]' };
+    yield { kind: 'error', code: 'INPUT_INVALID' };
     return;
   }
   const original = input.question.trim();
   if (original.length === 0) {
-    yield { kind: 'error', message: 'question is empty' };
+    yield { kind: 'error', code: 'INPUT_INVALID' };
     return;
   }
   if (original.length > 1000) {
-    yield { kind: 'error', message: 'question too long (max 1000 chars)' };
+    yield { kind: 'error', code: 'INPUT_INVALID' };
     return;
   }
 
@@ -1609,10 +1628,9 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
           }
         } catch (err) {
           stopGenerationGen();
-          yield {
-            kind: 'error',
-            message: `general-knowledge stream failed: ${err instanceof Error ? err.message : 'unknown'}`,
-          };
+          const code = classifyLlmError(err);
+          console.error('[rag general-knowledge]', code, err instanceof Error ? err.message : err);
+          yield { kind: 'error', code };
           return;
         }
         stopGenerationGen();
@@ -1838,10 +1856,9 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
     }
   } catch (err) {
     stopGeneration();
-    yield {
-      kind: 'error',
-      message: `LLM stream failed: ${err instanceof Error ? err.message : 'unknown'}`,
-    };
+    const code = classifyLlmError(err);
+    console.error('[rag answer-stream]', code, err instanceof Error ? err.message : err);
+    yield { kind: 'error', code };
     return;
   }
   stopGeneration();
@@ -2248,7 +2265,9 @@ export async function ingestText({
   text: string;
 }): Promise<IngestResult> {
   const chunks = chunkText(text);
-  if (chunks.length === 0) throw new Error('document is empty after trimming');
+  if (chunks.length === 0) {
+    throw new AppError('INGEST_READ_FAILED', { message: 'document is empty after trimming' });
+  }
 
   const sb = supabase();
 
@@ -2271,7 +2290,14 @@ export async function ingestText({
     embedResult = await embedTexts(chunks);
   } catch (err) {
     await sb.from('documents').update({ status: 'failed' }).eq('id', docId);
-    throw err;
+    // Als embedTexts al een AppError gooide (dim mismatch), behouden we die.
+    // Anders wrappen we OpenAI-fouten naar EMBED_FAILED zodat de UI weet hoe
+    // ze de gebruiker moet aanspreken.
+    if (err instanceof AppError) throw err;
+    throw new AppError('EMBED_FAILED', {
+      message: err instanceof Error ? err.message : 'embed call failed',
+      cause: err,
+    });
   }
 
   const rows = chunks.map((content, i) => ({

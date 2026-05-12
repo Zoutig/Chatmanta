@@ -533,11 +533,56 @@ export function AssistantMessage({
   );
 }
 
-export function ErrorMessage({ message }: { message: string }) {
+import type { AppErrorCode } from '@/lib/errors/app-error';
+import { userView } from '@/lib/errors/user-messages';
+
+export type ErrorMessageProps = {
+  // Bij voorkeur een code; UI mapt naar gebruikersvriendelijke title/body.
+  code?: AppErrorCode;
+  // Vrije message — alleen gebruikt als `code` ontbreekt (legacy/UI-eigen errors).
+  message?: string;
+  // Subtiel zichtbaar als grijze 'ID: chm_...' onder de error.
+  requestId?: string;
+  // Wordt aan userView() gegeven zodat 'wacht N seconden' invult.
+  retryAfterSec?: number;
+  // Toont de actie-knop uit userView() (bv. 'Probeer opnieuw'). Geen onRetry → geen knop.
+  onRetry?: () => void;
+};
+
+export function ErrorMessage({
+  code,
+  message,
+  requestId,
+  retryAfterSec,
+  onRetry,
+}: ErrorMessageProps) {
+  const view = code
+    ? userView(code, { retryAfterSec })
+    : {
+        title: 'Er ging iets mis',
+        body: message ?? 'Probeer het opnieuw of laad de pagina opnieuw.',
+        action: onRetry ? 'Opnieuw proberen' : undefined,
+      };
+
   return (
     <div className="msg-error slide-in">
-      <span className="label">Fout</span>
-      {message}
+      <div className="msg-error-head">
+        <span className="label">Fout</span>
+        <span className="msg-error-title">{view.title}</span>
+      </div>
+      <div className="msg-error-body">{view.body}</div>
+      {(onRetry && view.action) || requestId ? (
+        <div className="msg-error-footer">
+          {onRetry && view.action ? (
+            <button type="button" className="msg-error-retry" onClick={onRetry}>
+              {view.action}
+            </button>
+          ) : (
+            <span />
+          )}
+          {requestId ? <span className="msg-error-id">ID: {requestId}</span> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

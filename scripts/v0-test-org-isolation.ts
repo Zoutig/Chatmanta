@@ -70,7 +70,7 @@ async function runOnce(question: string, orgId: string): Promise<ChatResponse | 
       return ev.response;
     }
     if (ev.kind === 'error') {
-      console.error('  ✗ stream error:', ev.message);
+      console.error('  ✗ stream error:', ev.code);
       return null;
     }
   }

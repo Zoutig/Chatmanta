@@ -13,19 +13,15 @@ import {
   type KnowledgeGapWindow,
 } from '@/lib/v0/server/knowledge-gap-snapshot';
 import { requireV0Auth } from './_auth';
+import { actionTry, type ActionResult } from '@/lib/errors/action';
 
 export async function getKnowledgeGapSnapshotAction(
   organizationId: string,
   window: KnowledgeGapWindow,
-): Promise<{ ok: true; snapshot: KnowledgeGapSnapshot } | { ok: false; error: string }> {
-  try {
+): Promise<ActionResult<{ snapshot: KnowledgeGapSnapshot }>> {
+  return actionTry(async () => {
     await requireV0Auth();
     const snapshot = await getKnowledgeGapSnapshot(organizationId, window);
-    return { ok: true, snapshot };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : 'snapshot failed',
-    };
-  }
+    return { snapshot };
+  });
 }

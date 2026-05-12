@@ -12,16 +12,15 @@ import {
   type LatencyWindow,
 } from '@/lib/v0/server/latency-snapshot';
 import { requireV0Auth } from './_auth';
+import { actionTry, type ActionResult } from '@/lib/errors/action';
 
 export async function getLatencySnapshotAction(
   organizationId: string,
   window: LatencyWindow,
-): Promise<{ ok: true; snapshot: LatencySnapshot } | { ok: false; error: string }> {
-  try {
+): Promise<ActionResult<{ snapshot: LatencySnapshot }>> {
+  return actionTry(async () => {
     await requireV0Auth();
     const snapshot = await getLatencySnapshot(organizationId, window);
-    return { ok: true, snapshot };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'snapshot failed' };
-  }
+    return { snapshot };
+  });
 }

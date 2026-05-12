@@ -11,27 +11,30 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { ACTIVE_ORG_COOKIE, KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 export async function setActiveOrgAction(
   slug: string,
-): Promise<{ ok: true; slug: OrgSlug } | { ok: false; error: string }> {
-  if (!(slug in KNOWN_ORGS)) {
-    return { ok: false, error: `Onbekende org: ${slug}` };
-  }
-  const validSlug = slug as OrgSlug;
-  const store = await cookies();
-  store.set(ACTIVE_ORG_COOKIE, validSlug, {
-    path: '/',
-    maxAge: ONE_YEAR_SECONDS,
-    httpOnly: false, // bewust client-leesbaar zodat eventuele client-side reads
-    // de slug kunnen tonen zonder extra fetch — geen security risk omdat dit
-    // geen auth-cookie is, alleen een UI-preference.
-    sameSite: 'lax',
+): Promise<ActionResult<{ slug: OrgSlug }>> {
+  return actionTry(async () => {
+    if (!(slug in KNOWN_ORGS)) {
+      fail('NOT_FOUND', `unknown org slug: ${slug}`);
+    }
+    const validSlug = slug as OrgSlug;
+    const store = await cookies();
+    store.set(ACTIVE_ORG_COOKIE, validSlug, {
+      path: '/',
+      maxAge: ONE_YEAR_SECONDS,
+      httpOnly: false, // bewust client-leesbaar zodat eventuele client-side reads
+      // de slug kunnen tonen zonder extra fetch — geen security risk omdat dit
+      // geen auth-cookie is, alleen een UI-preference.
+      sameSite: 'lax',
+    });
+    // Hele tree opnieuw renderen — page.tsx leest cookie en geeft alle
+    // org-gescopte data (threads, docs, usage) door aan de ChatShell.
+    revalidatePath('/');
+    return { slug: validSlug };
   });
-  // Hele tree opnieuw renderen — page.tsx leest cookie en geeft alle
-  // org-gescopte data (threads, docs, usage) door aan de ChatShell.
-  revalidatePath('/');
-  return { ok: true, slug: validSlug };
 }

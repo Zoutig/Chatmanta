@@ -21,6 +21,8 @@ import { normalizeStyle } from '@/lib/v0/style';
 import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { getActiveOrgId } from '@/lib/v0/server/active-org';
+import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
+import { newRequestId } from '@/lib/errors/request-id';
 
 export const runtime = 'nodejs';
 
@@ -56,29 +58,34 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
 }
 
 export async function POST(req: Request) {
+  const requestId = newRequestId();
+
   // v0.4 security gate #1 — rate limit per IP. Faalt door als bucket overstroomt.
   const ip = getClientIp(req);
   const rl = await getRateLimiter().check(ip);
   if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'rate limit exceeded', retryAfterSec: rl.retryAfterSec },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(rl.retryAfterSec),
-          'X-RateLimit-Limit': String(rl.limit),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': String(Math.floor(rl.resetAt / 1000)),
-        },
+    const err = new AppError('RATE_LIMIT', { retryAfterSec: rl.retryAfterSec });
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status,
+      headers: {
+        'Retry-After': String(rl.retryAfterSec),
+        'X-RateLimit-Limit': String(rl.limit),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(Math.floor(rl.resetAt / 1000)),
+        'X-Request-Id': requestId,
       },
-    );
+    });
   }
 
   let body: Body;
   try {
     body = (await req.json()) as Body;
   } catch {
-    return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
+    const err = new AppError('INPUT_INVALID', { message: 'invalid JSON body' });
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status,
+      headers: { 'X-Request-Id': requestId },
+    });
   }
 
   const question = typeof body.question === 'string' ? body.question : '';
@@ -88,7 +95,11 @@ export async function POST(req: Request) {
   const history = parseHistory(body.history);
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
   if (!question.trim()) {
-    return NextResponse.json({ error: 'question is required' }, { status: 400 });
+    const err = new AppError('INPUT_INVALID', { message: 'question is required' });
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status,
+      headers: { 'X-Request-Id': requestId },
+    });
   }
   // HyDE-modus override (v0.5 evaluatie-toggle). Onbekende waarde of niet
   // gestuurd → 'auto' (= volg bot-versie config).
@@ -118,6 +129,7 @@ export async function POST(req: Request) {
       injectionPattern: patternName,
       blockedMessage: INJECTION_BLOCKED_MESSAGE,
       organizationId: getActiveOrgId(req),
+      requestId,
     }).catch(() => undefined);
 
     // NDJSON-stream met één 'fallback' event zodat de client-side parser het
@@ -143,6 +155,7 @@ export async function POST(req: Request) {
       headers: {
         'Content-Type': 'application/x-ndjson; charset=utf-8',
         'Cache-Control': 'no-store',
+        'X-Request-Id': requestId,
       },
     });
   }
@@ -199,14 +212,21 @@ export async function POST(req: Request) {
               },
             };
           }
-          controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+          // Verrijk error-events met requestId zodat de widget hem subtiel
+          // kan tonen. Andere events gaan ongewijzigd door.
+          const enriched =
+            event.kind === 'error' ? { ...event, requestId } : event;
+          controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
         }
       } catch (err) {
+        const appErr = toAppError(err);
+        // Server-log de volledige technische context; client krijgt alleen code.
+        console.error('[chat stream]', requestId, appErr.code, appErr.message, appErr.cause ?? '');
         controller.enqueue(
           encoder.encode(
             JSON.stringify({
               kind: 'error',
-              message: err instanceof Error ? err.message : 'unknown',
+              ...toWire(appErr, requestId),
             }) + '\n',
           ),
         );
@@ -226,7 +246,7 @@ export async function POST(req: Request) {
           requested: hydeModeRequested,
           actual: finalResponse.kind === 'smalltalk' ? null : hydeModeActual,
         };
-        logQuery(question, finalResponse, injectionInfo, organizationId, hydeMeta).catch(
+        logQuery(question, finalResponse, injectionInfo, organizationId, hydeMeta, requestId).catch(
           () => undefined,
         );
       }
@@ -238,6 +258,7 @@ export async function POST(req: Request) {
       'Content-Type': 'application/x-ndjson; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
+      'X-Request-Id': requestId,
     },
   });
 }

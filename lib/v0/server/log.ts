@@ -85,6 +85,9 @@ type QueryLogRow = {
   // v0.5 route-category (migratie 0015). NULL voor legacy. Distinguishes
   // 'general' (re-classifier disclaimer-antwoord) van normale 'search' RAG.
   category: 'search' | 'general' | 'off_topic' | 'smalltalk' | null;
+  // v0.5+ correlation-ID (migratie 0017). Gevuld voor requests die door
+  // /api/v0/chat lopen; NULL voor legacy of niet-API-paden.
+  request_id: string | null;
 };
 
 /**
@@ -153,6 +156,7 @@ export async function logQuery(
   injection?: { detected: boolean; pattern: string | null },
   organizationId: string = DEV_ORG_ID,
   hydeMeta?: HydeMeta,
+  requestId?: string,
 ): Promise<void> {
   try {
     // v0.4 retrieval-telemetry + claim verification uit extras (alleen
@@ -238,6 +242,7 @@ export async function logQuery(
             hyde_ms: null,
             hyde_document: null,
             category: 'smalltalk' as const,
+            request_id: requestId ?? null,
           }
         : {
             organization_id: organizationId,
@@ -281,6 +286,7 @@ export async function logQuery(
             hyde_ms: hydeMs,
             hyde_document: hydeDocument,
             category,
+            request_id: requestId ?? null,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -333,6 +339,7 @@ export async function logBlockedQuery(input: {
   injectionPattern: string;
   blockedMessage: string;
   organizationId?: string;
+  requestId?: string;
 }): Promise<void> {
   try {
     const row: QueryLogRow = {
@@ -373,6 +380,7 @@ export async function logBlockedQuery(input: {
       hyde_ms: null,
       hyde_document: null,
       category: null,
+      request_id: input.requestId ?? null,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);
