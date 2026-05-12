@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Image from 'next/image';
 import type {
   ChatHistoryTurn,
@@ -94,7 +95,6 @@ export function ChatShell({
   // de bestaande width-tokens leidend.
   const [mantaLeftCollapsed, setMantaLeftCollapsed] = useState(false);
   const [mantaRightCollapsed, setMantaRightCollapsed] = useState(false);
-  const [, startTransition] = useTransition();
   const convoRef = useRef<HTMLDivElement>(null);
 
   // Threads — initiele lijst van server, daarna client-side beheerd via
@@ -204,7 +204,13 @@ export function ChatShell({
         { user: trimmed, response: null, streamingText: null, livePhase: null, error: null, replacementReason: null },
       ]);
 
-      startTransition(async () => {
+      // Bewust GEEN startTransition rond de stream-loop: React 19 markeert
+      // updates binnen een transition als non-urgent en coalesceert dichte
+      // streams van setState-calls (zoals de answer-delta storm) tot één
+      // commit. flushSync per delta is dan niet sterk genoeg om door de
+      // transition-batching heen te breken — alleen door geen transition te
+      // openen krijgt elke delta een eigen render-frame.
+      void (async () => {
         try {
           const res = await fetch('/api/v0/chat', {
             method: 'POST',
@@ -264,15 +270,21 @@ export function ChatShell({
                   },
                 });
               } else if (event.kind === 'answer-delta') {
-                setTurns((prev) => {
-                  if (prev.length === 0) return prev;
-                  const next = prev.slice();
-                  const last = next[next.length - 1];
-                  next[next.length - 1] = {
-                    ...last,
-                    streamingText: (last.streamingText ?? '') + event.text,
-                  };
-                  return next;
+                // Per delta een synchrone commit forceren. Zonder flushSync
+                // batcht React 19 meerdere setStates die binnen één
+                // reader.read()-iteratie binnenkomen tot één commit, waardoor
+                // de tussenliggende tokens nooit op het scherm verschijnen.
+                flushSync(() => {
+                  setTurns((prev) => {
+                    if (prev.length === 0) return prev;
+                    const next = prev.slice();
+                    const last = next[next.length - 1];
+                    next[next.length - 1] = {
+                      ...last,
+                      streamingText: (last.streamingText ?? '') + event.text,
+                    };
+                    return next;
+                  });
                 });
               } else if (event.kind === 'answer-done') {
                 final = event.response;
@@ -333,7 +345,7 @@ export function ChatShell({
             streamingText: null,
           });
         }
-      });
+      })();
     },
     [botVersion, persistTurn, rewriteOn, threshold, tone, length, hydeMode, updateLastTurn],
   );
