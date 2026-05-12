@@ -1165,6 +1165,16 @@ export type StreamEvent =
   // V0.4: finale phaseTimingsMs nadat followups_ms is gemeten. Consumer moet
   // hierop wachten vóór logQuery anders mist query_log de followups-fase.
   | { kind: 'metrics-done'; phaseTimingsMs: PhaseTimings }
+  // V0.5 claim-regenerate: bij verifiedRatio < bot.claimRegenerateThreshold
+  // draaien we een tweede answer-LLM-call met stricter prompt. Het resultaat
+  // vervangt de eerder gestreamede answer in de UI. Wordt tussen answer-done
+  // en metrics-done geyield (cache-write krijgt het regenerate-antwoord).
+  | {
+      kind: 'replacement';
+      response: ChatResponse;
+      reason: 'claim-regenerate';
+      regeneratedVerifiedRatio: number | null;
+    }
   | { kind: 'error'; message: string };
 
 export async function* runRagQueryStreaming(input: {
@@ -1930,6 +1940,88 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
 
   yield { kind: 'answer-done', response: initialResponse };
 
+  // V0.5 claim-regenerate: bij verifiedRatio < threshold, regenereer met
+  // stricter prompt. Max één extra poging. Het regenerate-antwoord vervangt
+  // het oorspronkelijke via een 'replacement' event; cache krijgt het
+  // regenerate-antwoord (= wat de gebruiker uiteindelijk zag).
+  let activeResponse: Extract<ChatResponse, { kind: 'answer' }> = initialResponse as Extract<
+    ChatResponse,
+    { kind: 'answer' }
+  >;
+  let activeAnswerText = finalAnswerText;
+  let regenerateInputTokens = 0;
+  let regenerateOutputTokens = 0;
+  let regenerateCost = 0;
+  let regenerateRatio: number | null = null;
+  let regenerateClaims: ClaimVerificationData[] | undefined;
+  if (
+    bot.claimRegenerateEnabled &&
+    typeof claimConfidence === 'number' &&
+    Number.isFinite(claimConfidence) &&
+    claimConfidence < bot.claimRegenerateThreshold &&
+    claimsList && claimsList.length > 0
+  ) {
+    const REGENERATE_SYSTEM_ADDON = `
+
+[REGENERATE-REGEL — alleen voor deze tweede poging]
+Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of bijna letterlijk in de aangeleverde chunks staan. Bij twijfel of een feit echt in de context staat: laat het feit weg. Liever een korter, voorzichtiger antwoord dan een antwoord met onverifieerbare claims.`;
+    try {
+      const stricter = await chatComplete({
+        model: bot.chatModel,
+        system: styledSystemPrompt + REGENERATE_SYSTEM_ADDON,
+        user: userPrompt,
+        temperature: Math.max(0.0, bot.chatTemperature - 0.2),
+        maxTokens: V0_RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      });
+      regenerateInputTokens = stricter.inputTokens;
+      regenerateOutputTokens = stricter.outputTokens;
+      regenerateCost = stricter.costUsd;
+      const reparsedRegen = parseV03Output(stricter.text);
+      activeAnswerText = reparsedRegen.answer || stricter.text.trim();
+
+      try {
+        const { verifyClaims } = await import('./claims');
+        const chunkInputs2 = final.slice(0, used).map((c) => ({
+          id: c.id,
+          text: c.parent_content ?? c.content,
+        }));
+        const verifyResult2 = await verifyClaims({
+          answerText: activeAnswerText,
+          chunks: chunkInputs2,
+          threshold: bot.claimVerificationThreshold,
+        });
+        regenerateRatio = Number.isFinite(verifyResult2.confidence)
+          ? verifyResult2.confidence
+          : null;
+        if (verifyResult2.claims.length > 0) regenerateClaims = verifyResult2.claims;
+      } catch (err) {
+        console.warn('[regenerate verify] failed:', err);
+      }
+
+      const regenExtras = {
+        ...(activeResponse.extras ?? {}),
+        ...(regenerateClaims ? { claims: regenerateClaims } : {}),
+        ...(regenerateRatio !== null ? { claimConfidence: regenerateRatio } : {}),
+      };
+      activeResponse = {
+        ...activeResponse,
+        answer: activeAnswerText,
+        chatInputTokens: activeResponse.chatInputTokens + regenerateInputTokens,
+        chatOutputTokens: activeResponse.chatOutputTokens + regenerateOutputTokens,
+        totalCostUsd: activeResponse.totalCostUsd + regenerateCost,
+        extras: regenExtras,
+      };
+      yield {
+        kind: 'replacement',
+        response: activeResponse,
+        reason: 'claim-regenerate',
+        regeneratedVerifiedRatio: regenerateRatio,
+      };
+    } catch (err) {
+      console.warn('[claim-regenerate] failed, keeping initial answer:', err);
+    }
+  }
+
   // Followups na de answer-done yield — gebruiker ziet antwoord al, followups
   // verschijnen kort daarna in de UI via het followups-done event.
   // V0.5: hard timeout op 5s zodat een trage OpenAI-call niet de finale
@@ -1986,12 +2078,12 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
   // dezelfde UX levert als een verse RAG-run.
   if (bot.cacheEnabled && cacheEmbedVector) {
     const cachedResponse: ChatResponse = {
-      ...initialResponse,
-      chatInputTokens: initialResponse.chatInputTokens + followUpsInputTokens,
-      chatOutputTokens: initialResponse.chatOutputTokens + followUpsOutputTokens,
-      totalCostUsd: initialResponse.totalCostUsd + followUpsCost,
+      ...activeResponse,
+      chatInputTokens: activeResponse.chatInputTokens + followUpsInputTokens,
+      chatOutputTokens: activeResponse.chatOutputTokens + followUpsOutputTokens,
+      totalCostUsd: activeResponse.totalCostUsd + followUpsCost,
       extras: {
-        ...initialResponse.extras,
+        ...activeResponse.extras,
         ...(followUps && followUps.length > 0 ? { followUps } : {}),
         phaseTimingsMs: phaseTimingsFinal,
       },

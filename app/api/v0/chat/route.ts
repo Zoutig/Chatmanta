@@ -172,6 +172,11 @@ export async function POST(req: Request) {
           // followups_ms missen.
           if (event.kind === 'smalltalk' || event.kind === 'fallback' || event.kind === 'answer-done') {
             finalResponse = event.response;
+          } else if (event.kind === 'replacement') {
+            // V0.5 claim-regenerate: het regenerate-antwoord vervangt het
+            // eerder via answer-done gestreamede antwoord. logQuery moet
+            // straks deze versie loggen.
+            finalResponse = event.response;
           } else if (event.kind === 'followups-done' && finalResponse?.kind === 'answer') {
             const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
             finalResponse = {

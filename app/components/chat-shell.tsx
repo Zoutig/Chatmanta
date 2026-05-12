@@ -32,6 +32,7 @@ type Turn = {
   streamingText: string | null;
   livePhase: PipelinePhase | null;
   error: string | null;
+  replacementReason: string | null;
 };
 
 export type BotFlags = {
@@ -173,7 +174,7 @@ export function ChatShell({
       setActiveCite(null);
       setTurns((prev) => [
         ...prev,
-        { user: trimmed, response: null, streamingText: null, livePhase: null, error: null },
+        { user: trimmed, response: null, streamingText: null, livePhase: null, error: null, replacementReason: null },
       ]);
 
       startTransition(async () => {
@@ -265,6 +266,15 @@ export function ChatShell({
                   },
                 };
                 updateLastTurn({ response: final, livePhase: null });
+              } else if (event.kind === 'replacement' && final?.kind === 'answer') {
+                // V0.5 claim-regenerate: het regenerate-antwoord vervangt de
+                // eerder via answer-done getoonde versie. UI toont banner.
+                final = event.response;
+                updateLastTurn({
+                  response: final,
+                  streamingText: null,
+                  replacementReason: 'Antwoord aangepast voor extra zekerheid',
+                });
               } else if (event.kind === 'metrics-done' && final?.kind === 'answer') {
                 // V0.4: finale phaseTimingsMs (inclusief followups_ms). Vervangt
                 // de partial die op answer-done meekwam. Daarna is `final`
@@ -337,6 +347,7 @@ export function ChatShell({
             streamingText: null,
             livePhase: null,
             error: 'Geen antwoord opgeslagen voor deze vraag.',
+            replacementReason: null,
           });
         }
         pendingUser = m.content;
@@ -347,6 +358,7 @@ export function ChatShell({
           streamingText: null,
           livePhase: null,
           error: null,
+          replacementReason: null,
         });
         pendingUser = null;
       }
@@ -358,6 +370,7 @@ export function ChatShell({
         streamingText: null,
         livePhase: null,
         error: 'Geen antwoord opgeslagen voor deze vraag.',
+        replacementReason: null,
       });
     }
     setTurns(loaded);
@@ -453,6 +466,7 @@ export function ChatShell({
                         onCiteClick={onCiteClick}
                         onFollowUp={ask}
                         onRegenerate={isLast && !pending ? onRegenerate : undefined}
+                        replacementReason={t.replacementReason}
                       />
                     ) : (
                       <PendingPlaceholder phase={t.livePhase} botVersion={botVersion} />
