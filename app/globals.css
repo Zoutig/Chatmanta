@@ -1647,6 +1647,28 @@ body.body-fixed { overflow: hidden; }
   white-space: pre-wrap;
 }
 
+/* v0.5 — bronnen-tab toont parentExcerpt (wat de LLM zag) bovenaan, met
+ * kern-match (small-chunk excerpt) eronder met een dun scheidings-lijntje. */
+.source-excerpt-parent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.source-excerpt-parent-text {
+  /* inherits .source-excerpt — geen aparte rules nodig */
+}
+.source-kern-match {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft, var(--border-strong));
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.45;
+}
+
 .sim-meter {
   margin-top: 10px;
   height: 3px;
