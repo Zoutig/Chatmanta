@@ -16,6 +16,7 @@ import OpenAI from 'openai';
 import type { BotConfig } from './bots';
 import { buildSystemPrompt } from '../style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
+import { costForModelUsd } from '../../ai/llm';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1591,13 +1592,14 @@ export async function* runRagQueryStreaming(input: {
         confidence = reparsed.confidence ?? confidence;
         cascadeInputTokens = stronger.inputTokens;
         cascadeOutputTokens = stronger.outputTokens;
-        // Cascade gebruikt een ander model — bereken cost via OpenAI std rates
-        // voor gpt-4o (USD per 1M). Hardcoded omdat het een bewuste fallback is.
-        const GPT4O_IN = 2.5,
-          GPT4O_OUT = 10.0;
-        cascadeCost =
-          (stronger.inputTokens / 1_000_000) * GPT4O_IN +
-          (stronger.outputTokens / 1_000_000) * GPT4O_OUT;
+        // Cascade gebruikt bot.cascadeModel — kost wordt opgezocht in de
+        // centrale MODEL_COSTS_USD-tabel (lib/ai/llm.ts). Onbekend model
+        // → 0 met warn (zie costForModelUsd).
+        cascadeCost = costForModelUsd(
+          bot.cascadeModel,
+          stronger.inputTokens,
+          stronger.outputTokens,
+        );
         cascadeUsed = true;
       } catch (err) {
         console.warn('[cascade] failed, keeping initial answer:', err);
