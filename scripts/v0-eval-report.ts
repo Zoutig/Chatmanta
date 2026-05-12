@@ -39,7 +39,7 @@ const { data: runRows, error: runErr } = await sb
   .select(
     `id, question_id, bot_version, judge_model, bot_kind, bot_answer, bot_sources,
      bot_cost_usd, bot_latency_ms,
-     score_correctness, score_completeness, score_grounding, score_citation,
+     score_correctness, score_completeness, score_grounding,
      judge_reasoning, judge_parse_error, judge_cost_usd, judge_latency_ms,
      hyde_mode_requested, hyde_mode_actual,
      run_index, retrieved_filenames, retrieval_recall_at_k, retrieval_mrr,
@@ -180,60 +180,29 @@ if (violations.length === 0) {
 }
 lines.push('');
 
-// 4b. Samenvatting per versie × hyde_mode (incl. citation)
+// 4b. Samenvatting per versie × hyde_mode
 lines.push('## Samenvatting per versie × hyde_mode');
 lines.push('');
-lines.push('| versie | hyde_mode | n | C | P | G | I (citation) | overall | bot $ | judge $ | bot ms (avg) |');
-lines.push('|--------|-----------|---|---|---|---|--------------|---------|-------|---------|--------------|');
+lines.push('| versie | hyde_mode | n | C | P | G | overall | bot $ | judge $ | bot ms (avg) |');
+lines.push('|--------|-----------|---|---|---|---|---------|-------|---------|--------------|');
 for (const pair of versionModePairs) {
   const [v, mode] = pair.split('::');
   const vRows = latestRuns.filter((r) => r.bot_version === v && modeKey(r) === mode);
   const c = avgOf(vRows, (r) => r.score_correctness);
   const p = avgOf(vRows, (r) => r.score_completeness);
   const g = avgOf(vRows, (r) => r.score_grounding);
-  const i = avgOf(vRows, (r) => r.score_citation);
-  const all = [c, p, g, i].filter((n): n is number => n !== null);
+  const all = [c, p, g].filter((n): n is number => n !== null);
   const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
   const bCost = vRows.reduce((s, r) => s + Number(r.bot_cost_usd ?? 0), 0);
   const jCost = vRows.reduce((s, r) => s + Number(r.judge_cost_usd ?? 0), 0);
   const lat = avgOf(vRows, (r) => Number(r.bot_latency_ms ?? 0));
   lines.push(
-    `| ${v} | ${mode} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | ${fmt(i)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | $${jCost.toFixed(4)} | ${fmt(lat, 0)} |`,
+    `| ${v} | ${mode} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | $${jCost.toFixed(4)} | ${fmt(lat, 0)} |`,
   );
 }
 lines.push('');
 
-// 4c. Per-tag breakdown — laat zien waar zwakte zit (per cross-cutting tag)
-lines.push('## Per-tag breakdown');
-lines.push('');
-const allTags = new Set<string>();
-for (const q of questions) for (const t of (q.tags as string[]) ?? []) allTags.add(t);
-const tagList = [...allTags].sort();
-if (tagList.length === 0) {
-  lines.push('(geen tags in corpus)');
-} else {
-  lines.push('| tag | versie | n | C | P | G | I | overall |');
-  lines.push('|-----|--------|---|---|---|---|---|---------|');
-  for (const tag of tagList) {
-    const qIdsForTag = new Set(
-      questions.filter((q) => (q.tags as string[]).includes(tag)).map((q) => q.id as string),
-    );
-    for (const v of versionsForHeader) {
-      const rows = latestRuns.filter((r) => qIdsForTag.has(r.question_id as string) && r.bot_version === v);
-      if (rows.length === 0) continue;
-      const c = avgOf(rows, (r) => r.score_correctness);
-      const p = avgOf(rows, (r) => r.score_completeness);
-      const g = avgOf(rows, (r) => r.score_grounding);
-      const ii = avgOf(rows, (r) => r.score_citation);
-      const all = [c, p, g, ii].filter((n): n is number => n !== null);
-      const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
-      lines.push(`| ${tag} | ${v} | ${rows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | ${fmt(ii)} | **${fmt(overall)}** |`);
-    }
-  }
-}
-lines.push('');
-
-// 4d. Per-question_type breakdown — toont waar adversarial categorieën zwak zijn
+// 4c. Per-question_type breakdown — toont waar adversarial categorieën zwak zijn
 lines.push('## Per-question_type breakdown');
 lines.push('');
 const allTypes = new Set<string>();
@@ -242,8 +211,8 @@ for (const q of questions) {
   allTypes.add(t);
 }
 const typeList = [...allTypes].sort();
-lines.push('| question_type | versie | n | C | P | G | I | overall | violations |');
-lines.push('|---------------|--------|---|---|---|---|---|---------|------------|');
+lines.push('| question_type | versie | n | C | P | G | overall | violations |');
+lines.push('|---------------|--------|---|---|---|---|---------|------------|');
 for (const qt of typeList) {
   const qIdsForType = new Set(
     questions.filter((q) => ((q.question_type as string | null) ?? 'factual') === qt).map((q) => q.id as string),
@@ -254,11 +223,10 @@ for (const qt of typeList) {
     const c = avgOf(rows, (r) => r.score_correctness);
     const p = avgOf(rows, (r) => r.score_completeness);
     const g = avgOf(rows, (r) => r.score_grounding);
-    const ii = avgOf(rows, (r) => r.score_citation);
-    const all = [c, p, g, ii].filter((n): n is number => n !== null);
+    const all = [c, p, g].filter((n): n is number => n !== null);
     const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
     const vios = rows.filter((r) => r.must_not_violation).length;
-    lines.push(`| ${qt} | ${v} | ${rows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | ${fmt(ii)} | **${fmt(overall)}** | ${vios > 0 ? `🚨 ${vios}` : '0'} |`);
+    lines.push(`| ${qt} | ${v} | ${rows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | ${vios > 0 ? `🚨 ${vios}` : '0'} |`);
   }
 }
 lines.push('');
@@ -303,43 +271,9 @@ for (const v of versionsForHeader) {
 }
 lines.push('');
 
-// 4g. Multi-run variance — alleen tonen als er multi-run data is
-if (hasMultiRun) {
-  lines.push('## Multi-run variance (σ van scores tussen runs)');
-  lines.push('');
-  lines.push('Standaarddeviatie van scores binnen runs van dezelfde (vraag × versie × hyde_mode). Σ≈0 = consistent, hogere σ = judge-ruis of bot-variance.');
-  lines.push('');
-  lines.push('| versie | hyde_mode | n_runs | σ_C | σ_P | σ_G | σ_I |');
-  lines.push('|--------|-----------|--------|-----|-----|-----|-----|');
-  function stdDev(nums: (number | null)[]): number | null {
-    const vals = nums.filter((n): n is number => n !== null);
-    if (vals.length < 2) return null;
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const sq = vals.reduce((s, n) => s + (n - mean) ** 2, 0) / vals.length;
-    return Math.sqrt(sq);
-  }
-  for (const pair of versionModePairs) {
-    const [v, mode] = pair.split('::');
-    // Verzamel σ per (q, v, mode) en middel over alle vragen — ruwe maar bruikbare proxy.
-    const sigmas: { c: number[]; p: number[]; g: number[]; i: number[] } = { c: [], p: [], g: [], i: [] };
-    const totalRuns = allLatestVariance.filter((r) => r.bot_version === v && modeKey(r) === mode).length;
-    for (const q of questions) {
-      const rows = allLatestVariance.filter((r) => r.question_id === q.id && r.bot_version === v && modeKey(r) === mode);
-      if (rows.length < 2) continue;
-      const sc = stdDev(rows.map((r) => r.score_correctness));
-      const sp = stdDev(rows.map((r) => r.score_completeness));
-      const sg = stdDev(rows.map((r) => r.score_grounding));
-      const si = stdDev(rows.map((r) => r.score_citation));
-      if (sc !== null) sigmas.c.push(sc);
-      if (sp !== null) sigmas.p.push(sp);
-      if (sg !== null) sigmas.g.push(sg);
-      if (si !== null) sigmas.i.push(si);
-    }
-    const mean = (arr: number[]) => arr.length === 0 ? null : arr.reduce((a, b) => a + b, 0) / arr.length;
-    lines.push(`| ${v} | ${mode} | ${totalRuns} | ${fmt(mean(sigmas.c), 2)} | ${fmt(mean(sigmas.p), 2)} | ${fmt(mean(sigmas.g), 2)} | ${fmt(mean(sigmas.i), 2)} |`);
-  }
-  lines.push('');
-}
+// (Multi-run variance sectie weggehaald — was alleen relevant bij --runs > 1
+// en gaf in de praktijk een lege/ruisige tabel. Multi-run data blijft wel in
+// de CSV voor handmatige spreadsheet-analyse.)
 
 // 4b. Per-vraag detail
 lines.push('## Per-vraag detail');
@@ -361,20 +295,20 @@ for (const q of questions) {
     for (const f of q.gold_facts as string[]) lines.push(`- ${f}`);
   }
   lines.push('');
-  lines.push('| versie | hyde_mode | C | P | G | I | kind | violation | bot ms | bot $ |');
-  lines.push('|--------|-----------|---|---|---|---|------|-----------|--------|-------|');
+  lines.push('| versie | hyde_mode | C | P | G | kind | violation | bot ms | bot $ |');
+  lines.push('|--------|-----------|---|---|---|------|-----------|--------|-------|');
   for (const pair of versionModePairs) {
     const [v, mode] = pair.split('::');
     const r = latestRuns.find(
       (row) => row.question_id === q.id && row.bot_version === v && modeKey(row) === mode,
     );
     if (!r) {
-      lines.push(`| ${v} | ${mode} | — | — | — | — | — | — | — | — |`);
+      lines.push(`| ${v} | ${mode} | — | — | — | — | — | — | — |`);
       continue;
     }
     const vio = r.must_not_violation ? '🚨' : '';
     lines.push(
-      `| ${v} | ${mode} | ${fmtScore(r.score_correctness)} | ${fmtScore(r.score_completeness)} | ${fmtScore(r.score_grounding)} | ${fmtScore(r.score_citation)} | ${r.bot_kind} | ${vio} | ${r.bot_latency_ms} | $${Number(r.bot_cost_usd ?? 0).toFixed(4)} |`,
+      `| ${v} | ${mode} | ${fmtScore(r.score_correctness)} | ${fmtScore(r.score_completeness)} | ${fmtScore(r.score_grounding)} | ${r.bot_kind} | ${vio} | ${r.bot_latency_ms} | $${Number(r.bot_cost_usd ?? 0).toFixed(4)} |`,
     );
   }
   lines.push('');
@@ -404,7 +338,7 @@ for (const q of questions) {
 // ---------------------------------------------------------------------------
 const csvLines: string[] = [];
 csvLines.push(
-  'slug,difficulty,question_type,bot_version,hyde_mode_actual,hyde_mode_requested,run_index,correctness,completeness,grounding,citation,recall_at_k,mrr,must_not_violation,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error',
+  'slug,difficulty,question_type,bot_version,hyde_mode_actual,hyde_mode_requested,run_index,correctness,completeness,grounding,recall_at_k,mrr,must_not_violation,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error',
 );
 // CSV gebruikt allLatestVariance zodat multi-run rows allemaal in spreadsheet
 // belanden voor variance-analyse, niet alleen run_index=0.
@@ -424,7 +358,6 @@ for (const q of questions) {
         r.score_correctness ?? '',
         r.score_completeness ?? '',
         r.score_grounding ?? '',
-        r.score_citation ?? '',
         r.retrieval_recall_at_k ?? '',
         r.retrieval_mrr ?? '',
         r.must_not_violation ? 'true' : 'false',

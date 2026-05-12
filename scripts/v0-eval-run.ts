@@ -55,8 +55,9 @@ const hydeModeArg = parseStringArg('hyde-mode');
 const runsArg = parseStringArg('runs');
 const runsCount = runsArg ? Math.max(1, Math.min(20, parseInt(runsArg, 10))) : 1;
 if (runsArg && (!Number.isFinite(runsCount) || runsCount < 1)) {
-  fail(`--runs moet een positief geheel getal zijn (kreeg "${runsArg}")`);
+  fail(`--smoke moet zonder = staan; --runs moet een positief geheel getal zijn (kreeg "${runsArg}")`);
 }
+const smokeMode = process.argv.includes('--smoke');
 const hydeMode: HydeModeRequest = hydeModeArg
   ? (isHydeModeRequest(hydeModeArg)
       ? hydeModeArg
@@ -98,11 +99,26 @@ if (slugsFilter) qBuilder = qBuilder.in('slug', slugsFilter);
 
 const { data: qRows, error: qErr } = await qBuilder;
 if (qErr) fail(`eval_questions select: ${qErr.message}`);
-const questions = (qRows ?? []) as EvalQuestion[];
+let questions = (qRows ?? []) as EvalQuestion[];
 if (questions.length === 0) {
   fail(slugsFilter
     ? `Geen vragen gevonden met slugs: ${slugsFilter.join(', ')}. Run eerst \`npm run eval:seed\`.`
     : 'Geen eval_questions in DB. Run eerst `npm run eval:seed`.');
+}
+
+// --smoke: pak eerste vraag per question_type → snelle iteratie-set die elke
+// categorie minstens 1× raakt. Combineerbaar met --slugs (--slugs wint),
+// onbedoeld met --versions (smoke gaat over vragen, niet versies).
+if (smokeMode && !slugsFilter) {
+  const seenTypes = new Set<string>();
+  const smoke: EvalQuestion[] = [];
+  for (const q of questions) {
+    const t = q.question_type ?? 'factual';
+    if (seenTypes.has(t)) continue;
+    seenTypes.add(t);
+    smoke.push(q);
+  }
+  questions = smoke;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +137,8 @@ for (const v of versions) {
 const t0 = performance.now();
 console.log(`--- V0 Eval Run ---`);
 console.log(`  versies      : ${versions.join(', ')}`);
-console.log(`  vragen       : ${questions.length}${slugsFilter ? ` (gefilterd op slug)` : ''}`);
+const qFilter = slugsFilter ? ' (gefilterd op slug)' : smokeMode ? ' (smoke subset — 1 per question_type)' : '';
+console.log(`  vragen       : ${questions.length}${qFilter}`);
 console.log(`  runs/cell    : ${runsCount}${runsCount > 1 ? ' (multi-run voor variance)' : ''}`);
 console.log(`  jobs         : ${jobs.length}`);
 console.log(`  concurrency  : ${CONCURRENCY}`);
@@ -158,7 +175,7 @@ const rows = await withConcurrency<Job, EvalRunRow | null>(jobs, CONCURRENCY, as
     completed++;
     totalBotCost += row.bot_cost_usd;
     totalJudgeCost += row.judge_cost_usd;
-    const scores = `C${row.score_correctness ?? '-'}/P${row.score_completeness ?? '-'}/G${row.score_grounding ?? '-'}/I${row.score_citation ?? '-'}`;
+    const scores = `C${row.score_correctness ?? '-'}/P${row.score_completeness ?? '-'}/G${row.score_grounding ?? '-'}`;
     const flag = row.judge_parse_error ? ' ⚠judge-parse' : '';
     const violation = row.must_not_violation ? ' 🚨MUST-NOT' : '';
     const kind = row.bot_kind === 'answer' ? '' : ` [${row.bot_kind}]`;
@@ -187,8 +204,8 @@ function fmtAvg(n: number | null): string {
 }
 
 console.log(`\n--- Summary (${totalSec}s, ${completed} ok, ${failed} failed) ---`);
-console.log('  versie  | C    P    G    I    | avg  | bot $    judge $');
-console.log('  --------|---------------------|------|------------------');
+console.log('  versie  | C    P    G    | avg  | bot $    judge $');
+console.log('  --------|----------------|------|------------------');
 for (const v of versions) {
   const vRows = okRows.filter((r) => r.bot_version === v);
   if (vRows.length === 0) {
@@ -198,13 +215,12 @@ for (const v of versions) {
   const c = avg(vRows.map((r) => r.score_correctness));
   const p = avg(vRows.map((r) => r.score_completeness));
   const g = avg(vRows.map((r) => r.score_grounding));
-  const i = avg(vRows.map((r) => r.score_citation));
-  const all = [c, p, g, i].filter((n): n is number => n !== null);
+  const all = [c, p, g].filter((n): n is number => n !== null);
   const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
   const bCost = vRows.reduce((s, r) => s + r.bot_cost_usd, 0);
   const jCost = vRows.reduce((s, r) => s + r.judge_cost_usd, 0);
   console.log(
-    `  ${v.padEnd(7)} | ${fmtAvg(c)} ${fmtAvg(p)} ${fmtAvg(g)} ${fmtAvg(i)} | ${fmtAvg(overall)} | $${bCost.toFixed(4)}  $${jCost.toFixed(4)}`,
+    `  ${v.padEnd(7)} | ${fmtAvg(c)} ${fmtAvg(p)} ${fmtAvg(g)} | ${fmtAvg(overall)} | $${bCost.toFixed(4)}  $${jCost.toFixed(4)}`,
   );
 }
 console.log(`\n  totale cost: bot $${totalBotCost.toFixed(4)} + judge $${totalJudgeCost.toFixed(4)} = $${(totalBotCost + totalJudgeCost).toFixed(4)}`);

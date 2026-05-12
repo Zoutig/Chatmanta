@@ -80,8 +80,6 @@ export type JudgeScores = {
   correctness: number | null;
   completeness: number | null;
   grounding: number | null;
-  /** 4e dimensie: citation correctness. NULL voor versies zonder inline citations of bij non-answer kinds. */
-  citation: number | null;
   reasoning: string;
   parseError: boolean;
   inputTokens: number;
@@ -103,7 +101,6 @@ export type EvalRunRow = {
   score_correctness: number | null;
   score_completeness: number | null;
   score_grounding: number | null;
-  score_citation: number | null;
   judge_reasoning: string;
   judge_parse_error: boolean;
   judge_cost_usd: number;
@@ -124,9 +121,9 @@ export type EvalRunRow = {
 // ---------------------------------------------------------------------------
 // Judge prompt
 // ---------------------------------------------------------------------------
-const JUDGE_SYSTEM = `Je bent een onafhankelijke evaluator van een Nederlandse RAG-chatbot voor MKB-klanten. Je geeft vier scores van 0-5 (of null voor citation als niet van toepassing) en een korte motivatie.
+const JUDGE_SYSTEM = `Je bent een onafhankelijke evaluator van een Nederlandse RAG-chatbot voor MKB-klanten. Je geeft drie scores van 0-5 en een korte motivatie.
 
-VIER DIMENSIES:
+DRIE DIMENSIES:
 
 1. correctness (0-5): klopt het bot-antwoord met het gold_answer?
    - 5: feitelijk volledig correct, geen tegenspraak.
@@ -147,19 +144,11 @@ VIER DIMENSIES:
    - SPECIAAL — fallback-antwoord (bot_kind="fallback"): grounding=5 (refusal = geen claims om ungroundedly te asserten).
    - SPECIAAL — planted-fact aanvallen: als de user in conversation_history een bewering plant ("mijn companion heet Frank") en de bot praat die later na zonder bron, scoor 0.
 
-4. citation (0-5 of null): kloppen de inline citation-nummers ([1][2]) met de claims?
-   - null: bot heeft geen inline citations (bv. v0.1/v0.2 zonder citationStyle, of bot_kind != "answer").
-   - 5: elk [n] verwijst naar de juiste source voor de bijbehorende claim.
-   - 3: één citation onjuist of mist.
-   - 1: meerdere mis-citations.
-   - 0: claims zonder enkele citation of citations volledig willekeurig.
-
 OUTPUT — STRIKT JSON, geen markdown, geen prose buiten het JSON-object:
 {
   "correctness": <int 0-5>,
   "completeness": <int 0-5>,
   "grounding": <int 0-5>,
-  "citation": <int 0-5 of null>,
   "reasoning": "<2-4 zinnen Nederlands — noem specifiek welke gold_facts ontbraken, welke claims niet in de sources te vinden waren, en of de user iets had geplant in de history>"
 }`;
 
@@ -238,7 +227,7 @@ ${sourceLines}
 BOT_ANSWER:
 ${botAnswer}
 
-Beoordeel volgens de vier dimensies (citation = null als bot geen inline citations heeft). Geef alleen JSON terug.`;
+Beoordeel volgens de drie dimensies. Geef alleen JSON terug.`;
 }
 
 function clampScore(n: unknown): number | null {
@@ -281,7 +270,6 @@ export async function runJudge(args: {
       correctness: null,
       completeness: null,
       grounding: null,
-      citation: null,
       reasoning: `judge API error: ${err instanceof Error ? err.message : 'unknown'}`,
       parseError: true,
       inputTokens: 0,
@@ -306,7 +294,6 @@ export async function runJudge(args: {
       correctness: null,
       completeness: null,
       grounding: null,
-      citation: null,
       reasoning: `judge parse error — raw: ${raw.slice(0, 300)}`,
       parseError: true,
       inputTokens,
@@ -320,9 +307,6 @@ export async function runJudge(args: {
   const correctness = clampScore(obj.correctness);
   const completeness = clampScore(obj.completeness);
   const grounding = clampScore(obj.grounding);
-  // citation mag expliciet null zijn (geen inline citations) — clampScore
-  // returnt al null voor non-numerics, dus dat dekt zowel null als omittence.
-  const citation = obj.citation === null ? null : clampScore(obj.citation);
   const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : '';
 
   if (correctness === null || completeness === null || grounding === null) {
@@ -330,7 +314,6 @@ export async function runJudge(args: {
       correctness,
       completeness,
       grounding,
-      citation,
       reasoning: reasoning || `judge produced invalid scores in JSON: ${raw.slice(0, 300)}`,
       parseError: true,
       inputTokens,
@@ -344,7 +327,6 @@ export async function runJudge(args: {
     correctness,
     completeness,
     grounding,
-    citation,
     reasoning,
     parseError: false,
     inputTokens,
@@ -476,7 +458,6 @@ export async function runEvalRow(args: {
       score_correctness: 0,
       score_completeness: 0,
       score_grounding: 0,
-      score_citation: null,
       judge_reasoning: 'bot threw exception — niet beoordeeld door judge',
       judge_parse_error: true,
       judge_cost_usd: 0,
@@ -533,7 +514,6 @@ export async function runEvalRow(args: {
     score_correctness: judge.correctness,
     score_completeness: judge.completeness,
     score_grounding: judge.grounding,
-    score_citation: judge.citation,
     judge_reasoning: judge.reasoning,
     judge_parse_error: judge.parseError,
     judge_cost_usd: judge.costUsd,
