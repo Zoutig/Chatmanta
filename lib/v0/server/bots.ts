@@ -387,6 +387,14 @@ export const LATEST_BOT_VERSION = V0_4.version;
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [V0_1.version, V0_2.version, V0_3.version, V0_4.version];
 
+/**
+ * Default versions voor eval-runs: alleen de twee nieuwste. Oudere versies
+ * blijven werken via `?v=` in de UI, maar krijgen geen judge-calls meer —
+ * dat scheelt ~50% van de OpenAI-spend per run (gpt-4o judge × N versies).
+ * Voor een complete sweep over alle versies: `npm run eval:run -- --all`.
+ */
+export const EVAL_DEFAULT_VERSIONS: string[] = BOT_VERSIONS_ORDERED.slice(-2);
+
 /** Resolve a version string to a config; falls back to latest if unknown. */
 export function resolveBot(version: string | null | undefined): BotConfig {
   if (version && version in BOTS) return BOTS[version];
