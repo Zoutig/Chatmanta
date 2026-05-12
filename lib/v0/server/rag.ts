@@ -1408,9 +1408,31 @@ export async function* runRagQueryStreaming(input: {
       // Tone/length: gecachte rij is mogelijk geschreven onder andere stijl-
       // toggles; we accepteren mismatch (zie spec) en zetten de huidige call's
       // toggles op de response zodat logging klopt.
+      //
+      // V0.5 fix: vervang de gecachte phaseTimingsMs door de werkelijke cache-
+      // hit timings. Zonder dit erft elke cache-hit de full-pipeline timings
+      // van de originele write (bv. 13s) en vertekent dat de aggregate p50/p95
+      // omhoog — terwijl de UX een ms-snel antwoord is.
+      const cacheHitTotalMs = Math.round(performance.now() - tPipelineStart);
+      const cacheHitTimings: PhaseTimings = {
+        embedding_ms: timings.embedding_ms ?? 0,
+        retrieval_ms: 0,
+        generation_ms: 0,
+        total_ms: cacheHitTotalMs,
+        ...(timings.cache_lookup_ms !== undefined
+          ? { cache_lookup_ms: timings.cache_lookup_ms }
+          : {}),
+      };
       const baseEnriched =
         cached.kind === 'answer'
-          ? { ...cached, extras: { ...(cached.extras ?? {}), fromCache: true } }
+          ? {
+              ...cached,
+              extras: {
+                ...(cached.extras ?? {}),
+                fromCache: true,
+                phaseTimingsMs: cacheHitTimings,
+              },
+            }
           : cached;
       const enriched: ChatResponse = { ...baseEnriched, tone, length };
       yield {
@@ -1579,15 +1601,29 @@ export async function* runRagQueryStreaming(input: {
 
       if (rc.category === 'general') {
         yield { kind: 'status', phase: 'answer' };
+        // Deterministische opening + sluiting: buiten de LLM om geplakt zodat
+        // ze 100% letterlijk aanwezig zijn én geen dubbele varianten kunnen
+        // ontstaan. Niet-streaming hier: post-hoc sanitization is robuuster
+        // dan mid-stream detectie, en latency-impact is acceptabel (GENERAL
+        // is zelf al een fallback-pad bij zero retrieval-hits).
+        const GENERAL_OPENING =
+          'Even kort: dit valt buiten onze specifieke documentatie, maar in het algemeen ';
+        const GENERAL_CLOSING =
+          ' Wil je weten hoe ChatManta hier specifiek mee omgaat? Vraag gerust.';
         const generalSystem = `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. De gebruiker stelt een algemene-kennis-vraag binnen ons domein (MKB, SaaS, AI, RAG, chatbots, klantcontact, ondernemerschap, marketing).
 
-Geef een KORT antwoord — maximaal 3 zinnen — over wat dit onderwerp is. Schrijf in dezelfde taal als de vraag (default Nederlands).
+Schrijf ALLEEN 1 tot 2 zinnen die kort uitleggen wat het onderwerp is. Schrijf in dezelfde taal als de vraag (default Nederlands).
 
-BEGIN je antwoord ALTIJD met deze exacte zin: "Even kort: dit valt buiten onze specifieke documentatie, maar in het algemeen…"
-
-EINDIG je antwoord ALTIJD met: "Wil je weten hoe ChatManta hier specifiek mee omgaat? Vraag gerust."
-
-Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlotte antwoord. Schrijf alsof je het zelf weet.`;
+KRITISCHE FORMAT-REGELS:
+- Jouw output wordt geplakt achter de zinhelft "Even kort: dit valt buiten onze specifieke documentatie, maar in het algemeen " — begin daarom met een werkwoord (of voorzetsel) in kleine letter dat grammaticaal aansluit.
+- Voorbeelden:
+    Vraag: "Wat zijn MKB-bedrijven?" → "zijn MKB-bedrijven kleine en middelgrote ondernemingen die..."
+    Vraag: "Wat is SaaS?" → "is SaaS een softwaremodel waarbij..."
+    Vraag: "Wat doet een klantcontact-medewerker?" → "behandelt een klantcontact-medewerker vragen van klanten via..."
+- Schrijf NOOIT zelf de opening ("Even kort", "In het algemeen", "Dit valt buiten...").
+- Schrijf NOOIT zelf een afsluitende vraag of uitnodiging ("Wil je weten...", "Heb je verder...", "Kan ik je nog..."). Die sluiting wordt automatisch na jouw output geplakt.
+- Eindig met een punt na de laatste inhoudelijke zin.
+- Geen citations, geen <thinking>-tags, geen confidence, geen lijsten — alleen 1-2 vlotte zinnen.`;
         yield {
           kind: 'answer-start',
           botVersion: bot.version,
@@ -1595,37 +1631,27 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
           rewrite: rewriteInfo,
           threshold,
         };
-        let genAccText = '';
+        let modelText = '';
         let genChatInputTokens = 0;
         let genChatOutputTokens = 0;
         let genChatCostUsd = 0;
         const stopGenerationGen = tMark('generation_ms');
         try {
-          const stream = await openai().chat.completions.create({
+          const resp = await openai().chat.completions.create({
             model: bot.chatModel,
             temperature: bot.chatTemperature,
             max_tokens: 200,
-            stream: true,
-            stream_options: { include_usage: true },
             messages: [
               { role: 'system', content: generalSystem },
               { role: 'user', content: original },
             ],
           });
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) {
-              genAccText += delta;
-              yield { kind: 'answer-delta', text: delta };
-            }
-            if (chunk.usage) {
-              genChatInputTokens = chunk.usage.prompt_tokens ?? 0;
-              genChatOutputTokens = chunk.usage.completion_tokens ?? 0;
-              genChatCostUsd =
-                (genChatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-                (genChatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
-            }
-          }
+          modelText = resp.choices[0]?.message?.content ?? '';
+          genChatInputTokens = resp.usage?.prompt_tokens ?? 0;
+          genChatOutputTokens = resp.usage?.completion_tokens ?? 0;
+          genChatCostUsd =
+            (genChatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
+            (genChatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
         } catch (err) {
           stopGenerationGen();
           const code = classifyLlmError(err);
@@ -1634,6 +1660,35 @@ Geen citations, geen <thinking>-tags, geen confidence — alleen het korte vlott
           return;
         }
         stopGenerationGen();
+
+        // Post-hoc sanitize: strip opening-varianten, sluiting-varianten,
+        // en force lowercase op de eerste letter zodat de zin grammaticaal
+        // aansluit op "...in het algemeen ".
+        let core = modelText.trim();
+        core = core.replace(/^Even kort[:,—-]?\s*/i, '');
+        core = core.replace(/^Dit valt buiten onze specifieke documentatie,?\s*maar\s*/i, '');
+        core = core.replace(/^In het algemeen[:,]?\s*/i, '');
+        core = core.replace(
+          /\s*Wil je(?: meer)? weten\s+hoe\s+ChatManta\s+hier\s+(?:specifiek\s+)?mee\s+omgaat\??\s*(?:Vraag gerust\.?)?\s*$/i,
+          '',
+        );
+        core = core.replace(
+          /\s*(?:Heb je verder nog vragen|Kan ik je nog ergens mee helpen|Wil je meer weten)\??\s*$/i,
+          '',
+        );
+        core = core.trim();
+        if (core.length > 0 && /^[A-ZÀ-Ý]/.test(core)) {
+          core = core[0].toLowerCase() + core.slice(1);
+        }
+        if (core.length > 0 && !/[.!?]$/.test(core)) {
+          core += '.';
+        }
+
+        const finalAnswer = GENERAL_OPENING + core + GENERAL_CLOSING;
+        // Eén delta met het volledige antwoord — geen streaming voor GENERAL,
+        // maar UI-contract (answer-start → delta(s) → answer-done) blijft intact.
+        yield { kind: 'answer-delta', text: finalAnswer };
+        const genAccText = finalAnswer;
 
         const phaseTimingsGen: PhaseTimings = {
           embedding_ms: timings.embedding_ms ?? 0,
@@ -2175,10 +2230,12 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   }
 
   // Finale phaseTimingsMs — bevat nu ook followups_ms (als die ran). total_ms
-  // wordt opnieuw berekend zodat de followups-tijd erin meetelt.
+  // BLIJFT bevroren op het answer-done moment (time-to-final-answer = wat de
+  // gebruiker voelt). Followups draait na de answer-done yield en wordt apart
+  // gerapporteerd via followups_ms — dat dubbel optellen in total_ms zou de
+  // gerapporteerde SLA ~p95 = 3s slechter maken dan de UX is.
   const phaseTimingsFinal: PhaseTimings = {
     ...phaseTimingsAtAnswer,
-    total_ms: Math.round(performance.now() - tPipelineStart),
     ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
   };
   yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsFinal };

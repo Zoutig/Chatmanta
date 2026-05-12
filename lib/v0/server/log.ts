@@ -200,7 +200,15 @@ export async function logQuery(
     const generationMs = typeof t?.generation_ms === 'number' ? t.generation_ms : null;
     const totalMs = typeof t?.total_ms === 'number' ? t.total_ms : null;
     const hydeMs = typeof t?.hyde_ms === 'number' ? t.hyde_ms : null;
-    const phaseTimings = t ?? null;
+    // V0.5 latency-budget telemetry: extras.latencyBudgetExceeded zit als
+    // broer-veld náást phaseTimingsMs op extras. Mergen we in de jsonb mee,
+    // anders is de skip-logica observability-loos buiten de live SSE-stream.
+    const lbe = extras?.latencyBudgetExceeded;
+    const phaseTimings = t
+      ? lbe
+        ? { ...t, latencyBudgetExceeded: lbe }
+        : t
+      : null;
     const fromCache = extras?.fromCache === true;
 
     const row: QueryLogRow =
