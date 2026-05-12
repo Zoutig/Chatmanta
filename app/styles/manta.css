@@ -1098,6 +1098,24 @@ html[data-style="manta"] [data-manta-send]:hover:not(:disabled) {
 html[data-style="manta"] [data-manta-send]:active:not(:disabled) {
   transform: translateY(0);
 }
+/* Disabled-state override: behoud accent-look maar dimmed — button-1's
+   default disabled-style (grijs #f2f2f2) leest in Manta-mode als "kapot".
+   Selector-specificity ([data-attr]:pseudo = 0,2,0) > Tailwind arbitrary class
+   (0,1,0), dus de bg/color hier winnen zonder !important. */
+html[data-style="manta"] [data-manta-send]:disabled {
+  background: color-mix(in oklab, var(--primary) 35%, transparent);
+  color: color-mix(in oklab, var(--primary-foreground, #fff) 65%, transparent);
+  border-color: transparent;
+  cursor: not-allowed;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 2px rgba(10, 15, 23, 0.04);
+  transform: none;
+  filter: none;
+}
+html[data-style="manta"] [data-manta-send]:disabled .manta-send-arrow {
+  opacity: 0.5;
+}
 
 /* Pijl-suffix — schuift rechts op hover. */
 html[data-style="manta"] .manta-send-arrow {
