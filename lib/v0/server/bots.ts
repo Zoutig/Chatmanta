@@ -89,6 +89,27 @@ export type BotConfig = {
    * lijn met de blueprint similarity threshold. Validatie via eval-corpus.
    */
   claimVerificationThreshold: number;
+  /**
+   * v0.5: bij retrieval zero-hits (allSources < threshold), draait een
+   * tweede-stage re-classifier (lib/v0/server/reclassify.ts). Bij category
+   * 'general' beantwoorden we met een aparte general-knowledge prompt + een
+   * verplichte disclaimer; bij 'off_topic' geven we een vaste polite refusal
+   * zonder LLM-call. Default false — alleen v0.5 zet dit aan.
+   */
+  generalKnowledgeEnabled: boolean;
+  /**
+   * v0.5: bij claim-verification met verifiedRatio < claimRegenerateThreshold
+   * draaien we één extra answer-LLM-call met een striktere system-prompt
+   * (alleen feiten uit chunks). Het resultaat wordt via een SSE 'replacement'
+   * event naar de UI gestuurd. Max één retry per query. Default false.
+   */
+  claimRegenerateEnabled: boolean;
+  /**
+   * v0.5: drempel waaronder claimRegenerate triggert. 0.5 = "meer dan helft
+   * van de claims niet vector-similar aan enige chunk". Lager = strenger,
+   * meer retries. Negeerd als claimRegenerateEnabled=false.
+   */
+  claimRegenerateThreshold: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -120,6 +141,9 @@ const V0_1: BotConfig = {
   selectiveHyDETrigger: 0.5,
   claimVerification: false,
   claimVerificationThreshold: 0.7,
+  generalKnowledgeEnabled: false,
+  claimRegenerateEnabled: false,
+  claimRegenerateThreshold: 0.5,
   systemPrompt: `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon:
