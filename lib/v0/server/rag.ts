@@ -253,12 +253,22 @@ async function preProcessInput(
   history: ChatHistoryTurn[] = [],
 ): Promise<PreProcessResult> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS);
-  const userMessage = trimmed.length === 0
-    ? original
-    : `${formatHistoryBlock(trimmed)}HUIDIGE INPUT: ${original}`;
+  const hasHistory = trimmed.length > 0;
+  const userMessage = hasHistory
+    ? `${formatHistoryBlock(trimmed)}HUIDIGE INPUT: ${original}`
+    : original;
+  // V0.5: prepend multi-turn-addon (STAP 0 context-resolutie) ALLEEN bij
+  // history-aanwezigheid. Single-turn queries krijgen de base prompt zonder
+  // STAP 0 — voorkomt prompt-overload op adversarial cases (zie eval Run 3
+  // analyse: grounding-dip op false-premise / out-of-corpus / typo cases was
+  // gekoppeld aan langere prompt). v0.1-v0.4 hebben addon='' dus geen effect.
+  const systemPrompt =
+    hasHistory && bot.preProcessMultiTurnAddon.length > 0
+      ? `${bot.preProcessMultiTurnAddon}\n\n${bot.preProcessSystem}`
+      : bot.preProcessSystem;
   const result = await chatComplete({
     model: bot.chatModel,
-    system: bot.preProcessSystem,
+    system: systemPrompt,
     user: userMessage,
     temperature: V0_RAG_DEFAULTS.REWRITE_TEMPERATURE,
     maxTokens: V0_RAG_DEFAULTS.REWRITE_MAX_TOKENS,

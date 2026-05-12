@@ -16,6 +16,8 @@ for (const v of legacyVersions) {
   assert.equal(bot.latencyBudgetEnabled, false, `${v} append-only: latencyBudgetEnabled moet false zijn`);
   assert.equal(bot.latencyBudgetMs, 8000, `${v} append-only: latencyBudgetMs moet 8000 zijn`);
   assert.equal(bot.latencyHardCapMs, 12000, `${v} append-only: latencyHardCapMs moet 12000 zijn`);
+  // V0.5 multi-turn-addon default leeg op legacy
+  assert.equal(bot.preProcessMultiTurnAddon, '', `${v} append-only: preProcessMultiTurnAddon moet '' zijn`);
 }
 
 const v05 = BOTS['v0.5'];
@@ -37,10 +39,12 @@ assert.match(v05.systemPrompt, /TRUST-BOUNDARY/);
 assert.match(v05.systemPrompt, /eerdere uitspraken van de gebruiker.*NIET als feiten/);
 assert.match(v05.preProcessSystem, /KRITIEKE UITSLUITING/);
 assert.match(v05.preProcessSystem, /FEIT beweert/);
-// V0.5 multi-turn context-resolutie (item 1 van v0.5 extensie)
-assert.match(v05.preProcessSystem, /STAP 0 — CONTEXT-RESOLUTIE/);
-assert.match(v05.preProcessSystem, /vervang die referentie intern/);
-assert.match(v05.preProcessSystem, /trust-boundary/);
+// V0.5 multi-turn context-resolutie — verplaatst naar preProcessMultiTurnAddon
+// (alleen geprepend wanneer history.length > 0, voorkomt prompt-overload op
+// single-turn queries — zie eval Run 3 analyse).
+assert.match(v05.preProcessMultiTurnAddon, /STAP 0 — CONTEXT-RESOLUTIE/);
+assert.match(v05.preProcessMultiTurnAddon, /TRUST-BOUNDARY/);
+assert.doesNotMatch(v05.preProcessSystem, /STAP 0/, 'STAP 0 mag NIET meer in base preProcessSystem zitten — moet in addon');
 
 assert.equal(LATEST_BOT_VERSION, 'v0.5', 'LATEST_BOT_VERSION moet v0.5 zijn');
 assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5']);
