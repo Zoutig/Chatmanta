@@ -974,6 +974,14 @@ html[data-style="manta"] .manta-glass-tinted {
   border-color: color-mix(in oklab, var(--manta-teal) 30%, transparent);
 }
 
+/* Docs-panel upload + crawl knoppen: Manta-tinted hover (zachter dan
+   button-1's default secondary→gray-alpha overlay, dat in Manta-context
+   te abrupt-donker leest). */
+html[data-style="manta"] .docs-actions button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--manta-teal) 8%, transparent);
+  border-color: color-mix(in oklab, var(--manta-teal) 22%, transparent);
+}
+
 html[data-style="manta"] .manta-pill-popover,
 html[data-style="manta"] .manta-threshold-popover {
   position: absolute;
@@ -1117,20 +1125,19 @@ html[data-style="manta"] [data-manta-send]:disabled .manta-send-arrow {
   opacity: 0.5;
 }
 
-/* Pijl-suffix — schuift rechts op hover. */
+/* Pijl-icoon — subtiele lift + opacity-bump op hover (ronde knop). */
 html[data-style="manta"] .manta-send-arrow {
-  margin-left: 2px;
-  opacity: 0.85;
+  opacity: 0.9;
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
               opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 html[data-style="manta"] [data-manta-send]:hover:not(:disabled) .manta-send-arrow {
-  transform: translateX(4px);
+  transform: translateY(-1px) scale(1.08);
   opacity: 1;
 }
 html[data-style="manta"] [data-manta-send]:active:not(:disabled) .manta-send-arrow {
-  transform: translateX(7px);
-  opacity: 0.8;
+  transform: translateY(0) scale(1.04);
+  opacity: 0.9;
 }
 
 /* Shimmer-sweep — witte diagonale glans veegt over de knop op hover.

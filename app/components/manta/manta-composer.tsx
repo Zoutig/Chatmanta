@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { Icon } from '../svg-icons';
 import { Button as Button1 } from '../ui/button-1';
 import type { Length, Tone } from '@/lib/v0/style-types';
@@ -95,7 +95,8 @@ export function MantaComposer({
           <Button1
             type="manta"
             size="medium"
-            shape="square"
+            shape="circle"
+            svgOnly
             data-manta-send
             disabled={pending}
             loading={pending}
@@ -103,16 +104,13 @@ export function MantaComposer({
             aria-label="Verstuur"
             title="Verstuur (↵)"
             className="relative overflow-hidden group/send"
-            suffix={
-              <ArrowRight
-                className="manta-send-arrow"
-                size={14}
-                strokeWidth={2.2}
-                aria-hidden="true"
-              />
-            }
           >
-            Verstuur
+            <ArrowUp
+              className="manta-send-arrow"
+              size={16}
+              strokeWidth={2.4}
+              aria-hidden="true"
+            />
           </Button1>
         </div>
       </div>
