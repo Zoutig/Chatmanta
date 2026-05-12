@@ -29,6 +29,10 @@ assert.match(v05.systemPrompt, /TRUST-BOUNDARY/);
 assert.match(v05.systemPrompt, /eerdere uitspraken van de gebruiker.*NIET als feiten/);
 assert.match(v05.preProcessSystem, /KRITIEKE UITSLUITING/);
 assert.match(v05.preProcessSystem, /FEIT beweert/);
+// V0.5 multi-turn context-resolutie (item 1 van v0.5 extensie)
+assert.match(v05.preProcessSystem, /STAP 0 — CONTEXT-RESOLUTIE/);
+assert.match(v05.preProcessSystem, /vervang die referentie intern/);
+assert.match(v05.preProcessSystem, /trust-boundary/);
 
 assert.equal(LATEST_BOT_VERSION, 'v0.5', 'LATEST_BOT_VERSION moet v0.5 zijn');
 assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5']);
