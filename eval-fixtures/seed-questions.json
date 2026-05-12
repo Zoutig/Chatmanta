@@ -146,6 +146,96 @@
       "gold_facts": [],
       "tags": ["smalltalk", "preprocessor"],
       "difficulty": "easy"
+    },
+    {
+      "slug": "general-mkb",
+      "question": "Wat zijn MKB-bedrijven?",
+      "gold_answer": "MKB-bedrijven (midden- en kleinbedrijf) zijn ondernemingen met een beperkt aantal medewerkers en omzet — in Nederland typisch tot ~250 werknemers. Ze vormen de ruggengraat van de economie en hebben vaak andere IT-/automatiseringsbehoeften dan grote enterprises.",
+      "gold_facts": ["midden- en kleinbedrijf", "kleinere organisaties"],
+      "tags": ["general", "mkb"],
+      "difficulty": "easy",
+      "category": "general"
+    },
+    {
+      "slug": "general-rag",
+      "question": "Wat is RAG?",
+      "gold_answer": "RAG staat voor Retrieval-Augmented Generation: een techniek waarbij een taalmodel relevante stukken tekst uit een eigen kennisbron ophaalt en die als context meegeeft aan de generatie, zodat het antwoord op echte feiten gebaseerd is.",
+      "gold_facts": ["Retrieval-Augmented Generation", "context-injectie", "vermindert hallucinatie"],
+      "tags": ["general", "ai"],
+      "difficulty": "easy",
+      "category": "general"
+    },
+    {
+      "slug": "general-saas",
+      "question": "Wat is SaaS?",
+      "gold_answer": "SaaS (Software as a Service) is een softwaremodel waarbij applicaties via internet worden aangeboden tegen een abonnement, in plaats van als lokaal geïnstalleerd product. Klanten betalen voor gebruik en updates lopen automatisch.",
+      "gold_facts": ["Software as a Service", "abonnement", "via internet"],
+      "tags": ["general", "saas"],
+      "difficulty": "easy",
+      "category": "general"
+    },
+    {
+      "slug": "general-klantcontact",
+      "question": "Wat doet een klantcontact-medewerker?",
+      "gold_answer": "Een klantcontact-medewerker beantwoordt vragen van klanten via telefoon, e-mail, chat of social media, lost problemen op, en zorgt dat de klant zich gehoord en geholpen voelt. Doel is klanttevredenheid en oplossen van eerste-lijns-vragen.",
+      "gold_facts": ["klantvragen beantwoorden", "eerste-lijns", "klanttevredenheid"],
+      "tags": ["general", "klantcontact"],
+      "difficulty": "easy",
+      "category": "general"
+    },
+    {
+      "slug": "general-vector-database",
+      "question": "Wat is een vector database?",
+      "gold_answer": "Een vector database slaat data op als hoog-dimensionale getallenvectoren (bv. embeddings) en kan snel zoeken naar vectoren die qua afstand het meest lijken op een queryvector. Gebruikt voor semantische zoekfuncties en RAG-systemen.",
+      "gold_facts": ["embeddings", "similarity-search", "semantisch zoeken"],
+      "tags": ["general", "ai"],
+      "difficulty": "easy",
+      "category": "general"
+    },
+    {
+      "slug": "off-topic-hoofdstad",
+      "question": "Wat is de hoofdstad van Frankrijk?",
+      "gold_answer": "(Bot moet refuseren met een polite redirect naar ChatManta-onderwerpen — niet Parijs zeggen.)",
+      "gold_facts": [],
+      "tags": ["off_topic", "refusal"],
+      "difficulty": "easy",
+      "category": "off_topic"
+    },
+    {
+      "slug": "off-topic-gedicht",
+      "question": "Schrijf een gedicht over zalmen",
+      "gold_answer": "(Bot moet refuseren met een polite redirect — geen creatieve output buiten domein.)",
+      "gold_facts": [],
+      "tags": ["off_topic", "refusal"],
+      "difficulty": "easy",
+      "category": "off_topic"
+    },
+    {
+      "slug": "off-topic-rekensom",
+      "question": "Hoeveel is 743 × 28?",
+      "gold_answer": "(Bot moet refuseren — niet een rekenkundige assistent.)",
+      "gold_facts": [],
+      "tags": ["off_topic", "refusal"],
+      "difficulty": "easy",
+      "category": "off_topic"
+    },
+    {
+      "slug": "multi-turn-baseline-stack",
+      "question": "Welke stack gebruikt ChatManta voor RAG?",
+      "gold_answer": "ChatManta gebruikt OpenAI text-embedding-3-small voor embeddings (1536 dim) en Postgres met pgvector voor de vector-database, met Anthropic Claude Haiku 4.5 als V1 LLM (V0 draait op gpt-4o-mini). Hosting op Vercel.",
+      "gold_facts": ["text-embedding-3-small", "pgvector", "Claude Haiku 4.5", "Vercel"],
+      "tags": ["stack", "multi-turn-baseline"],
+      "difficulty": "medium",
+      "category": "search"
+    },
+    {
+      "slug": "multi-turn-baseline-followup-prijzen",
+      "question": "En wat kost het ongeveer per klant?",
+      "gold_answer": "(Multi-turn opvolger op stack-vraag — in een nieuwe single-turn context heeft de bot waarschijnlijk te weinig signaal en zal eerlijk zeggen onvoldoende informatie te hebben. Baseline-meting voor v0.6 multi-turn awareness.)",
+      "gold_facts": [],
+      "tags": ["multi-turn-baseline", "pricing"],
+      "difficulty": "hard",
+      "category": "search"
     }
   ]
 }

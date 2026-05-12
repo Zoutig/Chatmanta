@@ -20,6 +20,10 @@ type SeedQuestion = {
   gold_facts: string[];
   tags: string[];
   difficulty: 'easy' | 'medium' | 'hard';
+  /** v0.5: verwacht bot-gedrag voor route-correctness eval. Optioneel —
+      cases zonder category krijgen NULL in de DB (judge meet route_correct
+      dan niet). */
+  category?: 'search' | 'general' | 'off_topic' | 'smalltalk';
 };
 
 type SeedFile = {
@@ -63,6 +67,13 @@ for (const q of parsed.questions) {
   if (!['easy', 'medium', 'hard'].includes(q.difficulty)) {
     fail(`slug=${q.slug}: difficulty moet easy|medium|hard zijn (kreeg "${q.difficulty}")`);
   }
+  if (q.category !== undefined) {
+    if (!['search', 'general', 'off_topic', 'smalltalk'].includes(q.category)) {
+      fail(
+        `slug=${q.slug}: category moet search|general|off_topic|smalltalk zijn (kreeg "${q.category}")`,
+      );
+    }
+  }
 }
 
 async function main(): Promise<void> {
@@ -94,6 +105,7 @@ async function main(): Promise<void> {
       gold_facts: q.gold_facts,
       tags: q.tags,
       difficulty: q.difficulty,
+      category: q.category ?? null,
     };
 
     if (existing) {
