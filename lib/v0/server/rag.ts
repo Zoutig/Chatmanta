@@ -715,6 +715,8 @@ type RawChunk = {
   /** v0.4 parent-document retrieval — null als chunk geen parent heeft (oude ingest). */
   parent_chunk_id?: string | null;
   parent_content?: string | null;
+  /** v0.6 — parent_chunks.parent_index (0-indexed). NULL als geen parent. UI displayt als parent_index + 1. */
+  parent_index?: number | null;
 };
 
 export type RetrievedChunk = RawChunk & { filename: string | null };
@@ -774,17 +776,27 @@ async function hydrateParentContent(chunks: RetrievedChunk[]): Promise<void> {
   const sb = supabase();
   const { data, error } = await sb
     .from('parent_chunks')
-    .select('id, content')
+    .select('id, content, parent_index')
     .in('id', parentIds);
   if (error) {
     // Niet fataal — fall-back: chunk content gebruikt zoals eerst.
     console.warn('[parent_chunks] hydrate failed:', error.message);
-    for (const c of needsHydration) c.parent_content = null;
+    for (const c of needsHydration) {
+      c.parent_content = null;
+      c.parent_index = null;
+    }
     return;
   }
-  const byId = new Map((data ?? []).map((r) => [r.id as string, r.content as string]));
+  const byId = new Map(
+    (data ?? []).map((r) => [
+      r.id as string,
+      { content: r.content as string, parent_index: r.parent_index as number },
+    ]),
+  );
   for (const c of needsHydration) {
-    c.parent_content = byId.get(c.parent_chunk_id as string) ?? null;
+    const hit = byId.get(c.parent_chunk_id as string);
+    c.parent_content = hit?.content ?? null;
+    c.parent_index = hit?.parent_index ?? null;
   }
 }
 
@@ -806,6 +818,13 @@ export type ChatSource = {
    * de LLM en grounding eerlijk kan beoordelen.
    */
   parentExcerpt?: string;
+  /**
+   * v0.6 — 0-indexed positie van de parent-chunk binnen het document
+   * (parent_chunks.parent_index). De UI displayt als `Sectie {parentIndex + 1}`.
+   * NULL of undefined als de chunk geen parent heeft (oude ingest zonder
+   * parent_chunk_id) — UI laat dan geen Sectie-badge zien.
+   */
+  parentIndex?: number | null;
 };
 
 export type ChatRewriteInfo = {
@@ -916,8 +935,37 @@ export type ChatResponse =
       totalCostUsd: number;
     });
 
-const EXCERPT_CHARS = 240;
-const PARENT_EXCERPT_CHARS = 1500;
+const EXCERPT_MIN = 180;
+const EXCERPT_MAX = 260;
+const PARENT_EXCERPT_MIN = 1200;
+const PARENT_EXCERPT_MAX = 1500;
+
+/**
+ * Smart truncation: knip op zin-grens binnen [min, max] waar mogelijk, anders
+ * laatste spatie in venster, anders harde slice. Geeft altijd ` …` suffix als
+ * er getrunceerd is. Sentence-end = `.` `!` `?` of newline.
+ */
+function truncateSentence(text: string, min: number, max: number): string {
+  if (text.length <= max) return text;
+  // Zoek laatste zin-grens in [min, max]
+  const window = text.slice(0, max);
+  const sentenceEnd = Math.max(
+    window.lastIndexOf('.'),
+    window.lastIndexOf('!'),
+    window.lastIndexOf('?'),
+    window.lastIndexOf('\n'),
+  );
+  if (sentenceEnd >= min) {
+    return text.slice(0, sentenceEnd + 1).trimEnd() + ' …';
+  }
+  // Fall back op laatste spatie in venster
+  const spaceIdx = window.lastIndexOf(' ');
+  if (spaceIdx >= min) {
+    return text.slice(0, spaceIdx).trimEnd() + ' …';
+  }
+  // Geen geschikt grenspunt — harde slice (oude gedrag)
+  return text.slice(0, max).trimEnd() + '…';
+}
 
 function toSource(c: RetrievedChunk): ChatSource {
   const parent = c.parent_content ?? null;
@@ -925,15 +973,11 @@ function toSource(c: RetrievedChunk): ChatSource {
     id: c.id,
     filename: c.filename,
     similarity: c.similarity,
-    contentExcerpt:
-      c.content.length > EXCERPT_CHARS
-        ? c.content.slice(0, EXCERPT_CHARS).trimEnd() + '…'
-        : c.content,
+    contentExcerpt: truncateSentence(c.content, EXCERPT_MIN, EXCERPT_MAX),
     parentExcerpt: parent
-      ? parent.length > PARENT_EXCERPT_CHARS
-        ? parent.slice(0, PARENT_EXCERPT_CHARS).trimEnd() + '…'
-        : parent
+      ? truncateSentence(parent, PARENT_EXCERPT_MIN, PARENT_EXCERPT_MAX)
       : undefined,
+    parentIndex: c.parent_index ?? null,
   };
 }
 
