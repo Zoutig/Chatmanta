@@ -459,7 +459,11 @@ async function retrieveChunksHybrid(
 // dezelfde vraag — zonder best-sim-log is niet te zien of dat door (a) lege
 // cache, (b) te streng threshold, of (c) andere oorzaak komt.
 // ---------------------------------------------------------------------------
-const CACHE_HIT_THRESHOLD = 0.97;
+// v0.5 — 0.97 was te streng (test-set 17 vragen → 0 hits). 0.93 = "zelfde
+// vraag-ish" volgens text-embedding-3-small op NL-tekst. Bij regressie
+// (false-hits) snel terug naar 0.95. Hit + miss top-1-sim wordt nu beide
+// gelogd zodat we de optimale waarde later op echte data kunnen bisecten.
+const CACHE_HIT_THRESHOLD = 0.93;
 
 async function lookupCachedAnswer(
   queryVector: number[],
@@ -488,6 +492,9 @@ async function lookupCachedAnswer(
     );
     return null;
   }
+  console.info(
+    `[cache] HIT — top_sim=${top.similarity.toFixed(3)} (≥${CACHE_HIT_THRESHOLD}) org=${organizationId} ver=${botVersion} id=${top.id}`,
+  );
   // Bump hit_count fire-and-forget.
   sb.from('answer_cache')
     .update({ hit_count: undefined, last_hit_at: new Date().toISOString() })
