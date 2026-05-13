@@ -11,6 +11,13 @@ import type {
   EvalSnapshotQuestion,
   EvalSnapshotRun,
 } from '@/lib/v0/server/evals-snapshot';
+import {
+  STAGE_KEYS,
+  computeStagePercentiles,
+  slowestStageByQuestionType,
+  type RunWithStageTimings,
+  type StageKey,
+} from '@/lib/v0/server/eval-latency-stats';
 
 export function EvalsView() {
   const [snapshot, setSnapshot] = useState<EvalSnapshot | null>(null);
@@ -85,6 +92,8 @@ export function EvalsView() {
   return (
     <div className="evals-view">
       <SummaryStrip snapshot={snapshot} onRefresh={() => void load()} loading={loading} />
+
+      <StageLatencyPanel snapshot={snapshot} />
 
       <div className="evals-meta">
         <span>{snapshot.questions.length} vragen</span>
@@ -393,6 +402,280 @@ function VersionDetail({ run }: { run: EvalSnapshotRun }) {
         </details>
       ) : null}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StageLatencyPanel — migration 0019 visualisatie.
+//
+// Toont per (botVersion) een gestapelde bar van stage-p50's + p50/p95 cijfers,
+// en daaronder een tabel "slowest stage per question_type". Filter op
+// question_type werkt in-memory op de bestaande snapshot — geen extra fetch.
+// Default collapsed zodat de Evals-tab op kleine schermen niet meteen
+// volgepropt staat.
+// ---------------------------------------------------------------------------
+
+const STAGE_CSS_VAR: Record<StageKey, string> = {
+  preprocess_ms: '--phase-preprocess',
+  cache_lookup_ms: '--phase-cache-lookup',
+  decompose_ms: '--phase-decompose',
+  hyde_ms: '--phase-hyde',
+  expand_ms: '--phase-expand',
+  embedding_ms: '--phase-embedding',
+  retrieval_ms: '--phase-retrieval',
+  rerank_ms: '--phase-rerank',
+  generation_ms: '--phase-generation',
+  verify_ms: '--phase-verify',
+  followups_ms: '--phase-followups',
+  cascade_ms: '--phase-cascade',
+  total_ms: '--fg-faint', // unused — total wordt niet als bar-segment gerenderd
+};
+
+function shortStage(stage: StageKey): string {
+  // Drop het '_ms' suffix voor compacte labels.
+  return stage.replace(/_ms$/, '');
+}
+
+function StageLatencyPanel({ snapshot }: { snapshot: EvalSnapshot }) {
+  const [open, setOpen] = useState(false);
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<string>('alle');
+
+  // Map questionId → questionType voor segmentatie.
+  const qTypeByQId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const q of snapshot.questions) m.set(q.id, q.questionType);
+    return m;
+  }, [snapshot.questions]);
+
+  const allQuestionTypes = useMemo(() => {
+    const s = new Set<string>();
+    for (const q of snapshot.questions) s.add(q.questionType);
+    return ['alle', ...[...s].sort()];
+  }, [snapshot.questions]);
+
+  // Filter runs op question_type indien actief.
+  const filteredRuns: RunWithStageTimings[] = useMemo(() => {
+    return snapshot.runs
+      .filter((r) => {
+        if (questionTypeFilter === 'alle') return true;
+        return qTypeByQId.get(r.questionId) === questionTypeFilter;
+      })
+      .map((r) => ({
+        questionId: r.questionId,
+        botVersion: r.botVersion,
+        stageTimingsMs: r.stageTimingsMs,
+      }));
+  }, [snapshot.runs, qTypeByQId, questionTypeFilter]);
+
+  const pctls = useMemo(() => computeStagePercentiles(filteredRuns), [filteredRuns]);
+  const slowest = useMemo(
+    () => slowestStageByQuestionType(filteredRuns, qTypeByQId),
+    [filteredRuns, qTypeByQId],
+  );
+
+  // Bouw per-version groep: { version: { stage: p50, total: p50, p95 } }.
+  const perVersion = useMemo(() => {
+    type Row = { stage: StageKey; p50: number; p95: number };
+    const map = new Map<string, { rows: Row[]; total: Row | null }>();
+    for (const r of pctls) {
+      let entry = map.get(r.botVersion);
+      if (!entry) {
+        entry = { rows: [], total: null };
+        map.set(r.botVersion, entry);
+      }
+      if (r.stage === 'total_ms') {
+        entry.total = { stage: r.stage, p50: r.p50, p95: r.p95 };
+      } else {
+        entry.rows.push({ stage: r.stage, p50: r.p50, p95: r.p95 });
+      }
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [pctls]);
+
+  const haveData = perVersion.length > 0;
+
+  return (
+    <div className="evals-stage-panel" style={{ marginTop: 12 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          display: 'flex',
+          width: '100%',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 10px',
+          background: 'var(--bg-soft, transparent)',
+          border: '1px solid var(--border, #2a2a2a)',
+          borderRadius: 6,
+          color: 'inherit',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <span>Stage latency · p50 / p95</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--fg-faint)' }}>
+          {haveData ? `${perVersion.length} versies` : 'geen data'}
+        </span>
+      </button>
+
+      {open ? (
+        <div style={{ padding: '10px 4px 4px' }}>
+          {!haveData ? (
+            <p style={{ fontSize: 12, color: 'var(--fg-faint)', margin: 0 }}>
+              Geen runs met <code>stage_timings_ms</code> — pre-migration data of nog
+              geen recente eval-runs gedraaid sinds migration 0019.
+            </p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 11 }}>
+                <label htmlFor="qt-filter" style={{ color: 'var(--fg-faint)' }}>
+                  question_type:
+                </label>
+                <select
+                  id="qt-filter"
+                  value={questionTypeFilter}
+                  onChange={(e) => setQuestionTypeFilter(e.target.value)}
+                  style={{
+                    background: 'var(--bg-soft, transparent)',
+                    color: 'inherit',
+                    border: '1px solid var(--border, #2a2a2a)',
+                    borderRadius: 4,
+                    padding: '2px 6px',
+                    fontSize: 11,
+                  }}
+                >
+                  {allQuestionTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {perVersion.map(([version, entry]) => (
+                  <StageBarRow key={version} version={version} rows={entry.rows} total={entry.total} />
+                ))}
+              </div>
+
+              {questionTypeFilter === 'alle' && slowest.length > 0 ? (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--fg-faint)' }}>
+                    Slowest stage per question_type
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 0.6fr', gap: 4, fontSize: 11 }}>
+                    <div style={{ color: 'var(--fg-faint)' }}>type</div>
+                    <div style={{ color: 'var(--fg-faint)' }}>versie</div>
+                    <div style={{ color: 'var(--fg-faint)' }}>bottleneck</div>
+                    <div style={{ color: 'var(--fg-faint)', textAlign: 'right' }}>% van total</div>
+                    {slowest.map((row, i) => (
+                      <Slot key={i} row={row} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StageBarRow({
+  version,
+  rows,
+  total,
+}: {
+  version: string;
+  rows: { stage: StageKey; p50: number; p95: number }[];
+  total: { stage: StageKey; p50: number; p95: number } | null;
+}) {
+  const totalP50 = total?.p50 ?? rows.reduce((s, r) => s + r.p50, 0);
+  const totalP95 = total?.p95 ?? null;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, marginBottom: 3 }}>
+        <span style={{ fontWeight: 600 }}>{version}</span>
+        <span style={{ color: 'var(--fg-faint)' }}>
+          p50 {totalP50}ms{totalP95 !== null ? ` · p95 ${totalP95}ms` : ''}
+        </span>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          height: 14,
+          width: '100%',
+          borderRadius: 3,
+          overflow: 'hidden',
+          background: 'var(--bg-soft, #1a1a1a)',
+        }}
+        title={rows.map((r) => `${shortStage(r.stage)}: ${r.p50}ms`).join(' · ')}
+      >
+        {rows.map((r) => {
+          const pct = totalP50 > 0 ? (r.p50 / totalP50) * 100 : 0;
+          if (pct < 0.5) return null; // hide invisibly thin segments
+          return (
+            <span
+              key={r.stage}
+              style={{
+                width: `${pct}%`,
+                background: `var(${STAGE_CSS_VAR[r.stage]})`,
+              }}
+              title={`${shortStage(r.stage)}: ${r.p50}ms p50, ${r.p95}ms p95`}
+            />
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4, fontSize: 10 }}>
+        {rows.map((r) => (
+          <span key={r.stage} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                background: `var(${STAGE_CSS_VAR[r.stage]})`,
+                borderRadius: 2,
+              }}
+            />
+            <span style={{ color: 'var(--fg-faint)' }}>
+              {shortStage(r.stage)} {r.p50}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Slot({
+  row,
+}: {
+  row: { questionType: string; botVersion: string; slowestStage: StageKey; p50: number; pctOfTotal: number };
+}) {
+  return (
+    <>
+      <div>{row.questionType}</div>
+      <div>{row.botVersion}</div>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            background: `var(${STAGE_CSS_VAR[row.slowestStage]})`,
+            borderRadius: 2,
+            display: 'inline-block',
+          }}
+        />
+        {shortStage(row.slowestStage)} ({row.p50}ms)
+      </div>
+      <div style={{ textAlign: 'right' }}>{row.pctOfTotal}%</div>
+    </>
   );
 }
 

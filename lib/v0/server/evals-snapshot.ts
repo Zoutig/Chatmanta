@@ -19,7 +19,11 @@
 import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { DEV_ORG_ID } from './rag';
+import { DEV_ORG_ID, type PhaseTimings } from './rag';
+
+// Re-export zodat UI-componenten PhaseTimings via deze module kunnen importeren
+// zonder direct in server-internals (./rag) te reiken.
+export type { PhaseTimings };
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -41,6 +45,9 @@ export type EvalSnapshotQuestion = {
   goldFacts: string[];
   tags: string[];
   difficulty: 'easy' | 'medium' | 'hard';
+  // Migration 0015: question_type voor segmentatie. Default 'factual' bij
+  // NULL/onbekend zodat downstream logica nooit op een leeg type stuit.
+  questionType: string;
 };
 
 export type EvalSnapshotSource = {
@@ -65,6 +72,9 @@ export type EvalSnapshotRun = {
   judgeParseError: boolean;
   judgeCostUsd: number;
   judgeLatencyMs: number;
+  // Migration 0019: per-stage latency snapshot (PhaseTimings van rag.ts).
+  // NULL voor pre-migration rows en synthetic-fallback rows.
+  stageTimingsMs: PhaseTimings | null;
   createdAt: string;
 };
 
@@ -99,13 +109,27 @@ function safeSources(raw: unknown): EvalSnapshotSource[] {
     .filter((s): s is EvalSnapshotSource => s !== null);
 }
 
+// Parsing-guard voor de stage_timings_ms JSONB-kolom (migration 0019).
+// Accepteert alleen objecten met numerieke total_ms (de minimale shape die
+// PhaseTimings garandeert). Onbekende keys laten we doorlopen — extra optionele
+// stages zoals hyde_ms / verify_ms blijven gewoon werken.
+function safeStageTimings(raw: unknown): PhaseTimings | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.total_ms !== 'number') return null;
+  if (typeof obj.embedding_ms !== 'number') return null;
+  if (typeof obj.retrieval_ms !== 'number') return null;
+  if (typeof obj.generation_ms !== 'number') return null;
+  return obj as unknown as PhaseTimings;
+}
+
 export async function getEvalSnapshot(): Promise<EvalSnapshot> {
   const client = sb();
 
   // 1. eval_questions
   const { data: qRows, error: qErr } = await client
     .from('eval_questions')
-    .select('id, slug, question, gold_answer, gold_facts, tags, difficulty')
+    .select('id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type')
     .eq('organization_id', DEV_ORG_ID)
     .order('slug');
   if (qErr) throw new Error(`eval_questions select: ${qErr.message}`);
@@ -118,6 +142,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
     goldFacts: (q.gold_facts as string[]) ?? [],
     tags: (q.tags as string[]) ?? [],
     difficulty: q.difficulty as 'easy' | 'medium' | 'hard',
+    questionType: (q.question_type as string | null) ?? 'factual',
   }));
 
   // 2. eval_runs — newest-first; client-side dedupe op (question_id, bot_version)
@@ -129,6 +154,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
        bot_cost_usd, bot_latency_ms,
        score_correctness, score_completeness, score_grounding,
        judge_reasoning, judge_parse_error, judge_cost_usd, judge_latency_ms,
+       stage_timings_ms,
        created_at`,
     )
     .eq('organization_id', DEV_ORG_ID)
@@ -162,6 +188,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
       judgeParseError: Boolean(r.judge_parse_error),
       judgeCostUsd: Number(r.judge_cost_usd ?? 0),
       judgeLatencyMs: Number(r.judge_latency_ms ?? 0),
+      stageTimingsMs: safeStageTimings(r.stage_timings_ms),
       createdAt: r.created_at as string,
     });
   }
