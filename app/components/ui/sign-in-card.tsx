@@ -12,8 +12,8 @@ import { EtheralShadow } from './etheral-shadow';
  * Manta-themed sign-in card. Bron 21st.dev `sign-in-card-2`, aangepast:
  * - Email + Google + signup + remember-me + forgot weggehaald (V0 = één
  *   wachtwoord).
- * - Purple gradient → Manta-teal (gebruikt `--manta-accent` via
- *   color-mix in oklab).
+ * - Purple gradient → Caribbean Green (#00CC9B) hardcoded — login moet
+ *   branding-consistent zijn, los van de user-accent in localStorage.
  * - Submit gaat via `useActionState` naar de bestaande `login` server
  *   action — geen auth-flow change.
  * - Behouden: 3D card-tilt op mouse, traveling light beams,
@@ -52,7 +52,7 @@ export function SignInCard({ next }: { next: string }) {
           z'n eigen position:relative om de SVG-filter correct te plaatsen. */}
       <div className="absolute inset-0 pointer-events-none">
         <EtheralShadow
-          color="color-mix(in oklab, var(--manta-accent, #009292) 70%, #02151a)"
+          color="color-mix(in oklab, #00CC9B 70%, #02151a)"
           animation={{ scale: 100, speed: 90 }}
           noise={{ opacity: 0.7, scale: 1.2 }}
           sizing="fill"
@@ -170,7 +170,7 @@ export function SignInCard({ next }: { next: string }) {
                   transition={{ type: 'spring', duration: 0.8 }}
                   className="mx-auto w-12 h-8 relative"
                 >
-                  <Image src="/logo/mark.png" alt="ChatManta" width={510} height={270} priority style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 12px color-mix(in oklab, var(--manta-accent, #009292) 50%, transparent))' }} />
+                  <Image src="/logo/mark.png" alt="ChatManta" width={510} height={270} priority style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 12px color-mix(in oklab, #00CC9B 50%, transparent))' }} />
                 </motion.div>
                 <motion.h1
                   initial={{ opacity: 0, y: 10 }}
@@ -255,11 +255,11 @@ export function SignInCard({ next }: { next: string }) {
                   disabled={pending}
                   className="w-full relative group/button mt-2"
                 >
-                  <div className="absolute inset-0 rounded-lg blur-lg opacity-0 group-hover/button:opacity-70 transition-opacity duration-300" style={{ background: 'color-mix(in oklab, var(--manta-accent, #009292) 50%, white)' }} />
+                  <div className="absolute inset-0 rounded-lg blur-lg opacity-0 group-hover/button:opacity-70 transition-opacity duration-300" style={{ background: 'color-mix(in oklab, #00CC9B 50%, white)' }} />
                   <div
                     className="relative overflow-hidden font-medium h-10 rounded-lg transition-all duration-300 flex items-center justify-center"
                     style={{
-                      background: 'linear-gradient(135deg, color-mix(in oklab, var(--manta-accent, #009292) 90%, white), var(--manta-accent, #009292))',
+                      background: 'linear-gradient(135deg, color-mix(in oklab, #00CC9B 90%, white), #00CC9B)',
                       color: '#fff',
                     }}
                   >
