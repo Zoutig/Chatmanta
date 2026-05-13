@@ -6,6 +6,7 @@ import { listThreads } from '@/lib/v0/server/threads';
 import { getAllTimeUsage } from '@/lib/v0/server/log';
 import { BOT_VERSIONS_ORDERED, BOTS, resolveBot } from '@/lib/v0/server/bots';
 import { getActiveOrgFromCookies, listKnownOrgs } from '@/lib/v0/server/active-org';
+import { getExamplesForOrg } from '@/lib/v0/server/empty-state-examples';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,7 @@ export default async function Home({
   // verse data uit de nieuwe org.
   const activeOrg = await getActiveOrgFromCookies();
   const orgs = listKnownOrgs();
+  const examples = getExamplesForOrg(activeOrg.slug);
 
   const [docs, threads, allTimeUsage] = await Promise.all([
     listDocs(activeOrg.id),
@@ -64,6 +66,7 @@ export default async function Home({
       activeOrgSlug={activeOrg.slug}
       activeOrgId={activeOrg.id}
       availableOrgs={orgs.map((o) => ({ slug: o.slug, name: o.name }))}
+      examples={examples}
     />
   );
 }
