@@ -24,7 +24,7 @@ import {
   type FaqItem,
   type FaqSnapshot,
   type FaqWindow,
-} from '@/lib/v0/server/faq-snapshot';
+} from '@/lib/v0/faq-types';
 
 const WINDOWS: { key: FaqWindow; label: string }[] = [
   { key: '24h', label: '24u' },
