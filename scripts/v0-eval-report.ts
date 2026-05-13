@@ -13,6 +13,15 @@ import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 import { resolveBot, BOTS } from '../lib/v0/server/bots';
+import type { PhaseTimings } from '../lib/v0/server/rag';
+import {
+  STAGE_KEYS,
+  computeStagePercentiles,
+  slowestStageByQuestionType,
+  extractLatestAndBaseline,
+  compareBaseline,
+  type RunWithStageTimings,
+} from '../lib/v0/server/eval-latency-stats';
 
 const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
 const OUT_DIR = resolve('eval-out');
@@ -44,6 +53,7 @@ const { data: runRows, error: runErr } = await sb
      hyde_mode_requested, hyde_mode_actual,
      run_index, retrieved_filenames, retrieval_recall_at_k, retrieval_mrr,
      must_not_violation,
+     stage_timings_ms,
      created_at`,
   )
   .eq('organization_id', DEV_ORG_ID)
@@ -135,6 +145,38 @@ function fmtScore(n: number | null | undefined): string {
   return String(n);
 }
 
+// Parsing-guard voor stage_timings_ms JSONB-kolom (migration 0019). Geeft een
+// PhaseTimings of null terug. Matcht safeStageTimings in evals-snapshot.ts.
+function parseStageTimings(raw: unknown): PhaseTimings | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.total_ms !== 'number') return null;
+  if (typeof obj.embedding_ms !== 'number') return null;
+  if (typeof obj.retrieval_ms !== 'number') return null;
+  if (typeof obj.generation_ms !== 'number') return null;
+  return obj as unknown as PhaseTimings;
+}
+
+// RunRow → RunWithStageTimings adapter voor de eval-latency-stats helpers.
+// Inclusief hyde_mode in de pseudo-key zodat A/B/C runs niet door elkaar
+// vergeleken worden (regression-check moet same-config zijn).
+function toStatsRow(r: RunRow): RunWithStageTimings {
+  return {
+    questionId: r.question_id as string,
+    botVersion: `${r.bot_version as string}::${modeKey(r)}`,
+    stageTimingsMs: parseStageTimings(r.stage_timings_ms),
+  };
+}
+
+// Vertaal de pseudo-key ${version}::${mode} terug voor rendering. Stage-rows
+// die geen "::" bevatten (kunnen niet voorkomen via toStatsRow maar defensief)
+// vallen terug op de hele string als version + mode='auto'.
+function splitVersionMode(combined: string): { version: string; mode: string } {
+  const idx = combined.indexOf('::');
+  if (idx === -1) return { version: combined, mode: 'auto' };
+  return { version: combined.slice(0, idx), mode: combined.slice(idx + 2) };
+}
+
 // ---------------------------------------------------------------------------
 // 4. Markdown report
 // ---------------------------------------------------------------------------
@@ -199,6 +241,86 @@ for (const pair of versionModePairs) {
   lines.push(
     `| ${v} | ${mode} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | $${jCost.toFixed(4)} | ${fmt(lat, 0)} |`,
   );
+}
+lines.push('');
+
+// 4b-bis. Per-stage latency (p50/p95/p99) — migration 0019 nieuwe sectie.
+// Gebruikt latestRuns als input (current snapshot) gekeyed op (v::mode) zodat
+// 3-way A/B/C runs niet door elkaar gemengd worden.
+lines.push('## Per-stage latency (p50 / p95 / p99)');
+lines.push('');
+const stageRunsCurrent: RunWithStageTimings[] = latestRuns.map(toStatsRow);
+const stagePctls = computeStagePercentiles(stageRunsCurrent);
+if (stagePctls.length === 0) {
+  lines.push('_Geen rijen met stage_timings_ms — pre-migration data of geen recente runs._');
+} else {
+  lines.push('| versie | hyde_mode | stage | n | p50 | p95 | p99 |');
+  lines.push('|--------|-----------|-------|---|-----|-----|-----|');
+  for (const row of stagePctls) {
+    const { version, mode } = splitVersionMode(row.botVersion);
+    const p99 = row.p99 === null ? '—' : String(row.p99);
+    lines.push(
+      `| ${version} | ${mode} | ${row.stage} | ${row.n} | ${row.p50} | ${row.p95} | ${p99} |`,
+    );
+  }
+  lines.push('');
+  lines.push('_p99 = "—" bij n < 30 (statistische ondergrens)._');
+}
+lines.push('');
+
+// 4b-ter. Slowest stage per question_type — welke stage domineert per
+// categorie? Helpt prioriteren: "factual is generation-bound, multi_hop is
+// retrieval-bound".
+lines.push('## Slowest stage per question_type');
+lines.push('');
+const qTypeByQId = new Map<string, string>();
+for (const q of questions) {
+  qTypeByQId.set(q.id as string, (q.question_type as string | null) ?? 'factual');
+}
+const slowest = slowestStageByQuestionType(stageRunsCurrent, qTypeByQId);
+if (slowest.length === 0) {
+  lines.push('_Geen rijen met stage_timings_ms beschikbaar voor segmentatie._');
+} else {
+  lines.push('| question_type | versie | hyde_mode | slowest stage | p50 (ms) | % of total | n |');
+  lines.push('|---------------|--------|-----------|---------------|----------|------------|---|');
+  for (const row of slowest) {
+    const { version, mode } = splitVersionMode(row.botVersion);
+    lines.push(
+      `| ${row.questionType} | ${version} | ${mode} | ${row.slowestStage} | ${row.p50} | ${row.pctOfTotal}% | ${row.n} |`,
+    );
+  }
+}
+lines.push('');
+
+// 4b-quater. Regressie vs vorige run — vergelijk latest per (q, v, mode) met
+// second-latest. Eerste-run-ooit: sectie wordt overgeslagen (geen baseline).
+lines.push('## Regressie vs vorige run');
+lines.push('');
+const allRunsForBaseline: RunWithStageTimings[] = (runRows ?? []).map((r) => toStatsRow(r));
+const { latest: regLatest, baseline: regBaseline } =
+  extractLatestAndBaseline(allRunsForBaseline);
+if (regBaseline.length === 0) {
+  lines.push('_Geen baseline beschikbaar — dit lijkt de eerste run te zijn voor deze (vraag × versie × hyde_mode) combinaties._');
+} else {
+  const comparisons = compareBaseline(regLatest, regBaseline);
+  if (comparisons.length === 0) {
+    lines.push('_Geen overlappende (versie, stage) cellen tussen current en baseline._');
+  } else {
+    lines.push('| versie | hyde_mode | stage | baseline p95 | current p95 | Δ | % | verdict |');
+    lines.push('|--------|-----------|-------|--------------|-------------|---|---|---------|');
+    for (const row of comparisons) {
+      const { version, mode } = splitVersionMode(row.botVersion);
+      const verdictIcon =
+        row.verdict === 'regression' ? '🚨 regression' : row.verdict === 'watch' ? '🟡 watch' : 'ok';
+      const deltaStr = row.deltaMs >= 0 ? `+${row.deltaMs}ms` : `${row.deltaMs}ms`;
+      const pctStr = row.pctChange >= 0 ? `+${row.pctChange}%` : `${row.pctChange}%`;
+      lines.push(
+        `| ${version} | ${mode} | ${row.stage} | ${row.baselineP95} | ${row.currentP95} | ${deltaStr} | ${pctStr} | ${verdictIcon} |`,
+      );
+    }
+    lines.push('');
+    lines.push('_Verdict: regression = p95 >+20% ÉN >+200ms · watch = p95 >+10%._');
+  }
 }
 lines.push('');
 
@@ -337,8 +459,11 @@ for (const q of questions) {
 // 5. CSV (machine-leesbaar voor spreadsheet-analyse)
 // ---------------------------------------------------------------------------
 const csvLines: string[] = [];
+// 13 per-stage kolommen (migration 0019) — volgorde matcht STAGE_KEYS in
+// eval-latency-stats.ts, gelijk aan PhaseTimings declaratie in rag.ts.
+const stageCsvHeaders = STAGE_KEYS.join(',');
 csvLines.push(
-  'slug,difficulty,question_type,bot_version,hyde_mode_actual,hyde_mode_requested,run_index,correctness,completeness,grounding,recall_at_k,mrr,must_not_violation,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error',
+  `slug,difficulty,question_type,bot_version,hyde_mode_actual,hyde_mode_requested,run_index,correctness,completeness,grounding,recall_at_k,mrr,must_not_violation,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error,${stageCsvHeaders}`,
 );
 // CSV gebruikt allLatestVariance zodat multi-run rows allemaal in spreadsheet
 // belanden voor variance-analyse, niet alleen run_index=0.
@@ -346,6 +471,11 @@ for (const q of questions) {
   const qType = (q.question_type as string | null) ?? 'factual';
   for (const r of allLatestVariance) {
     if (r.question_id !== q.id) continue;
+    const stages = parseStageTimings(r.stage_timings_ms);
+    const stageCells = STAGE_KEYS.map((k) => {
+      const v = stages?.[k];
+      return typeof v === 'number' ? String(v) : '';
+    });
     csvLines.push(
       [
         q.slug,
@@ -366,6 +496,7 @@ for (const q of questions) {
         Number(r.bot_cost_usd ?? 0).toFixed(6),
         Number(r.judge_cost_usd ?? 0).toFixed(6),
         r.judge_parse_error ? 'true' : 'false',
+        ...stageCells,
       ].join(','),
     );
   }
