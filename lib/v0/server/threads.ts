@@ -225,7 +225,8 @@ export async function commitTurn(opts: {
     createdAt = created.created_at as string;
     nextPosition = 0;
   } else {
-    // Bestaande thread — zoek volgende positie + valideer dat hij bestaat.
+    // Bestaande thread — valideer dat hij bestaat. nextPosition wordt
+    // per retry-attempt opnieuw bepaald (zie loop hieronder).
     const { data: t, error: tErr } = await sb
       .from('v0_threads')
       .select('id, title, bot_version, created_at')
@@ -238,36 +239,56 @@ export async function commitTurn(opts: {
     title = t.title as string;
     botVersion = t.bot_version as string;
     createdAt = t.created_at as string;
-
-    const { data: maxRow, error: mErr } = await sb
-      .from('v0_thread_messages')
-      .select('position')
-      .eq('thread_id', threadId)
-      .order('position', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (mErr) throw new Error(`commitTurn maxpos: ${mErr.message}`);
-    nextPosition = (maxRow?.position ?? -1) + 1;
   }
 
-  // Schrijf het paar in één insert call zodat fouten uniform afhandelen.
-  const { error: insErr } = await sb.from('v0_thread_messages').insert([
-    {
-      thread_id: threadId,
-      position: nextPosition,
-      role: 'user',
-      content: trimmedUser,
-      response: null,
-    },
-    {
-      thread_id: threadId,
-      position: nextPosition + 1,
-      role: 'assistant',
-      content: opts.response.answer,
-      response: opts.response,
-    },
-  ]);
-  if (insErr) throw new Error(`commitTurn insert: ${insErr.message}`);
+  // Schrijf het paar in één insert call. Voor bestaande threads is het
+  // (max-pos lookup → insert) paar een race: twee concurrent commits
+  // kunnen dezelfde max-pos lezen en op identieke posities willen
+  // schrijven. UNIQUE(thread_id, position) vangt de tweede; we lezen
+  // dan vers en proberen opnieuw. Voor nieuwe threads kan dit niet —
+  // de id is vers en niemand anders schrijft erop. (Finding 2, codex
+  // adversarial-review 2026-05-13.)
+  const isExisting = opts.threadId !== null;
+  const MAX_RETRIES = 5;
+  let attempt = 0;
+  while (true) {
+    if (isExisting) {
+      const { data: maxRow, error: mErr } = await sb
+        .from('v0_thread_messages')
+        .select('position')
+        .eq('thread_id', threadId)
+        .order('position', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (mErr) throw new Error(`commitTurn maxpos: ${mErr.message}`);
+      nextPosition = (maxRow?.position ?? -1) + 1;
+    }
+
+    const { error: insErr } = await sb.from('v0_thread_messages').insert([
+      {
+        thread_id: threadId,
+        position: nextPosition,
+        role: 'user',
+        content: trimmedUser,
+        response: null,
+      },
+      {
+        thread_id: threadId,
+        position: nextPosition + 1,
+        role: 'assistant',
+        content: opts.response.answer,
+        response: opts.response,
+      },
+    ]);
+    if (!insErr) break;
+
+    // Postgres unique_violation = 23505. Bij race: re-read max-pos en
+    // probeer opnieuw. Andere fouten of nieuwe-thread pad: direct gooien.
+    const isConflict = (insErr as { code?: string }).code === '23505';
+    if (!isExisting || !isConflict || ++attempt >= MAX_RETRIES) {
+      throw new Error(`commitTurn insert: ${insErr.message}`);
+    }
+  }
 
   // Bump updated_at op de thread zodat hij bovenaan in de sidebar komt.
   // (Niet nodig voor net-aangemaakte threads, maar idempotent — telt niet.)
