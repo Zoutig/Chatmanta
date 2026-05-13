@@ -6,7 +6,7 @@
 // Format: ndjson — één JSON object per regel, scheidings-token \n.
 // Events: zie StreamEvent in lib/v0/server/rag.ts.
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import {
   runRagQueryStreaming,
   resolveHydeMode,
@@ -120,17 +120,28 @@ export async function POST(req: Request) {
 
   if (injection.detected && injectionMode === 'block') {
     const patternName = injection.pattern?.name ?? 'unknown';
-    // Fire-and-forget log — niet blocking voor de user response.
-    logBlockedQuery({
-      question,
-      botVersion: bot.version,
-      tone,
-      length,
-      injectionPattern: patternName,
-      blockedMessage: INJECTION_BLOCKED_MESSAGE,
-      organizationId: getActiveOrgId(req),
-      requestId,
-    }).catch(() => undefined);
+    // Post-response log via after() — voorkomt dat de blocked-telemetrie
+    // verdampt op serverless wanneer de response al weg is.
+    after(async () => {
+      try {
+        await logBlockedQuery({
+          question,
+          botVersion: bot.version,
+          tone,
+          length,
+          injectionPattern: patternName,
+          blockedMessage: INJECTION_BLOCKED_MESSAGE,
+          organizationId: getActiveOrgId(req),
+          requestId,
+        });
+      } catch (err) {
+        console.error(
+          '[logBlockedQuery]',
+          requestId,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    });
 
     // NDJSON-stream met één 'fallback' event zodat de client-side parser het
     // identiek behandelt aan een normale fallback (bestaande handler hoeft
@@ -233,9 +244,10 @@ export async function POST(req: Request) {
       } finally {
         controller.close();
       }
-      // Fire-and-forget logging na het sluiten van de stream. Bij log-only
-      // injection-detectie geven we de detectie info mee zodat query_log
-      // de telemetrie krijgt zonder dat we de query blokkeerden.
+      // Post-stream logging — `after()` houdt de serverless-invocation in
+      // leven tot logQuery klaar is, zodat query_log/cost/latency niet
+      // verdampen op Vercel zodra de browser-response weg is. Fouten worden
+      // expliciet gelogd ipv geslikt — terugvindbaar via requestId.
       if (finalResponse) {
         const injectionInfo = injection.detected
           ? { detected: true, pattern: injection.pattern?.name ?? null }
@@ -246,9 +258,25 @@ export async function POST(req: Request) {
           requested: hydeModeRequested,
           actual: finalResponse.kind === 'smalltalk' ? null : hydeModeActual,
         };
-        logQuery(question, finalResponse, injectionInfo, organizationId, hydeMeta, requestId).catch(
-          () => undefined,
-        );
+        const finalResponseForLog = finalResponse;
+        after(async () => {
+          try {
+            await logQuery(
+              question,
+              finalResponseForLog,
+              injectionInfo,
+              organizationId,
+              hydeMeta,
+              requestId,
+            );
+          } catch (err) {
+            console.error(
+              '[logQuery]',
+              requestId,
+              err instanceof Error ? err.message : err,
+            );
+          }
+        });
       }
     },
   });
