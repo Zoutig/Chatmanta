@@ -1937,10 +1937,17 @@ KRITISCHE FORMAT-REGELS:
     confidence = parsed.confidence;
 
     // Cascade naar sterker model bij low confidence.
+    // Retrieval-gate (v0.5 hotfix 2026-05-13): cascade alleen als top-1 chunk
+    // sterk genoeg is. Op zwakke retrieval (top1_sim < cascadeMinTopSim) is
+    // er geen grond om "harder te proberen" — een sterker model vult dan met
+    // priors en hallucineert. Zie docs/superpowers/specs/
+    // 2026-05-13-v0.5-cascade-hotfix-design.md.
     if (
       bot.cascadeOnLowConfidence &&
       confidence !== null &&
       confidence < 0.5 &&
+      topSim !== null &&
+      topSim >= bot.cascadeMinTopSim &&
       bot.cascadeModel !== bot.chatModel &&
       (withinBudget() || markSkipped('cascade'))
     ) {
