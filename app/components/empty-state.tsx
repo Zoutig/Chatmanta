@@ -2,28 +2,14 @@
 
 import Image from 'next/image';
 import { useMemo } from 'react';
-
-const EXAMPLES: { label: string; q: string }[] = [
-  { label: 'Wat doet het?', q: 'wat doet ChatManta?' },
-  { label: 'Stack', q: 'welke stack gebruiken jullie?' },
-  { label: 'Doelgroep', q: 'voor welke doelgroep is het?' },
-  { label: 'Kernprincipes', q: 'wat zijn de kernprincipes?' },
-  { label: 'Jorion', q: 'wat is Jorion Solutions?' },
-  { label: 'Multi-tenancy', q: 'hoe werkt multi-tenancy?' },
-  { label: 'Anti-hallucinatie', q: 'hoe voorkomt de bot hallucinaties?' },
-  { label: 'Cost-discipline', q: 'hoe worden de kosten beheerst?' },
-  { label: 'Embedding-model', q: 'welk embedding-model wordt gebruikt?' },
-  { label: 'Crawler', q: "hoeveel pagina's kan Firecrawl crawlen?" },
-  { label: 'Hosting', q: 'waar draait ChatManta?' },
-  { label: 'Widget', q: 'hoe wordt de chatbot op een klantsite gezet?' },
-];
+import type { ExampleQuestion } from '@/lib/v0/server/empty-state-examples';
 
 const PICK_COUNT = 4;
 
 // Mulberry32-PRNG → deterministisch per seed, zodat server-render en client-
 // hydration dezelfde shuffle produceren (geen hydration mismatch).
-function pickSeeded(seed: number): typeof EXAMPLES {
-  const out = EXAMPLES.slice();
+function pickSeeded(source: ExampleQuestion[], seed: number): ExampleQuestion[] {
+  const out = source.slice();
   let s = (seed | 0) || 1;
   const n = Math.min(PICK_COUNT, out.length);
   for (let i = 0; i < n; i++) {
@@ -42,16 +28,22 @@ export function EmptyState({
   docCount,
   chunkCount,
   seed = 0,
+  examples,
 }: {
   onPick: (q: string) => void;
   docCount: number;
   chunkCount: number;
   /** Bumpt iedere "Nieuwe vraag"-klik → andere 4 voorbeelden. 0 = initial render (eerste 4). */
   seed?: number;
+  /** Pool aan voorbeelden voor de actieve org — wordt door page.tsx server-side opgehaald. */
+  examples: ExampleQuestion[];
 }) {
   const picks = useMemo(
-    () => (seed === 0 ? EXAMPLES.slice(0, PICK_COUNT) : pickSeeded(seed)),
-    [seed],
+    () =>
+      seed === 0
+        ? examples.slice(0, Math.min(PICK_COUNT, examples.length))
+        : pickSeeded(examples, seed),
+    [seed, examples],
   );
 
   return (

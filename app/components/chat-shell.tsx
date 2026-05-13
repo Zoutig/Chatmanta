@@ -13,6 +13,7 @@ import type {
 import { fromWire, type AppErrorCode } from '@/lib/errors/app-error';
 import type { ThreadSummary } from '@/lib/v0/server/threads';
 import type { AllTimeUsage } from '@/lib/v0/server/log';
+import type { ExampleQuestion } from '@/lib/v0/server/empty-state-examples';
 import {
   commitTurnAction,
   deleteThreadAction,
@@ -78,6 +79,7 @@ export function ChatShell({
   activeOrgSlug,
   activeOrgId,
   availableOrgs,
+  examples,
 }: {
   botVersion: string;
   bots: BotMeta[];
@@ -92,6 +94,7 @@ export function ChatShell({
   activeOrgSlug: string;
   activeOrgId: string;
   availableOrgs: OrgOption[];
+  examples: ExampleQuestion[];
 }) {
   const [threshold, setThreshold] = useState(defaultThreshold);
   const [rewriteOn, setRewriteOn] = useState(defaultEnableRewrite);
@@ -512,6 +515,7 @@ export function ChatShell({
           docCount={docs.length}
           chunkCount={totalChunks}
           seed={examplesSeed}
+          examples={examples}
         />
       ) : (
         <div className="conversation-inner">
