@@ -1,5 +1,9 @@
 #!/bin/sh
-# Blokkeert direct pushen naar 'main'. Alle wijzigingen via PR.
+# Pre-push hook — twee checks:
+#   1. Blokkeert direct pushen naar 'main'. Alle wijzigingen via PR.
+#   2. Detecteert NNNN-collisions tussen nieuwe Supabase-migrations in
+#      deze branch en bestaande open PRs (zie check-migration-collision.mjs).
+#
 # Bypass voor noodgevallen: git push --no-verify
 
 protected_branch='main'
@@ -19,5 +23,15 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         exit 1
     fi
 done
+
+# Migration-collision check. Skipt zichzelf wanneer gh/node ontbreken of er
+# geen nieuwe migrations zijn; blokkeert alleen bij een bevestigde collision
+# met een andere open PR (eigen open PR wordt uitgesloten).
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$repo_root" ] && [ -f "$repo_root/.githooks/check-migration-collision.mjs" ]; then
+    if command -v node >/dev/null 2>&1; then
+        node "$repo_root/.githooks/check-migration-collision.mjs" || exit 1
+    fi
+fi
 
 exit 0
