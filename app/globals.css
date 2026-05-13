@@ -948,6 +948,7 @@ body.body-fixed { overflow: hidden; }
 .kind-chip.smalltalk { color: var(--accent-2); background: color-mix(in oklab, var(--accent-2) 12%, transparent); }
 .kind-chip.cache { color: var(--violet); background: color-mix(in oklab, var(--violet) 12%, transparent); }
 .kind-chip.cascade { color: var(--warn); background: color-mix(in oklab, var(--warn) 12%, transparent); }
+.kind-chip.algemeen { color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
 /* ==========================================================================
    Claim verification — chip + breakdown + Claims-tab

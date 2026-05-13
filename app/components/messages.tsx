@@ -380,6 +380,17 @@ export function AssistantMessage({
           ) : null}
           {extras?.fromCache ? <span className="kind-chip cache">Cache</span> : null}
           {extras?.cascadeUsed ? <span className="kind-chip cascade">Cascade</span> : null}
+          {extras?.category === 'general' ? (
+            <span
+              className="kind-chip"
+              style={{
+                color: 'var(--accent)',
+                background: 'color-mix(in oklab, var(--accent) 12%, transparent)',
+              }}
+            >
+              Algemeen
+            </span>
+          ) : null}
           {extras?.confidence !== undefined && !isStreaming ? (
             <ConfidenceBadge value={extras.confidence} />
           ) : null}
