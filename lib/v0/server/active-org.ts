@@ -48,17 +48,17 @@ export const KNOWN_ORGS: Record<OrgSlug, KnownOrg> = {
   'acme-corp': {
     id: '00000000-0000-0000-0000-0000000000a1',
     slug: 'acme-corp',
-    name: 'ACME Corp',
+    name: 'Dakwerken De Boer',
   },
   'globex-inc': {
     id: '00000000-0000-0000-0000-0000000000a2',
     slug: 'globex-inc',
-    name: 'Globex Inc',
+    name: 'FysioPlus Utrecht',
   },
   initech: {
     id: '00000000-0000-0000-0000-0000000000a3',
     slug: 'initech',
-    name: 'Initech',
+    name: 'Bakker & Vermeer Accountants',
   },
 };
 
