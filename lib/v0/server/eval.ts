@@ -21,6 +21,7 @@ import {
   type ChatSource,
   type HydeModeRequest,
   type HydeModeResolved,
+  type PhaseTimings,
 } from './rag';
 import { resolveBot, type BotConfig } from './bots';
 
@@ -129,6 +130,10 @@ export type EvalRunRow = {
   retrieval_recall_at_k: number | null;
   retrieval_mrr: number | null;
   must_not_violation: boolean;
+  // Migration 0019 — per-stage latency breakdown. NULL voor synthetic-fallback
+  // rows (geen response) en theoretisch ook als de stream geen metrics-done
+  // emit én response.extras.phaseTimingsMs leeg liet (zou nu nooit moeten).
+  stage_timings_ms: PhaseTimings | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -477,6 +482,11 @@ export async function runEvalRow(args: {
   const botStart = performance.now();
   let response: ChatResponse | null = null;
   let streamErr: string | null = null;
+  // Migration 0019: capture per-stage timings uit het 'metrics-done' event
+  // (definitieve waarden inclusief followups_ms). Cache-hit path emit GEEN
+  // metrics-done — voor die situatie vallen we na de loop terug op
+  // response.extras.phaseTimingsMs.
+  let phaseTimings: PhaseTimings | null = null;
   try {
     for await (const ev of runRagQueryStreaming({
       question: question.question,
@@ -491,6 +501,8 @@ export async function runEvalRow(args: {
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         response = ev.response;
+      } else if (ev.kind === 'metrics-done') {
+        phaseTimings = ev.phaseTimingsMs;
       } else if (ev.kind === 'error') {
         // V0.5 errors zijn code-based; bewaar de code als technische tag voor
         // eval_runs. Eval-judge zelf gebruikt 'response' (= null bij error).
@@ -502,6 +514,14 @@ export async function runEvalRow(args: {
   }
 
   const botLatencyMs = Math.round(performance.now() - botStart);
+
+  // Cache-hit fallback: phaseTimings via response.extras (geen metrics-done event).
+  // Alleen 'answer' kind heeft extras; fallback/smalltalk lopen nooit via cache-hit
+  // path met phaseTimingsMs in extras, dus voor die kinds blijft phaseTimings null.
+  if (!phaseTimings && response && response.kind === 'answer') {
+    const extrasTimings = response.extras?.phaseTimingsMs;
+    if (extrasTimings) phaseTimings = extrasTimings;
+  }
 
   if (!response) {
     // Stream eindigde zonder smalltalk/fallback/answer-done — synthetic
@@ -532,6 +552,7 @@ export async function runEvalRow(args: {
       retrieval_recall_at_k: null,
       retrieval_mrr: null,
       must_not_violation: false,
+      stage_timings_ms: phaseTimings,
     };
   }
 
@@ -590,6 +611,7 @@ export async function runEvalRow(args: {
     retrieval_recall_at_k: recallAtK,
     retrieval_mrr: mrr,
     must_not_violation: mustNotViolation,
+    stage_timings_ms: phaseTimings,
   };
 }
 
