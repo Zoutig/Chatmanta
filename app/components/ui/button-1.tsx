@@ -120,14 +120,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       {...rest}
     >
       {loading ? <Spinner size={size === 'large' ? 24 : 16} color="currentColor" /> : prefix}
-      <span
-        className={cn(
-          'relative overflow-hidden whitespace-nowrap text-ellipsis font-sans',
-          size !== 'tiny' && variant !== 'unstyled' && 'px-1.5',
-        )}
-      >
-        {children}
-      </span>
+      {!(svgOnly && loading) && (
+        <span
+          className={cn(
+            'relative overflow-hidden whitespace-nowrap text-ellipsis font-sans',
+            size !== 'tiny' && variant !== 'unstyled' && 'px-1.5',
+          )}
+        >
+          {children}
+        </span>
+      )}
       {!loading && suffix}
     </button>
   );
