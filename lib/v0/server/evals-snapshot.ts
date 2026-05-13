@@ -19,7 +19,11 @@
 import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { DEV_ORG_ID } from './rag';
+import { DEV_ORG_ID, type PhaseTimings } from './rag';
+
+// Re-export zodat UI-componenten PhaseTimings via deze module kunnen importeren
+// zonder direct in server-internals (./rag) te reiken.
+export type { PhaseTimings };
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -65,6 +69,9 @@ export type EvalSnapshotRun = {
   judgeParseError: boolean;
   judgeCostUsd: number;
   judgeLatencyMs: number;
+  // Migration 0019: per-stage latency snapshot (PhaseTimings van rag.ts).
+  // NULL voor pre-migration rows en synthetic-fallback rows.
+  stageTimingsMs: PhaseTimings | null;
   createdAt: string;
 };
 
@@ -99,6 +106,20 @@ function safeSources(raw: unknown): EvalSnapshotSource[] {
     .filter((s): s is EvalSnapshotSource => s !== null);
 }
 
+// Parsing-guard voor de stage_timings_ms JSONB-kolom (migration 0019).
+// Accepteert alleen objecten met numerieke total_ms (de minimale shape die
+// PhaseTimings garandeert). Onbekende keys laten we doorlopen — extra optionele
+// stages zoals hyde_ms / verify_ms blijven gewoon werken.
+function safeStageTimings(raw: unknown): PhaseTimings | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.total_ms !== 'number') return null;
+  if (typeof obj.embedding_ms !== 'number') return null;
+  if (typeof obj.retrieval_ms !== 'number') return null;
+  if (typeof obj.generation_ms !== 'number') return null;
+  return obj as unknown as PhaseTimings;
+}
+
 export async function getEvalSnapshot(): Promise<EvalSnapshot> {
   const client = sb();
 
@@ -129,6 +150,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
        bot_cost_usd, bot_latency_ms,
        score_correctness, score_completeness, score_grounding,
        judge_reasoning, judge_parse_error, judge_cost_usd, judge_latency_ms,
+       stage_timings_ms,
        created_at`,
     )
     .eq('organization_id', DEV_ORG_ID)
@@ -162,6 +184,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
       judgeParseError: Boolean(r.judge_parse_error),
       judgeCostUsd: Number(r.judge_cost_usd ?? 0),
       judgeLatencyMs: Number(r.judge_latency_ms ?? 0),
+      stageTimingsMs: safeStageTimings(r.stage_timings_ms),
       createdAt: r.created_at as string,
     });
   }
