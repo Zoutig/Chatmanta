@@ -36,7 +36,15 @@ const MeshGradientBackground = dynamic(
   { ssr: false },
 );
 
-const VARIANTS = ['mesh', 'petals'] as const;
+const EtheralShadowBackground = dynamic(
+  () =>
+    import('./etheral-shadow-background').then((m) => ({
+      default: m.EtheralShadowBackground,
+    })),
+  { ssr: false },
+);
+
+const VARIANTS = ['mesh', 'petals', 'etheral'] as const;
 type Variant = (typeof VARIANTS)[number];
 
 function pick(): Variant {
@@ -45,10 +53,11 @@ function pick(): Variant {
 
 export function LoginBackground() {
   // useState init-fn draait 1× per mount. SSR kiest mogelijk variant A,
-  // client variant B — maar omdat beide kinderen via dynamic({ssr:false})
+  // client variant B — maar omdat alle kinderen via dynamic({ssr:false})
   // server-side `null` zijn, ontstaat er geen DOM-mismatch.
   const [variant] = useState<Variant>(pick);
 
   if (variant === 'petals') return <DigitalPetalsShader />;
+  if (variant === 'etheral') return <EtheralShadowBackground />;
   return <MeshGradientBackground />;
 }

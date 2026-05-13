@@ -36,7 +36,9 @@ export function DigitalPetalsShader() {
       return;
     }
 
-    renderer.setPixelRatio(window.devicePixelRatio);
+    // Cap pixel ratio op 2 — op high-DPI displays kan een te hoge ratio
+    // sub-pixel aliasing geven die als flicker oogt.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -75,7 +77,12 @@ export function DigitalPetalsShader() {
         float mouseDist = length(uv - mouse);
         float bloom     = smoothstep(0.4, 0.0, mouseDist);
 
-        float petals     = 5.0 + sin(t) * 2.0;
+        // Petals MOET een even integer zijn anders ontstaat er een
+        // verticale naad op de negatieve x-as (atan(y,x) springt daar
+        // van +pi naar -pi en sin(a*petals) is alleen continu over
+        // die wrap als petals * pi een geheel veelvoud van pi is).
+        // Pulse 50/50 tussen 4 en 6 via step(0, sin(t)).
+        float petals     = 4.0 + 2.0 * step(0.0, sin(t));
         float petalShape = sin(a * petals + r * 2.0);
         petalShape = pow(abs(petalShape), 0.5);
 
@@ -86,10 +93,14 @@ export function DigitalPetalsShader() {
         vec3 color2         = vec3(0.01, 0.31, 0.31);
         vec3 highlightColor = vec3(0.50, 1.0, 0.94);
 
+        // Spatial random (per pixel, niet per frame) — tijd-variërende
+        // noise op een smoothstep-grens veroorzaakte zichtbare flicker
+        // omdat elk pixel dicht bij de threshold per frame tussen
+        // color1/color2 sprong.
         vec3 finalColor = mix(
           color1,
           color2,
-          smoothstep(0.5, 0.8, r + random(vec2(t, t)) * 0.1)
+          smoothstep(0.5, 0.8, r + random(uv * 50.0) * 0.1)
         ) * pattern;
 
         finalColor += highlightColor * pow(pattern, 10.0) * (1.0 + bloom);
