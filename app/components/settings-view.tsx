@@ -28,6 +28,8 @@ export function SettingsView({
   onHydeModeChange,
   rewriteOn,
   onToggleRewrite,
+  generalKnowledgeOn,
+  onToggleGeneralKnowledge,
   botVersion,
   bots,
   botFlags,
@@ -42,6 +44,8 @@ export function SettingsView({
   onHydeModeChange: (m: HydeMode) => void;
   rewriteOn: boolean;
   onToggleRewrite: () => void;
+  generalKnowledgeOn: boolean;
+  onToggleGeneralKnowledge: () => void;
   botVersion: string;
   bots: BotMeta[];
   botFlags: {
@@ -49,6 +53,7 @@ export function SettingsView({
     selfReflect: boolean;
     cascadeOnLowConfidence: boolean;
     cascadeModel: string;
+    generalKnowledgeEnabled: boolean;
   };
 }) {
   const router = useRouter();
@@ -120,6 +125,13 @@ export function SettingsView({
           desc="Smalltalk-detect, typfout-correctie, synoniem-expansie. +1 LLM-call ≈ $0.0001."
           on={rewriteOn}
           onChange={onToggleRewrite}
+        />
+        <ToggleRow
+          label="Algemene-kennis-antwoorden"
+          desc="Bij zero-hits beantwoordt de bot algemene vragen binnen ons domein (extra LLM-call ≈ $0.0001–0.0003). Uit = directe fallback zonder LLM-call. Beschikbaar vanaf v0.5."
+          on={generalKnowledgeOn}
+          onChange={onToggleGeneralKnowledge}
+          disabled={!botFlags.generalKnowledgeEnabled}
         />
         <ToggleRow
           label="Cache layer"

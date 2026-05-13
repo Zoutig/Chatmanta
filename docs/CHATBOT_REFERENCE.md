@@ -877,6 +877,8 @@ Locatie: `lib/v0/server/bots.ts`. Elke versie is een object van type `BotConfig`
 | `latencyBudgetMs` (v0.5) | number | Soft target in ms. Overschrijding → skip optionele fases. Default 8000. |
 | `latencyHardCapMs` (v0.5) | number | Hard cap in ms — safety-net voor extreme hangs. Default 12000. |
 
+**Runtime override `enableGeneralKnowledge` (v0.5+):** Stuur `enableGeneralKnowledge: false` in de `/api/v0/chat` body om reclassify over te slaan en direct naar FALLBACK te gaan. Default = true. UI-toggle in SettingsView. Per-vraag effect gelogd in `query_log.general_knowledge_actual`.
+
 ---
 
 ## 10. Operationele commando's

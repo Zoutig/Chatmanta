@@ -65,4 +65,43 @@ test.describe('V0.5 — general-knowledge router', () => {
     const text = (await assistant.innerText()).toLowerCase();
     expect(text).not.toMatch(/in een rivier|zwemmen|schubben|stroomopwaarts/);
   });
+
+  test('TOGGLE OFF: "Wat zijn MKB-bedrijven?" geeft FALLBACK ipv GENERAL antwoord, geen reclassify-call', async ({
+    page,
+  }) => {
+    await page.goto(V05_URL);
+    await expect(page.locator('body')).toContainText(/v0\.5/i);
+
+    // Het right-panel staat default open (chat-shell.tsx: rightOpen=true).
+    // We hoeven dus alleen de Instellingen-tab te openen.
+    const settingsTab = page.getByRole('tab', { name: 'Instellingen' });
+    await expect(settingsTab).toBeVisible();
+    await settingsTab.click();
+
+    // ToggleRow rendert <button role="switch" aria-label="Algemene-kennis-antwoorden">.
+    const toggle = page.getByRole('switch', { name: /algemene-kennis-antwoorden/i });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    // Stel de GENERAL-vraag.
+    const composer = page.getByRole('textbox', { name: /stel een vraag|composer|bericht/i }).first();
+    await composer.fill('Wat zijn MKB-bedrijven?');
+    await composer.press('Enter');
+
+    const assistant = page.locator('.msg-assistant').last();
+    await expect(assistant).toBeVisible({ timeout: 60_000 });
+
+    // Mag NIET de GENERAL-disclaimer bevatten — toggle staat uit, reclassify
+    // is dus niet gedraaid.
+    await expect(assistant).not.toContainText(/Even kort.*buiten onze specifieke documentatie/i);
+
+    // Moet de FALLBACK_MESSAGE bevatten — zie rag.ts:
+    // "Daar heb ik geen informatie over. Stel je vraag anders, of neem
+    // contact op met de organisatie."
+    await expect(assistant).toContainText(/Daar heb ik geen informatie over/i, {
+      timeout: 60_000,
+    });
+  });
 });
