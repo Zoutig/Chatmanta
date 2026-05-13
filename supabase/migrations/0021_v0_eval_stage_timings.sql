@@ -22,6 +22,15 @@
 alter table public.eval_runs
   add column if not exists stage_timings_ms jsonb;
 
+-- Idempotent constraint setup: deze migration is oorspronkelijk als 0019
+-- toegepast en wordt na de renumber naar 0021 (zie
+-- 0019a_normalize_id_collisions.sql) opnieuw uitgevoerd op DBs die de
+-- collision hadden — daar bestaat de constraint al. DROP IF EXISTS + ADD is
+-- in dezelfde BEGIN..COMMIT transactioneel atomair (Postgres rolt DDL terug
+-- bij failure).
+alter table public.eval_runs
+  drop constraint if exists eval_runs_stage_timings_is_object_chk;
+
 alter table public.eval_runs
   add constraint eval_runs_stage_timings_is_object_chk
     check (stage_timings_ms is null or jsonb_typeof(stage_timings_ms) = 'object');
