@@ -5,7 +5,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/re
 import { Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { login, type LoginState } from '../../login/actions';
 import { cn } from '@/lib/utils';
-import { EtheralShadow } from './etheral-shadow';
+import { LoginBackground } from './login-background';
 
 /**
  * Manta-themed sign-in card. Bron 21st.dev `sign-in-card-2`, aangepast:
@@ -46,16 +46,13 @@ export function SignInCard({ next }: { next: string }) {
 
   return (
     <div className="min-h-screen w-screen relative overflow-hidden flex items-center justify-center" style={{ background: '#02060c' }}>
-      {/* Etheral-shadow animated SVG-filter background, Manta-teal getint.
-          Wrapper-div is absolute fullbleed; de EtheralShadow zelf gebruikt
-          z'n eigen position:relative om de SVG-filter correct te plaatsen. */}
+      {/* Roterende shader-background: kiest random 1 van N varianten per
+          page-load uit ./login-background. Vervangt de oude single
+          EtheralShadow zodat de login speelser/levendiger oogt. Alle
+          varianten zijn ingekleurd op het Caribbean Green palette
+          zodat de branding-consistentie behouden blijft. */}
       <div className="absolute inset-0 pointer-events-none">
-        <EtheralShadow
-          color="color-mix(in oklab, #00CC9B 70%, #02151a)"
-          animation={{ scale: 100, speed: 90 }}
-          noise={{ opacity: 0.7, scale: 1.2 }}
-          sizing="fill"
-        />
+        <LoginBackground />
       </div>
 
       {/* Card */}
