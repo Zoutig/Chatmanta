@@ -35,6 +35,7 @@ type Body = {
   question?: unknown;
   threshold?: unknown;
   enableRewrite?: unknown;
+  enableGeneralKnowledge?: unknown;
   version?: unknown;
   history?: unknown;
   tone?: unknown;
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
   const question = typeof body.question === 'string' ? body.question : '';
   const threshold = typeof body.threshold === 'number' ? body.threshold : 0.4;
   const enableRewrite = body.enableRewrite !== false;
+  const enableGeneralKnowledge = body.enableGeneralKnowledge !== false;
   const version = typeof body.version === 'string' ? body.version : '';
   const history = parseHistory(body.history);
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
@@ -177,6 +179,7 @@ export async function POST(req: Request) {
     question,
     threshold,
     enableRewrite,
+    enableGeneralKnowledge,
     bot,
     history,
     tone,
