@@ -59,6 +59,7 @@ export type BotFlags = {
   selfReflect: boolean;
   cascadeOnLowConfidence: boolean;
   cascadeModel: string;
+  generalKnowledgeEnabled: boolean;
 };
 
 export type OrgOption = { slug: string; name: string };
@@ -94,6 +95,7 @@ export function ChatShell({
 }) {
   const [threshold, setThreshold] = useState(defaultThreshold);
   const [rewriteOn, setRewriteOn] = useState(defaultEnableRewrite);
+  const [generalKnowledgeOn, setGeneralKnowledgeOn] = useState(botFlags.generalKnowledgeEnabled);
   const { tone, length, setTone, setLength } = useStyle();
   const { hydeMode, setHydeMode } = useHydeMode();
   const { mode: styleMode } = useStyleMode();
@@ -230,6 +232,7 @@ export function ChatShell({
               question: trimmed,
               threshold,
               enableRewrite: rewriteOn,
+              enableGeneralKnowledge: generalKnowledgeOn,
               version: botVersion,
               history,
               tone,
@@ -384,7 +387,7 @@ export function ChatShell({
         }
       })();
     },
-    [botVersion, persistTurn, rewriteOn, threshold, tone, length, hydeMode, updateLastTurn],
+    [botVersion, persistTurn, rewriteOn, generalKnowledgeOn, threshold, tone, length, hydeMode, updateLastTurn],
   );
 
   const onCiteClick = useCallback((idx: number) => {
@@ -617,6 +620,8 @@ export function ChatShell({
           onHydeModeChange={setHydeMode}
           rewriteOn={rewriteOn}
           onToggleRewrite={() => setRewriteOn((v) => !v)}
+          generalKnowledgeOn={generalKnowledgeOn}
+          onToggleGeneralKnowledge={() => setGeneralKnowledgeOn((v) => !v)}
           botVersion={botVersion}
           botSystemPrompt={botSystemPrompt}
           bots={bots}
@@ -684,6 +689,8 @@ export function ChatShell({
           onHydeModeChange={setHydeMode}
           rewriteOn={rewriteOn}
           onToggleRewrite={() => setRewriteOn((v) => !v)}
+          generalKnowledgeOn={generalKnowledgeOn}
+          onToggleGeneralKnowledge={() => setGeneralKnowledgeOn((v) => !v)}
           botVersion={botVersion}
           botSystemPrompt={botSystemPrompt}
           bots={bots}

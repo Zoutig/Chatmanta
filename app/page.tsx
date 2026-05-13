@@ -52,6 +52,7 @@ export default async function Home({
         selfReflect: bot.selfReflect,
         cascadeOnLowConfidence: bot.cascadeOnLowConfidence,
         cascadeModel: bot.cascadeModel,
+        generalKnowledgeEnabled: bot.generalKnowledgeEnabled,
       }}
       botSystemPrompt={bot.systemPrompt}
       defaultThreshold={bot.similarityThreshold}

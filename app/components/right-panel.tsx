@@ -42,6 +42,8 @@ export function RightPanel({
   onHydeModeChange,
   rewriteOn,
   onToggleRewrite,
+  generalKnowledgeOn,
+  onToggleGeneralKnowledge,
   botVersion,
   botSystemPrompt,
   bots,
@@ -64,6 +66,8 @@ export function RightPanel({
   onHydeModeChange: (m: HydeMode) => void;
   rewriteOn: boolean;
   onToggleRewrite: () => void;
+  generalKnowledgeOn: boolean;
+  onToggleGeneralKnowledge: () => void;
   botVersion: string;
   botSystemPrompt: string;
   bots: BotMeta[];
@@ -72,6 +76,7 @@ export function RightPanel({
     selfReflect: boolean;
     cascadeOnLowConfidence: boolean;
     cascadeModel: string;
+    generalKnowledgeEnabled: boolean;
   };
   activeCite: number | null;
   onCiteClick: (idx: number) => void;
@@ -180,6 +185,8 @@ export function RightPanel({
             onHydeModeChange={onHydeModeChange}
             rewriteOn={rewriteOn}
             onToggleRewrite={onToggleRewrite}
+            generalKnowledgeOn={generalKnowledgeOn}
+            onToggleGeneralKnowledge={onToggleGeneralKnowledge}
             botVersion={botVersion}
             bots={bots}
             botFlags={botFlags}
