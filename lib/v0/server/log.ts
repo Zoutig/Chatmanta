@@ -88,6 +88,11 @@ type QueryLogRow = {
   // v0.5+ correlation-ID (migratie 0017). Gevuld voor requests die door
   // /api/v0/chat lopen; NULL voor legacy of niet-API-paden.
   request_id: string | null;
+  // v0.5+ general-knowledge gate (migratie 0019). True wanneer de zero-hits
+  // gate reclassify dreef (general-knowledge antwoord, off-topic, of via
+  // reclassify-fallback), false wanneer de gate hard fallback gaf zonder
+  // reclassify-call. NULL voor smalltalk/blocked en legacy rijen.
+  general_knowledge_actual: boolean | null;
 };
 
 /**
@@ -210,6 +215,11 @@ export async function logQuery(
         : t
       : null;
     const fromCache = extras?.fromCache === true;
+    // v0.5+ general-knowledge actual. NULL voor smalltalk (gate draait niet);
+    // anders pluk uit response. Defensieve `?? null` voor oude threads-table
+    // rijen die nog zonder dit veld zijn gedeserialiseerd.
+    const generalKnowledgeActual =
+      response.kind === 'smalltalk' ? null : response.generalKnowledgeActual ?? null;
 
     const row: QueryLogRow =
       response.kind === 'smalltalk'
@@ -251,6 +261,7 @@ export async function logQuery(
             hyde_document: null,
             category: 'smalltalk' as const,
             request_id: requestId ?? null,
+            general_knowledge_actual: null,
           }
         : {
             organization_id: organizationId,
@@ -295,6 +306,7 @@ export async function logQuery(
             hyde_document: hydeDocument,
             category,
             request_id: requestId ?? null,
+            general_knowledge_actual: generalKnowledgeActual,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -389,6 +401,8 @@ export async function logBlockedQuery(input: {
       hyde_document: null,
       category: null,
       request_id: input.requestId ?? null,
+      // Blocked queries draaien de general-knowledge gate niet — NULL.
+      general_knowledge_actual: null,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);
