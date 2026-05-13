@@ -45,6 +45,9 @@ export type EvalSnapshotQuestion = {
   goldFacts: string[];
   tags: string[];
   difficulty: 'easy' | 'medium' | 'hard';
+  // Migration 0015: question_type voor segmentatie. Default 'factual' bij
+  // NULL/onbekend zodat downstream logica nooit op een leeg type stuit.
+  questionType: string;
 };
 
 export type EvalSnapshotSource = {
@@ -126,7 +129,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
   // 1. eval_questions
   const { data: qRows, error: qErr } = await client
     .from('eval_questions')
-    .select('id, slug, question, gold_answer, gold_facts, tags, difficulty')
+    .select('id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type')
     .eq('organization_id', DEV_ORG_ID)
     .order('slug');
   if (qErr) throw new Error(`eval_questions select: ${qErr.message}`);
@@ -139,6 +142,7 @@ export async function getEvalSnapshot(): Promise<EvalSnapshot> {
     goldFacts: (q.gold_facts as string[]) ?? [],
     tags: (q.tags as string[]) ?? [],
     difficulty: q.difficulty as 'easy' | 'medium' | 'hard',
+    questionType: (q.question_type as string | null) ?? 'factual',
   }));
 
   // 2. eval_runs — newest-first; client-side dedupe op (question_id, bot_version)
