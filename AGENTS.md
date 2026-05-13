@@ -95,6 +95,7 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 **Migrations:**
 - Eigen tooling, géén `supabase db push`: `npm run migrate`, `migrate:status`, `migrate:bootstrap`
 - Files in `supabase/migrations/NNNN_*.sql`, strikt volgnummer; nieuwe migration = RLS-policies in dezelfde file
+- ⚠️ Vóór je `NNNN` kiest: check zowel lokaal als open PRs voor het hoogste nummer. Parallelle branches/worktrees claimen anders allebei hetzelfde nummer — de conflict zit dan in de file-content, niet in de naam. Snelcheck: `ls supabase/migrations | sort | tail -3` + `gh pr list --state open --search "supabase/migrations" --limit 5`.
 
 **V0-scripts (snel demo-data manipuleren):**
 - `v0:ingest`, `v0:chat`, `v0:list`, `v0:reset`, `v0:tune`, `v0:reingest-parents`, `v0:seed-orgs`, `v0:test-org-isolation` — zie `package.json`
@@ -120,6 +121,9 @@ Bouw geen vooruit-werk uit een latere fase. Definition of Done van vorige fase m
 - Wijzig nooit een gemarkeerde V1 hard rule zonder te vragen
 - Als je iets niet zeker weet: zeg dat en stel een verifieerbare check voor
 - Bij library-versies en npm-packages: lees `node_modules/<pkg>/README` of recente docs voor je veronderstelt hoe de API eruitziet — Next.js, Supabase en Vercel AI SDK veranderen snel
+- **Minimaal eerst, uitbreiden later** — bij evals, tests en analyses lever precies de gevraagde scope. Geen extra dimensies, breakdowns, variance-secties of citation-coverage tenzij Sebastiaan ernaar vraagt. Eerste-PR-diff > 2× de spec is een signaal dat je over-implementeert; trim eerst, vraag dan of er meer moet bij.
+- **Niet delegeren wat je zelf kunt** — Sebastiaan niet vragen om handmatig SQL, migrations of worktree-exits te draaien. Gebruik `npm run migrate`, `ExitWorktree`, Bash. Bij Codex/security-review-bevindingen: verifieer false positives zelf (~2 per review is de baseline) vóór je fixes toepast. Uitzondering: onomkeerbare actions (push naar main, mergen, externe billable API-calls) → eerst bevestigen.
+- **Cache-issues vóór bug-jacht** — als een UI-wijziging niet zichtbaar is, clear `.next/` en herstart de dev server eerst. Veel "bugs" zijn stale Turbopack/.next cache, niet echte bugs. Verspil geen debugging-tijd voor je dit hebt uitgesloten.
 
 ## Werkstroom & parallelle sessies
 
@@ -188,3 +192,5 @@ CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill
 **Voor agents specifiek:**
 - Krijg je een `[BLOCKED]` melding bij `git push`? Goed — je probeerde direct op main te pushen. Maak een feature branch en push opnieuw.
 - Probeer NOOIT `git push --no-verify` zonder dat de gebruiker er expliciet om vraagt. Dit ondermijnt de hele bescherming.
+- **Geen absolute paden naar de hoofdrepo vanuit een worktree-sessie.** Edit/Write met `C:\Users\solys\Documents\Code\chatmanta\...` terwijl je in `../chatmanta-<doel>/` werkt schrijft naar de hoofdrepo, niet je worktree — je commit landt dan in de verkeerde branch. Gebruik relatieve paden of paden onder de worktree-root. De globale pre-edit hook (`~/.claude/hooks/pre-edit-worktree-check.ps1`) print bij elke edit de worktree-root en branch, en flagt `OUTSIDE WORKTREE` als je een vreemd pad raakt — neem die warning serieus en heroverweeg vóór je verder typt.
+- **Na een merge ruim je op:** `git branch -D feat/seb/<branch>` lokaal (squash-merges → `-d` faalt altijd, dus `-D`), `git push origin --delete feat/seb/<branch>` op remote (of via `gh`), `git worktree remove ../chatmanta-<doel>` als het er een was, en `Get-Process node | Stop-Process -Force` als poort 3000/3001 vast blijft zitten door een orphan dev-server.
