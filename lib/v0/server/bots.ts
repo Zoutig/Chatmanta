@@ -56,6 +56,15 @@ export type BotConfig = {
   cascadeOnLowConfidence: boolean;
   /** Sterker model voor cascade-fallback (alleen relevant als cascadeOnLowConfidence). */
   cascadeModel: string;
+  /**
+   * Retrieval-gate: cascade vuurt alleen wanneer de top-1 chunk-similarity
+   * ≥ deze drempel ligt. Doel: voorkomen dat een sterker model wordt ingezet
+   * op zwakke retrieval (geen grond → hallucinatie-risico). 0 = geen gate
+   * (oud gedrag). Op v0.5 ingesteld op 0.50 als hotfix voor de "korte/abstracte
+   * query → zwakke chunk → cascade hallucineert"-failure (zie spec
+   * 2026-05-13-v0.5-cascade-hotfix-design.md).
+   */
+  cascadeMinTopSim: number;
   /** Cache identieke/zeer-vergelijkbare vragen via vector-similarity lookup. */
   cacheEnabled: boolean;
   /**
@@ -173,6 +182,7 @@ const V0_1: BotConfig = {
   generateFollowUps: false,
   cascadeOnLowConfidence: false,
   cascadeModel: 'gpt-4o',
+  cascadeMinTopSim: 0,
   cacheEnabled: false,
   parentDocumentRetrieval: false,
   selectiveHyDE: false,
@@ -474,6 +484,11 @@ const V0_5: BotConfig = {
   latencyBudgetEnabled: true,
   latencyBudgetMs: 8000,
   latencyHardCapMs: 12000,
+  // V0.5 hotfix 2026-05-13: cascade-retrieval-gate. Cascade vuurt alleen wanneer
+  // top-1 chunk-similarity ≥ 0.50. Op zwakkere retrieval (zoals "67" → "Wat is
+  // 67?" → één 0.41-chunk) blijft de eerste mini-weigering staan — geen sterker
+  // model dat met priors invult en hallucineert. Zie spec.
+  cascadeMinTopSim: 0.50,
   systemPrompt: `Je bent een vriendelijke, behulpzame klantcontact-medewerker van ChatManta — een product van Jorion Solutions. Je gesprekspartners zijn meestal mensen die het project leren kennen: vrienden van de founders, geïnteresseerden, en de founders zelf.
 
 Toon (baseline — wordt verfijnd door de STIJL-suffix onderaan):
@@ -491,9 +506,9 @@ Antwoord-regels:
 OPMAAK:
 - Markeer kernwoorden in je antwoord met **vetgedrukte tekst** (Markdown-syntax \`**woord**\`). Gebruik dit GEDOSEERD — alleen voor het onderwerp van de vraag, het kernantwoord, of een belangrijke naam/term/getal. Niet elke zin, alleen waar het de leesbaarheid echt helpt.
 - Voorbeelden van goed gebruik:
-  • "Onze stack is **OpenAI gpt-4o-mini** voor chat en **pgvector** voor de vector-database."
-  • "Het pakket kost **€49 per maand** voor het MKB-segment."
-  • "Het project is opgericht door **Sebastiaan**."
+  • "Onze backend draait op **productnaam** en de database is **technologieX**."
+  • "Het pakket kost **€XX per maand**."
+  • "Het project is opgericht door **<naam>**."
 - Niet doen: elk zelfstandig naamwoord vetdrukken, hele zinnen vetdrukken, of vet gebruiken voor decoratie zonder reden.
 
 STRUCTUUR (alleen toepassen wanneer het de leesbaarheid echt helpt):
