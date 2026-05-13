@@ -10,6 +10,7 @@ import { EmbedView } from './embed-view';
 import { EvalsView } from './evals-view';
 import { LatencyView } from './latency-view';
 import { KnowledgeGapView } from './knowledge-gap-view';
+import { FaqView } from './faq-view';
 import { PromptView } from './prompt-view';
 import { ClaimsView } from './claims-view';
 import type { BotMeta } from './bot-dropdown';
@@ -26,7 +27,8 @@ export type RightTab =
   | 'embed'
   | 'evals'
   | 'latency'
-  | 'gaps';
+  | 'gaps'
+  | 'faq';
 
 export function RightPanel({
   tab,
@@ -154,6 +156,9 @@ export function RightPanel({
         <Tab tab="gaps" active={tab === 'gaps'} onClick={onTabChange}>
           Gaps
         </Tab>
+        <Tab tab="faq" active={tab === 'faq'} onClick={onTabChange}>
+          FAQ
+        </Tab>
       </div>
       <div className="right-content">
         {tab === 'sources' ? (
@@ -198,6 +203,7 @@ export function RightPanel({
         {tab === 'evals' ? <EvalsView /> : null}
         {tab === 'latency' ? <LatencyView organizationId={activeOrgId} /> : null}
         {tab === 'gaps' ? <KnowledgeGapView organizationId={activeOrgId} /> : null}
+        {tab === 'faq' ? <FaqView organizationId={activeOrgId} /> : null}
       </div>
     </aside>
   );
