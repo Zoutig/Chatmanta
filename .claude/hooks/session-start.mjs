@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 // SessionStart hook: laat de agent zien wat er sinds vorige sessie gebeurd is.
-// Doet GEEN auto-pull (zou ongevraagd mergeconflicten kunnen veroorzaken).
+// - git fetch draait async op de achtergrond (blokkeert sessiestart niet)
+// - resultaten van fetch + gh worden 5 min gecached in .claude/.cache/
 
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+const FETCH_TTL_MS = 5 * 60 * 1000;
+const PR_TTL_MS = 5 * 60 * 1000;
 
 function safe(cmd) {
   try {
@@ -16,8 +22,50 @@ const root = safe('git rev-parse --show-toplevel');
 if (!root) { console.log('{}'); process.exit(0); }
 process.chdir(root);
 
-safe('git fetch origin --quiet');
+const cacheDir = join(root, '.claude', '.cache');
+const cacheFile = join(cacheDir, 'session-start.json');
+if (!existsSync(cacheDir)) {
+  try { mkdirSync(cacheDir, { recursive: true }); } catch {}
+}
 
+function readCache() {
+  try { return JSON.parse(readFileSync(cacheFile, 'utf8')); } catch { return {}; }
+}
+function writeCache(data) {
+  try { writeFileSync(cacheFile, JSON.stringify(data)); } catch {}
+}
+function isFresh(ts, ttl) {
+  return typeof ts === 'number' && (Date.now() - ts) < ttl;
+}
+function ageLabel(ts) {
+  const s = Math.round((Date.now() - ts) / 1000);
+  return s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
+}
+
+const cache = readCache();
+let fetchLabel;
+
+// git fetch — async spawn als de cache stale is, anders skip
+if (isFresh(cache.fetchedAt, FETCH_TTL_MS)) {
+  fetchLabel = `origin gefetched ${ageLabel(cache.fetchedAt)} geleden (cached)`;
+} else {
+  // Timestamp NU schrijven zorgt dat parallelle sessies niet allemaal een fetch starten
+  cache.fetchedAt = Date.now();
+  writeCache(cache);
+  try {
+    const child = spawn('git', ['fetch', 'origin', '--quiet'], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+    fetchLabel = 'origin fetch loopt async op de achtergrond';
+  } catch {
+    fetchLabel = 'fetch overgeslagen (kon git niet starten)';
+  }
+}
+
+// Lokale git-calls (geen netwerk, snel)
 const branch = safe('git rev-parse --abbrev-ref HEAD') || 'unknown';
 const cwd = process.cwd();
 const behind = parseInt(safe('git rev-list --count HEAD..origin/main') || '0', 10);
@@ -25,8 +73,7 @@ const ahead = parseInt(safe('git rev-list --count origin/main..HEAD') || '0', 10
 const recent = safe('git log HEAD..origin/main --oneline').split('\n').filter(Boolean).slice(0, 10).join('\n');
 const status = safe('git status --short');
 
-// V2: detecteer parallelle worktrees op dezelfde repo. Lijst is "<path> <sha> [branch]"
-// per regel; het eerste pad is altijd de main working tree (= deze sessie of een andere).
+// Worktrees
 const worktrees = safe('git worktree list --porcelain')
   .split('\n\n')
   .map((block) => {
@@ -36,26 +83,38 @@ const worktrees = safe('git worktree list --porcelain')
     return path ? { path, branch: br || '(detached)' } : null;
   })
   .filter(Boolean);
-// Normaliseer paden: git worktree gebruikt forward slashes op Windows, cwd backslashes.
 const norm = (p) => p.replace(/\\/g, '/').toLowerCase();
 const cwdNorm = norm(cwd);
 const otherWorktrees = worktrees.filter((w) => norm(w.path) !== cwdNorm);
 
+// gh pr list — sync call alleen als cache stale is
 let prs = [];
-try {
-  prs = JSON.parse(safe('gh pr list --state open --limit 5 --json number,title,headRefName,author') || '[]');
-} catch { /* gh not available or not authed */ }
+let prsLabel = '';
+if (isFresh(cache.prsAt, PR_TTL_MS) && Array.isArray(cache.prs)) {
+  prs = cache.prs;
+  prsLabel = ` (cached, ${ageLabel(cache.prsAt)} oud)`;
+} else {
+  try {
+    const raw = safe('gh pr list --state open --limit 5 --json number,title,headRefName,author');
+    if (raw) {
+      prs = JSON.parse(raw);
+      cache.prs = prs;
+      cache.prsAt = Date.now();
+      writeCache(cache);
+    }
+  } catch { /* gh not available or not authed */ }
+}
 
-// Visuele prominent banner — zorgt dat ik niet over de branch heen lees.
+// Banner
 const parts = [
-  '┌─ Werkcontext bij sessie-start (auto-fetched, geen pull) ─',
+  '┌─ Werkcontext bij sessie-start ─',
   `│  Branch:   ${branch}`,
   `│  Workdir:  ${cwd}`,
+  `│  Fetch:    ${fetchLabel}`,
   '└─',
   '',
 ];
 
-// Versterkte instructie aan Claude: vóór codewijzigingen altijd bevestigen.
 parts.push('⚠  VOOR JE EERSTE CODE-WIJZIGING IN DEZE SESSIE:');
 parts.push('   Bevestig kort met de gebruiker:');
 parts.push(`     1. Is "${branch}" de juiste branch, of moet er een feature-branch komen?`);
@@ -102,7 +161,7 @@ if (behind === 0 && ahead === 0 && !status) {
 
 if (prs.length > 0) {
   parts.push('');
-  parts.push('Open PRs (van jou of teamgenoot):');
+  parts.push(`Open PRs (van jou of teamgenoot)${prsLabel}:`);
   prs.forEach(pr => {
     const author = (pr.author && pr.author.login) || '?';
     parts.push(`  #${pr.number} [${pr.headRefName}] ${pr.title} (door @${author})`);
