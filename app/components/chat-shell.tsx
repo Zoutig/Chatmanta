@@ -278,6 +278,7 @@ export function ChatShell({
                     botVersion: event.botVersion,
                     tone,
                     length,
+                    generalKnowledgeActual: null,
                     kind: 'answer',
                     answer: '',
                     rewrite: event.rewrite,

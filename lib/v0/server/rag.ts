@@ -881,6 +881,12 @@ type BaseChatResponse = {
   tone: Tone;
   /** Length toggle waarmee deze response gegenereerd is. */
   length: Length;
+  /**
+   * v0.5: gate-outcome voor het zero-hits reclassify-pad. true = pad mocht
+   * draaien; false = pad geskipt (bot doesn't support OR user toggle off).
+   * null voor smalltalk en non-zero-hits answers (pad niet bereikt).
+   */
+  generalKnowledgeActual: boolean | null;
 };
 
 /** Per-claim verification result (v0.4 feature 3). Compact structure voor extras. */
@@ -1093,6 +1099,7 @@ export async function runRagQuery({
         botVersion: bot.version,
         tone,
         length,
+        generalKnowledgeActual: null,
         kind: 'smalltalk',
         answer: pp.reply,
         preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
@@ -1138,6 +1145,7 @@ export async function runRagQuery({
       botVersion: bot.version,
       tone,
       length,
+      generalKnowledgeActual: null,
       kind: 'fallback',
       answer: FALLBACK_MESSAGE,
       reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
@@ -1189,6 +1197,7 @@ export async function runRagQuery({
     botVersion: bot.version,
     tone,
     length,
+    generalKnowledgeActual: null,
     kind: 'answer',
     answer: chat.text.trim(),
     rewrite: rewriteInfo,
@@ -1278,6 +1287,13 @@ export async function* runRagQueryStreaming(input: {
    * = volg bot-config. Override wint altijd, ook over bots met useHyDE=false.
    */
   hydeModeOverride?: HydeModeRequest;
+  /**
+   * v0.5: per-query override voor general-knowledge reclassify-pad. Default true
+   * — gated combined with bot.generalKnowledgeEnabled. UI-toggle (SettingsView)
+   * stuurt false om de extra LLM-call bij zero-hits over te slaan en direct naar
+   * FALLBACK_MESSAGE te gaan.
+   */
+  enableGeneralKnowledge?: boolean;
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
   const tone: Tone = input.tone ?? DEFAULT_TONE;
@@ -1285,6 +1301,10 @@ export async function* runRagQueryStreaming(input: {
   const orgId = input.organizationId ?? DEV_ORG_ID;
   const hydeModeRequested: HydeModeRequest = input.hydeModeOverride ?? 'auto';
   const hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
+  // v0.5 general-knowledge toggle: gate combined with bot config. Default true
+  // for backwards-compat (older clients/scripts without the field).
+  const enableGeneralKnowledge = input.enableGeneralKnowledge !== false;
+  const generalKnowledgeActive = bot.generalKnowledgeEnabled && enableGeneralKnowledge;
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     yield { kind: 'error', code: 'INPUT_INVALID' };
@@ -1371,6 +1391,7 @@ export async function* runRagQueryStreaming(input: {
           botVersion: bot.version,
           tone,
           length,
+          generalKnowledgeActual: null,
           kind: 'smalltalk',
           answer: pp.reply,
           preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
@@ -1434,7 +1455,7 @@ export async function* runRagQueryStreaming(input: {
               },
             }
           : cached;
-      const enriched: ChatResponse = { ...baseEnriched, tone, length };
+      const enriched: ChatResponse = { ...baseEnriched, tone, length, generalKnowledgeActual: null };
       yield {
         kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',
         response: enriched,
@@ -1584,15 +1605,16 @@ export async function* runRagQueryStreaming(input: {
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   if (aboveThreshold.length === 0) {
-    // V0.5: tweede-stage re-classifier wanneer bot.generalKnowledgeEnabled.
-    // We weten nu dat retrieval géén relevante chunks gaf — de vraag is dus
-    // ofwel algemene kennis binnen het domein (GENERAL) of buiten het domein
-    // (OFF_TOPIC) of een specifiek detail dat we eerlijk niet kennen
-    // (FALLBACK).
+    // V0.5: tweede-stage re-classifier wanneer bot.generalKnowledgeEnabled
+    // EN de UI-toggle aan staat. We weten nu dat retrieval géén relevante
+    // chunks gaf — de vraag is dus ofwel algemene kennis binnen het domein
+    // (GENERAL) of buiten het domein (OFF_TOPIC) of een specifiek detail dat
+    // we eerlijk niet kennen (FALLBACK).
     //
-    // Bij !generalKnowledgeEnabled (v0.1-v0.4) gedragen we ons exact zoals
-    // voorheen: vaste FALLBACK_MESSAGE, geen LLM-call.
-    if (bot.generalKnowledgeEnabled) {
+    // Bij !generalKnowledgeActive (v0.1-v0.4, of v0.5 met toggle-uit)
+    // gedragen we ons exact zoals v0.1-v0.4: vaste FALLBACK_MESSAGE, geen
+    // LLM-call.
+    if (generalKnowledgeActive) {
       const { reclassifyAfterZeroHits } = await import('./reclassify');
       const rc = await reclassifyAfterZeroHits(original, bot);
       const reclassifyTokensIn = rc.inputTokens;
@@ -1708,6 +1730,7 @@ KRITISCHE FORMAT-REGELS:
           botVersion: bot.version,
           tone,
           length,
+          generalKnowledgeActual: true,
           kind: 'answer',
           answer: genAccText.trim(),
           rewrite: rewriteInfo,
@@ -1746,6 +1769,7 @@ KRITISCHE FORMAT-REGELS:
             botVersion: bot.version,
             tone,
             length,
+            generalKnowledgeActual: true,
             kind: 'fallback',
             answer: OFF_TOPIC_REFUSAL,
             reason: 'OFF_TOPIC re-classify — vraag buiten domein',
@@ -1775,6 +1799,7 @@ KRITISCHE FORMAT-REGELS:
           botVersion: bot.version,
           tone,
           length,
+          generalKnowledgeActual: true,
           kind: 'fallback',
           answer: FALLBACK_MESSAGE,
           reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}); re-classify=fallback.`,
@@ -1804,6 +1829,7 @@ KRITISCHE FORMAT-REGELS:
         botVersion: bot.version,
         tone,
         length,
+        generalKnowledgeActual: false,
         kind: 'fallback',
         answer: FALLBACK_MESSAGE,
         reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
@@ -2058,6 +2084,7 @@ KRITISCHE FORMAT-REGELS:
     botVersion: bot.version,
     tone,
     length,
+    generalKnowledgeActual: null,
     kind: 'answer',
     answer: finalAnswerText,
     rewrite: rewriteInfo,

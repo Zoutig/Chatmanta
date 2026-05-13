@@ -150,6 +150,7 @@ export async function POST(req: Request) {
       botVersion: bot.version,
       tone,
       length,
+      generalKnowledgeActual: null,
       kind: 'fallback',
       answer: INJECTION_BLOCKED_MESSAGE,
       reason: `Injection patroon gedetecteerd: ${patternName}`,
