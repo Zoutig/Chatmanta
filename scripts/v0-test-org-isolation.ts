@@ -1,13 +1,14 @@
-// V0.4 multi-org isolation test — bewijst dat retrieval scoped is op
+// V0 multi-org isolation test — bewijst dat retrieval scoped is op
 // organization_id. Drie scenarios:
 //
-//   1. Vraag over ACME aan acme-corp → moet ACME-info terugkrijgen
-//   2. Vraag over ACME aan globex-inc → moet fallback geven (geen ACME-data)
-//   3. Vraag over Hank Scorpio aan globex-inc → moet Globex-info terugkrijgen
+//   1. Dakwerken-vraag aan acme-corp (Dakwerken De Boer) → moet hit zijn
+//   2. Dakwerken-vraag aan globex-inc (FysioPlus Utrecht) → moet fallback geven
+//      (geen dakwerken-data in fysio-org)
+//   3. Fysio-vraag aan globex-inc → moet hit zijn (positive)
 //
 // Pass-criterium: scenario 2 retourneert kind='fallback' OF een answer die
-// ACME niet noemt (anti-hallucinatie deed zijn werk). Scenarios 1 en 3
-// moeten kind='answer' zijn met de juiste namen in de tekst.
+// dakwerken-termen niet noemt (anti-hallucinatie deed zijn werk). Scenarios 1
+// en 3 moeten kind='answer' zijn met de juiste termen in de tekst.
 //
 // Usage:
 //   npm run v0:test-org-isolation
@@ -32,28 +33,28 @@ type Scenario = {
 
 const SCENARIOS: Scenario[] = [
   {
-    label: 'ACME-vraag aan ACME (positive)',
-    question: 'Wat doet ACME Corporation precies?',
+    label: 'Dakwerken-vraag aan Dakwerken (positive)',
+    question: 'Leggen jullie ook platte daken aan met EPDM of bitumen?',
     orgSlug: 'acme-corp',
-    expectContains: ['ACME'],
-    forbidContains: ['Globex', 'Initech', 'Lumbergh'],
+    expectContains: ['dak'],
+    forbidContains: ['manuele therapie', 'fysio', 'jaarrekening'],
   },
   {
-    label: 'ACME-vraag aan Globex (isolation)',
-    question: 'Wat doet ACME Corporation precies?',
+    label: 'Dakwerken-vraag aan FysioPlus (isolation)',
+    question: 'Leggen jullie ook platte daken aan met EPDM of bitumen?',
     orgSlug: 'globex-inc',
-    forbidContains: ['ACME', 'Wile E. Coyote', 'aambeelden'],
+    forbidContains: ['Dakwerken De Boer', 'EPDM', 'bitumen', 'dakgoot'],
     allowFallback: true,
-    // Niet requireFallback omdat de bot soms een algemeen "weet ik niet" geeft
-    // zonder formele fallback-status — beide gedragingen zijn OK zolang er
-    // geen ACME data lekt.
+    // Niet requireFallback: bot mag ook een vriendelijke 'dat doen wij niet'
+    // teruggeven zonder formele fallback-status — beide zijn OK zolang er
+    // geen dakwerken-data lekt.
   },
   {
-    label: 'Globex-vraag aan Globex (positive)',
-    question: 'Wie is de oprichter van Globex Corporation?',
+    label: 'Fysio-vraag aan FysioPlus (positive)',
+    question: 'Behandelen jullie ook manuele therapie?',
     orgSlug: 'globex-inc',
-    expectContains: ['Hank Scorpio'],
-    forbidContains: ['ACME', 'Initech'],
+    expectContains: ['manuele'],
+    forbidContains: ['Dakwerken De Boer', 'EPDM', 'jaarrekening'],
   },
 ];
 
@@ -115,7 +116,7 @@ function checkScenario(s: Scenario, response: ChatResponse | null): { pass: bool
 }
 
 async function main(): Promise<void> {
-  console.log('--- V0.4 multi-org isolation test ---\n');
+  console.log('--- V0 multi-org isolation test ---\n');
 
   let pass = 0;
   let fail = 0;
