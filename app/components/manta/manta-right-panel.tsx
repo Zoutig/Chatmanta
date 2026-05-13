@@ -9,6 +9,7 @@ import { OpmaakView } from '../opmaak-view';
 import { EmbedView } from '../embed-view';
 import { EvalsView } from '../evals-view';
 import { LatencyView } from '../latency-view';
+import { FaqView } from '../faq-view';
 import { PromptView } from '../prompt-view';
 import { ClaimsView } from '../claims-view';
 import type { BotMeta } from '../bot-dropdown';
@@ -73,6 +74,24 @@ function buildTabs(sourceCount: number, claimCount: number, docCount: number): R
         <g>
           <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
           <path d="M8 5v3l2 1.5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        </g>
+      ),
+    },
+    {
+      id: 'faq',
+      label: 'FAQ',
+      group: 'Antwoord',
+      icon: (
+        <g>
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          <path
+            d="M6.4 6.4c0-.9.7-1.6 1.6-1.6s1.6.7 1.6 1.6c0 1.1-1.6 1.3-1.6 2.4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <circle cx="8" cy="11" r="0.7" fill="currentColor" />
         </g>
       ),
     },
@@ -305,6 +324,7 @@ export function MantaRightPanel({
             {tab === 'embed' ? <EmbedView botVersion={botVersion} /> : null}
             {tab === 'evals' ? <EvalsView /> : null}
             {tab === 'latency' ? <LatencyView organizationId={activeOrgId} /> : null}
+            {tab === 'faq' ? <FaqView organizationId={activeOrgId} /> : null}
           </div>
         </div>
       ) : null}
