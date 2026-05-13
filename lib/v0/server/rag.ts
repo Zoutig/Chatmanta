@@ -2317,9 +2317,11 @@ export type IngestResult = {
 export async function ingestText({
   filename,
   text,
+  organizationId,
 }: {
   filename: string;
   text: string;
+  organizationId: string;
 }): Promise<IngestResult> {
   const chunks = chunkText(text);
   if (chunks.length === 0) {
@@ -2331,7 +2333,7 @@ export async function ingestText({
   const { data: doc, error: docErr } = await sb
     .from('documents')
     .insert({
-      organization_id: DEV_ORG_ID,
+      organization_id: organizationId,
       filename,
       source: 'v0_local',
       status: 'processing',
@@ -2358,7 +2360,7 @@ export async function ingestText({
   }
 
   const rows = chunks.map((content, i) => ({
-    organization_id: DEV_ORG_ID,
+    organization_id: organizationId,
     document_id: docId,
     content,
     embedding: embedResult.vectors[i],
@@ -2380,13 +2382,15 @@ export async function ingestText({
   };
 }
 
-export async function deleteDoc(docId: string): Promise<void> {
+export async function deleteDoc(docId: string, organizationId: string): Promise<void> {
   // CASCADE op document_chunks.document_id ruimt chunks automatisch.
+  // organizationId is verplicht: zonder org-scope kan een delete uit de
+  // verkeerde org's data lopen (zie codex adversarial review 2026-05-13).
   const sb = supabase();
   const { error } = await sb
     .from('documents')
     .delete()
-    .eq('organization_id', DEV_ORG_ID)
+    .eq('organization_id', organizationId)
     .eq('id', docId);
   if (error) throw new Error(`deleteDoc: ${error.message}`);
 }

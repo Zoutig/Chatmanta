@@ -20,6 +20,7 @@ import {
   type DocSummary,
   type IngestResult,
 } from '@/lib/v0/server/rag';
+import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { toAppError, type AppErrorCode } from '@/lib/errors/app-error';
@@ -75,7 +76,12 @@ export async function ingestAction(
   }
 
   try {
-    const result = await ingestText({ filename: file.name, text });
+    const activeOrg = await getActiveOrgFromCookies();
+    const result = await ingestText({
+      filename: file.name,
+      text,
+      organizationId: activeOrg.id,
+    });
     revalidatePath('/');
     return { kind: 'success', result, filename: file.name };
   } catch (err) {
@@ -88,12 +94,14 @@ export async function removeDocAction(docId: string): Promise<ActionResult> {
   return actionTry(async () => {
     const limit = await checkMutationLimit();
     if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
-    await deleteDoc(docId);
+    const activeOrg = await getActiveOrgFromCookies();
+    await deleteDoc(docId, activeOrg.id);
     revalidatePath('/');
     return {};
   });
 }
 
 export async function refreshDocs(): Promise<DocSummary[]> {
-  return listDocs();
+  const activeOrg = await getActiveOrgFromCookies();
+  return listDocs(activeOrg.id);
 }
