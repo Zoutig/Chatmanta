@@ -61,3 +61,6 @@ tests/.auth-state.json
 
 # ad-hoc debug scripts (browser automation, one-off diagnostics)
 /tmp/
+
+# wekelijkse werk-samenvattingen voor privé-archief (gegenereerd door scheduled remote agent)
+/weekly-reports/
