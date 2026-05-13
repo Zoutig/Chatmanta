@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
-import Image from 'next/image';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { login, type LoginState } from '../../login/actions';
@@ -169,9 +168,21 @@ export function SignInCard({ next }: { next: string }) {
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: 'spring', duration: 0.8 }}
                   className="mx-auto w-12 h-8 relative"
-                >
-                  <Image src="/logo/mark.png" alt="ChatManta" width={510} height={270} priority style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 12px color-mix(in oklab, #00CC9B 50%, transparent))' }} />
-                </motion.div>
+                  role="img"
+                  aria-label="ChatManta"
+                  style={{
+                    backgroundColor: '#00CC9B',
+                    WebkitMaskImage: "url('/logo/mono-mark.png')",
+                    maskImage: "url('/logo/mono-mark.png')",
+                    WebkitMaskSize: 'contain',
+                    maskSize: 'contain',
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskPosition: 'center',
+                    maskPosition: 'center',
+                    filter: 'drop-shadow(0 0 12px color-mix(in oklab, #00CC9B 50%, transparent))',
+                  }}
+                />
                 <motion.h1
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
