@@ -2061,7 +2061,16 @@ KRITISCHE FORMAT-REGELS:
   let claimConfidence: number | undefined;
   let hardFactSupported: boolean | undefined;
   let missingHardFacts: string[] | undefined;
-  if (bot.claimVerification && (withinBudget() || markSkipped('claimVerification'))) {
+  // v0.6.1: bij adaptiveHardFactVerification mag claim-verify NIET geskipt
+  // worden door latency-budget — anders draait de hard-fact check (die
+  // op claim-verify-output bouwt) nooit op de langzame queries waar
+  // hallucinatie-risico het hoogst is. Cost van verify is ~200ms + één
+  // embed-call (~$0.0001), acceptabele uitruil voor grounding-correctheid.
+  const verifyBudgetGate =
+    bot.adaptiveHardFactVerification === true
+      ? true
+      : (withinBudget() || markSkipped('claimVerification'));
+  if (bot.claimVerification && verifyBudgetGate) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
     try {
