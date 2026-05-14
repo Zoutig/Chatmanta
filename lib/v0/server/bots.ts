@@ -150,6 +150,26 @@ export type BotConfig = {
    */
   preProcessMultiTurnAddon: string;
   /**
+   * v0.6.1: format chunks in answer-context als plain-text
+   * `MATCHED_SPAN:\n<small-chunk>\n\nSURROUNDING_CONTEXT:\n<parent-content>`
+   * i.p.v. één enkele parent-blob. Geeft de LLM een precision-anker (de small
+   * chunk die feitelijk matchte) plus context voor nuance. Backwards-compat:
+   * undefined of false → huidige v0.5 gedrag (parent_content ?? content blob).
+   * Vereist bot.parentDocumentRetrieval ook aan voor effect (anders is er
+   * geen parent_content om als surrounding context te tonen).
+   */
+  matchedSpanContext?: boolean;
+  /**
+   * v0.6.1: post-hoc verificatie of harde feiten in het antwoord (geld,
+   * percentages, datums, aantallen, e-mail/URL, telefoon) 1-op-1 of
+   * genormaliseerd in de aangeleverde chunks staan. Aanvulling op de
+   * bestaande embedding-similarity claim-check (die vector-shape matcht
+   * maar verkeerde getallen niet onderscheidt). Bij missing facts:
+   * trigger de bestaande claim-regenerate flow met stricter prompt.
+   * Vereist bot.claimVerification om effect te hebben (zelfde stage).
+   */
+  adaptiveHardFactVerification?: boolean;
+  /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
    * omdat v0.4 met cascade nooit dezelfde latency haalt als v0.1.
@@ -617,6 +637,43 @@ Geen referentie in de huidige vraag? Sla STAP 0 over.
 };
 
 // ---------------------------------------------------------------------------
+// v0.6.1 — hard-fact verifier + matched-span context (PR-A van v0.6 split)
+//
+// Append-only — V0_1 t/m V0_5 blijven ongewijzigd zodat eval-vergelijkingen
+// reproduceerbaar zijn. Twee orthogonale grounding-features:
+//
+//   * matchedSpanContext: format chunks in answer-context als plain-text
+//     `MATCHED_SPAN:` + `SURROUNDING_CONTEXT:` blokken (small-chunk als
+//     precision-anker, parent-content voor nuance) i.p.v. één parent-blob.
+//     De LLM weet daardoor preciezer welk fragment de match veroorzaakte.
+//
+//   * adaptiveHardFactVerification: post-hoc check of harde feiten in het
+//     antwoord (geld/percentages/datums/aantallen/e-mail/URL/telefoon)
+//     letterlijk of genormaliseerd in de chunks staan. Aanvulling op de
+//     embedding-similarity claim-check die wel vector-shape matcht maar
+//     verkeerde getallen niet onderscheidt. Missing facts → claim-regenerate
+//     met stricter prompt (bestaande v0.5 flow, hergebruikt).
+//
+// Verifieerbaar via:
+//   - eval grounding-delta op hard-fact testcases (fixtures/eval-hard-facts.json)
+//   - vergelijking v0.5 vs v0.6.1, runs=2, met Phase 0 noise-baseline als
+//     significantie-drempel (2× stddev).
+// ---------------------------------------------------------------------------
+const V0_6_1: BotConfig = {
+  ...V0_5,
+  version: 'v0.6.1',
+  label: 'v0.6.1 — hard-facts + matched-span',
+  description:
+    'v0.5 + matched-span context format (small als anker, parent als nuance) + hard-fact verifier op antwoord (geld/datums/percentages/aantallen/e-mail/URL/telefoon). Bij ungrounded harde feiten triggert claim-regenerate met stricter prompt.',
+  matchedSpanContext: true,
+  adaptiveHardFactVerification: true,
+  // Latency-budget licht omhoog t.o.v. v0.5: hard-fact verifier kost ~50ms
+  // regex op het antwoord + 0-1 extra normaliserings-passes per claim.
+  evalBudgetMs: 6500,
+  evalBudgetUsd: 0.0050,
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
@@ -625,10 +682,11 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_3.version]: V0_3,
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
+  [V0_6_1.version]: V0_6_1,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_5.version;
+export const LATEST_BOT_VERSION = V0_6_1.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -637,6 +695,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_3.version,
   V0_4.version,
   V0_5.version,
+  V0_6_1.version,
 ];
 
 /**

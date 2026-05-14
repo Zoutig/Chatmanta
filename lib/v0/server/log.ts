@@ -93,6 +93,12 @@ type QueryLogRow = {
   // reclassify-fallback), false wanneer de gate hard fallback gaf zonder
   // reclassify-call. NULL voor smalltalk/blocked en legacy rijen.
   general_knowledge_actual: boolean | null;
+  // v0.6.1 hard-fact verifier (migratie 0022). NULL voor v0.1-v0.5 én voor
+  // v0.6.1-runs waar bot.adaptiveHardFactVerification uit stond (= check
+  // niet gedraaid). False = minstens één hard fact missing (regenerate
+  // mogelijk getriggered). True = alle harde feiten ondersteund.
+  hard_fact_supported: boolean | null;
+  missing_hard_facts: unknown | null;
 };
 
 /**
@@ -221,6 +227,13 @@ export async function logQuery(
     const generalKnowledgeActual =
       response.kind === 'smalltalk' ? null : response.generalKnowledgeActual ?? null;
 
+    // v0.6.1 hard-fact verifier. Aanwezig in extras alleen wanneer
+    // bot.adaptiveHardFactVerification aanstond. Voor smalltalk/blocked
+    // en oudere versies blijft het NULL.
+    const hfs = extras?.hardFactSupport;
+    const hardFactSupported = typeof hfs?.supported === 'boolean' ? hfs.supported : null;
+    const missingHardFacts = hfs?.missing ?? null;
+
     const row: QueryLogRow =
       response.kind === 'smalltalk'
         ? {
@@ -262,6 +275,8 @@ export async function logQuery(
             category: 'smalltalk' as const,
             request_id: requestId ?? null,
             general_knowledge_actual: null,
+            hard_fact_supported: null,
+            missing_hard_facts: null,
           }
         : {
             organization_id: organizationId,
@@ -307,6 +322,8 @@ export async function logQuery(
             category,
             request_id: requestId ?? null,
             general_knowledge_actual: generalKnowledgeActual,
+            hard_fact_supported: hardFactSupported,
+            missing_hard_facts: missingHardFacts,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -403,6 +420,9 @@ export async function logBlockedQuery(input: {
       request_id: input.requestId ?? null,
       // Blocked queries draaien de general-knowledge gate niet — NULL.
       general_knowledge_actual: null,
+      // Blocked queries genereren geen antwoord → geen hard-fact check.
+      hard_fact_supported: null,
+      missing_hard_facts: null,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);

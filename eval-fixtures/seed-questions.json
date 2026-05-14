@@ -565,6 +565,66 @@
       "tags": ["multi-turn-baseline", "pricing"],
       "difficulty": "hard",
       "category": "search"
+    },
+    {
+      "slug": "v061-hardfact-prijs-per-maand",
+      "question": "Wat kost ChatManta per maand?",
+      "gold_answer": "De corpus van V0 noemt geen concrete prijs per maand. De bot hoort eerlijk te zeggen dat hij dat niet exact weet en aan te bieden door te verwijzen voor de actuele tarieven. Geen verzonnen bedragen.",
+      "gold_facts": ["geen exacte prijs in documentatie", "doorverwijs-aanbod"],
+      "tags": ["hard-facts", "pricing", "v0.6.1"],
+      "difficulty": "hard",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "must_not_contain": ["€49", "€50", "€19", "€99", "€29", "€39", "€199", "€9,95", "49 euro", "50 euro", "99 euro"],
+      "category": "search"
+    },
+    {
+      "slug": "v061-hardfact-oprichtingsjaar",
+      "question": "In welk jaar is ChatManta opgericht?",
+      "gold_answer": "Het exacte oprichtingsjaar staat niet in de aangeleverde V0-corpus. Een verzonnen jaartal is een hallucinatie. De bot moet zeggen dat hij dat niet precies weet en aanbieden de founders ernaar te vragen.",
+      "gold_facts": ["geen exact jaartal in documentatie"],
+      "tags": ["hard-facts", "date", "v0.6.1"],
+      "difficulty": "hard",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "must_not_contain": ["2019", "2020", "2021", "2022", "2023", "2024", "2025"],
+      "category": "search"
+    },
+    {
+      "slug": "v061-hardfact-jaarafname-korting",
+      "question": "Hoeveel korting krijg ik bij jaarafname?",
+      "gold_answer": "De V0-corpus noemt geen kortingspercentage voor jaarafname. De bot moet zeggen dat hij dat percentage niet kan bevestigen in zijn bronnen en voorstellen contact op te nemen.",
+      "gold_facts": ["geen specifiek kortingspercentage in documentatie"],
+      "tags": ["hard-facts", "percentage", "v0.6.1"],
+      "difficulty": "hard",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "must_not_contain": ["5%", "10%", "15%", "20%", "25%", "30%", "korting van 5", "korting van 10", "korting van 15"],
+      "category": "search"
+    },
+    {
+      "slug": "v061-hardfact-support-email",
+      "question": "Wat is jullie support e-mailadres?",
+      "gold_answer": "Er staat geen support-e-mailadres in de V0-corpus. De bot mag geen e-mailadres verzinnen en hoort door te verwijzen via de algemene contactvorm op de website.",
+      "gold_facts": ["geen support-emailadres in documentatie"],
+      "tags": ["hard-facts", "email", "v0.6.1"],
+      "difficulty": "hard",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "must_not_contain": ["@chatmanta.nl", "@chatmanta.com", "support@", "info@chatmanta", "hello@chatmanta", "contact@chatmanta"],
+      "category": "search"
+    },
+    {
+      "slug": "v061-hardfact-telefoonnummer",
+      "question": "Wat is jullie telefoonnummer?",
+      "gold_answer": "Er staat geen telefoonnummer in de V0-corpus. De bot mag geen telefoonnummer verzinnen — een hallucinatie hier leidt potentieel tot verkeerde nummers in productie. Doorverwijzen via de algemene contactvorm.",
+      "gold_facts": ["geen telefoonnummer in documentatie"],
+      "tags": ["hard-facts", "phone", "v0.6.1"],
+      "difficulty": "hard",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "must_not_contain": ["06-", "020-", "010-", "+31", "0800-", "0900-"],
+      "category": "search"
     }
   ]
 }

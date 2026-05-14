@@ -954,6 +954,22 @@ export type V03Extras = {
     /** Lijst van fase-namen die zijn overgeslagen (volgorde = chronologisch). */
     skipped: string[];
   };
+  /**
+   * v0.6.1 — hard-fact verifier aggregate. Aanwezig wanneer
+   * bot.adaptiveHardFactVerification aan stond EN claim-verify draaide.
+   *  - supported: true = alle harde feiten (geld/percentages/datums/aantallen/
+   *    email/url/telefoon) in het antwoord zijn 1-op-1 of genormaliseerd
+   *    terug te vinden in de chunks; false = minstens één feit ontbreekt.
+   *  - missing: lijst van missing facts, categorie-prefixed ("money:500",
+   *    "phone:0699999999"). Leeg array bij supported=true.
+   *  - regenerateTriggered: true wanneer false→true cascade naar claim-
+   *    regenerate ging draaien (bestaande v0.5 flow, hergebruikt).
+   */
+  hardFactSupport?: {
+    supported: boolean;
+    missing: string[];
+    regenerateTriggered?: boolean;
+  };
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -1875,18 +1891,39 @@ KRITISCHE FORMAT-REGELS:
   // context, small chunk had alleen het exacte match-fragment).
   // Backwards-compat: chunks zonder parent (oude ingest) krijgen gewoon hun
   // eigen content.
+  //
+  // v0.6.1 matched-span variant (bot.matchedSpanContext=true): toon de small
+  // chunk als MATCHED_SPAN (precision-anker — wat feitelijk de match veroorzaakte)
+  // en de parent als SURROUNDING_CONTEXT (nuance + bredere passage). De LLM
+  // krijgt zo expliciete signalering wat het kern-bewijs is. Zonder de flag
+  // (v0.5 en eerder) blijft de oude blob-aanpak.
   let context = '';
   let used = 0;
   let anyParentSwap = false;
+  let usedMatchedSpan = false;
   for (const c of final) {
-    const text = c.parent_content ?? c.content;
-    if (c.parent_content) anyParentSwap = true;
-    const block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${text}\n\n`;
+    const hasParent = typeof c.parent_content === 'string' && c.parent_content.length > 0;
+    if (hasParent) anyParentSwap = true;
+    let block: string;
+    if (bot.matchedSpanContext && hasParent) {
+      block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\nMATCHED_SPAN:\n${c.content}\n\nSURROUNDING_CONTEXT:\n${c.parent_content}\n\n`;
+      usedMatchedSpan = true;
+    } else {
+      const text = c.parent_content ?? c.content;
+      block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${text}\n\n`;
+    }
     if (context.length + block.length > V0_RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
     context += block;
     used++;
   }
-  const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
+  // V0.6.1 — kort inline-prefix dat de LLM uitlegt hoe matched-span/surrounding
+  // context te gebruiken. Alleen als minstens één chunk in matched-span format
+  // gerenderd is. Op andere versies / chunks zonder parent: leeg, dus user-
+  // prompt is byte-identiek aan v0.5.
+  const matchedSpanIntro = usedMatchedSpan
+    ? 'Bronnen-format: elke source bevat een MATCHED_SPAN (het exacte fragment dat met de vraag matchte) en SURROUNDING_CONTEXT (bredere passage). Baseer feitelijke claims primair op de MATCHED_SPAN — gebruik SURROUNDING_CONTEXT alleen voor nuance en begrip.\n\n'
+    : '';
+  const userPrompt = `${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
@@ -2011,10 +2048,19 @@ KRITISCHE FORMAT-REGELS:
   // v0.4 claim verification — split antwoord in claims, embed-vergelijk met
   // de chunks die de LLM zag (parent_content waar beschikbaar). Cheap: één
   // batched embed call, ~$0.0001. Geen LLM-call, geen prompt-cost.
+  //
+  // v0.6.1: bij bot.adaptiveHardFactVerification ook regex-extractie van
+  // harde feiten (geld/percentages/datums/etc.) per claim + check of die
+  // letterlijk of genormaliseerd in de chunks staan. Resultaat wordt mee-
+  // gegeven aan de regenerate-trigger (Stage 15) zodat een hallucinatie van
+  // een specifiek bedrag óók een tweede poging triggert, niet alleen lage
+  // embedding-similarity.
   let claimVerifyEmbedTokens = 0;
   let claimVerifyEmbedCost = 0;
   let claimsList: ClaimVerificationData[] | undefined;
   let claimConfidence: number | undefined;
+  let hardFactSupported: boolean | undefined;
+  let missingHardFacts: string[] | undefined;
   if (bot.claimVerification && (withinBudget() || markSkipped('claimVerification'))) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
@@ -2028,12 +2074,17 @@ KRITISCHE FORMAT-REGELS:
         answerText: finalAnswerText,
         chunks: chunkInputs,
         threshold: bot.claimVerificationThreshold,
+        hardFactCheck: bot.adaptiveHardFactVerification === true,
       });
       claimVerifyEmbedTokens = result.embedTokens;
       claimVerifyEmbedCost = result.costUsd;
       if (result.claims.length > 0) {
         claimsList = result.claims;
         claimConfidence = Number.isFinite(result.confidence) ? result.confidence : undefined;
+      }
+      if (bot.adaptiveHardFactVerification === true) {
+        hardFactSupported = result.hardFactSupported;
+        missingHardFacts = result.missingHardFacts ?? [];
       }
     } catch (err) {
       console.warn('[claim verification] failed:', err);
@@ -2123,6 +2174,17 @@ KRITISCHE FORMAT-REGELS:
       ...(bot.claimVerification
         ? { claimVerificationThreshold: bot.claimVerificationThreshold }
         : {}),
+      // v0.6.1 hard-fact verifier — alleen aanwezig als bot.adaptiveHardFactVerification
+      // aan stond. regenerateTriggered wordt door Stage 15 mogelijk later
+      // gemuteerd via activeResponse.extras (zie regenExtras hieronder).
+      ...(hardFactSupported !== undefined
+        ? {
+            hardFactSupport: {
+              supported: hardFactSupported,
+              missing: missingHardFacts ?? [],
+            },
+          }
+        : {}),
       // V0.5 latency-budget — alleen aanwezig als minimaal één fase werd
       // overgeslagen. Bij empty skippedPhases = budget niet overschreden.
       ...(skippedPhases.length > 0
@@ -2144,6 +2206,12 @@ KRITISCHE FORMAT-REGELS:
   // stricter prompt. Max één extra poging. Het regenerate-antwoord vervangt
   // het oorspronkelijke via een 'replacement' event; cache krijgt het
   // regenerate-antwoord (= wat de gebruiker uiteindelijk zag).
+  //
+  // V0.6.1: regenerate triggert OOK wanneer bot.adaptiveHardFactVerification
+  // hardFactSupported=false meldt (= een specifiek bedrag/datum/aantal in het
+  // antwoord staat NIET in de chunks). Embedding-similarity vangt zo'n
+  // hallucinatie van een concreet getal niet (vector-shape matcht ~hetzelfde).
+  // De regenerate met stricter prompt mag dat getal dan weglaten.
   let activeResponse: Extract<ChatResponse, { kind: 'answer' }> = initialResponse as Extract<
     ChatResponse,
     { kind: 'answer' }
@@ -2154,18 +2222,28 @@ KRITISCHE FORMAT-REGELS:
   let regenerateCost = 0;
   let regenerateRatio: number | null = null;
   let regenerateClaims: ClaimVerificationData[] | undefined;
-  if (
-    bot.claimRegenerateEnabled &&
+  let regenerateHardFactSupported: boolean | undefined;
+  let regenerateMissingHardFacts: string[] | undefined;
+  const lowClaimConfidence =
     typeof claimConfidence === 'number' &&
     Number.isFinite(claimConfidence) &&
-    claimConfidence < bot.claimRegenerateThreshold &&
+    claimConfidence < bot.claimRegenerateThreshold;
+  const unsupportedHardFact =
+    bot.adaptiveHardFactVerification === true && hardFactSupported === false;
+  if (
+    bot.claimRegenerateEnabled &&
+    (lowClaimConfidence || unsupportedHardFact) &&
     claimsList && claimsList.length > 0 &&
     (withinBudget() || markSkipped('claimRegenerate'))
   ) {
     const REGENERATE_SYSTEM_ADDON = `
 
 [REGENERATE-REGEL — alleen voor deze tweede poging]
-Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of bijna letterlijk in de aangeleverde chunks staan. Bij twijfel of een feit echt in de context staat: laat het feit weg. Liever een korter, voorzichtiger antwoord dan een antwoord met onverifieerbare claims.`;
+Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of bijna letterlijk in de aangeleverde chunks staan. Bij twijfel of een feit echt in de context staat: laat het feit weg. Liever een korter, voorzichtiger antwoord dan een antwoord met onverifieerbare claims.${
+      unsupportedHardFact && missingHardFacts && missingHardFacts.length > 0
+        ? `\n\nSpecifiek: in de vorige poging stonden harde feiten die NIET in de bronnen zijn terug te vinden (${missingHardFacts.slice(0, 5).join(', ')}). Laat zulke bedragen/datums/aantallen/contactgegevens weg of vervang ze met een algemeen "neem contact op voor exacte details".`
+        : ''
+    }`;
     try {
       const stricter = await chatComplete({
         model: bot.chatModel,
@@ -2190,11 +2268,16 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           answerText: activeAnswerText,
           chunks: chunkInputs2,
           threshold: bot.claimVerificationThreshold,
+          hardFactCheck: bot.adaptiveHardFactVerification === true,
         });
         regenerateRatio = Number.isFinite(verifyResult2.confidence)
           ? verifyResult2.confidence
           : null;
         if (verifyResult2.claims.length > 0) regenerateClaims = verifyResult2.claims;
+        if (bot.adaptiveHardFactVerification === true) {
+          regenerateHardFactSupported = verifyResult2.hardFactSupported;
+          regenerateMissingHardFacts = verifyResult2.missingHardFacts ?? [];
+        }
       } catch (err) {
         console.warn('[regenerate verify] failed:', err);
       }
@@ -2203,6 +2286,25 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
         ...(activeResponse.extras ?? {}),
         ...(regenerateClaims ? { claims: regenerateClaims } : {}),
         ...(regenerateRatio !== null ? { claimConfidence: regenerateRatio } : {}),
+        // v0.6.1 — overschrijf hardFactSupport met regenerate-resultaat en
+        // markeer dat regenerate getriggered is (waardevol voor eval slicing).
+        ...(regenerateHardFactSupported !== undefined
+          ? {
+              hardFactSupport: {
+                supported: regenerateHardFactSupported,
+                missing: regenerateMissingHardFacts ?? [],
+                regenerateTriggered: true,
+              },
+            }
+          : hardFactSupported !== undefined
+            ? {
+                hardFactSupport: {
+                  supported: hardFactSupported,
+                  missing: missingHardFacts ?? [],
+                  regenerateTriggered: true,
+                },
+              }
+            : {}),
       };
       activeResponse = {
         ...activeResponse,
