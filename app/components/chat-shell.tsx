@@ -35,6 +35,7 @@ import { MantaComposer } from './manta/manta-composer';
 import { MantaRightPanel } from './manta/manta-right-panel';
 import { MantaAurora } from './manta/manta-aurora';
 import { TypingLoader } from './ui/loader';
+import { ThreadIdFooter } from './thread-id-footer';
 
 // Gestructureerde error-state op een Turn: bij voorkeur een AppErrorCode (UI
 // mapt naar vriendelijke tekst), met optioneel een correlation-ID. `message`
@@ -595,6 +596,8 @@ export function ChatShell({
               {conversationBlock}
             </div>
 
+            <ThreadIdFooter threadId={activeThreadId} />
+
             <MantaComposer
               onSend={ask}
               pending={pending}
@@ -665,6 +668,8 @@ export function ChatShell({
         <div className="conversation" ref={convoRef}>
           {conversationBlock}
         </div>
+
+        <ThreadIdFooter threadId={activeThreadId} />
 
         <Composer
           onSend={ask}
