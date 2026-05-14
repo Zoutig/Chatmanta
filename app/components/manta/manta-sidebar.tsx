@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Icon } from '../svg-icons';
 import type { ThreadSummary } from '@/lib/v0/server/threads';
 import type { AllTimeUsage } from '@/lib/v0/server/log';
@@ -43,14 +44,31 @@ export function MantaSidebar({
   return (
     <aside className={`manta-sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="manta-sidebar-brand">
-        <div className="manta-sidebar-brand-mark" aria-hidden="true">
-          <Image src="/logo/mark.png" alt="" width={510} height={270} priority />
-        </div>
-        {!collapsed ? (
-          <span className="manta-sidebar-brand-text">
-            Chat<span className="manta-sidebar-brand-accent">Manta</span>
-          </span>
-        ) : null}
+        {/* Logo + "ChatManta" tekst zijn klikbaar — terug naar /home hub.
+            Collapse-button blijft buiten de Link (geen button-in-anchor). */}
+        <Link
+          href="/home"
+          prefetch={false}
+          aria-label="Terug naar ChatManta home"
+          className="manta-sidebar-brand-home"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 'inherit',
+            textDecoration: 'none',
+            color: 'inherit',
+            cursor: 'pointer',
+          }}
+        >
+          <div className="manta-sidebar-brand-mark" aria-hidden="true">
+            <Image src="/logo/mark.png" alt="" width={510} height={270} priority />
+          </div>
+          {!collapsed ? (
+            <span className="manta-sidebar-brand-text">
+              Chat<span className="manta-sidebar-brand-accent">Manta</span>
+            </span>
+          ) : null}
+        </Link>
         {!collapsed ? (
           <button
             type="button"

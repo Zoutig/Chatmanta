@@ -1,25 +1,27 @@
 'use client';
 
 /**
- * MeshGradient achtergrond — vloeiende kleurmix in Caribbean Green
- * palette. Wrapper rond `@paper-design/shaders-react` MeshGradient.
- *
- * Kleuren: donker → licht (#02151a → #80fff0) zodat de mix natuurlijk
- * van diepte naar highlight beweegt. Match met de hardcoded
- * Caribbean Green branding in SignInCard (logo + submit button).
+ * MeshGradient achtergrond — vloeiende 5-stop mix die de gekozen
+ * accent-kleur volgt (Caribbean Green / Common Teal / Crystal Teal /
+ * Dark Teal). Stops komen uit `getShaderPalette(accent)`: donker →
+ * midtone → accent → highlight, allemaal binnen dezelfde teal-familie.
  *
  * `speed`/`distortion`/`swirl` zijn rustig getuned (matcht het
  * tempo van de andere login-animaties).
  */
 
 import { MeshGradient } from '@paper-design/shaders-react';
+import { useAccent } from '@/lib/v0/hooks/use-accent';
+import { getShaderPalette } from '@/lib/v0/shader-palette';
 
 export function MeshGradientBackground() {
+  const { accent } = useAccent();
+  const colors = getShaderPalette(accent);
   return (
     <MeshGradient
       className="absolute inset-0 w-full h-full"
       style={{ backgroundColor: '#02060c' }}
-      colors={['#02151a', '#024D50', '#009292', '#00CC9B', '#80fff0']}
+      colors={[...colors]}
       speed={0.6}
       distortion={0.8}
       swirl={0.3}

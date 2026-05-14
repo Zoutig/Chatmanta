@@ -20,9 +20,19 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useAccent } from '@/lib/v0/hooks/use-accent';
+import { getShaderPalette, hexToRgb01 } from '@/lib/v0/shader-palette';
 
 export function DigitalPetalsShader() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { accent } = useAccent();
+  // Houd uniforms in een ref zodat de accent-watcher hieronder ze kan
+  // bijwerken zonder de WebGL-init opnieuw te draaien.
+  const colorUniformsRef = useRef<{
+    uColor1: { value: THREE.Vector3 };
+    uColor2: { value: THREE.Vector3 };
+    uHighlight: { value: THREE.Vector3 };
+  } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -51,15 +61,16 @@ export function DigitalPetalsShader() {
       }
     `;
 
-    // Caribbean Green palette:
-    //  color1         = #00CC9B (Caribbean primary)
-    //  color2         = #024D50 (Dark Teal — voor diepte/voorgrond)
-    //  highlightColor = #80fff0 (lichte teal-cyan ipv puur wit)
+    // Kleuren zijn nu accent-volgend via uniforms (uColor1 = accent,
+    // uColor2 = midtone, uHighlight = highlight uit getShaderPalette).
     const fragmentShader = `
       precision highp float;
       uniform vec2 iResolution;
       uniform float iTime;
       uniform vec2 iMouse;
+      uniform vec3 uColor1;
+      uniform vec3 uColor2;
+      uniform vec3 uHighlight;
 
       float random(vec2 st) {
         return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -89,9 +100,9 @@ export function DigitalPetalsShader() {
         float flow    = sin(r * 10.0 - t * 2.0);
         float pattern = mix(petalShape, flow, 0.5) + bloom * 0.5;
 
-        vec3 color1         = vec3(0.0, 0.80, 0.61);
-        vec3 color2         = vec3(0.01, 0.31, 0.31);
-        vec3 highlightColor = vec3(0.50, 1.0, 0.94);
+        vec3 color1         = uColor1;
+        vec3 color2         = uColor2;
+        vec3 highlightColor = uHighlight;
 
         // Spatial random (per pixel, niet per frame) — tijd-variërende
         // noise op een smoothstep-grens veroorzaakte zichtbare flicker
@@ -109,6 +120,19 @@ export function DigitalPetalsShader() {
       }
     `;
 
+    // Initiële kleuren — `accent` uit closure (eerste mount). Volgende
+    // wijzigingen lopen via de accent-watcher useEffect verderop, die
+    // alleen de uniforms muteert (geen re-init van WebGL).
+    const initialPalette = getShaderPalette(accent);
+    const uColor1 = { value: new THREE.Vector3(...hexToRgb01(accent)) };
+    const uColor2 = {
+      value: new THREE.Vector3(...hexToRgb01(initialPalette[1])),
+    };
+    const uHighlight = {
+      value: new THREE.Vector3(...hexToRgb01(initialPalette[4])),
+    };
+    colorUniformsRef.current = { uColor1, uColor2, uHighlight };
+
     const uniforms = {
       iTime: { value: 0 },
       iResolution: { value: new THREE.Vector2() },
@@ -118,6 +142,9 @@ export function DigitalPetalsShader() {
           container.clientHeight / 2,
         ),
       },
+      uColor1,
+      uColor2,
+      uHighlight,
     };
 
     const material = new THREE.ShaderMaterial({
@@ -164,8 +191,28 @@ export function DigitalPetalsShader() {
       material.dispose();
       geometry.dispose();
       renderer.dispose();
+      colorUniformsRef.current = null;
     };
+    // accent wordt expres uit deze deps gehouden — de accent-watcher
+    // hieronder muteert de uniform-values rechtstreeks zodat WebGL niet
+    // opnieuw geïnitialiseerd hoeft te worden bij een kleurwissel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Accent-watcher: bij wissel, schrijf de nieuwe RGB-waardes direct
+  // naar de bestaande uniform-Vector3s. De animation-loop pakt ze in
+  // de volgende frame op zonder material-rebuild.
+  useEffect(() => {
+    const u = colorUniformsRef.current;
+    if (!u) return;
+    const palette = getShaderPalette(accent);
+    const [r1, g1, b1] = hexToRgb01(accent);
+    const [r2, g2, b2] = hexToRgb01(palette[1]);
+    const [r3, g3, b3] = hexToRgb01(palette[4]);
+    u.uColor1.value.set(r1, g1, b1);
+    u.uColor2.value.set(r2, g2, b2);
+    u.uHighlight.value.set(r3, g3, b3);
+  }, [accent]);
 
   return (
     <div

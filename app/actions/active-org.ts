@@ -32,9 +32,10 @@ export async function setActiveOrgAction(
       // geen auth-cookie is, alleen een UI-preference.
       sameSite: 'lax',
     });
-    // Hele tree opnieuw renderen — page.tsx leest cookie en geeft alle
-    // org-gescopte data (threads, docs, usage) door aan de ChatShell.
-    revalidatePath('/');
+    // Hele tree opnieuw renderen — admintool/page.tsx leest cookie en
+    // geeft alle org-gescopte data (threads, docs, usage) door aan de
+    // ChatShell.
+    revalidatePath('/admintool');
     return { slug: validSlug };
   });
 }

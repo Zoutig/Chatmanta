@@ -82,7 +82,7 @@ export async function ingestAction(
       text,
       organizationId: activeOrg.id,
     });
-    revalidatePath('/');
+    revalidatePath('/admintool');
     return { kind: 'success', result, filename: file.name };
   } catch (err) {
     const appErr = toAppError(err);
@@ -96,7 +96,7 @@ export async function removeDocAction(docId: string): Promise<ActionResult> {
     if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
     const activeOrg = await getActiveOrgFromCookies();
     await deleteDoc(docId, activeOrg.id);
-    revalidatePath('/');
+    revalidatePath('/admintool');
     return {};
   });
 }
