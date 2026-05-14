@@ -11,8 +11,9 @@ import { LoginBackground } from './login-background';
  * Manta-themed sign-in card. Bron 21st.dev `sign-in-card-2`, aangepast:
  * - Email + Google + signup + remember-me + forgot weggehaald (V0 = één
  *   wachtwoord).
- * - Purple gradient → Caribbean Green (#00CC9B) hardcoded — login moet
- *   branding-consistent zijn, los van de user-accent in localStorage.
+ * - Logo + submit volgen `--manta-accent` zodat de hele app één
+ *   huisstijl-keuze respecteert (Phase 2, mei 2026 — hardcoded
+ *   Caribbean Green keuze van iteratie 1 expliciet ingetrokken).
  * - Submit gaat via `useActionState` naar de bestaande `login` server
  *   action — geen auth-flow change.
  * - Behouden: 3D card-tilt op mouse, traveling light beams,
@@ -168,7 +169,7 @@ export function SignInCard({ next }: { next: string }) {
                   role="img"
                   aria-label="ChatManta"
                   style={{
-                    backgroundColor: '#00CC9B',
+                    backgroundColor: 'var(--manta-accent)',
                     WebkitMaskImage: "url('/logo/mono-mark.png')",
                     maskImage: "url('/logo/mono-mark.png')",
                     WebkitMaskSize: 'contain',
@@ -177,7 +178,8 @@ export function SignInCard({ next }: { next: string }) {
                     maskRepeat: 'no-repeat',
                     WebkitMaskPosition: 'center',
                     maskPosition: 'center',
-                    filter: 'drop-shadow(0 0 12px color-mix(in oklab, #00CC9B 50%, transparent))',
+                    filter:
+                      'drop-shadow(0 0 12px color-mix(in oklab, var(--manta-accent) 50%, transparent))',
                   }}
                 />
                 <motion.h1
@@ -263,11 +265,18 @@ export function SignInCard({ next }: { next: string }) {
                   disabled={pending}
                   className="w-full relative group/button mt-2"
                 >
-                  <div className="absolute inset-0 rounded-lg blur-lg opacity-0 group-hover/button:opacity-70 transition-opacity duration-300" style={{ background: 'color-mix(in oklab, #00CC9B 50%, white)' }} />
+                  <div
+                    className="absolute inset-0 rounded-lg blur-lg opacity-0 group-hover/button:opacity-70 transition-opacity duration-300"
+                    style={{
+                      background:
+                        'color-mix(in oklab, var(--manta-accent) 50%, white)',
+                    }}
+                  />
                   <div
                     className="relative overflow-hidden font-medium h-10 rounded-lg transition-all duration-300 flex items-center justify-center"
                     style={{
-                      background: 'linear-gradient(135deg, color-mix(in oklab, #00CC9B 90%, white), #00CC9B)',
+                      background:
+                        'linear-gradient(135deg, color-mix(in oklab, var(--manta-accent) 90%, white), var(--manta-accent))',
                       color: '#fff',
                     }}
                   >

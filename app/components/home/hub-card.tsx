@@ -41,15 +41,15 @@ export function HubCard({
       style={{
         borderRadius: 'var(--r-xl, 20px)',
         background: isPrimary
-          ? 'linear-gradient(160deg, rgba(0,204,155,0.10) 0%, rgba(255,255,255,0.04) 55%, rgba(0,204,155,0.05) 100%)'
+          ? 'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 14%, transparent) 0%, rgba(255,255,255,0.04) 55%, color-mix(in oklab, var(--manta-accent) 7%, transparent) 100%)'
           : 'rgba(255,255,255,0.035)',
         backdropFilter: 'blur(20px) saturate(140%)',
         WebkitBackdropFilter: 'blur(20px) saturate(140%)',
         border: isPrimary
-          ? '1px solid rgba(0,204,155,0.32)'
+          ? '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
           : '1px solid rgba(120,200,230,0.12)',
         boxShadow: isPrimary
-          ? '0 14px 40px -18px rgba(0,204,155,0.45), inset 0 1px 0 rgba(255,255,255,0.05)'
+          ? '0 14px 40px -18px color-mix(in oklab, var(--manta-accent) 50%, transparent), inset 0 1px 0 rgba(255,255,255,0.05)'
           : '0 8px 30px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.03)',
       }}
     >
@@ -63,7 +63,7 @@ export function HubCard({
           style={{
             borderRadius: 'inherit',
             boxShadow: isPrimary
-              ? '0 0 0 1px rgba(0,204,155,0.55), 0 0 36px rgba(0,204,155,0.32)'
+              ? '0 0 0 1px color-mix(in oklab, var(--manta-accent) 60%, transparent), 0 0 36px color-mix(in oklab, var(--manta-accent) 35%, transparent)'
               : '0 0 0 1px rgba(120,200,230,0.28)',
           }}
         />
@@ -76,12 +76,14 @@ export function HubCard({
           style={{
             borderRadius: '14px',
             background: isPrimary
-              ? 'linear-gradient(135deg, rgba(0,204,155,0.22), rgba(0,146,146,0.12))'
+              ? 'linear-gradient(135deg, color-mix(in oklab, var(--manta-accent) 26%, transparent), color-mix(in oklab, var(--manta-accent) 14%, transparent))'
               : 'rgba(255,255,255,0.05)',
             border: isPrimary
-              ? '1px solid rgba(0,204,155,0.35)'
+              ? '1px solid color-mix(in oklab, var(--manta-accent) 42%, transparent)'
               : '1px solid rgba(120,200,230,0.10)',
-            color: isPrimary ? '#a7ffe6' : '#cfe8f0',
+            color: isPrimary
+              ? 'color-mix(in oklab, var(--manta-accent) 35%, #ffffff)'
+              : '#cfe8f0',
           }}
         >
           <Icon name={iconName} size={22} />
@@ -106,7 +108,7 @@ export function HubCard({
             style={{
               borderRadius: '999px',
               color: '#03171a',
-              background: '#00CC9B',
+              background: 'var(--manta-accent)',
               letterSpacing: '0.08em',
             }}
           >
@@ -152,7 +154,9 @@ export function HubCard({
               !disabled && 'group-hover:translate-x-0.5',
             )}
             style={{
-              color: isPrimary ? '#00CC9B' : 'rgba(155,213,224,0.85)',
+              color: isPrimary
+                ? 'var(--manta-accent)'
+                : 'rgba(155,213,224,0.85)',
             }}
           >
             {cta}
@@ -180,7 +184,12 @@ export function HubCard({
   return (
     <Link
       href={href}
-      className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00CC9B]/50 rounded-[20px]"
+      className="block h-full focus-visible:outline-none focus-visible:ring-2 rounded-[20px]"
+      style={{
+        // Tailwind kan geen CSS-var in ring-color injecteren; daarom inline.
+        ['--tw-ring-color' as string]:
+          'color-mix(in oklab, var(--manta-accent) 50%, transparent)',
+      }}
     >
       {body}
     </Link>
