@@ -112,7 +112,7 @@ export default function HomePage() {
               iconName="sliders"
               title="Admintool"
               description="Beheer en test je ChatManta chatomgeving."
-              href="/"
+              href="/admintool"
               cta="Open admintool"
             />
             <HubCard

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Icon } from './svg-icons';
 import type { ThreadSummary } from '@/lib/v0/server/threads';
 import type { AllTimeUsage } from '@/lib/v0/server/log';
@@ -38,9 +39,15 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
-      <div className="brand">
+      <Link
+        href="/home"
+        prefetch={false}
+        aria-label="Terug naar ChatManta home"
+        className="brand"
+        style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
+      >
         <div className="brand-mark">
-          <Image src="/logo/mark.png" alt="ChatManta" width={510} height={270} priority />
+          <Image src="/logo/mark.png" alt="" width={510} height={270} priority />
         </div>
         <div className="brand-text">
           <div className="brand-name">
@@ -48,7 +55,7 @@ export function Sidebar({
           </div>
           <div className="brand-tag">v0 · admin</div>
         </div>
-      </div>
+      </Link>
 
       <div className="sidebar-actions">
         <button type="button" className="btn-new" onClick={onNewChat}>
