@@ -22,14 +22,36 @@ export default function HomePage() {
       {/* Top-bar */}
       <header className="relative z-10 flex items-center justify-between px-5 md:px-10 pt-6 md:pt-8">
         <div className="flex items-center gap-2.5">
-          <Image
-            src="/logo/wordmark.png"
-            alt="ChatManta"
-            width={140}
-            height={36}
-            priority
-            className="h-7 md:h-8 w-auto opacity-90"
-          />
+          {/* Manta-mark wrapped in .brand-mark — manta.css recolort de PNG
+              naar var(--manta-accent) (= Caribbean Green default) via
+              mask-image. Tekst "ChatManta" wordt los gerendeerd zodat
+              alleen de manta accent-kleurt; tekst behoudt z'n eigen
+              styling — zelfde conventie als sidebar.tsx:42. */}
+          <div
+            className="brand-mark relative"
+            style={{ width: 36, height: 22 }}
+            aria-hidden
+          >
+            <Image
+              src="/logo/mark.png"
+              alt=""
+              width={510}
+              height={270}
+              priority
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          </div>
+          <span
+            className="text-base md:text-lg leading-none"
+            style={{
+              fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+              color: '#eaf6fb',
+            }}
+          >
+            Chat<span style={{ color: '#00CC9B' }}>Manta</span>
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <AnimatedThemeToggler />
