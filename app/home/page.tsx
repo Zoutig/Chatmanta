@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { HubBackground } from '../components/home/hub-background';
 import { HubCard } from '../components/home/hub-card';
 import { AnimatedThemeToggler } from '../components/ui/animated-theme-toggler';
@@ -22,25 +21,28 @@ export default function HomePage() {
       {/* Top-bar */}
       <header className="relative z-10 flex items-center justify-between px-5 md:px-10 pt-6 md:pt-8">
         <div className="flex items-center gap-2.5">
-          {/* Manta-mark wrapped in .brand-mark — manta.css recolort de PNG
-              naar var(--manta-accent) (= Caribbean Green default) via
-              mask-image. Tekst "ChatManta" wordt los gerendeerd zodat
-              alleen de manta accent-kleurt; tekst behoudt z'n eigen
-              styling — zelfde conventie als sidebar.tsx:42. */}
+          {/* Manta-mark altijd in Caribbean Green, onafhankelijk van
+              data-style. Inline mask zodat de .brand-mark::before-regel uit
+              manta.css (die alleen onder data-style="manta" pakt) niet
+              vereist is — op /home blijft de huisstijl één lijn. Zelfde
+              mono-mark.png asset als sign-in-card.tsx (commit a5800d9). */}
           <div
-            className="brand-mark relative"
-            style={{ width: 36, height: 22 }}
-            aria-hidden
-          >
-            <Image
-              src="/logo/mark.png"
-              alt=""
-              width={510}
-              height={270}
-              priority
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
-          </div>
+            role="img"
+            aria-label="ChatManta logo"
+            style={{
+              width: 36,
+              height: 22,
+              backgroundColor: '#00CC9B',
+              WebkitMaskImage: "url('/logo/mono-mark.png')",
+              maskImage: "url('/logo/mono-mark.png')",
+              WebkitMaskSize: 'contain',
+              maskSize: 'contain',
+              WebkitMaskRepeat: 'no-repeat',
+              maskRepeat: 'no-repeat',
+              WebkitMaskPosition: 'center',
+              maskPosition: 'center',
+            }}
+          />
           <span
             className="text-base md:text-lg leading-none"
             style={{
