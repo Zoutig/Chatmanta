@@ -67,24 +67,24 @@ export function ThreadIdFooter({ threadId }: { threadId: string | null }) {
         title={`Klik om volledige ID te kopiëren\n${threadId}`}
         style={{
           pointerEvents: 'auto',
-          fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+          fontFamily: 'var(--font-mono)',
           fontSize: '11px',
           lineHeight: 1,
-          color: 'var(--muted-foreground, rgba(255,255,255,0.55))',
-          background: 'transparent',
-          border: '1px solid color-mix(in srgb, currentColor 18%, transparent)',
-          borderRadius: '6px',
+          color: 'var(--accent)',
+          background: 'var(--accent-soft)',
+          border: '1px solid var(--border)',
+          borderRadius: '4px',
           padding: '4px 8px',
           cursor: 'pointer',
-          letterSpacing: '0.02em',
-          transition: 'color 120ms, border-color 120ms, background 120ms',
+          letterSpacing: '0.04em',
+          transition: 'border-color 120ms, background 120ms',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background =
-            'color-mix(in srgb, currentColor 6%, transparent)';
+          e.currentTarget.style.borderColor =
+            'var(--border-bright, var(--accent))';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.borderColor = 'var(--border)';
         }}
       >
         {label}
