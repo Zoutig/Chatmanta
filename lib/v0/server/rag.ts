@@ -279,10 +279,22 @@ async function preProcessInput(
   // STAP 0 — voorkomt prompt-overload op adversarial cases (zie eval Run 3
   // analyse: grounding-dip op false-premise / out-of-corpus / typo cases was
   // gekoppeld aan langere prompt). v0.1-v0.4 hebben addon='' dus geen effect.
-  const systemPrompt =
-    hasHistory && bot.preProcessMultiTurnAddon.length > 0
-      ? `${bot.preProcessMultiTurnAddon}\n\n${bot.preProcessSystem}`
-      : bot.preProcessSystem;
+  //
+  // V0.6.2: extra conditie via bot.adaptiveHistoryResolution. Dan wordt de
+  // addon alleen geprepend wanneer needsHistoryResolution(original)=true —
+  // keyword-heuristic die kijkt of de vraag echt referenties heeft die
+  // chat-history nodig hebben. Zelfstandige vervolgvragen zoals "Wat is de
+  // prijs?" krijgen GEEN addon, korter prompt, minder drift-risico.
+  // V0.6.1 en eerder: bot.adaptiveHistoryResolution undefined → falsy →
+  // condittie skip, v0.6.1-gedrag behouden.
+  let useMultiTurnAddon = hasHistory && bot.preProcessMultiTurnAddon.length > 0;
+  if (useMultiTurnAddon && bot.adaptiveHistoryResolution === true) {
+    const { needsHistoryResolution } = await import('./rag-decision');
+    useMultiTurnAddon = needsHistoryResolution(original);
+  }
+  const systemPrompt = useMultiTurnAddon
+    ? `${bot.preProcessMultiTurnAddon}\n\n${bot.preProcessSystem}`
+    : bot.preProcessSystem;
   const result = await chatComplete({
     model: bot.chatModel,
     system: systemPrompt,
@@ -887,6 +899,18 @@ type BaseChatResponse = {
    * null voor smalltalk en non-zero-hits answers (pad niet bereikt).
    */
   generalKnowledgeActual: boolean | null;
+  /**
+   * v0.6.2: verfijnde knowledge-gap classificatie wanneer bot.knowledgeGapLogging
+   * aan stond én het antwoord-pad een gap aanstipt. Mogelijke waarden:
+   *  - 'zero_hits': aboveThreshold.length===0 → fallback of reclassify-pad
+   *  - 'low_confidence': claimConfidence < threshold (regenerate-trigger)
+   *  - 'low_grounding': hardFactSupport.supported === false (regenerate-trigger)
+   *  - 'off_topic': re-classifier zei off-topic → polite refusal
+   *  - null/undefined: geen gap (normaal answer of smalltalk)
+   * Wordt door log.ts naar query_log.gap_kind kolom gemapt. Op fallback-kind
+   * antwoorden óók beschikbaar (anders dan extras die alleen op answer-kind zit).
+   */
+  gapKind?: 'zero_hits' | 'low_confidence' | 'low_grounding' | 'off_topic' | null;
 };
 
 /** Per-claim verification result (v0.4 feature 3). Compact structure voor extras. */
@@ -969,6 +993,24 @@ export type V03Extras = {
     supported: boolean;
     missing: string[];
     regenerateTriggered?: boolean;
+  };
+  /**
+   * v0.6.2 — adaptive RAG decision. Alleen aanwezig wanneer bot.adaptiveRag
+   * aan stond. Bevat het 3-path-result (fast/standard/careful) +
+   * retrievalStrength + per-stage booleans + reasonCodes voor debug/eval.
+   * Wordt door log.ts opgeslagen in query_log.adaptive_decision (jsonb).
+   * Eval-report slicet hierop voor per-path means.
+   */
+  adaptiveDecision?: {
+    path: 'fast' | 'standard' | 'careful';
+    retrievalStrength: 'none' | 'weak' | 'medium' | 'strong';
+    shouldUseHyDE: boolean;
+    shouldRerank: boolean;
+    shouldVerifyClaims: boolean;
+    shouldRegenerateClaims: boolean;
+    shouldCascade: boolean;
+    shouldGenerateFollowupsInline: boolean;
+    reasonCodes: string[];
   };
 };
 
@@ -1322,6 +1364,13 @@ export async function* runRagQueryStreaming(input: {
   const enableGeneralKnowledge = input.enableGeneralKnowledge !== false;
   const generalKnowledgeActive = bot.generalKnowledgeEnabled && enableGeneralKnowledge;
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
+  // V0.6.2 config-aware retrieval-sizing. Bij undefined → V0_RAG_DEFAULTS
+  // (v0.1-v0.6.1 ongewijzigd). V0.6.2 zet TOP_K=8, rerankInputMax=20, en
+  // finalContextMaxChunks=5 om de reranker meer kandidaten te geven zonder
+  // de answer-context te vergroten.
+  const retrievalTopK = bot.retrievalTopK ?? V0_RAG_DEFAULTS.TOP_K;
+  const rerankInputMax = bot.rerankInputMax ?? V0_RAG_DEFAULTS.MAX_RERANK_INPUT;
+  const finalContextMax = bot.finalContextMaxChunks ?? V0_RAG_DEFAULTS.TOP_K;
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
     yield { kind: 'error', code: 'INPUT_INVALID' };
     return;
@@ -1561,9 +1610,9 @@ export async function* runRagQueryStreaming(input: {
   const allHits = await Promise.all(
     querySet.map((q, i) => {
       if (bot.hybridSearch && !q.isHyde) {
-        return retrieveChunksHybrid(vectors[i], q.text, V0_RAG_DEFAULTS.TOP_K, withParents, orgId);
+        return retrieveChunksHybrid(vectors[i], q.text, retrievalTopK, withParents, orgId);
       }
-      return retrieveChunks(vectors[i], V0_RAG_DEFAULTS.TOP_K, withParents, orgId);
+      return retrieveChunks(vectors[i], retrievalTopK, withParents, orgId);
     }),
   );
   stopRetrieve();
@@ -1580,10 +1629,33 @@ export async function* runRagQueryStreaming(input: {
   // Wordt gelogd ongeacht selective HyDE (interessante baseline-metriek).
   const top1SimInitial = topSim;
 
+  // V0.6.2: adaptive decision — pre-HyDE call zodat we HyDE-gate via
+  // decision.shouldUseHyDE (rekent latency-budget mee). Bij adaptiveRag=false
+  // returnt de helper shouldUseHyDE=true zodat de bestaande selective-HyDE
+  // conditie leidend blijft. We berekenen later nog een post-HyDE decision
+  // voor rerank/cascade/verify gating.
+  const { decideRagStrategy } = await import('./rag-decision');
+  const decisionPreHyDE = decideRagStrategy({
+    bot,
+    originalQuestion: original,
+    rewrittenQuestion: queryForEmbed,
+    top1Sim: topSim,
+    top2Sim: merged[1]?.similarity ?? null,
+    aboveThresholdCount: merged.filter((c) => c.similarity >= threshold).length,
+    subQueryCount: subQueries.length,
+    historyLength: history.length,
+    elapsedMs: elapsedMs(),
+  });
+
   // Selective HyDE: trigger pas hier, ALS top-1 onder de drempel zat. Eén
   // HyDE generate + embed + retrieve + merge. We zoeken NIET opnieuw met de
   // andere queries (sub-queries / multi-query) want die hadden hun kans al.
-  if (hydeModeActual === 'selective' && (topSim ?? 0) < bot.selectiveHyDETrigger) {
+  // V0.6.2: extra adaptive-gate via decision.shouldUseHyDE.
+  if (
+    hydeModeActual === 'selective' &&
+    (topSim ?? 0) < bot.selectiveHyDETrigger &&
+    (!bot.adaptiveRag || decisionPreHyDE.shouldUseHyDE)
+  ) {
     yield { kind: 'status', phase: 'hyde' };
     const stopHydeGen = tMark('hyde_ms');
     const hyde = await generateHydeDocument(subQueries[0], bot);
@@ -1600,7 +1672,7 @@ export async function* runRagQueryStreaming(input: {
     const stopHydeRetrieve = tMark('retrieval_ms');
     const hydeRetrieved = await retrieveChunks(
       hydeEmbed.vectors[0],
-      V0_RAG_DEFAULTS.TOP_K,
+      retrievalTopK,
       withParents,
       orgId,
     );
@@ -1786,6 +1858,7 @@ KRITISCHE FORMAT-REGELS:
             tone,
             length,
             generalKnowledgeActual: true,
+            ...(bot.knowledgeGapLogging ? { gapKind: 'off_topic' as const } : {}),
             kind: 'fallback',
             answer: OFF_TOPIC_REFUSAL,
             reason: 'OFF_TOPIC re-classify — vraag buiten domein',
@@ -1816,6 +1889,7 @@ KRITISCHE FORMAT-REGELS:
           tone,
           length,
           generalKnowledgeActual: true,
+          ...(bot.knowledgeGapLogging ? { gapKind: 'zero_hits' as const } : {}),
           kind: 'fallback',
           answer: FALLBACK_MESSAGE,
           reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}); re-classify=fallback.`,
@@ -1846,6 +1920,7 @@ KRITISCHE FORMAT-REGELS:
         tone,
         length,
         generalKnowledgeActual: false,
+        ...(bot.knowledgeGapLogging ? { gapKind: 'zero_hits' as const } : {}),
         kind: 'fallback',
         answer: FALLBACK_MESSAGE,
         reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
@@ -1872,12 +1947,31 @@ KRITISCHE FORMAT-REGELS:
   let rerankCost = 0;
   let rerankInputTokens = 0;
   let rerankOutputTokens = 0;
-  let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
-  if (bot.rerank === 'llm' && aboveThreshold.length > 1 && (withinBudget() || markSkipped('rerank'))) {
+  // V0.6.2: definitieve adaptive decision na threshold-filter + HyDE-augment.
+  // Hierop hangen rerank / cascade / claim-verify / followups gates.
+  const decision = decideRagStrategy({
+    bot,
+    originalQuestion: original,
+    rewrittenQuestion: queryForEmbed,
+    top1Sim: topSim,
+    top2Sim: merged[1]?.similarity ?? null,
+    aboveThresholdCount: aboveThreshold.length,
+    subQueryCount: subQueries.length,
+    historyLength: history.length,
+    elapsedMs: elapsedMs(),
+  });
+
+  let final: RetrievedChunk[] = aboveThreshold.slice(0, finalContextMax);
+  if (
+    bot.rerank === 'llm' &&
+    aboveThreshold.length > 1 &&
+    (withinBudget() || markSkipped('rerank')) &&
+    (!bot.adaptiveRag || decision.shouldRerank)
+  ) {
     yield { kind: 'status', phase: 'rerank' };
     const stopRerank = tMark('rerank_ms');
-    const candidates = aboveThreshold.slice(0, V0_RAG_DEFAULTS.MAX_RERANK_INPUT);
-    const r = await rerankChunks(original, candidates, V0_RAG_DEFAULTS.TOP_K, bot);
+    const candidates = aboveThreshold.slice(0, rerankInputMax);
+    const r = await rerankChunks(original, candidates, finalContextMax, bot);
     stopRerank();
     final = r.ranked;
     rerankCost = r.costUsd;
@@ -2005,14 +2099,23 @@ KRITISCHE FORMAT-REGELS:
     // er geen grond om "harder te proberen" — een sterker model vult dan met
     // priors en hallucineert. Zie docs/superpowers/specs/
     // 2026-05-13-v0.5-cascade-hotfix-design.md.
+    // V0.6.2: extra adaptive-gate. Bij adaptiveRag=true gebruikt cascade de
+    // strengere adaptiveCascadeMinTopSim (0.60 default) i.p.v. bot.cascadeMinTopSim
+    // (0.50), én moet decision.shouldCascade aan staan (= retrievalStrength
+    // medium/strong + aboveThresholdCount >= 2). Bij weak retrieval: cascade
+    // NIET — een sterker model vult dan met priors → hallucinatie.
+    const effectiveCascadeMinSim = bot.adaptiveRag
+      ? (bot.adaptiveCascadeMinTopSim ?? bot.cascadeMinTopSim)
+      : bot.cascadeMinTopSim;
     if (
       bot.cascadeOnLowConfidence &&
       confidence !== null &&
       confidence < 0.5 &&
       topSim !== null &&
-      topSim >= bot.cascadeMinTopSim &&
+      topSim >= effectiveCascadeMinSim &&
       bot.cascadeModel !== bot.chatModel &&
-      (withinBudget() || markSkipped('cascade'))
+      (withinBudget() || markSkipped('cascade')) &&
+      (!bot.adaptiveRag || decision.shouldCascade)
     ) {
       yield { kind: 'status', phase: 'cascade' };
       const stopCascade = tMark('cascade_ms');
@@ -2066,11 +2169,18 @@ KRITISCHE FORMAT-REGELS:
   // op claim-verify-output bouwt) nooit op de langzame queries waar
   // hallucinatie-risico het hoogst is. Cost van verify is ~200ms + één
   // embed-call (~$0.0001), acceptabele uitruil voor grounding-correctheid.
+  //
+  // V0.6.2: extra adaptive-gate via decision.shouldVerifyClaims. Op 'fast'-
+  // pad (sterke retrieval + clear winner + single-query) wordt verify
+  // overgeslagen — daar is hallucinatie-risico laag genoeg. 'standard' en
+  // 'careful' draaien verify altijd.
   const verifyBudgetGate =
     bot.adaptiveHardFactVerification === true
       ? true
       : (withinBudget() || markSkipped('claimVerification'));
-  if (bot.claimVerification && verifyBudgetGate) {
+  const verifyDecisionGate =
+    !bot.adaptiveRag || decision.shouldVerifyClaims;
+  if (bot.claimVerification && verifyBudgetGate && verifyDecisionGate) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
     try {
@@ -2205,6 +2315,24 @@ KRITISCHE FORMAT-REGELS:
             },
           }
         : {}),
+      // V0.6.2 adaptive decision — alleen aanwezig wanneer bot.adaptiveRag.
+      // Bevat path + retrievalStrength + per-stage booleans + reasonCodes.
+      // Wordt door log.ts naar query_log.adaptive_decision (jsonb) gemapt.
+      ...(bot.adaptiveRag
+        ? {
+            adaptiveDecision: {
+              path: decision.path,
+              retrievalStrength: decision.retrievalStrength,
+              shouldUseHyDE: decision.shouldUseHyDE,
+              shouldRerank: decision.shouldRerank,
+              shouldVerifyClaims: decision.shouldVerifyClaims,
+              shouldRegenerateClaims: decision.shouldRegenerateClaims,
+              shouldCascade: decision.shouldCascade,
+              shouldGenerateFollowupsInline: decision.shouldGenerateFollowupsInline,
+              reasonCodes: decision.reasonCodes,
+            },
+          }
+        : {}),
       phaseTimingsMs: phaseTimingsAtAnswer,
     },
   };
@@ -2315,6 +2443,15 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
               }
             : {}),
       };
+      // V0.6.2 gapKind classificatie: hard-fact failure → 'low_grounding',
+      // anders claimConfidence-trigger → 'low_confidence'. Alleen wanneer
+      // bot.knowledgeGapLogging, anders blijft gapKind undefined.
+      const gapKindForRegenerate: 'low_grounding' | 'low_confidence' | undefined =
+        bot.knowledgeGapLogging
+          ? unsupportedHardFact
+            ? 'low_grounding'
+            : 'low_confidence'
+          : undefined;
       activeResponse = {
         ...activeResponse,
         answer: activeAnswerText,
@@ -2322,6 +2459,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
         chatOutputTokens: activeResponse.chatOutputTokens + regenerateOutputTokens,
         totalCostUsd: activeResponse.totalCostUsd + regenerateCost,
         extras: regenExtras,
+        ...(gapKindForRegenerate ? { gapKind: gapKindForRegenerate } : {}),
       };
       yield {
         kind: 'replacement',
@@ -2339,7 +2477,26 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   // V0.5: hard timeout op 5s zodat een trage OpenAI-call niet de finale
   // metrics-done blokkeert. Bij timeout of throw → emit followups-done met
   // lege array + error-string.
-  if (bot.generateFollowUps && (withinBudget() || markSkipped('followups'))) {
+  //
+  // V0.6.2: bij adaptiveRag staan inline-followups standaard UIT
+  // (decision.shouldGenerateFollowupsInline=false). UI-contract blijft
+  // intact door alsnog een lege followups-done te yielden met error-string
+  // 'skipped-adaptive-v06'. Followups blijven beschikbaar voor latere
+  // sync-call vanuit de UI zelf indien gewenst.
+  if (
+    bot.adaptiveRag &&
+    bot.generateFollowUps &&
+    !decision.shouldGenerateFollowupsInline
+  ) {
+    yield {
+      kind: 'followups-done',
+      followUps: [],
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      error: 'skipped-adaptive-v06',
+    };
+  } else if (bot.generateFollowUps && (withinBudget() || markSkipped('followups'))) {
     yield { kind: 'status', phase: 'followups' };
     const stopFollowups = tMark('followups_ms');
     let followupsError: string | null = null;
