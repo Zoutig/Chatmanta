@@ -11,6 +11,11 @@
 import 'server-only';
 
 import { embedTexts } from './rag';
+import {
+  extractHardFacts,
+  hardFactsSupportedBySources,
+  type ExtractedHardFacts,
+} from './hard-facts';
 
 export type ClaimVerification = {
   /** 0-based positie in het antwoord. */
@@ -23,6 +28,26 @@ export type ClaimVerification = {
   bestSimilarity: number;
   /** Welke chunk haalde de hoogste sim? null als geen chunks beschikbaar. */
   bestChunkId: string | null;
+  /**
+   * v0.6.1: harde feiten in deze claim (geld/percentages/datums/aantallen/
+   * email/url/telefoon). Alleen gezet als verifyClaims met
+   * hardFactCheck=true werd aangeroepen EN de claim minstens één hard fact
+   * bevat. Undefined = check niet gedraaid OF geen harde feiten in claim.
+   */
+  hardFacts?: ExtractedHardFacts;
+  /**
+   * v0.6.1: lijst hard-fact strings die NIET in de chunks teruggevonden
+   * konden worden (categorie-prefixed: "money:500", "phone:0699999999").
+   * Lege array = alles ondersteund. Undefined = check niet gedraaid.
+   */
+  missingHardFacts?: string[];
+  /**
+   * v0.6.1: aggregate boolean per claim. true = alle harde feiten in deze
+   * claim teruggevonden in chunks (genormaliseerd). false = minstens één
+   * fact ontbreekt. Undefined = check niet gedraaid OF claim bevat geen
+   * harde feiten (dan is hardFactSupported irrelevant).
+   */
+  hardFactSupported?: boolean;
 };
 
 export type ClaimVerificationResult = {
@@ -33,6 +58,18 @@ export type ClaimVerificationResult = {
   costUsd: number;
   /** Embed-tokens voor de extra call. */
   embedTokens: number;
+  /**
+   * v0.6.1: aggregate hard-fact ondersteuning over alle claims. true = elke
+   * claim met harde feiten heeft hardFactSupported=true (of bevat geen harde
+   * feiten). false = minstens één claim heeft missende harde feiten.
+   * Undefined wanneer hardFactCheck niet aanstond.
+   */
+  hardFactSupported?: boolean;
+  /**
+   * v0.6.1: alle missing hard-facts geünificeerd (categorie-prefixed).
+   * Dedupt over claims. Undefined wanneer hardFactCheck niet aanstond.
+   */
+  missingHardFacts?: string[];
 };
 
 // Min lengte na strip-citations om als "echte claim" te tellen. Onder dit
@@ -87,32 +124,76 @@ function cosineSim(a: number[], b: number[]): number {
  * embed-call voor alle claims + chunks samen — single round-trip naar OpenAI.
  *
  * @param threshold default 0.7. Configureerbaar via bot.claimVerificationThreshold.
+ * @param hardFactCheck v0.6.1 — als true, run ook per-claim hard-fact extractie
+ *   (regex op geld/percentages/datums/etc.) en check of die letterlijk of
+ *   genormaliseerd in de chunks staan. Aanvulling op embedding-similarity die
+ *   wel vector-shape matcht maar verkeerde getallen niet onderscheidt.
  */
 export async function verifyClaims(args: {
   answerText: string;
   chunks: { id: string; text: string }[];
   threshold: number;
+  hardFactCheck?: boolean;
 }): Promise<ClaimVerificationResult> {
   const claims = splitIntoClaims(args.answerText);
+  const hardFactCheck = args.hardFactCheck === true;
 
   if (claims.length === 0) {
-    return { claims: [], confidence: NaN, costUsd: 0, embedTokens: 0 };
+    return {
+      claims: [],
+      confidence: NaN,
+      costUsd: 0,
+      embedTokens: 0,
+      ...(hardFactCheck ? { hardFactSupported: true, missingHardFacts: [] } : {}),
+    };
   }
+
+  // Helper: voeg hard-fact data toe aan een claim-object indien check actief
+  // is en de claim minstens één hard fact bevat.
+  const sourceTexts = args.chunks.map((c) => c.text);
+  const enrichWithHardFacts = (
+    claim: ClaimVerification,
+  ): ClaimVerification => {
+    if (!hardFactCheck) return claim;
+    const facts = extractHardFacts(claim.text);
+    const hasAnyFact =
+      facts.money.length +
+        facts.percentages.length +
+        facts.datesOrYears.length +
+        facts.numbers.length +
+        facts.emails.length +
+        facts.urls.length +
+        facts.phones.length >
+      0;
+    if (!hasAnyFact) return claim;
+    const support = hardFactsSupportedBySources(facts, sourceTexts);
+    return {
+      ...claim,
+      hardFacts: facts,
+      missingHardFacts: support.missing,
+      hardFactSupported: support.supported,
+    };
+  };
 
   if (args.chunks.length === 0) {
     // Geen chunks → niets te verifiëren tegen. Markeer alles als unverified
     // met sim=0. Confidence 0.
-    return {
-      claims: claims.map((text, index) => ({
+    const noChunksClaims = claims.map<ClaimVerification>((text, index) =>
+      enrichWithHardFacts({
         index,
         text,
         verified: false,
         bestSimilarity: 0,
         bestChunkId: null,
-      })),
+      }),
+    );
+    const aggregated = aggregateHardFactSupport(noChunksClaims, hardFactCheck);
+    return {
+      claims: noChunksClaims,
       confidence: 0,
       costUsd: 0,
       embedTokens: 0,
+      ...aggregated,
     };
   }
 
@@ -139,19 +220,46 @@ export async function verifyClaims(args: {
     }
     const verified = bestSim >= args.threshold;
     if (verified) verifiedCount++;
-    verifications.push({
-      index: i,
-      text: claims[i],
-      verified,
-      bestSimilarity: Math.max(0, bestSim),
-      bestChunkId: bestIdx >= 0 ? args.chunks[bestIdx].id : null,
-    });
+    verifications.push(
+      enrichWithHardFacts({
+        index: i,
+        text: claims[i],
+        verified,
+        bestSimilarity: Math.max(0, bestSim),
+        bestChunkId: bestIdx >= 0 ? args.chunks[bestIdx].id : null,
+      }),
+    );
   }
 
+  const aggregated = aggregateHardFactSupport(verifications, hardFactCheck);
   return {
     claims: verifications,
     confidence: verifications.length === 0 ? NaN : verifiedCount / verifications.length,
     costUsd: embed.costUsd,
     embedTokens: embed.tokens,
+    ...aggregated,
+  };
+}
+
+/** v0.6.1 — aggregate hardFactSupported over alle claims. Een claim zonder
+ *  hard-facts (hardFactSupported===undefined) telt als "geen probleem".
+ *  Returnt undefined-fields als hardFactCheck uit stond zodat het response
+ *  type schoon blijft. */
+function aggregateHardFactSupport(
+  claims: ClaimVerification[],
+  enabled: boolean,
+): Pick<ClaimVerificationResult, 'hardFactSupported' | 'missingHardFacts'> {
+  if (!enabled) return {};
+  const missing: string[] = [];
+  let anyClaimUnsupported = false;
+  for (const c of claims) {
+    if (c.hardFactSupported === false) {
+      anyClaimUnsupported = true;
+      if (c.missingHardFacts) missing.push(...c.missingHardFacts);
+    }
+  }
+  return {
+    hardFactSupported: !anyClaimUnsupported,
+    missingHardFacts: [...new Set(missing)],
   };
 }

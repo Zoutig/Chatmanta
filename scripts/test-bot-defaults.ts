@@ -1,5 +1,6 @@
 // Verifieert dat v0.1-v0.4 de v0.5-velden geërfd hebben op false/false/0.5
-// (append-only respect) en dat v0.5 zelf de flags WEL op true/true/0.5 heeft.
+// (append-only respect), v0.5 zelf de flags WEL op true/true/0.3 heeft, en
+// v0.6.1 de matched-span + hard-fact-verification flags aan heeft staan.
 // Run: npx tsx scripts/test-bot-defaults.ts
 
 import { strict as assert } from 'node:assert';
@@ -18,6 +19,9 @@ for (const v of legacyVersions) {
   assert.equal(bot.latencyHardCapMs, 12000, `${v} append-only: latencyHardCapMs moet 12000 zijn`);
   // V0.5 multi-turn-addon default leeg op legacy
   assert.equal(bot.preProcessMultiTurnAddon, '', `${v} append-only: preProcessMultiTurnAddon moet '' zijn`);
+  // V0.6.1 flags: legacy en v0.5 moeten ongedefinieerd of false zijn (append-only)
+  assert.ok(!bot.matchedSpanContext, `${v} append-only: matchedSpanContext moet falsy zijn`);
+  assert.ok(!bot.adaptiveHardFactVerification, `${v} append-only: adaptiveHardFactVerification moet falsy zijn`);
 }
 
 const v05 = BOTS['v0.5'];
@@ -46,10 +50,28 @@ assert.match(v05.preProcessMultiTurnAddon, /STAP 0 — CONTEXT-RESOLUTIE/);
 assert.match(v05.preProcessMultiTurnAddon, /TRUST-BOUNDARY/);
 assert.doesNotMatch(v05.preProcessSystem, /STAP 0/, 'STAP 0 mag NIET meer in base preProcessSystem zitten — moet in addon');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.5', 'LATEST_BOT_VERSION moet v0.5 zijn');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5']);
+// V0.6.1 — hard-fact verifier + matched-span context (PR-A van v0.6 split).
+// Erft van V0_5: alle v0.5-flags blijven aan, plus de twee nieuwe flags.
+const v061 = BOTS['v0.6.1'];
+assert.ok(v061, 'v0.6.1 ontbreekt uit BOTS-registry');
+assert.equal(v061.matchedSpanContext, true, 'v0.6.1 moet matchedSpanContext=true hebben');
+assert.equal(v061.adaptiveHardFactVerification, true, 'v0.6.1 moet adaptiveHardFactVerification=true hebben');
+// Erfenis van v0.5 — alle features die v0.5 aanzette blijven aan
+assert.equal(v061.generalKnowledgeEnabled, true, 'v0.6.1 erft generalKnowledgeEnabled=true van v0.5');
+assert.equal(v061.claimRegenerateEnabled, true, 'v0.6.1 erft claimRegenerateEnabled=true van v0.5');
+assert.equal(v061.claimVerification, true, 'v0.6.1 erft claimVerification=true van v0.5');
+assert.equal(v061.parentDocumentRetrieval, true, 'v0.6.1 erft parentDocumentRetrieval=true — vereist voor matched-span');
+assert.equal(v061.latencyBudgetEnabled, true, 'v0.6.1 erft latencyBudgetEnabled=true');
+// V0.5 bewust ongewijzigd — matched-span en hard-fact-verifier mogen NIET aan v0.5
+assert.ok(!v05.matchedSpanContext, 'v0.5 mag matchedSpanContext NIET aan hebben staan (append-only)');
+assert.ok(!v05.adaptiveHardFactVerification, 'v0.5 mag adaptiveHardFactVerification NIET aan hebben staan (append-only)');
 
-console.log(`✓ Legacy v0.1-v0.4 hebben de v0.5-velden op default (false/false/0.5)`);
+assert.equal(LATEST_BOT_VERSION, 'v0.6.1', 'LATEST_BOT_VERSION moet v0.6.1 zijn');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6.1']);
+
+console.log(`✓ Legacy v0.1-v0.4 hebben de v0.5/v0.6.1-velden op default (false)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
 console.log(`✓ v0.5 systemPrompt heeft soft word-ban (geen zwartelijst)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.5, BOT_VERSIONS_ORDERED bevat v0.5`);
+console.log(`✓ v0.5 heeft matched-span + hard-fact flags falsy gehouden (append-only)`);
+console.log(`✓ v0.6.1 heeft matchedSpanContext=true + adaptiveHardFactVerification=true`);
+console.log(`✓ LATEST_BOT_VERSION = v0.6.1, BOT_VERSIONS_ORDERED bevat alle 6 versies`);
