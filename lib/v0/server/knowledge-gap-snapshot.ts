@@ -1,14 +1,23 @@
-// V0.5 knowledge-gap snapshot — read-only DB-laag voor de Knowledge-Gap-tab.
+// V0.5+ knowledge-gap snapshot — read-only DB-laag voor de Knowledge-Gap-tab.
 //
 // Tracket welke vragen geen antwoord opleverden (= "gaps" in de docs/bot):
 //   - kind='fallback': zero-hit retrieval, vaste FALLBACK_MESSAGE getoond
 //   - category='off_topic': re-classifier zei "buiten domein" (apart bucket)
 //
+// V0.6.2 fijnere classificatie via query_log.gap_kind kolom (migratie 0023):
+//   - 'zero_hits'      = zelfde als kind='fallback' (back-compat overlap)
+//   - 'low_confidence' = claim-regenerate triggered op claimConfidence
+//   - 'low_grounding'  = claim-regenerate triggered op hard-fact failure
+//   - 'off_topic'      = zelfde als category='off_topic' (back-compat overlap)
+// Legacy v0.1-v0.6.1 rijen houden gap_kind=NULL maar worden nog steeds
+// gevonden via de oude kind/category queries — dubbel tellen voorkomen via
+// distinct id-buckets.
+//
 // NIET als gap geteld:
 //   - category='general': bot gaf wel een algemene uitleg (geen doc-gap maar
 //     domein-vraag die de bot al goed oplost)
 //   - kind='smalltalk': geen kennis-vraag
-//   - kind='answer' met category='search': normale RAG-success
+//   - kind='answer' met category='search' EN geen regenerate-trigger: normale RAG-success
 //
 // Gebruik: dev/bot-owner ziet welke vragen klanten stellen die de docs niet
 // dekken, en kan content gericht uitbreiden. Per-org gefiltered.
@@ -53,12 +62,22 @@ export type KnowledgeGapSnapshot = {
   fallbackCount: number;
   /** Queries met category='off_topic' (re-classifier wees ze af). */
   offTopicCount: number;
+  /** v0.6.2: queries met gap_kind='low_confidence' (claim-regenerate
+   *  triggered op verifiedRatio < threshold). 0 voor v0.1-v0.6.1. */
+  lowConfidenceCount: number;
+  /** v0.6.2: queries met gap_kind='low_grounding' (regenerate triggered op
+   *  hard-fact verifier supported=false). 0 voor v0.1-v0.6.1. */
+  lowGroundingCount: number;
   /** fallbackCount / totalQueries (0-1). NaN als totalQueries=0. */
   fallbackRate: number;
   /** Top-N (default 20) meest-gestelde unanswered vragen. */
   topUnanswered: KnowledgeGapItem[];
   /** Top-N off-topic vragen, apart bucket. */
   topOffTopic: KnowledgeGapItem[];
+  /** v0.6.2: top-N low-confidence queries (verifiedRatio < threshold). */
+  topLowConfidence: KnowledgeGapItem[];
+  /** v0.6.2: top-N low-grounding queries (hard-fact mismatch). */
+  topLowGrounding: KnowledgeGapItem[];
   generatedAt: string;
 };
 
@@ -169,20 +188,48 @@ export async function getKnowledgeGapSnapshot(
     }));
   })();
 
-  const [totalQueries, fallbackRows, offTopicRows] = await Promise.all([
-    totalPromise,
-    fallbackPromise,
-    offTopicPromise,
-  ]);
+  // V0.6.2: low-confidence + low-grounding via gap_kind. Aparte query op
+  // gap_kind IN (...), TS-side gesplitst. Bestaat alleen voor v0.6.2+ rijen
+  // (oudere bots hebben gap_kind=NULL).
+  const adaptiveGapPromise = (async () => {
+    let q = client
+      .from('query_log')
+      .select('question, bot_version, created_at, gap_kind')
+      .eq('organization_id', organizationId)
+      .in('gap_kind', ['low_confidence', 'low_grounding']);
+    if (since) q = q.gte('created_at', since);
+    const { data, error } = await q;
+    if (error) throw new Error(`query_log gap_kind select: ${error.message}`);
+    return (data ?? []).map((r) => ({
+      question: r.question as string,
+      bot_version: r.bot_version as string,
+      created_at: r.created_at as string,
+      gap_kind: r.gap_kind as string,
+    }));
+  })();
+
+  const [totalQueries, fallbackRows, offTopicRows, adaptiveGapRows] =
+    await Promise.all([totalPromise, fallbackPromise, offTopicPromise, adaptiveGapPromise]);
+
+  const lowConfidenceRows = adaptiveGapRows.filter(
+    (r) => r.gap_kind === 'low_confidence',
+  );
+  const lowGroundingRows = adaptiveGapRows.filter(
+    (r) => r.gap_kind === 'low_grounding',
+  );
 
   return {
     window,
     totalQueries,
     fallbackCount: fallbackRows.length,
     offTopicCount: offTopicRows.length,
+    lowConfidenceCount: lowConfidenceRows.length,
+    lowGroundingCount: lowGroundingRows.length,
     fallbackRate: totalQueries === 0 ? 0 : fallbackRows.length / totalQueries,
     topUnanswered: groupByQuestion(fallbackRows),
     topOffTopic: groupByQuestion(offTopicRows),
+    topLowConfidence: groupByQuestion(lowConfidenceRows),
+    topLowGrounding: groupByQuestion(lowGroundingRows),
     generatedAt: new Date().toISOString(),
   };
 }

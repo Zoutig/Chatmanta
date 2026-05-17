@@ -22,6 +22,17 @@ for (const v of legacyVersions) {
   // V0.6.1 flags: legacy en v0.5 moeten ongedefinieerd of false zijn (append-only)
   assert.ok(!bot.matchedSpanContext, `${v} append-only: matchedSpanContext moet falsy zijn`);
   assert.ok(!bot.adaptiveHardFactVerification, `${v} append-only: adaptiveHardFactVerification moet falsy zijn`);
+  // V0.6.2 flags: alle 10 adaptive-velden falsy/undefined op legacy versies
+  assert.ok(!bot.adaptiveRag, `${v} append-only: adaptiveRag moet falsy zijn`);
+  assert.equal(bot.adaptiveWeakTopSim, undefined, `${v} append-only: adaptiveWeakTopSim moet undefined zijn`);
+  assert.equal(bot.adaptiveStrongTopSim, undefined, `${v} append-only: adaptiveStrongTopSim moet undefined zijn`);
+  assert.equal(bot.adaptiveRerankMargin, undefined, `${v} append-only: adaptiveRerankMargin moet undefined zijn`);
+  assert.equal(bot.adaptiveCascadeMinTopSim, undefined, `${v} append-only: adaptiveCascadeMinTopSim moet undefined zijn`);
+  assert.equal(bot.retrievalTopK, undefined, `${v} append-only: retrievalTopK moet undefined zijn`);
+  assert.equal(bot.rerankInputMax, undefined, `${v} append-only: rerankInputMax moet undefined zijn`);
+  assert.equal(bot.finalContextMaxChunks, undefined, `${v} append-only: finalContextMaxChunks moet undefined zijn`);
+  assert.ok(!bot.adaptiveHistoryResolution, `${v} append-only: adaptiveHistoryResolution moet falsy zijn`);
+  assert.ok(!bot.knowledgeGapLogging, `${v} append-only: knowledgeGapLogging moet falsy zijn`);
 }
 
 const v05 = BOTS['v0.5'];
@@ -65,13 +76,40 @@ assert.equal(v061.latencyBudgetEnabled, true, 'v0.6.1 erft latencyBudgetEnabled=
 // V0.5 bewust ongewijzigd — matched-span en hard-fact-verifier mogen NIET aan v0.5
 assert.ok(!v05.matchedSpanContext, 'v0.5 mag matchedSpanContext NIET aan hebben staan (append-only)');
 assert.ok(!v05.adaptiveHardFactVerification, 'v0.5 mag adaptiveHardFactVerification NIET aan hebben staan (append-only)');
+// V0.5 en v0.6.1 mogen GEEN adaptive-flags hebben — append-only voor PR-B
+assert.ok(!v05.adaptiveRag, 'v0.5 mag adaptiveRag NIET aan hebben staan (append-only)');
+assert.ok(!v061.adaptiveRag, 'v0.6.1 mag adaptiveRag NIET aan hebben staan (append-only)');
+assert.equal(v05.retrievalTopK, undefined, 'v0.5 retrievalTopK moet undefined zijn');
+assert.equal(v061.retrievalTopK, undefined, 'v0.6.1 retrievalTopK moet undefined zijn');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.6.1', 'LATEST_BOT_VERSION moet v0.6.1 zijn');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6.1']);
+// V0.6.2 — adaptive RAG (PR-B). Erft alle v0.6.1-features + 10 adaptive flags.
+const v062 = BOTS['v0.6.2'];
+assert.ok(v062, 'v0.6.2 ontbreekt uit BOTS-registry');
+assert.equal(v062.adaptiveRag, true, 'v0.6.2 moet adaptiveRag=true hebben');
+assert.equal(v062.adaptiveWeakTopSim, 0.45, 'v0.6.2 moet adaptiveWeakTopSim=0.45 hebben');
+assert.equal(v062.adaptiveStrongTopSim, 0.62, 'v0.6.2 moet adaptiveStrongTopSim=0.62 hebben');
+assert.equal(v062.adaptiveRerankMargin, 0.08, 'v0.6.2 moet adaptiveRerankMargin=0.08 hebben');
+assert.equal(v062.adaptiveCascadeMinTopSim, 0.60, 'v0.6.2 moet adaptiveCascadeMinTopSim=0.60 hebben');
+assert.equal(v062.retrievalTopK, 8, 'v0.6.2 moet retrievalTopK=8 hebben');
+assert.equal(v062.rerankInputMax, 20, 'v0.6.2 moet rerankInputMax=20 hebben');
+assert.equal(v062.finalContextMaxChunks, 5, 'v0.6.2 moet finalContextMaxChunks=5 hebben');
+assert.equal(v062.adaptiveHistoryResolution, true, 'v0.6.2 moet adaptiveHistoryResolution=true hebben');
+assert.equal(v062.knowledgeGapLogging, true, 'v0.6.2 moet knowledgeGapLogging=true hebben');
+// V0.6.2 erft v0.6.1 features
+assert.equal(v062.matchedSpanContext, true, 'v0.6.2 erft matchedSpanContext=true van v0.6.1');
+assert.equal(v062.adaptiveHardFactVerification, true, 'v0.6.2 erft adaptiveHardFactVerification=true van v0.6.1');
+// V0.6.2 erft v0.5 features
+assert.equal(v062.generalKnowledgeEnabled, true, 'v0.6.2 erft generalKnowledgeEnabled=true');
+assert.equal(v062.claimRegenerateEnabled, true, 'v0.6.2 erft claimRegenerateEnabled=true');
+assert.equal(v062.latencyBudgetEnabled, true, 'v0.6.2 erft latencyBudgetEnabled=true');
 
-console.log(`✓ Legacy v0.1-v0.4 hebben de v0.5/v0.6.1-velden op default (false)`);
+assert.equal(LATEST_BOT_VERSION, 'v0.6.2', 'LATEST_BOT_VERSION moet v0.6.2 zijn');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6.1', 'v0.6.2']);
+
+console.log(`✓ Legacy v0.1-v0.4 hebben de v0.5/v0.6.1/v0.6.2-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
 console.log(`✓ v0.5 systemPrompt heeft soft word-ban (geen zwartelijst)`);
-console.log(`✓ v0.5 heeft matched-span + hard-fact flags falsy gehouden (append-only)`);
+console.log(`✓ v0.5 + v0.6.1 hebben de v0.6.2-flags falsy/undefined (append-only)`);
 console.log(`✓ v0.6.1 heeft matchedSpanContext=true + adaptiveHardFactVerification=true`);
-console.log(`✓ LATEST_BOT_VERSION = v0.6.1, BOT_VERSIONS_ORDERED bevat alle 6 versies`);
+console.log(`✓ v0.6.2 heeft adaptiveRag=true + 10 adaptive-flags op plan-defaults`);
+console.log(`✓ LATEST_BOT_VERSION = v0.6.2, BOT_VERSIONS_ORDERED bevat alle 7 versies`);

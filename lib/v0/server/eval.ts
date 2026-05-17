@@ -523,6 +523,22 @@ export async function runEvalRow(args: {
     if (extrasTimings) phaseTimings = extrasTimings;
   }
 
+  // V0.6.2: merge adaptiveDecision en gapKind in stage_timings_ms zodat de
+  // eval-report op die velden kan slicen zonder schema-wijziging op eval_runs.
+  // Voor v0.1-v0.6.1 zijn beide undefined → phaseTimings blijft ongewijzigd.
+  if (response && phaseTimings) {
+    const adaptiveDecision =
+      response.kind === 'answer' ? response.extras?.adaptiveDecision : undefined;
+    const gapKind = (response as { gapKind?: string | null }).gapKind ?? null;
+    if (adaptiveDecision || gapKind) {
+      phaseTimings = {
+        ...phaseTimings,
+        ...(adaptiveDecision ? { adaptiveDecision } : {}),
+        ...(gapKind ? { gapKind } : {}),
+      } as PhaseTimings;
+    }
+  }
+
   if (!response) {
     // Stream eindigde zonder smalltalk/fallback/answer-done — synthetic
     // fallback-rij zodat de run niet hangt en regressies zichtbaar blijven.

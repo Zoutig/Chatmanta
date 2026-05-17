@@ -244,6 +244,62 @@ for (const pair of versionModePairs) {
 }
 lines.push('');
 
+// 4c. V0.6.2 adaptive RAG: samenvatting per versie × decision.path
+// (fast/standard/careful). Bouw op stage_timings_ms.adaptiveDecision.path
+// dat eval.ts mee-injecteert. Alleen rijen met aanwezige adaptive_decision
+// komen mee — v0.1-v0.6.1 worden automatisch overgeslagen omdat zij geen
+// adaptiveDecision in stage_timings_ms hebben.
+type AdaptivePathKey = 'fast' | 'standard' | 'careful';
+type AdaptivePathRow = {
+  version: string;
+  path: AdaptivePathKey;
+  rows: RunRow[];
+};
+function adaptivePathOf(r: RunRow): AdaptivePathKey | null {
+  const st = r.stage_timings_ms as { adaptiveDecision?: { path?: string } } | null;
+  const p = st?.adaptiveDecision?.path;
+  if (p === 'fast' || p === 'standard' || p === 'careful') return p;
+  return null;
+}
+const adaptiveBuckets = new Map<string, AdaptivePathRow>();
+for (const r of latestRuns) {
+  const path = adaptivePathOf(r);
+  if (!path) continue;
+  const key = `${r.bot_version}::${path}`;
+  const bucket = adaptiveBuckets.get(key);
+  if (bucket) {
+    bucket.rows.push(r);
+  } else {
+    adaptiveBuckets.set(key, { version: r.bot_version as string, path, rows: [r] });
+  }
+}
+if (adaptiveBuckets.size > 0) {
+  lines.push('## V0.6.2 Adaptive decision — samenvatting per versie × path');
+  lines.push('');
+  lines.push('| versie | path | n | C | P | G | overall | bot $ | bot ms (avg) |');
+  lines.push('|--------|------|---|---|---|---|---------|-------|--------------|');
+  // Sort: versie alfabetisch, dan path in vaste volgorde
+  const pathOrder: Record<AdaptivePathKey, number> = { fast: 0, standard: 1, careful: 2 };
+  const sortedBuckets = [...adaptiveBuckets.values()].sort((a, b) =>
+    a.version.localeCompare(b.version) || pathOrder[a.path] - pathOrder[b.path],
+  );
+  for (const b of sortedBuckets) {
+    const c = avgOf(b.rows, (r) => r.score_correctness);
+    const p = avgOf(b.rows, (r) => r.score_completeness);
+    const g = avgOf(b.rows, (r) => r.score_grounding);
+    const all = [c, p, g].filter((n): n is number => n !== null);
+    const overall = all.length === 0 ? null : all.reduce((a, x) => a + x, 0) / all.length;
+    const bCost = b.rows.reduce((s, r) => s + Number(r.bot_cost_usd ?? 0), 0);
+    const lat = avgOf(b.rows, (r) => Number(r.bot_latency_ms ?? 0));
+    lines.push(
+      `| ${b.version} | ${b.path} | ${b.rows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | ${fmt(lat, 0)} |`,
+    );
+  }
+  lines.push('');
+  lines.push('_Alleen v0.6.2+ runs met `bot.adaptiveRag=true`. Per-path means tonen of `fast` daadwerkelijk de latency drukt zonder grounding-verlies._');
+  lines.push('');
+}
+
 // 4b-bis. Per-stage latency (p50/p95/p99) — migration 0019 nieuwe sectie.
 // Gebruikt latestRuns als input (current snapshot) gekeyed op (v::mode) zodat
 // 3-way A/B/C runs niet door elkaar gemengd worden.

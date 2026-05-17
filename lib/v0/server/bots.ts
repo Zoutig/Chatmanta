@@ -170,6 +170,77 @@ export type BotConfig = {
    */
   adaptiveHardFactVerification?: boolean;
   /**
+   * v0.6.2: master-switch voor de adaptive decision layer (rag-decision.ts).
+   * Bij true wordt `decideRagStrategy()` aangeroepen na threshold-filter en
+   * gateet de bestaande pipeline-stages (HyDE, rerank, cascade, claim-verify,
+   * followups). Bij false/undefined → identieke gedrag aan v0.6.1 (alle
+   * bestaande condities blijven werken). Vereist geen andere v0.6.2-flags
+   * om te functioneren, maar werkt het best mét adaptiveStrongTopSim/etc.
+   */
+  adaptiveRag?: boolean;
+  /**
+   * v0.6.2: drempel waaronder een query als "weak retrieval" geldt — top-1
+   * sim < adaptiveWeakTopSim. Default 0.45 (uit eval-corpus distributie,
+   * empirisch verifieerbaar via top1Sim-histogram). Beneden deze drempel:
+   * decision.path = 'careful', alle kwaliteitslagen aan.
+   */
+  adaptiveWeakTopSim?: number;
+  /**
+   * v0.6.2: drempel waarboven retrieval "strong" is — top-1 sim ≥
+   * adaptiveStrongTopSim. Default 0.62. Boven deze drempel én bij voldoende
+   * top1-top2 gap → decision.path = 'fast' (skip rerank/verify/cascade/
+   * followups). Tussen weak en strong: 'standard' (v0.6.1-pad behouden).
+   */
+  adaptiveStrongTopSim?: number;
+  /**
+   * v0.6.2: minimale top1-top2 sim-gap om rerank/cascade te SKIPPEN.
+   * Default 0.08. Bij gap < margin = retrieval is ambigu → rerank/cascade
+   * alsnog aan ook bij top1 boven strong. Voorkomt "fast path" op queries
+   * waar er twee even goede kandidaten zijn.
+   */
+  adaptiveRerankMargin?: number;
+  /**
+   * v0.6.2: strenger cascadeMinTopSim wanneer adaptiveRag aan. Default 0.60
+   * (vs 0.50 in v0.5 hotfix). Cascade fired alleen bij medium/strong
+   * retrieval — bij weak heeft een sterker model geen grond. Zonder
+   * adaptiveRag: bestaand cascadeMinTopSim blijft leidend.
+   */
+  adaptiveCascadeMinTopSim?: number;
+  /**
+   * v0.6.2: top-K kandidaten per retrieve-call. Default V0_RAG_DEFAULTS.TOP_K
+   * (5) bij undefined. Verhoogd naar 8 op v0.6.2 om reranker meer keuze te
+   * geven, maar finalContextMaxChunks bepaalt nog steeds wat naar LLM gaat.
+   */
+  retrievalTopK?: number;
+  /**
+   * v0.6.2: maximaal aantal chunks dat naar de LLM-rerank-call gaat.
+   * Default V0_RAG_DEFAULTS.MAX_RERANK_INPUT (10) bij undefined. Verhoogd
+   * naar 20 op v0.6.2 — meer kandidaten om uit te kiezen, langere rerank-
+   * prompt acceptabel omdat we hem selectief skippen.
+   */
+  rerankInputMax?: number;
+  /**
+   * v0.6.2: max chunks in de uiteindelijke answer-context (MAX_CONTEXT_CHARS
+   * blijft de byte-cap). Default = retrievalTopK / TOP_K. 5 op v0.6.2 om
+   * de extra kandidaten uit topK=8 niet allemaal door te geven.
+   */
+  finalContextMaxChunks?: number;
+  /**
+   * v0.6.2: bij history-aanwezigheid de multi-turn addon ALLEEN prepend
+   * wanneer needsHistoryResolution(question)=true (keyword-heuristic op
+   * referentie-aanwijzingen). Default false (v0.6.1-pad: prepend bij elke
+   * non-empty history). Bij true: korte prompts voor zelfstandige
+   * vervolgvragen die geen referentie nodig hebben.
+   */
+  adaptiveHistoryResolution?: boolean;
+  /**
+   * v0.6.2: zet gap_kind in extras (en daarmee in query_log) bij fallback/
+   * low-confidence/low-grounding/off_topic-paden. Gebruikt door de
+   * knowledge-gap-snapshot voor fijnere classificatie. Default false:
+   * legacy gedrag (snapshot leunt op kind='fallback' OR category='off_topic').
+   */
+  knowledgeGapLogging?: boolean;
+  /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
    * omdat v0.4 met cascade nooit dezelfde latency haalt als v0.1.
@@ -674,6 +745,49 @@ const V0_6_1: BotConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// v0.6.2 — adaptive RAG (PR-B van v0.6 split)
+//
+// Append-only — V0_1 t/m V0_6_1 blijven byte-identiek. Bouwt voort op v0.6.1
+// (erft hard-fact verifier + matched-span context).
+//
+// Doel: niet alle zware stages op elke query. Simpele FAQ-vragen (sterke
+// retrieval + zelfstandige vraag + duidelijke top1-top2 gap) krijgen het
+// 'fast'-pad — geen rerank/cascade/claim-verify/followups. Moeilijke vragen
+// (zwakke retrieval, samengesteld, harde feiten in antwoord) krijgen 'careful'
+// — alle stages aan. Daartussen blijft 'standard' = v0.6.1-pad.
+//
+// De adaptive-thresholds (0.45 weak, 0.62 strong, 0.08 margin) zijn schattingen
+// op basis van de v0.5/v0.6.1 top1Sim-distributie; te tunen na eval-run.
+// retrievalTopK 5→8 + rerankInputMax 10→20: meer kandidaten voor de reranker,
+// maar finalContextMaxChunks=5 zorgt dat de answer-context niet groeit.
+//
+// knowledgeGapLogging zet gap_kind in extras → query_log.gap_kind voor fijnere
+// classificatie dan alleen kind='fallback'. adaptiveHistoryResolution maakt
+// de multi-turn addon conditioneel op keyword-heuristic (needsHistoryResolution).
+// ---------------------------------------------------------------------------
+const V0_6_2: BotConfig = {
+  ...V0_6_1,
+  version: 'v0.6.2',
+  label: 'v0.6.2 — adaptive RAG',
+  description:
+    'v0.6.1 + adaptive decision-layer (fast/standard/careful 3 paden) + retrievalTopK 8 + selectieve multi-turn rewrite + gap_kind classificatie. Doel: simpele vragen sneller, complexe vragen met alle kwaliteitslagen aan.',
+  adaptiveRag: true,
+  adaptiveWeakTopSim: 0.45,
+  adaptiveStrongTopSim: 0.62,
+  adaptiveRerankMargin: 0.08,
+  adaptiveCascadeMinTopSim: 0.60,
+  retrievalTopK: 8,
+  rerankInputMax: 20,
+  finalContextMaxChunks: 5,
+  adaptiveHistoryResolution: true,
+  knowledgeGapLogging: true,
+  // Latency-budget omlaag t.o.v. v0.6.1: 'fast'-pad skipt enkele stages,
+  // dus gemiddelde p50 moet lager. Bij 'careful'-pad mag het hoger — daar
+  // staat de budget-skip-logica voor.
+  evalBudgetMs: 5500,
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
@@ -683,10 +797,11 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
   [V0_6_1.version]: V0_6_1,
+  [V0_6_2.version]: V0_6_2,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_6_1.version;
+export const LATEST_BOT_VERSION = V0_6_2.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -696,6 +811,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_4.version,
   V0_5.version,
   V0_6_1.version,
+  V0_6_2.version,
 ];
 
 /**

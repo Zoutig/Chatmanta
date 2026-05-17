@@ -99,6 +99,11 @@ type QueryLogRow = {
   // mogelijk getriggered). True = alle harde feiten ondersteund.
   hard_fact_supported: boolean | null;
   missing_hard_facts: unknown | null;
+  // V0.6.2 adaptive RAG telemetry (migratie 0023). NULL voor v0.1-v0.6.1.
+  //   * gap_kind: zero_hits | low_confidence | low_grounding | off_topic | NULL
+  //   * adaptive_decision: volledige RagDecision-blob (path, strength, shouldX, reasons)
+  gap_kind: string | null;
+  adaptive_decision: unknown | null;
 };
 
 /**
@@ -227,6 +232,16 @@ export async function logQuery(
     const generalKnowledgeActual =
       response.kind === 'smalltalk' ? null : response.generalKnowledgeActual ?? null;
 
+    // v0.6.2 adaptive RAG telemetry. gapKind zit op de top-level response
+    // (BaseChatResponse), niet in extras — werkt zo ook voor fallback-kind
+    // waar response.extras niet bestaat. adaptiveDecision wel in extras
+    // (alleen op answer-kind aanwezig).
+    const gapKind =
+      response.kind === 'smalltalk'
+        ? null
+        : (response as { gapKind?: string | null }).gapKind ?? null;
+    const adaptiveDecision = extras?.adaptiveDecision ?? null;
+
     // v0.6.1 hard-fact verifier. Aanwezig in extras alleen wanneer
     // bot.adaptiveHardFactVerification aanstond. Voor smalltalk/blocked
     // en oudere versies blijft het NULL.
@@ -277,6 +292,8 @@ export async function logQuery(
             general_knowledge_actual: null,
             hard_fact_supported: null,
             missing_hard_facts: null,
+            gap_kind: null,
+            adaptive_decision: null,
           }
         : {
             organization_id: organizationId,
@@ -324,6 +341,8 @@ export async function logQuery(
             general_knowledge_actual: generalKnowledgeActual,
             hard_fact_supported: hardFactSupported,
             missing_hard_facts: missingHardFacts,
+            gap_kind: gapKind,
+            adaptive_decision: adaptiveDecision,
           };
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
@@ -423,6 +442,9 @@ export async function logBlockedQuery(input: {
       // Blocked queries genereren geen antwoord → geen hard-fact check.
       hard_fact_supported: null,
       missing_hard_facts: null,
+      // Blocked queries draaien geen adaptive pipeline.
+      gap_kind: null,
+      adaptive_decision: null,
     };
     const { error } = await sb().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);
