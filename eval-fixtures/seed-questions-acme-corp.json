@@ -84,6 +84,61 @@
       "ideal_source_filenames": ["16-werkgebied.md"]
     },
     {
+      "slug": "werkgebied-emmeloord-bridge",
+      "question": "Kunnen jullie ook naar Emmeloord komen?",
+      "gold_answer": "Emmeloord ligt in de Noordoostpolder, in provincie Flevoland — en Flevoland valt binnen ons standaard werkgebied. In de detail-lijst voor Flevoland noemen we specifiek Almere en Zeewolde, dus voor Emmeloord even bellen voor de planning.",
+      "gold_facts": ["standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland", "Emmeloord ligt in Flevoland (Noordoostpolder)"],
+      "tags": ["bridging", "geo", "positive", "werkgebied", "diagnostic"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-urk-bridge",
+      "question": "Doen jullie ook werk in Urk?",
+      "gold_answer": "Urk ligt in provincie Flevoland en Flevoland valt binnen ons standaard werkgebied. We noemen specifiek Almere en Zeewolde in onze documentatie — voor Urk bellen we graag even om de planning af te stemmen.",
+      "gold_facts": ["standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland", "Urk ligt in Flevoland"],
+      "tags": ["bridging", "geo", "positive", "werkgebied", "diagnostic"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-baarn-control",
+      "question": "Komen jullie naar Baarn?",
+      "gold_answer": "Ja, Baarn valt binnen ons standaard werkgebied. We komen daar zonder voorrijkosten op offerte-bezoek en reguliere uitvoering.",
+      "gold_facts": ["Baarn expliciet in standaard werkgebied (provincie Utrecht)"],
+      "tags": ["control", "geo", "positive", "explicit-in-list", "diagnostic"],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-heerlen-bridge-out",
+      "question": "Doen jullie ook een opdracht in Heerlen?",
+      "gold_answer": "Heerlen ligt in Limburg en Limburg valt buiten ons werkgebied — voor klussen in Limburg, Groningen of Noord-Brabant verwijzen we klanten door naar regionale VEBIDAK-aangesloten collega's.",
+      "gold_facts": ["Heerlen ligt in Limburg", "Limburg buiten werkgebied", "doorverwijzing naar VEBIDAK-collega's"],
+      "tags": ["bridging", "geo", "negative", "out-of-area", "diagnostic"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-apeldoorn-implicit-out",
+      "question": "Kunnen jullie naar Apeldoorn komen voor dakwerk?",
+      "gold_answer": "Apeldoorn ligt in Gelderland, en hoewel we in een deel van Gelderland werken (Arnhem, Velp, Rozendaal, Renkum, Heelsum, Doorwerth, Oosterbeek — uitgebreid werkgebied met voorrijbijdrage), staat Apeldoorn daar niet in. Voor Apeldoorn is het 'op aanvraag' — bel even, dan kijken we of het past.",
+      "gold_facts": ["Apeldoorn ligt in Gelderland", "uitgebreid werkgebied dekt alleen centraal-Gelderland", "Apeldoorn niet expliciet"],
+      "tags": ["bridging", "geo", "negative", "implicit-out", "diagnostic"],
+      "difficulty": "hard",
+      "question_type": "ambiguous",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
       "slug": "werkgebied-randstad-fuzzy",
       "question": "Werken jullie in de Randstad?",
       "gold_answer": "We werken in delen van wat vaak Randstad wordt genoemd: provincie Utrecht (volledig) is ons standaard werkgebied, en in zuidelijk Noord-Holland (Amsterdam-Zuid, Diemen, Naarden, Bussum, Muiden, Weesp) komen we ook — daar met een vaste voorrijbijdrage. Voor andere Randstad-plaatsen zoals Den Haag, Rotterdam of Leiden geldt 'op aanvraag' — bel even, dan kijken we of het past.",
