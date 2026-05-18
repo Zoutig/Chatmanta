@@ -7,7 +7,9 @@ import {
   ReclassifyResult,
   RECLASSIFY_SYSTEM,
   DOMAIN_ALLOWLIST,
+  buildReclassifySystem,
 } from './reclassify-pure';
+import type { OrgPersona } from './persona';
 
 // V0.5 — tweede-stage classifier voor het zero-hit-pad in runRagQueryStreaming.
 //
@@ -50,6 +52,7 @@ export type ReclassifyOutput = {
 export async function reclassifyAfterZeroHits(
   question: string,
   bot: BotConfig,
+  persona?: OrgPersona,
 ): Promise<ReclassifyOutput> {
   const fallbackResult: ReclassifyOutput = {
     category: 'fallback',
@@ -57,13 +60,21 @@ export async function reclassifyAfterZeroHits(
     outputTokens: 0,
     costUsd: 0,
   };
+  // Per-org domain. Geen persona → DEV_ORG defaults via buildReclassifySystem.
+  // Reden voor de keuze: voor Initech (accountancy) is "wat is btw?" een GENERAL
+  // vraag binnen hun domein — met de oude hard-coded MKB/SaaS/AI/RAG-keyword-
+  // lijst werd dat als OFF_TOPIC geclassificeerd en kreeg de gebruiker een
+  // beleefde refusal voor een legitieme domein-vraag.
+  const systemPrompt = persona
+    ? buildReclassifySystem(persona.domainKeywords, persona.company)
+    : RECLASSIFY_SYSTEM;
   try {
     const resp = await openai().chat.completions.create({
       model: bot.chatModel,
       temperature: 0.0,
       max_tokens: 10,
       messages: [
-        { role: 'system', content: RECLASSIFY_SYSTEM },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
       ],
     });
