@@ -9,6 +9,7 @@ import { getAllTimeUsage } from '@/lib/v0/server/log';
 import { BOT_VERSIONS_ORDERED, BOTS, resolveBot } from '@/lib/v0/server/bots';
 import { getActiveOrgFromCookies, listKnownOrgs } from '@/lib/v0/server/active-org';
 import { getExamplesForOrg } from '@/lib/v0/server/empty-state-examples';
+import { getPersonaBySlug, renderPersonaTemplate } from '@/lib/v0/server/persona';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,11 @@ export default async function Home({
   const activeOrg = await getActiveOrgFromCookies();
   const orgs = listKnownOrgs();
   const examples = getExamplesForOrg(activeOrg.slug);
+  // Persona-rendered systemPrompt voor de Prompt-tab live preview. De server-
+  // side LLM-pipeline (runRagQueryStreaming) doet dezelfde render, dus de
+  // preview kan niet driften van wat de bot daadwerkelijk te zien krijgt.
+  const persona = getPersonaBySlug(activeOrg.slug);
+  const renderedBotSystemPrompt = renderPersonaTemplate(bot.systemPrompt, persona);
 
   const [docs, threads, allTimeUsage] = await Promise.all([
     listDocs(activeOrg.id),
@@ -58,7 +64,7 @@ export default async function Home({
         cascadeModel: bot.cascadeModel,
         generalKnowledgeEnabled: bot.generalKnowledgeEnabled,
       }}
-      botSystemPrompt={bot.systemPrompt}
+      botSystemPrompt={renderedBotSystemPrompt}
       defaultThreshold={bot.similarityThreshold}
       defaultEnableRewrite={bot.enableRewriteByDefault}
       docs={docs}

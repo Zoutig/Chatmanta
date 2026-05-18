@@ -18,6 +18,13 @@ import { buildSystemPrompt } from '../style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
 import { costForModelUsd } from '../../ai/llm';
 import { AppError, type AppErrorCode } from '../../errors/app-error';
+import {
+  buildGeneralClosingStripRegex,
+  composeBotPrompts,
+  getPersonaById,
+  renderPersonaTemplate,
+  type OrgPersona,
+} from './persona';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -267,6 +274,7 @@ function formatHistoryBlock(history: ChatHistoryTurn[]): string {
 async function preProcessInput(
   original: string,
   bot: BotConfig,
+  persona: OrgPersona,
   history: ChatHistoryTurn[] = [],
 ): Promise<PreProcessResult> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS);
@@ -292,9 +300,15 @@ async function preProcessInput(
     const { needsHistoryResolution } = await import('./rag-decision');
     useMultiTurnAddon = needsHistoryResolution(original);
   }
+  // Persona-rendering: het bot-prompt template bevat {{COMPANY}} / {{AUDIENCE}}
+  // etc. placeholders — die moeten gerendered worden voordat we de LLM
+  // aanroepen, anders krijgt hij letterlijk "{{COMPANY}}" te zien en lekt de
+  // pre-trained naam ("ChatManta") door als invul-default. Multi-turn addon
+  // wordt apart gerendered want hij wordt geprepend, niet ingelezen.
+  const rendered = composeBotPrompts(bot, persona);
   const systemPrompt = useMultiTurnAddon
-    ? `${bot.preProcessMultiTurnAddon}\n\n${bot.preProcessSystem}`
-    : bot.preProcessSystem;
+    ? `${rendered.preProcessMultiTurnAddon}\n\n${rendered.preProcessSystem}`
+    : rendered.preProcessSystem;
   const result = await chatComplete({
     model: bot.chatModel,
     system: systemPrompt,
@@ -1148,7 +1162,13 @@ export async function runRagQuery({
     throw new AppError('INPUT_INVALID', { message: 'question too long (max 1000 chars)' });
   }
 
-  const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
+  // Eval-pad: geen orgId beschikbaar → render met DEV_ORG persona (semantisch
+  // identiek aan de oude hard-coded V0.X prompts).
+  const evalPersona = getPersonaById(DEV_ORG_ID);
+  const styledSystemPrompt = buildSystemPrompt(
+    renderPersonaTemplate(bot.systemPrompt, evalPersona),
+    { tone, length },
+  );
 
   // 1. Optional pre-processor — classifies smalltalk vs search and rewrites
   //    the query in one shot. Smalltalk is answered immediately without any
@@ -1157,7 +1177,10 @@ export async function runRagQuery({
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
   if (enableRewrite) {
-    const pp = await preProcessInput(original, bot);
+    // runRagQuery (non-streaming) is alleen de eval-pad — geen orgId-param,
+    // dus we vallen terug op DEV_ORG persona. De live chat draait via
+    // runRagQueryStreaming en resolveert persona correct per org.
+    const pp = await preProcessInput(original, bot, getPersonaById(DEV_ORG_ID));
     if (pp.kind === 'smalltalk') {
       return {
         botVersion: bot.version,
@@ -1363,6 +1386,13 @@ export async function* runRagQueryStreaming(input: {
   const tone: Tone = input.tone ?? DEFAULT_TONE;
   const length: Length = input.length ?? DEFAULT_LENGTH;
   const orgId = input.organizationId ?? DEV_ORG_ID;
+  // V0.6 persona-laag: resolveer hier één keer en gebruik door de hele
+  // pipeline (preProcess, main answer, general-knowledge prompt, off-topic
+  // refusal). Voorheen waren de prompts hard-coded op DEV_ORG identiteit,
+  // waardoor non-DEV orgs antwoorden kregen die zichzelf "ChatManta van
+  // Jorion Solutions" noemden — zelfs als de retrieved chunks uit de juiste
+  // org kwamen. Unknown orgId → fallback DEV_ORG persona.
+  const persona = getPersonaById(orgId);
   const hydeModeRequested: HydeModeRequest = input.hydeModeOverride ?? 'auto';
   const hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
   // v0.5 general-knowledge toggle: gate combined with bot config. Default true
@@ -1421,7 +1451,12 @@ export async function* runRagQueryStreaming(input: {
   // Bouw de samengestelde system prompt één keer; gebruikt door main answer-call
   // en (v0.3) cascade-call. Pre-processor en helper-LLM-calls (rerank, hyde,
   // decompose, follow-ups) gebruiken hun eigen task-specifieke prompts.
-  const styledSystemPrompt = buildSystemPrompt(bot.systemPrompt, { tone, length });
+  // Persona-template wordt eerst gerendered, daarna passes buildSystemPrompt
+  // de STIJL-suffix aan.
+  const styledSystemPrompt = buildSystemPrompt(
+    renderPersonaTemplate(bot.systemPrompt, persona),
+    { tone, length },
+  );
 
   // V0.4 latency: bewaar de pre-cache embed-vector op outer scope zodat we
   // hem kunnen hergebruiken bij de fire-and-forget cache-write na het
@@ -1445,7 +1480,7 @@ export async function* runRagQueryStreaming(input: {
   let preCacheEmbedTokens = 0;
   let preCacheEmbedCost = 0;
 
-  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, history) : null;
+  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history) : null;
   const cacheEmbedPromise = bot.cacheEnabled ? embedTexts([original]) : null;
 
   if (preProcessPromise) {
@@ -1710,7 +1745,7 @@ export async function* runRagQueryStreaming(input: {
     // LLM-call.
     if (generalKnowledgeActive) {
       const { reclassifyAfterZeroHits } = await import('./reclassify');
-      const rc = await reclassifyAfterZeroHits(original, bot);
+      const rc = await reclassifyAfterZeroHits(original, bot, persona);
       const reclassifyTokensIn = rc.inputTokens;
       const reclassifyTokensOut = rc.outputTokens;
       const reclassifyCost = rc.costUsd;
@@ -1724,9 +1759,11 @@ export async function* runRagQueryStreaming(input: {
         // is zelf al een fallback-pad bij zero retrieval-hits).
         const GENERAL_OPENING =
           'Even kort: dit valt buiten onze specifieke documentatie, maar in het algemeen ';
-        const GENERAL_CLOSING =
-          ' Wil je weten hoe ChatManta hier specifiek mee omgaat? Vraag gerust.';
-        const generalSystem = `Je bent een professionele klantcontact-medewerker van ChatManta — een product van Jorion Solutions. De gebruiker stelt een algemene-kennis-vraag binnen ons domein (MKB, SaaS, AI, RAG, chatbots, klantcontact, ondernemerschap, marketing).
+        // Persona-versie van de closing (Voor DEV_ORG: " Wil je weten hoe
+        // ChatManta hier specifiek mee omgaat? Vraag gerust.")
+        const GENERAL_CLOSING = persona.generalKnowledgeClosing;
+        const generalSystem = renderPersonaTemplate(
+          `Je bent een professionele klantcontact-medewerker van {{COMPANY}}{{COMPANY_SUFFIX}}. De gebruiker stelt een algemene-kennis-vraag binnen ons domein ({{DOMAIN_KEYWORDS}}).
 
 Schrijf ALLEEN 1 tot 2 zinnen die kort uitleggen wat het onderwerp is. Schrijf in dezelfde taal als de vraag (default Nederlands).
 
@@ -1739,7 +1776,9 @@ KRITISCHE FORMAT-REGELS:
 - Schrijf NOOIT zelf de opening ("Even kort", "In het algemeen", "Dit valt buiten...").
 - Schrijf NOOIT zelf een afsluitende vraag of uitnodiging ("Wil je weten...", "Heb je verder...", "Kan ik je nog..."). Die sluiting wordt automatisch na jouw output geplakt.
 - Eindig met een punt na de laatste inhoudelijke zin.
-- Geen citations, geen <thinking>-tags, geen confidence, geen lijsten — alleen 1-2 vlotte zinnen.`;
+- Geen citations, geen <thinking>-tags, geen confidence, geen lijsten — alleen 1-2 vlotte zinnen.`,
+          persona,
+        );
         yield {
           kind: 'answer-start',
           botVersion: bot.version,
@@ -1784,10 +1823,9 @@ KRITISCHE FORMAT-REGELS:
         core = core.replace(/^Even kort[:,—-]?\s*/i, '');
         core = core.replace(/^Dit valt buiten onze specifieke documentatie,?\s*maar\s*/i, '');
         core = core.replace(/^In het algemeen[:,]?\s*/i, '');
-        core = core.replace(
-          /\s*Wil je(?: meer)? weten\s+hoe\s+ChatManta\s+hier\s+(?:specifiek\s+)?mee\s+omgaat\??\s*(?:Vraag gerust\.?)?\s*$/i,
-          '',
-        );
+        // Persona-aware: matcht "Wil je weten hoe <companyName> hier ... mee
+        // omgaat?" — voor DEV_ORG = "ChatManta", voor anderen de org-naam.
+        core = core.replace(buildGeneralClosingStripRegex(persona), '');
         core = core.replace(
           /\s*(?:Heb je verder nog vragen|Kan ik je nog ergens mee helpen|Wil je meer weten)\??\s*$/i,
           '',
@@ -1855,8 +1893,7 @@ KRITISCHE FORMAT-REGELS:
       }
 
       if (rc.category === 'off_topic') {
-        const OFF_TOPIC_REFUSAL =
-          'Ik help met vragen rondom ChatManta en aanverwante onderwerpen — denk aan MKB-tech, chatbots, klantcontact. Wat wil je weten?';
+        const OFF_TOPIC_REFUSAL = `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`;
         yield {
           kind: 'fallback',
           response: {
