@@ -7,15 +7,25 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { Milestone, RoadmapPhase, Task } from '@/lib/commandcenter/types';
+import type {
+  CheckIn,
+  Decision,
+  Milestone,
+  RoadmapPhase,
+  Task,
+  TestCustomer,
+} from '@/lib/commandcenter/types';
 import type { PhaseStatus } from '@/lib/commandcenter/roadmap-phases';
 import { OwnerTodoPanel } from './owner-todo-panel';
 import { TaskModal } from './task-modal';
 import {
+  ActiveDecisions,
   BlockedPanel,
   DecisionsNeededPanel,
   FocusOfWeek,
+  LatestCheckIn,
   OverduePanel,
+  PipelineSnapshot,
   QuickStats,
   RoadmapProgress,
 } from './dashboard-widgets';
@@ -25,12 +35,18 @@ type DashboardClientProps = {
   initialTasks: Task[];
   milestones: Milestone[];
   phaseStatuses: Record<RoadmapPhase, PhaseStatus>;
+  checkIns: CheckIn[];
+  decisions: Decision[];
+  customers: TestCustomer[];
 };
 
 export function DashboardClient({
   initialTasks,
   milestones,
   phaseStatuses,
+  checkIns,
+  decisions,
+  customers,
 }: DashboardClientProps) {
   const router = useRouter();
   const [editing, setEditing] = useState<Task | null>(null);
@@ -148,20 +164,18 @@ export function DashboardClient({
         phaseStatuses={phaseStatuses}
       />
 
-      {/* Placeholder voor PR 3 features */}
-      <section
+      <LatestCheckIn checkIns={checkIns} />
+
+      <div
         style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px dashed rgba(120,200,230,0.18)',
-          borderRadius: 16,
-          padding: 18,
-          color: 'rgba(207,232,240,0.55)',
-          fontSize: 13,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: 14,
         }}
       >
-        Wekelijkse check-ins, beslissingenlog en sales-pipeline komen in de
-        volgende PR.
-      </section>
+        <ActiveDecisions decisions={decisions} />
+        <PipelineSnapshot customers={customers} />
+      </div>
 
       <TaskModal
         key={editing?.id ?? 'new'}

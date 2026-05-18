@@ -6,15 +6,27 @@
 
 import Link from 'next/link';
 import {
+  CUSTOMER_STATUSES,
   computePhaseProgress,
   isOverdue,
+  type CheckIn,
+  type CustomerStatus,
+  type Decision,
   type Milestone,
   type RoadmapPhase,
   type Task,
+  type TestCustomer,
 } from '@/lib/commandcenter/types';
 import { getActivePhase, getPhaseInfo, type PhaseStatus } from '@/lib/commandcenter/roadmap-phases';
 import { TaskCard } from './task-card';
-import { MilestoneStatusBadge, OwnerBadge, PhaseStatusBadge, ProgressBar } from './badges';
+import {
+  CustomerStatusBadge,
+  DecisionStatusBadge,
+  MilestoneStatusBadge,
+  OwnerBadge,
+  PhaseStatusBadge,
+  ProgressBar,
+} from './badges';
 
 // ---------------------------------------------------------------------------
 // QuickStats
@@ -571,5 +583,347 @@ export function RoadmapProgress({
         Open volledige roadmap →
       </Link>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LatestCheckIn — laatste week-retro + 3 prioriteiten (PR 3 / goal-prompt §12)
+// ---------------------------------------------------------------------------
+
+export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
+  if (checkIns.length === 0) {
+    return (
+      <section
+        style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px dashed rgba(120,200,230,0.18)',
+          borderRadius: 16,
+          padding: 18,
+          color: 'rgba(207,232,240,0.55)',
+          fontSize: 13,
+        }}
+      >
+        Nog geen check-ins.{' '}
+        <Link
+          href="/commandcenter/checkins"
+          style={{ color: 'rgba(155,213,224,0.85)', textDecoration: 'underline' }}
+        >
+          Begin met een wekelijkse check-in
+        </Link>{' '}
+        om prioriteiten op het dashboard te tonen.
+      </section>
+    );
+  }
+  const latest = checkIns[0];
+  return (
+    <section
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(120,200,230,0.12)',
+        borderRadius: 16,
+        padding: 18,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 600,
+              fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+            }}
+          >
+            Laatste check-in — {latest.weekLabel}
+          </h2>
+          <p
+            style={{
+              margin: '2px 0 0',
+              fontSize: 12,
+              color: 'rgba(207,232,240,0.55)',
+            }}
+          >
+            {latest.date}
+            {latest.attendees.length > 0 && ' · ' + latest.attendees.join(', ')}
+          </p>
+        </div>
+        <Link
+          href="/commandcenter/checkins"
+          style={{
+            fontSize: 12,
+            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            textDecoration: 'none',
+          }}
+        >
+          Alle check-ins →
+        </Link>
+      </div>
+      {latest.nextPriorities.length > 0 ? (
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: 'rgba(207,232,240,0.5)',
+              marginBottom: 6,
+            }}
+          >
+            Prioriteiten deze week
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.5 }}>
+            {latest.nextPriorities.slice(0, 3).map((p, i) => (
+              <li key={i} style={{ color: 'rgba(207,232,240,0.84)' }}>
+                {p}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <p style={{ margin: 0, fontSize: 13, color: 'rgba(207,232,240,0.5)' }}>
+          Geen prioriteiten gezet voor deze week.
+        </p>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ActiveDecisions — meest recente actieve beslissingen (PR 3 / goal-prompt §13)
+// ---------------------------------------------------------------------------
+
+export function ActiveDecisions({ decisions }: { decisions: Decision[] }) {
+  const items = decisions.filter((d) => d.status !== 'Geannuleerd').slice(0, 4);
+  if (items.length === 0) {
+    return (
+      <section
+        style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px dashed rgba(120,200,230,0.18)',
+          borderRadius: 16,
+          padding: 18,
+          color: 'rgba(207,232,240,0.55)',
+          fontSize: 13,
+        }}
+      >
+        Nog geen actieve beslissingen vastgelegd.
+      </section>
+    );
+  }
+  return (
+    <section
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(120,200,230,0.12)',
+        borderRadius: 16,
+        padding: 18,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 16,
+            fontWeight: 600,
+            fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+          }}
+        >
+          Recente beslissingen
+        </h2>
+        <Link
+          href="/commandcenter/decisions"
+          style={{
+            fontSize: 12,
+            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            textDecoration: 'none',
+          }}
+        >
+          Alle beslissingen →
+        </Link>
+      </div>
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((d) => (
+          <li
+            key={d.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              padding: '8px 10px',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(120,200,230,0.08)',
+              borderRadius: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, color: '#eaf6fb' }}>{d.title}</span>
+              <span style={{ fontSize: 11.5, color: 'rgba(207,232,240,0.5)' }}>
+                {d.date}
+              </span>
+            </div>
+            <DecisionStatusBadge status={d.status} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PipelineSnapshot — counts per pipeline-status (PR 3 / goal-prompt §14)
+// ---------------------------------------------------------------------------
+
+export function PipelineSnapshot({ customers }: { customers: TestCustomer[] }) {
+  const counts: Record<CustomerStatus, number> = Object.fromEntries(
+    CUSTOMER_STATUSES.map((s) => [s, 0]),
+  ) as Record<CustomerStatus, number>;
+  for (const c of customers) counts[c.status]++;
+  const active = counts['Testklant actief'] + counts['Betaalde klant'];
+  const inProgress =
+    counts['Benaderd'] + counts['Gesprek gepland'] + counts['Demo gegeven'];
+  const open = counts['Idee / mogelijke klant'] + counts['Nog benaderen'];
+
+  return (
+    <section
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(120,200,230,0.12)',
+        borderRadius: 16,
+        padding: 18,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 16,
+            fontWeight: 600,
+            fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+          }}
+        >
+          Testklanten pipeline
+        </h2>
+        <Link
+          href="/commandcenter/customers"
+          style={{
+            fontSize: 12,
+            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            textDecoration: 'none',
+          }}
+        >
+          Open pipeline →
+        </Link>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+          gap: 10,
+        }}
+      >
+        <SmallStat label="Actief / betalend" value={active} accent="#b7e9a3" />
+        <SmallStat label="In gesprek" value={inProgress} />
+        <SmallStat label="Open leads" value={open} />
+        <SmallStat label="Afgewezen" value={counts['Afgewezen / later']} />
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {CUSTOMER_STATUSES.filter((s) => counts[s] > 0).map((s) => (
+          <span
+            key={s}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 11.5,
+            }}
+          >
+            <CustomerStatusBadge status={s} />
+            <span style={{ color: 'rgba(207,232,240,0.6)' }}>{counts[s]}</span>
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SmallStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: string;
+}) {
+  return (
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(120,200,230,0.10)',
+        borderRadius: 12,
+        padding: '10px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 10.5,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: 'rgba(207,232,240,0.5)',
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+          fontSize: 20,
+          fontWeight: 600,
+          color: accent ?? '#eaf6fb',
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

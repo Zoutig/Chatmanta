@@ -5,6 +5,8 @@
 // rood/oranje — bewust afwijkend van het globale palet zodat ze "schreeuwen".
 
 import type {
+  CustomerStatus,
+  DecisionStatus,
   MilestoneStatus,
   Owner,
   Priority,
@@ -225,6 +227,78 @@ export function ProgressBar({
       />
     </div>
   );
+}
+
+export function DecisionStatusBadge({ status }: { status: DecisionStatus }) {
+  const map: Record<DecisionStatus, Omit<ChipProps, 'label'>> = {
+    Actief: {
+      bg: 'rgba(140,200,120,0.10)',
+      border: 'rgba(140,200,120,0.28)',
+      color: '#b7e9a3',
+    },
+    'Te herzien': {
+      bg: 'rgba(230,180,90,0.10)',
+      border: 'rgba(230,180,90,0.30)',
+      color: '#f0d39a',
+    },
+    Vervangen: {
+      bg: 'rgba(180,140,220,0.10)',
+      border: 'rgba(180,140,220,0.28)',
+      color: '#cfb1ee',
+    },
+    Geannuleerd: {
+      bg: 'rgba(255,255,255,0.04)',
+      border: 'rgba(255,255,255,0.12)',
+      color: 'rgba(207,232,240,0.45)',
+    },
+  };
+  return <Chip label={status} {...map[status]} />;
+}
+
+export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
+  const map: Record<CustomerStatus, Omit<ChipProps, 'label'>> = {
+    'Idee / mogelijke klant': {
+      bg: 'rgba(120,200,230,0.06)',
+      border: 'rgba(120,200,230,0.16)',
+      color: 'rgba(207,232,240,0.62)',
+    },
+    'Nog benaderen': {
+      bg: 'rgba(230,180,90,0.10)',
+      border: 'rgba(230,180,90,0.28)',
+      color: '#f0d39a',
+    },
+    Benaderd: {
+      bg: 'rgba(180,140,220,0.10)',
+      border: 'rgba(180,140,220,0.28)',
+      color: '#cfb1ee',
+    },
+    'Gesprek gepland': {
+      bg: 'rgba(120,170,255,0.10)',
+      border: 'rgba(120,170,255,0.30)',
+      color: '#a8c6ff',
+    },
+    'Demo gegeven': {
+      bg: 'color-mix(in oklab, var(--manta-accent) 14%, transparent)',
+      border: 'color-mix(in oklab, var(--manta-accent) 36%, transparent)',
+      color: 'color-mix(in oklab, var(--manta-accent) 28%, #ffffff)',
+    },
+    'Testklant actief': {
+      bg: 'rgba(140,200,120,0.12)',
+      border: 'rgba(140,200,120,0.30)',
+      color: '#b7e9a3',
+    },
+    'Betaalde klant': {
+      bg: 'rgba(140,200,120,0.18)',
+      border: 'rgba(140,200,120,0.40)',
+      color: '#c8f5b3',
+    },
+    'Afgewezen / later': {
+      bg: 'rgba(255,255,255,0.04)',
+      border: 'rgba(255,255,255,0.12)',
+      color: 'rgba(207,232,240,0.45)',
+    },
+  };
+  return <Chip label={status} {...map[status]} />;
 }
 
 export function LabelChip({ label }: { label: string }) {

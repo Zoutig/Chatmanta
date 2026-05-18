@@ -224,3 +224,178 @@ export function computePhaseProgress(
   }
   return { done: 0, total: 0, ratio: 0, source: 'empty' };
 }
+
+// ---------------------------------------------------------------------------
+// CheckIn — PR 3 (goal-prompt §12 / §18.3)
+// ---------------------------------------------------------------------------
+
+export type CheckIn = {
+  id: string;
+  weekLabel: string;
+  date: string;
+  attendees: string[];
+  completed: string;
+  notCompleted: string;
+  reasons: string;
+  sebastiaanNextTasks: string[];
+  nielsNextTasks: string[];
+  sharedNextTasks: string[];
+  nextPriorities: string[];
+  blockers: string;
+  decisions: string;
+  createdTaskIds: string[];
+  createdAt: string;
+};
+
+export type CheckInInput = {
+  weekLabel: string;
+  date: string;
+  attendees?: string[];
+  completed?: string;
+  notCompleted?: string;
+  reasons?: string;
+  sebastiaanNextTasks?: string[];
+  nielsNextTasks?: string[];
+  sharedNextTasks?: string[];
+  nextPriorities?: string[];
+  blockers?: string;
+  decisions?: string;
+  createdTaskIds?: string[];
+};
+
+export type CheckInPatch = Partial<CheckInInput>;
+
+// ---------------------------------------------------------------------------
+// Decision — PR 3 (goal-prompt §13 / §18.4)
+// ---------------------------------------------------------------------------
+
+export const DECISION_STATUSES = [
+  'Actief',
+  'Te herzien',
+  'Vervangen',
+  'Geannuleerd',
+] as const;
+export type DecisionStatus = (typeof DECISION_STATUSES)[number];
+
+export type Decision = {
+  id: string;
+  date: string;
+  title: string;
+  decision: string;
+  context: string | null;
+  impact: Impact | null;
+  decidedBy: Owner[];
+  reviewDate: string | null;
+  status: DecisionStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DecisionInput = {
+  date: string;
+  title: string;
+  decision?: string;
+  context?: string | null;
+  impact?: Impact | null;
+  decidedBy?: Owner[];
+  reviewDate?: string | null;
+  status?: DecisionStatus;
+};
+
+export type DecisionPatch = Partial<DecisionInput>;
+
+export const DECISION_DEFAULTS = {
+  status: 'Actief' as DecisionStatus,
+  decidedBy: ['Sebastiaan', 'Niels'] as Owner[],
+};
+
+const DECISION_STATUS_RANK: Record<DecisionStatus, number> = {
+  Actief: 0,
+  'Te herzien': 1,
+  Vervangen: 2,
+  Geannuleerd: 3,
+};
+
+export function compareDecisions(a: Decision, b: Decision): number {
+  const sr = DECISION_STATUS_RANK[a.status] - DECISION_STATUS_RANK[b.status];
+  if (sr !== 0) return sr;
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  return a.title.localeCompare(b.title);
+}
+
+// ---------------------------------------------------------------------------
+// TestCustomer — PR 3 (goal-prompt §14 / §18.5)
+// ---------------------------------------------------------------------------
+
+export const CUSTOMER_STATUSES = [
+  'Idee / mogelijke klant',
+  'Nog benaderen',
+  'Benaderd',
+  'Gesprek gepland',
+  'Demo gegeven',
+  'Testklant actief',
+  'Betaalde klant',
+  'Afgewezen / later',
+] as const;
+export type CustomerStatus = (typeof CUSTOMER_STATUSES)[number];
+
+export type TestCustomer = {
+  id: string;
+  companyName: string;
+  contactPerson: string | null;
+  website: string | null;
+  companyType: string | null;
+  status: CustomerStatus;
+  owner: Owner;
+  lastContactDate: string | null;
+  nextAction: string | null;
+  notes: string | null;
+  mainProblems: string | null;
+  caseStudyPotential: boolean;
+  linkedTaskIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TestCustomerInput = {
+  companyName: string;
+  contactPerson?: string | null;
+  website?: string | null;
+  companyType?: string | null;
+  status?: CustomerStatus;
+  owner?: Owner;
+  lastContactDate?: string | null;
+  nextAction?: string | null;
+  notes?: string | null;
+  mainProblems?: string | null;
+  caseStudyPotential?: boolean;
+  linkedTaskIds?: string[];
+};
+
+export type TestCustomerPatch = Partial<TestCustomerInput>;
+
+export const CUSTOMER_DEFAULTS = {
+  status: 'Idee / mogelijke klant' as CustomerStatus,
+  owner: 'Niels' as Owner,
+};
+
+const CUSTOMER_STATUS_RANK: Record<CustomerStatus, number> = {
+  'Testklant actief': 0,
+  'Gesprek gepland': 1,
+  'Demo gegeven': 2,
+  Benaderd: 3,
+  'Nog benaderen': 4,
+  'Idee / mogelijke klant': 5,
+  'Betaalde klant': 6,
+  'Afgewezen / later': 7,
+};
+
+export function compareCustomers(a: TestCustomer, b: TestCustomer): number {
+  const sr = CUSTOMER_STATUS_RANK[a.status] - CUSTOMER_STATUS_RANK[b.status];
+  if (sr !== 0) return sr;
+  // Most recently contacted first within same status
+  const da = a.lastContactDate ?? '0000-00-00';
+  const db = b.lastContactDate ?? '0000-00-00';
+  if (da !== db) return da < db ? 1 : -1;
+  return a.companyName.localeCompare(b.companyName);
+}

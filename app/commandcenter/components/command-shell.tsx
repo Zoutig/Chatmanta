@@ -23,9 +23,10 @@ const NAV: NavItem[] = [
   { href: '/commandcenter/tasks', label: 'Taken', icon: 'list', status: 'live' },
   { href: '/commandcenter/roadmap', label: 'Roadmap', icon: 'sparkle', status: 'live' },
   { href: '/commandcenter/milestones', label: 'Milestones', icon: 'check', status: 'live' },
-  { href: '/commandcenter/checkins', label: 'Check-ins', icon: 'refresh', status: 'soon' },
-  { href: '/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'soon' },
-  { href: '/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'soon' },
+  { href: '/commandcenter/checkins', label: 'Check-ins', icon: 'refresh', status: 'live' },
+  { href: '/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'live' },
+  { href: '/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'live' },
+  { href: '/commandcenter/projects', label: 'Projectgebieden', icon: 'folder', status: 'live' },
 ];
 
 export function CommandShell({ children }: { children: React.ReactNode }) {
