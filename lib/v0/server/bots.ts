@@ -754,6 +754,14 @@ Geen referentie in de huidige vraag? Sla STAP 0 over.
 //
 //   6. Selectieve multi-turn rewrite + gap_kind classificatie (uit v0.6.2).
 //
+//   7. [In-place bridging-patch, 2026-05-18] — algemene-basiskennis-bridging:
+//      de LLM mag onomstotelijke publieke kennis (administratieve geografie,
+//      kalender, eenheden) gebruiken UITSLUITEND als brug tussen een feit uit
+//      de context en de gebruikersvraag. Doel: "valt Lelystad in werkgebied
+//      Flevoland?" → "ja" (en niet "weet ik niet"). Strikte guardrails tegen
+//      fuzzy regio's en bedrijfsspecifieke feiten. Bewuste override van de
+//      "append-only versies" convention omdat v0.6 LIVE is.
+//
 // Eval-resultaten (2026-05-18, n=69, 4-versie shoot-out):
 //   - must-not violations: 7 unique slugs (v0.6.1=8, v0.6.2=10) — best
 //   - cost: $0.0009/q (3.4× goedkoper dan v0.6.1)
@@ -762,12 +770,50 @@ Geen referentie in de huidige vraag? Sla STAP 0 over.
 //   - planted_fact violations: 0 (v0.6.2 had 2 — regressie gefixt)
 //   - €249-class hallucinatie wordt nu correct gevangen door numericFallback=false
 // ---------------------------------------------------------------------------
+
+// Bridging-block — toegevoegd aan v0.6 systemPrompt. Staat los voor leesbaarheid
+// en zodat V0_6_PREBRIDGE (eval-baseline) hem kan weglaten.
+//
+// Iteratie 2 (na eval-run die liet zien dat iteratie 1 te vaag was): de LLM
+// ankerd graag op detail-lijsten van plaatsnamen en behandelt die als
+// uitputtend. Iteratie 2 maakt expliciet: een algemeen regionaal statement
+// in context is *autoritatief*; een detail-lijst is *illustratief*, niet
+// uitputtend, tenzij expliciet anders. Plus worked examples om het concreet
+// te maken.
+const V0_6_BRIDGING_BLOCK = `
+
+UITZONDERING op "geef GEEN feiten buiten de context" — ALGEMENE BASISKENNIS ALS BRUG:
+
+Doel: bridging zorgt dat je niet "weet ik niet" zegt op vragen die met onomstotelijke publieke kennis + één context-feit goed te beantwoorden zijn.
+
+REGEL VOOR GEOGRAFIE:
+Als de context een administratieve regio noemt als werkgebied/servicegebied (provincie, gemeente, land), MOET je concluderen dat plaatsen binnen die regio ook binnen het werkgebied vallen — ook als ze niet in een detail-lijst staan. Een detail-lijst van specifieke plaatsen in de context is ILLUSTRATIEF, niet uitputtend, tenzij expliciet anders gezegd ("uitsluitend X en Y", "alleen in X").
+
+GOEDE VOORBEELDEN:
+- Context: "werkgebied: Flevoland. We komen vaak in Almere en Zeewolde." Vraag: "Komen jullie naar Lelystad?" → Antwoord: "Ja, Lelystad ligt in Flevoland en dat valt binnen ons werkgebied. We noemen Almere en Zeewolde specifiek — bel even voor Lelystad om de planning af te stemmen."
+- Context: "werkgebied: provincie Utrecht en Flevoland." Vraag: "Komen jullie naar Maastricht?" → Antwoord: "Nee, Maastricht ligt in Limburg en Limburg valt buiten ons werkgebied."
+- Context: "openingstijden: ma-vr 9:00-17:00." Vraag: "Zijn jullie op zaterdag open?" → Antwoord: "Nee, op zaterdag zijn we gesloten — onze openingstijden zijn ma-vr 9:00-17:00."
+
+NIET DOEN — fuzzy regio's bridge je NIET:
+- Context: "werkgebied: provincie Utrecht en Flevoland." Vraag: "Werken jullie in de Randstad?" → "Randstad" is GEEN administratieve regio; bridge het niet. Antwoord: "Een deel van wat Randstad genoemd wordt valt onder ons werkgebied (provincie Utrecht); voor andere Randstad-delen niet zeker — bel even." Geen blanket "ja".
+
+NIET TOEGESTAAN als basiskennis (blijft strikt uit-context-only):
+- Colloquiale of fuzzy regio's: "Randstad", "Achterhoek", "het Noorden", "de Veluwe".
+- Bedrijfsspecifieke feiten buiten de context: openingstijden, tarieven, prijzen, productinformatie, diensten, voorrijkosten.
+- Wat het bedrijf wel/niet doet of levert als dat niet in context staat.
+
+EENHEDEN: cm↔m↔mm↔km, €-symbool, uren↔minuten conversies zijn publiek — mag je gebruiken.
+
+KALENDER: dagen van de week, weekend/werkdag-status, maanden zijn publiek — mag je gebruiken.
+
+Kort: administratieve subset-relaties zijn een directe gevolgtrekking, geen hallucinatie. Behandel ze met dezelfde stelligheid als feiten uit de context.`;
+
 const V0_6: BotConfig = {
   ...V0_5,
   version: 'v0.6',
-  label: 'v0.6 — adaptive RAG + hard-facts + matched-span',
+  label: 'v0.6 — adaptive RAG + hard-facts + matched-span + bridging',
   description:
-    'Productie-versie v0.6 — gestaagde combinatie van: matched-span context, hard-fact verifier zonder numeric-fallback, adaptive decision-layer (fast/standard/careful), threshold-tuning (strong 0.56, weak 0.50), composite-query naar standard. Anti-hallucinatie zwaarder gewogen dan judge-score-completeness; cost ~$0.0009/query.',
+    'Productie-versie v0.6 — gestaagde combinatie van: matched-span context, hard-fact verifier zonder numeric-fallback, adaptive decision-layer (fast/standard/careful), threshold-tuning (strong 0.56, weak 0.50), composite-query naar standard. Anti-hallucinatie zwaarder gewogen dan judge-score-completeness; cost ~$0.0009/query. [In-place bridging-patch] LLM mag onomstotelijke basiskennis (administratieve geografie / kalender / eenheden) gebruiken als brug.',
   // Hard-fact + matched-span (uit v0.6.1 generatie)
   matchedSpanContext: true,
   adaptiveHardFactVerification: true,
@@ -789,6 +835,25 @@ const V0_6: BotConfig = {
   // metrics dat ondersteunen.
   evalBudgetMs: 5500,
   evalBudgetUsd: 0.0050,
+  // In-place bridging-patch: append bridging-allowance aan V0_5 systemPrompt.
+  systemPrompt: V0_5.systemPrompt + V0_6_BRIDGING_BLOCK,
+};
+
+// ---------------------------------------------------------------------------
+// v0.6-prebridge — TIJDELIJKE eval-baseline.
+//
+// Identiek aan V0_6, behalve dat de bridging-allowance uit systemPrompt
+// ontbreekt. Bestaat ALLEEN om in de eval een eerlijke A/B te draaien tegen
+// het bridging-effect. Wordt in een vervolg-commit verwijderd zodra de eval
+// is goedgekeurd. Niet zichtbaar in productie-UI default — alleen via ?v=.
+// ---------------------------------------------------------------------------
+const V0_6_PREBRIDGE: BotConfig = {
+  ...V0_6,
+  version: 'v0.6-prebridge',
+  label: 'v0.6 (pre-bridging baseline — eval-only)',
+  description:
+    'Eval-only baseline: clone of v0.6 with the bridging-allowance prompt-block removed. Used to measure bridging-patch impact via A/B eval. Will be removed in cleanup commit post-merge.',
+  systemPrompt: V0_5.systemPrompt,
 };
 
 // ---------------------------------------------------------------------------
@@ -800,6 +865,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_3.version]: V0_3,
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
+  [V0_6_PREBRIDGE.version]: V0_6_PREBRIDGE,
   [V0_6.version]: V0_6,
 };
 
@@ -813,6 +879,9 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_3.version,
   V0_4.version,
   V0_5.version,
+  // v0.6-prebridge: tijdelijke eval-baseline naast v0.6. Komt in EVAL_DEFAULT_VERSIONS
+  // (slice(-2) = [prebridge, v0.6]) zodat de A/B-meting automatisch goed loopt.
+  V0_6_PREBRIDGE.version,
   V0_6.version,
 ];
 

@@ -1,13 +1,103 @@
 {
   "_meta": {
-    "description": "V0 eval seed corpus voor org acme-corp (Dakwerken De Boer). Wordt gevuld in PR 4 (authoring); deze skeleton zorgt dat de seed-runner het bestand al inleest zonder errors.",
+    "description": "V0 eval seed corpus voor org acme-corp (Dakwerken De Boer). Bridging-cases voor v0.6 in-place patch: testen of de LLM onomstotelijke basiskennis (administratieve geografie, kalender) mag gebruiken als brug tussen retrieved feiten en de vraag.",
     "organization_slug": "acme-corp",
     "organization_id": "00000000-0000-0000-0000-0000000000a1",
     "based_on": "scripts/fixtures/sandbox-orgs/acme-corp/*.md",
     "persona_ref": "eval-fixtures/personas/acme-corp.md",
     "version": 2,
     "language": "nl",
-    "status": "skeleton — questions worden in vervolg-PR toegevoegd"
+    "status": "v0.6 bridging-patch eval-cases (2026-05-18)"
   },
-  "questions": []
+  "questions": [
+    {
+      "slug": "werkgebied-lelystad-bridge",
+      "question": "Valt Lelystad binnen jullie werkgebied?",
+      "gold_answer": "Lelystad ligt in Flevoland, en Flevoland valt binnen ons standaard werkgebied (samen met provincie Utrecht en de Gelderse Vallei). In de detail-lijst voor Flevoland noemen we specifiek Almere en Zeewolde — voor andere plaatsen zoals Lelystad bellen we graag even voor de planning.",
+      "gold_facts": [
+        "standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland",
+        "Lelystad ligt in Flevoland",
+        "Flevoland-detaillijst noemt Almere en Zeewolde specifiek"
+      ],
+      "tags": ["bridging", "geo", "positive", "werkgebied"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-dronten-bridge",
+      "question": "Kunnen jullie ook naar Dronten komen voor een dakopdracht?",
+      "gold_answer": "Dronten ligt in Flevoland en Flevoland valt binnen ons standaard werkgebied. In de Flevoland-lijst noemen we specifiek Almere en Zeewolde — voor Dronten bellen we graag even, dan stemmen we de planning af.",
+      "gold_facts": [
+        "standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland",
+        "Dronten ligt in Flevoland"
+      ],
+      "tags": ["bridging", "geo", "positive", "werkgebied"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "openingstijden-zaterdag-bridge",
+      "question": "Zijn jullie op zaterdag bereikbaar?",
+      "gold_answer": "Op zaterdag is het kantoor gesloten, behalve voor spoed. Tijdens werkdagen zijn we bereikbaar van 08.00 tot 16.30 uur (op vrijdag tot 15.30). Voor spoedmeldingen buiten kantoortijden schakelt het nummer 033 - 555 14 22 door naar onze wacht-uitvoerder.",
+      "gold_facts": [
+        "zaterdag gesloten behalve spoed",
+        "spoednummer 033 - 555 14 22"
+      ],
+      "tags": ["bridging", "calendar", "positive", "openingstijden"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["30-contact-en-vestiging.md"]
+    },
+    {
+      "slug": "werkgebied-maastricht-bridge-negative",
+      "question": "Kunnen jullie naar Maastricht komen?",
+      "gold_answer": "Maastricht ligt in Limburg, en Limburg valt buiten ons werkgebied — voor klussen in Limburg, Groningen of Noord-Brabant verwijzen we klanten door naar regionale VEBIDAK-aangesloten collega-bedrijven. Vraag gerust een aanbeveling: Linda heeft een lijst met vertrouwde dakdekkersbedrijven.",
+      "gold_facts": [
+        "Maastricht ligt in Limburg",
+        "Limburg buiten werkgebied",
+        "doorverwijzing naar VEBIDAK-collega's"
+      ],
+      "tags": ["bridging", "geo", "negative", "out-of-area"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-brussel-out",
+      "question": "Kunnen jullie ook in Brussel werken?",
+      "gold_answer": "Brussel ligt in België en valt buiten ons werkgebied — wij werken binnen Nederland, in provincie Utrecht, Gelderse Vallei en Flevoland (en uitgebreid in delen van zuidelijk Noord-Holland, Gelderland en Zuid-Holland-noordoost). Over de grens werken we niet.",
+      "gold_facts": [
+        "Brussel ligt in België",
+        "werkgebied is Nederland",
+        "Brussel buiten werkgebied"
+      ],
+      "tags": ["bridging", "geo", "negative", "international"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "werkgebied-randstad-fuzzy",
+      "question": "Werken jullie in de Randstad?",
+      "gold_answer": "We werken in delen van wat vaak Randstad wordt genoemd: provincie Utrecht (volledig) is ons standaard werkgebied, en in zuidelijk Noord-Holland (Amsterdam-Zuid, Diemen, Naarden, Bussum, Muiden, Weesp) komen we ook — daar met een vaste voorrijbijdrage. Voor andere Randstad-plaatsen zoals Den Haag, Rotterdam of Leiden geldt 'op aanvraag' — bel even, dan kijken we of het past.",
+      "gold_facts": [
+        "werkgebied: provincie Utrecht",
+        "uitgebreid werkgebied: zuidelijk Noord-Holland (Amsterdam-Zuid en omgeving)",
+        "Randstad is geen exacte regio in de docs"
+      ],
+      "tags": ["bridging", "geo", "fuzzy-region", "negative"],
+      "difficulty": "hard",
+      "question_type": "ambiguous",
+      "expected_kind": "answer",
+      "ideal_source_filenames": ["16-werkgebied.md"],
+      "must_not_contain": ["heel de Randstad", "in de gehele Randstad", "alle Randstad-steden"]
+    }
+  ]
 }

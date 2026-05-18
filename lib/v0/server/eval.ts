@@ -793,6 +793,10 @@ export async function runEvalRow(args: {
       // onwaars zou kunnen hebben beweerd.
       history: question.conversation_history.length > 0 ? question.conversation_history : undefined,
       hydeModeOverride: hydeModeRequested,
+      // Multi-org eval: route retrieval naar de juiste org. Zonder dit valt
+      // runRagQueryStreaming terug op DEV_ORG_ID en haalt acme/globex/initech
+      // vragen chunks uit de ChatManta-docs — onbruikbaar voor multi-org eval.
+      organizationId,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         markFirstToken();
