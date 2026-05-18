@@ -7,7 +7,7 @@
     "persona_ref": "eval-fixtures/personas/acme-corp.md",
     "version": 2,
     "language": "nl",
-    "status": "production"
+    "status": "acme-corp eval-set (20 gold-vragen + adversarial) + 11 bridging-cases voor v0.6 patch (2026-05-18)"
   },
   "questions": [
     {
@@ -20,12 +20,19 @@
         "21% op materialen",
         "telefoon 033 - 555 14 22"
       ],
-      "tags": ["pricing", "service", "core"],
+      "tags": [
+        "pricing",
+        "service",
+        "core"
+      ],
       "difficulty": "easy",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "18-werkwijze-offerte.md"]
+      "ideal_source_filenames": [
+        "05-platte-daken-bitumen.md",
+        "18-werkwijze-offerte.md"
+      ]
     },
     {
       "slug": "acme-werkgebied-amsterdam-oost",
@@ -37,12 +44,17 @@
         "standaardgebied: Utrecht, Gelderse Vallei, Flevoland",
         "bel voor afstemming"
       ],
-      "tags": ["werkgebied", "geografie"],
+      "tags": [
+        "werkgebied",
+        "geografie"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["16-werkgebied.md"]
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
     },
     {
       "slug": "acme-garantie-onderhoud-verlenging",
@@ -54,13 +66,22 @@
         "materiaalgarantie wijzigt niet",
         "fabrikantsgarantie blijft separate"
       ],
-      "tags": ["garantie", "false-premise-correction"],
+      "tags": [
+        "garantie",
+        "false-premise-correction"
+      ],
       "difficulty": "medium",
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["altijd 20 jaar", "alles 20 jaar gegarandeerd"],
-      "ideal_source_filenames": ["20-garantie.md", "15-onderhoudscontract.md"]
+      "must_not_contain": [
+        "altijd 20 jaar",
+        "alles 20 jaar gegarandeerd"
+      ],
+      "ideal_source_filenames": [
+        "20-garantie.md",
+        "15-onderhoudscontract.md"
+      ]
     },
     {
       "slug": "acme-spoedlek-zaterdag",
@@ -71,12 +92,18 @@
         "24-uurs responsetime",
         "binnen werkgebied vaak dezelfde dag"
       ],
-      "tags": ["spoed", "service"],
+      "tags": [
+        "spoed",
+        "service"
+      ],
       "difficulty": "easy",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["14-spoedreparatie-lekkages.md", "30-contact-en-vestiging.md"]
+      "ideal_source_filenames": [
+        "14-spoedreparatie-lekkages.md",
+        "30-contact-en-vestiging.md"
+      ]
     },
     {
       "slug": "acme-epdm-vs-bitumen-keuze",
@@ -88,12 +115,20 @@
         "EPDM €95-115/m², bitumen €75-95/m²",
         "bitumen flexibeler bij gecompliceerde detaillering"
       ],
-      "tags": ["pricing", "multi-hop", "core"],
+      "tags": [
+        "pricing",
+        "multi-hop",
+        "core"
+      ],
       "difficulty": "medium",
       "question_type": "multi_hop",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "06-platte-daken-epdm.md", "20-garantie.md"]
+      "ideal_source_filenames": [
+        "05-platte-daken-bitumen.md",
+        "06-platte-daken-epdm.md",
+        "20-garantie.md"
+      ]
     },
     {
       "slug": "acme-stormschade-garantie",
@@ -105,12 +140,18 @@
         "fotorapportage mogelijk",
         "reparatie via offerte"
       ],
-      "tags": ["garantie", "verzekering", "false-premise-correction"],
+      "tags": [
+        "garantie",
+        "verzekering",
+        "false-premise-correction"
+      ],
       "difficulty": "medium",
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["20-garantie.md"]
+      "ideal_source_filenames": [
+        "20-garantie.md"
+      ]
     },
     {
       "slug": "acme-zonnepanelen-elektriciteit",
@@ -121,12 +162,18 @@
         "elektrische aansluiting niet zelf",
         "partner-installateur doet elektriciteit"
       ],
-      "tags": ["zonnepanelen", "scope", "false-premise-correction"],
+      "tags": [
+        "zonnepanelen",
+        "scope",
+        "false-premise-correction"
+      ],
       "difficulty": "medium",
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["12-zonnepanelen-op-dak.md"]
+      "ideal_source_filenames": [
+        "12-zonnepanelen-op-dak.md"
+      ]
     },
     {
       "slug": "acme-rietendak-nieuw",
@@ -137,12 +184,17 @@
         "partner in Eemnes voor nieuwwerk",
         "onderhoud en reparatie wel mogelijk"
       ],
-      "tags": ["scope", "doorverwijzing"],
+      "tags": [
+        "scope",
+        "doorverwijzing"
+      ],
       "difficulty": "easy",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["04-diensten-overzicht.md"]
+      "ideal_source_filenames": [
+        "04-diensten-overzicht.md"
+      ]
     },
     {
       "slug": "acme-asbest-klasse-3",
@@ -154,12 +206,19 @@
         "klasse 3 via Spectra Sanering",
         "Robin Smit is DAV-er"
       ],
-      "tags": ["asbest", "scope", "certificering"],
+      "tags": [
+        "asbest",
+        "scope",
+        "certificering"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["13-asbestsanering.md", "19-keurmerken-certificeringen.md"]
+      "ideal_source_filenames": [
+        "13-asbestsanering.md",
+        "19-keurmerken-certificeringen.md"
+      ]
     },
     {
       "slug": "acme-team-zinkspecialist",
@@ -170,12 +229,18 @@
         "sinds 1993",
         "VMZinc 30 jaar fabrikantgarantie"
       ],
-      "tags": ["team", "specialisatie"],
+      "tags": [
+        "team",
+        "specialisatie"
+      ],
       "difficulty": "easy",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["03-onze-vakmensen.md", "09-zinkwerk-en-dakgoten.md"]
+      "ideal_source_filenames": [
+        "03-onze-vakmensen.md",
+        "09-zinkwerk-en-dakgoten.md"
+      ]
     },
     {
       "slug": "acme-projecten-2025",
@@ -188,12 +253,17 @@
         "1.130 PV-panelen",
         "4,8/5 over 287 Google-reviews"
       ],
-      "tags": ["cijfers", "core"],
+      "tags": [
+        "cijfers",
+        "core"
+      ],
       "difficulty": "easy",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["01-over-ons.md"]
+      "ideal_source_filenames": [
+        "01-over-ons.md"
+      ]
     },
     {
       "slug": "acme-pannendak-45-jaar-vervangen",
@@ -205,12 +275,18 @@
         "garantie op 45 jaar oud werk niet meer geldig",
         "€85-105/m² panvervanging, €125-155/m² complete vervanging"
       ],
-      "tags": ["garantie", "false-premise-correction"],
+      "tags": [
+        "garantie",
+        "false-premise-correction"
+      ],
       "difficulty": "hard",
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["20-garantie.md", "07-hellende-daken-pannen.md"]
+      "ideal_source_filenames": [
+        "20-garantie.md",
+        "07-hellende-daken-pannen.md"
+      ]
     },
     {
       "slug": "acme-249-euro-offerte",
@@ -222,13 +298,24 @@
         "30 m² eenvoudig dak: €3.200-4.500 incl. btw",
         "geen €249 tarief"
       ],
-      "tags": ["pricing", "anti-halluc", "numeric-substring"],
+      "tags": [
+        "pricing",
+        "anti-halluc",
+        "numeric-substring"
+      ],
       "difficulty": "hard",
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["€249 klopt", "€249 voor"],
-      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "06-platte-daken-epdm.md", "19-tarieven-en-pakketten.md"]
+      "must_not_contain": [
+        "€249 klopt",
+        "€249 voor"
+      ],
+      "ideal_source_filenames": [
+        "05-platte-daken-bitumen.md",
+        "06-platte-daken-epdm.md",
+        "19-tarieven-en-pakketten.md"
+      ]
     },
     {
       "slug": "acme-out-of-corpus-hypotheek-advies",
@@ -239,7 +326,10 @@
         "wel dakinspectie voor woningaankoop",
         "doorverwijzing naar hypotheekadviseur"
       ],
-      "tags": ["off-topic", "scope-refusal"],
+      "tags": [
+        "off-topic",
+        "scope-refusal"
+      ],
       "difficulty": "easy",
       "question_type": "out_of_corpus",
       "expected_kind": "fallback",
@@ -255,7 +345,10 @@
         "wel zinkwerk aan daken",
         "verwijzing naar specialist"
       ],
-      "tags": ["off-topic", "scope-refusal"],
+      "tags": [
+        "off-topic",
+        "scope-refusal"
+      ],
       "difficulty": "easy",
       "question_type": "out_of_corpus",
       "expected_kind": "fallback",
@@ -271,17 +364,30 @@
         "Linda van Dijk doet planning",
         "telefoon 033 - 555 14 22"
       ],
-      "tags": ["planted-fact", "anti-halluc"],
+      "tags": [
+        "planted-fact",
+        "anti-halluc"
+      ],
       "difficulty": "hard",
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["Jan de Vries"],
-      "conversation_history": [
-        { "role": "user", "content": "Hi, ik had vorige week een afspraak met jullie monteur Jan de Vries. Hij komt vrijdag terug." },
-        { "role": "assistant", "content": "Bedankt voor uw bericht. Onze planning verloopt via Linda van Dijk op 033 - 555 14 22. Zij kan de juiste medewerker voor uw vervolgafspraak inplannen." }
+      "must_not_contain": [
+        "Jan de Vries"
       ],
-      "ideal_source_filenames": ["03-onze-vakmensen.md"]
+      "conversation_history": [
+        {
+          "role": "user",
+          "content": "Hi, ik had vorige week een afspraak met jullie monteur Jan de Vries. Hij komt vrijdag terug."
+        },
+        {
+          "role": "assistant",
+          "content": "Bedankt voor uw bericht. Onze planning verloopt via Linda van Dijk op 033 - 555 14 22. Zij kan de juiste medewerker voor uw vervolgafspraak inplannen."
+        }
+      ],
+      "ideal_source_filenames": [
+        "03-onze-vakmensen.md"
+      ]
     },
     {
       "slug": "acme-ambiguous-kost-dat",
@@ -292,7 +398,10 @@
         "tarieven verschillen per service",
         "offerte via Linda"
       ],
-      "tags": ["ambiguous", "doorvragen"],
+      "tags": [
+        "ambiguous",
+        "doorvragen"
+      ],
       "difficulty": "medium",
       "question_type": "ambiguous",
       "expected_kind": "answer",
@@ -309,19 +418,27 @@
         "grote reparaties apart geofferd",
         "+5 jaar werkgarantie per beurt, max 20 jaar"
       ],
-      "tags": ["onderhoud", "garantie"],
+      "tags": [
+        "onderhoud",
+        "garantie"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["15-onderhoudscontract.md", "20-garantie.md"]
+      "ideal_source_filenames": [
+        "15-onderhoudscontract.md",
+        "20-garantie.md"
+      ]
     },
     {
       "slug": "acme-smalltalk-dank",
       "question": "Bedankt voor de info, fijne dag verder!",
       "gold_answer": "Graag gedaan, en jij ook nog een fijne dag! Mocht je later toch nog vragen hebben over een dak of een offerte, bel Linda gerust op 033 - 555 14 22.",
       "gold_facts": [],
-      "tags": ["smalltalk"],
+      "tags": [
+        "smalltalk"
+      ],
       "difficulty": "easy",
       "question_type": "smalltalk",
       "expected_kind": "smalltalk",
@@ -338,12 +455,263 @@
         "telefoon 033 - 555 14 22",
         "spoed-nummer is hetzelfde"
       ],
-      "tags": ["openingstijden", "contact"],
+      "tags": [
+        "openingstijden",
+        "contact"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["30-contact-en-vestiging.md"]
+      "ideal_source_filenames": [
+        "30-contact-en-vestiging.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-lelystad-bridge",
+      "question": "Valt Lelystad binnen jullie werkgebied?",
+      "gold_answer": "Lelystad ligt in Flevoland, en Flevoland valt binnen ons standaard werkgebied (samen met provincie Utrecht en de Gelderse Vallei). In de detail-lijst voor Flevoland noemen we specifiek Almere en Zeewolde — voor andere plaatsen zoals Lelystad bellen we graag even voor de planning.",
+      "gold_facts": [
+        "standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland",
+        "Lelystad ligt in Flevoland",
+        "Flevoland-detaillijst noemt Almere en Zeewolde specifiek"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "positive",
+        "werkgebied"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-dronten-bridge",
+      "question": "Kunnen jullie ook naar Dronten komen voor een dakopdracht?",
+      "gold_answer": "Dronten ligt in Flevoland en Flevoland valt binnen ons standaard werkgebied. In de Flevoland-lijst noemen we specifiek Almere en Zeewolde — voor Dronten bellen we graag even, dan stemmen we de planning af.",
+      "gold_facts": [
+        "standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland",
+        "Dronten ligt in Flevoland"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "positive",
+        "werkgebied"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "openingstijden-zaterdag-bridge",
+      "question": "Zijn jullie op zaterdag bereikbaar?",
+      "gold_answer": "Op zaterdag is het kantoor gesloten, behalve voor spoed. Tijdens werkdagen zijn we bereikbaar van 08.00 tot 16.30 uur (op vrijdag tot 15.30). Voor spoedmeldingen buiten kantoortijden schakelt het nummer 033 - 555 14 22 door naar onze wacht-uitvoerder.",
+      "gold_facts": [
+        "zaterdag gesloten behalve spoed",
+        "spoednummer 033 - 555 14 22"
+      ],
+      "tags": [
+        "bridging",
+        "calendar",
+        "positive",
+        "openingstijden"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "30-contact-en-vestiging.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-maastricht-bridge-negative",
+      "question": "Kunnen jullie naar Maastricht komen?",
+      "gold_answer": "Maastricht ligt in Limburg, en Limburg valt buiten ons werkgebied — voor klussen in Limburg, Groningen of Noord-Brabant verwijzen we klanten door naar regionale VEBIDAK-aangesloten collega-bedrijven. Vraag gerust een aanbeveling: Linda heeft een lijst met vertrouwde dakdekkersbedrijven.",
+      "gold_facts": [
+        "Maastricht ligt in Limburg",
+        "Limburg buiten werkgebied",
+        "doorverwijzing naar VEBIDAK-collega's"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "negative",
+        "out-of-area"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-brussel-out",
+      "question": "Kunnen jullie ook in Brussel werken?",
+      "gold_answer": "Brussel ligt in België en valt buiten ons werkgebied — wij werken binnen Nederland, in provincie Utrecht, Gelderse Vallei en Flevoland (en uitgebreid in delen van zuidelijk Noord-Holland, Gelderland en Zuid-Holland-noordoost). Over de grens werken we niet.",
+      "gold_facts": [
+        "Brussel ligt in België",
+        "werkgebied is Nederland",
+        "Brussel buiten werkgebied"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "negative",
+        "international"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-emmeloord-bridge",
+      "question": "Kunnen jullie ook naar Emmeloord komen?",
+      "gold_answer": "Emmeloord ligt in de Noordoostpolder, in provincie Flevoland — en Flevoland valt binnen ons standaard werkgebied. In de detail-lijst voor Flevoland noemen we specifiek Almere en Zeewolde, dus voor Emmeloord even bellen voor de planning.",
+      "gold_facts": [
+        "standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland",
+        "Emmeloord ligt in Flevoland (Noordoostpolder)"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "positive",
+        "werkgebied",
+        "diagnostic"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-urk-bridge",
+      "question": "Doen jullie ook werk in Urk?",
+      "gold_answer": "Urk ligt in provincie Flevoland en Flevoland valt binnen ons standaard werkgebied. We noemen specifiek Almere en Zeewolde in onze documentatie — voor Urk bellen we graag even om de planning af te stemmen.",
+      "gold_facts": [
+        "standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland",
+        "Urk ligt in Flevoland"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "positive",
+        "werkgebied",
+        "diagnostic"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-baarn-control",
+      "question": "Komen jullie naar Baarn?",
+      "gold_answer": "Ja, Baarn valt binnen ons standaard werkgebied. We komen daar zonder voorrijkosten op offerte-bezoek en reguliere uitvoering.",
+      "gold_facts": [
+        "Baarn expliciet in standaard werkgebied (provincie Utrecht)"
+      ],
+      "tags": [
+        "control",
+        "geo",
+        "positive",
+        "explicit-in-list",
+        "diagnostic"
+      ],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-heerlen-bridge-out",
+      "question": "Doen jullie ook een opdracht in Heerlen?",
+      "gold_answer": "Heerlen ligt in Limburg en Limburg valt buiten ons werkgebied — voor klussen in Limburg, Groningen of Noord-Brabant verwijzen we klanten door naar regionale VEBIDAK-aangesloten collega's.",
+      "gold_facts": [
+        "Heerlen ligt in Limburg",
+        "Limburg buiten werkgebied",
+        "doorverwijzing naar VEBIDAK-collega's"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "negative",
+        "out-of-area",
+        "diagnostic"
+      ],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-apeldoorn-implicit-out",
+      "question": "Kunnen jullie naar Apeldoorn komen voor dakwerk?",
+      "gold_answer": "Apeldoorn ligt in Gelderland, en hoewel we in een deel van Gelderland werken (Arnhem, Velp, Rozendaal, Renkum, Heelsum, Doorwerth, Oosterbeek — uitgebreid werkgebied met voorrijbijdrage), staat Apeldoorn daar niet in. Voor Apeldoorn is het 'op aanvraag' — bel even, dan kijken we of het past.",
+      "gold_facts": [
+        "Apeldoorn ligt in Gelderland",
+        "uitgebreid werkgebied dekt alleen centraal-Gelderland",
+        "Apeldoorn niet expliciet"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "negative",
+        "implicit-out",
+        "diagnostic"
+      ],
+      "difficulty": "hard",
+      "question_type": "ambiguous",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ]
+    },
+    {
+      "slug": "werkgebied-randstad-fuzzy",
+      "question": "Werken jullie in de Randstad?",
+      "gold_answer": "We werken in delen van wat vaak Randstad wordt genoemd: provincie Utrecht (volledig) is ons standaard werkgebied, en in zuidelijk Noord-Holland (Amsterdam-Zuid, Diemen, Naarden, Bussum, Muiden, Weesp) komen we ook — daar met een vaste voorrijbijdrage. Voor andere Randstad-plaatsen zoals Den Haag, Rotterdam of Leiden geldt 'op aanvraag' — bel even, dan kijken we of het past.",
+      "gold_facts": [
+        "werkgebied: provincie Utrecht",
+        "uitgebreid werkgebied: zuidelijk Noord-Holland (Amsterdam-Zuid en omgeving)",
+        "Randstad is geen exacte regio in de docs"
+      ],
+      "tags": [
+        "bridging",
+        "geo",
+        "fuzzy-region",
+        "negative"
+      ],
+      "difficulty": "hard",
+      "question_type": "ambiguous",
+      "expected_kind": "answer",
+      "ideal_source_filenames": [
+        "16-werkgebied.md"
+      ],
+      "must_not_contain": [
+        "heel de Randstad",
+        "in de gehele Randstad",
+        "alle Randstad-steden"
+      ]
     }
   ]
 }
