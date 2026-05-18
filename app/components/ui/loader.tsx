@@ -49,3 +49,28 @@ export function TypingLoader({
     </div>
   );
 }
+
+/**
+ * ClassicLoader — ronde border-spinner met top-transparant segment.
+ * Bron: 21st.dev "ClassicLoader" snippet. De originele snippet gebruikte
+ * `border-primary`, maar Tailwind v4 in deze repo mapt geen `--color-primary`
+ * (alleen background/foreground in `@theme inline` van globals.css). Daarom
+ * lezen we de border-color direct uit `--primary` (zelfde patroon als
+ * `TypingLoader` hierboven). In Manta-mode resolved --primary naar
+ * --manta-accent via de aliassen in manta.css.
+ *
+ * className-override staat callers toe om size en border-thickness aan te
+ * passen (bv. `h-6 w-6 border-[2.5px]` voor de Manta-verstuur-knop).
+ */
+export function ClassicLoader({ className }: { className?: string }) {
+  return (
+    <div
+      role="status"
+      aria-label="Bezig"
+      className={cn(
+        'border-[var(--primary,currentColor)] flex h-10 w-10 animate-spin items-center justify-center rounded-full border-4 border-t-transparent',
+        className,
+      )}
+    />
+  );
+}

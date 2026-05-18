@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { Icon } from '../svg-icons';
 import { Button as Button1 } from '../ui/button-1';
+import { ClassicLoader } from '../ui/loader';
 import type { Length, Tone } from '@/lib/v0/style-types';
 
 const MAX_CHARS = 1000;
@@ -88,18 +89,21 @@ export function MantaComposer({
             svgOnly
             data-manta-send
             disabled={pending}
-            loading={pending}
             onClick={submit}
             aria-label="Verstuur"
             title="Verstuur (↵)"
             className="relative overflow-hidden group/send shrink-0"
           >
-            <ArrowUp
-              className="manta-send-arrow"
-              size={20}
-              strokeWidth={2.4}
-              aria-hidden="true"
-            />
+            {pending ? (
+              <ClassicLoader className="h-6 w-6 border-[2.5px]" />
+            ) : (
+              <ArrowUp
+                className="manta-send-arrow"
+                size={20}
+                strokeWidth={2.4}
+                aria-hidden="true"
+              />
+            )}
           </Button1>
         </div>
 
