@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
-import { resolveBot, BOTS } from '../lib/v0/server/bots';
+import { resolveBot, BOTS, EVAL_DEFAULT_VERSIONS } from '../lib/v0/server/bots';
 import type { PhaseTimings } from '../lib/v0/server/rag';
 import {
   STAGE_KEYS,
@@ -23,8 +23,39 @@ import {
   type RunWithStageTimings,
 } from '../lib/v0/server/eval-latency-stats';
 
-const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
 const OUT_DIR = resolve('eval-out');
+
+// V0.7 — friendly slug per org-UUID voor weergave.
+const ORG_SLUG_BY_ID: Readonly<Record<string, string>> = Object.freeze({
+  '00000000-0000-0000-0000-0000000000d0': 'dev-org',
+  '00000000-0000-0000-0000-0000000000a1': 'acme-corp',
+  '00000000-0000-0000-0000-0000000000a2': 'globex-inc',
+  '00000000-0000-0000-0000-0000000000a3': 'initech',
+});
+function orgSlug(id: string | null | undefined): string {
+  if (!id) return '(unknown)';
+  return ORG_SLUG_BY_ID[id] ?? id.slice(-4);
+}
+
+// V0.7 — productie-drempels voor betalende klanten. STARTWAARDEN — kalibreer
+// op je eerste 2-3 runs. Verdict: een versie passeert pas als ALLE drempels
+// gehaald zijn (geaggregeerd over alle ~75 Q in de eval-set).
+const PRODUCTION_THRESHOLDS = {
+  minAvgCorrectness: 4.0,
+  maxZeroCorrectnessRate: 0.02,
+  minAvgCompleteness: 3.5,
+  minAvgGrounding: 4.0,
+  minProductionReadyRate: 0.80,
+  minRightLengthRate: 0.85,
+  minSourceCitationBindingRate: 0.75,
+  minAvgToneMatch: 1.5,
+  minRouteCorrectRate: 0.90,
+  maxMetaTalkRate: 0.10,
+  minAvgRecallAtK: 0.70,
+  minAvgMrr: 0.60,
+  maxP95TotalMs: 8000,
+  maxP95FirstTokenMs: 1500,
+} as const;
 
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
@@ -46,9 +77,11 @@ const sb = createClient(url!, key!, {
 const { data: runRows, error: runErr } = await sb
   .from('eval_runs')
   .select(
-    `id, question_id, bot_version, judge_model, bot_kind, bot_answer, bot_sources,
+    `id, organization_id, question_id, bot_version, judge_model, bot_kind, bot_answer, bot_sources,
      bot_cost_usd, bot_latency_ms,
      score_correctness, score_completeness, score_grounding,
+     score_route_correct, score_meta_talk_present,
+     production_ready, answer_length_appropriate, source_citation_binding, score_tone_match,
      judge_reasoning, judge_parse_error, judge_cost_usd, judge_latency_ms,
      hyde_mode_requested, hyde_mode_actual,
      run_index, retrieved_filenames, retrieval_recall_at_k, retrieval_mrr,
@@ -56,7 +89,6 @@ const { data: runRows, error: runErr } = await sb
      stage_timings_ms,
      created_at`,
   )
-  .eq('organization_id', DEV_ORG_ID)
   .order('created_at', { ascending: false });
 if (runErr) fail(`eval_runs select: ${runErr.message}`);
 if (!runRows || runRows.length === 0) {
@@ -66,10 +98,17 @@ if (!runRows || runRows.length === 0) {
 
 const { data: qRows, error: qErr } = await sb
   .from('eval_questions')
-  .select('id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type, must_not_contain')
-  .eq('organization_id', DEV_ORG_ID);
+  .select('id, organization_id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type, must_not_contain');
 if (qErr) fail(`eval_questions select: ${qErr.message}`);
 const qById = new Map((qRows ?? []).map((q) => [q.id as string, q]));
+
+// V0.7: pairwise rows voor de win-rate sectie. Filteren is niet nodig — we
+// tonen alles uit de meest-recente batch.
+const { data: pairwiseRows, error: pwErr } = await sb
+  .from('eval_pairwise_runs')
+  .select('organization_id, question_id, bot_version_a, bot_version_b, winner, confidence, judge_rationale, judge_parse_error, created_at')
+  .order('created_at', { ascending: false });
+if (pwErr) fail(`eval_pairwise_runs select: ${pwErr.message}`);
 
 // ---------------------------------------------------------------------------
 // 2. Snapshot: voor elke (question_id, bot_version, hyde_mode_actual) →
@@ -241,6 +280,157 @@ for (const pair of versionModePairs) {
   lines.push(
     `| ${v} | ${mode} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | $${bCost.toFixed(4)} | $${jCost.toFixed(4)} | ${fmt(lat, 0)} |`,
   );
+}
+lines.push('');
+
+// 4b-bis. V0.7 eval-v2 — per-org × per-versie samenvatting met ALLE dimensies
+// (oude C/P/G + nieuwe production_ready / length / source-binding / tone).
+// Uitgesplitst per org omdat een versie die op DEV_ORG goed scoort maar op
+// initech faalt geen ship-candidate is voor boekhouders-klanten.
+lines.push('## V0.7 — Per-org × per-versie alle dimensies');
+lines.push('');
+const distinctOrgs = [...new Set(latestRuns.map((r) => r.organization_id as string))].sort();
+if (distinctOrgs.length === 0) {
+  lines.push('_Geen runs._');
+} else {
+  lines.push('| org | versie | n | C | P | G | route✓ | metaTalk | prod-ready | right-len | citation✓ | tone | recall@k | MRR |');
+  lines.push('|-----|--------|---|---|---|---|--------|----------|------------|-----------|-----------|------|----------|-----|');
+  for (const orgId of distinctOrgs) {
+    for (const v of versionsForHeader) {
+      const vRows = latestRuns.filter((r) => r.organization_id === orgId && r.bot_version === v);
+      if (vRows.length === 0) continue;
+      const c = avgOf(vRows, (r) => r.score_correctness);
+      const p = avgOf(vRows, (r) => r.score_completeness);
+      const g = avgOf(vRows, (r) => r.score_grounding);
+      const routeRows = vRows.filter((r) => r.score_route_correct !== null);
+      const routeOk = routeRows.length === 0 ? null
+        : routeRows.filter((r) => r.score_route_correct === true).length / routeRows.length;
+      const metaRows = vRows.filter((r) => r.score_meta_talk_present !== null);
+      const metaRate = metaRows.length === 0 ? null
+        : metaRows.filter((r) => r.score_meta_talk_present === true).length / metaRows.length;
+      const prRows = vRows.filter((r) => r.production_ready !== null);
+      const prRate = prRows.length === 0 ? null
+        : prRows.filter((r) => r.production_ready === true).length / prRows.length;
+      const lenRows = vRows.filter((r) => r.answer_length_appropriate !== null);
+      const lenRate = lenRows.length === 0 ? null
+        : lenRows.filter((r) => r.answer_length_appropriate === 'right_length').length / lenRows.length;
+      const citationRows = vRows.filter((r) => r.source_citation_binding !== null);
+      const citationRate = citationRows.length === 0 ? null
+        : citationRows.filter((r) => r.source_citation_binding === true).length / citationRows.length;
+      const tone = avgOf(vRows, (r) => r.score_tone_match as number | null);
+      const recall = avgOf(vRows.filter((r) => r.retrieval_recall_at_k !== null), (r) => Number(r.retrieval_recall_at_k));
+      const mrr = avgOf(vRows.filter((r) => r.retrieval_mrr !== null), (r) => Number(r.retrieval_mrr));
+      const pct = (n: number | null) => n === null ? '—' : `${Math.round(n * 100)}%`;
+      lines.push(
+        `| ${orgSlug(orgId)} | ${v} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | ${pct(routeOk)} | ${pct(metaRate)} | ${pct(prRate)} | ${pct(lenRate)} | ${pct(citationRate)} | ${fmt(tone)} | ${fmt(recall, 3)} | ${fmt(mrr, 3)} |`,
+      );
+    }
+  }
+  lines.push('');
+  lines.push('_route✓ / metaTalk = boolean rates over rijen waar judge ze ge-scored heeft. prod-ready / right-len / citation✓ = true-rates over rijen met niet-null waarde. Tone = avg 0-2 over rijen met persona-spec._');
+}
+lines.push('');
+
+// 4b-ter. V0.7 — Pairwise win-rate (head-to-head judgments per versie-paar).
+// LLM-judges zijn betrouwbaarder in vergelijken dan absolute scoren — dit is
+// het primaire ranking-signaal voor close-runners.
+lines.push('## V0.7 — Pairwise win-rate');
+lines.push('');
+const pwAll = pairwiseRows ?? [];
+if (pwAll.length === 0) {
+  lines.push('_Geen pairwise rijen. Run `npm run eval:run` zonder `--no-pairwise` om ze te vullen._');
+} else {
+  // Dedup op (org, question, A, B) → meest recente. Oudere comparisons blijven
+  // in eval_pairwise_runs voor history maar overzicht toont laatste batch.
+  type PwRow = NonNullable<typeof pairwiseRows>[number];
+  const pwLatest = new Map<string, PwRow>();
+  for (const r of pwAll) {
+    const k = `${r.organization_id}::${r.question_id}::${r.bot_version_a}::${r.bot_version_b}`;
+    if (!pwLatest.has(k)) pwLatest.set(k, r);
+  }
+  const pwRecent = [...pwLatest.values()];
+
+  // Versie-paren in deze batch.
+  const versionPairs = [...new Set(pwRecent.map((r) => `${r.bot_version_a}::${r.bot_version_b}`))].sort();
+
+  lines.push('### Per versie-paar (over alle orgs)');
+  lines.push('');
+  lines.push('| paar | n | A wint | tie | B wint | conclusie |');
+  lines.push('|------|---|--------|-----|--------|-----------|');
+  for (const pair of versionPairs) {
+    const [vA, vB] = pair.split('::');
+    const rows = pwRecent.filter((r) => r.bot_version_a === vA && r.bot_version_b === vB);
+    const n = rows.length;
+    const wA = rows.filter((r) => r.winner === 'A').length;
+    const wB = rows.filter((r) => r.winner === 'B').length;
+    const ties = rows.filter((r) => r.winner === 'tie').length;
+    const pctA = Math.round((wA / n) * 100);
+    const pctB = Math.round((wB / n) * 100);
+    const pctT = Math.round((ties / n) * 100);
+    let conclusion = '—';
+    if (wA / n >= 0.55) conclusion = `${vA} winnaar (≥55%)`;
+    else if (wB / n >= 0.55) conclusion = `${vB} winnaar (≥55%)`;
+    else conclusion = 'gelijk-op';
+    lines.push(`| ${vA} vs ${vB} | ${n} | ${wA} (${pctA}%) | ${ties} (${pctT}%) | ${wB} (${pctB}%) | ${conclusion} |`);
+  }
+  lines.push('');
+
+  // Per-org × versie-paar — promotion criterion: geen org mag <45% scoren
+  lines.push('### Per-org × versie-paar (promotie-criterium: geen org <45%)');
+  lines.push('');
+  lines.push('| org | paar | n | A wint | tie | B wint | min-rate | ⚠ |');
+  lines.push('|-----|------|---|--------|-----|--------|----------|----|');
+  for (const orgId of distinctOrgs) {
+    for (const pair of versionPairs) {
+      const [vA, vB] = pair.split('::');
+      const rows = pwRecent.filter(
+        (r) => r.organization_id === orgId
+          && r.bot_version_a === vA
+          && r.bot_version_b === vB,
+      );
+      if (rows.length === 0) continue;
+      const n = rows.length;
+      const wA = rows.filter((r) => r.winner === 'A').length;
+      const wB = rows.filter((r) => r.winner === 'B').length;
+      const ties = rows.filter((r) => r.winner === 'tie').length;
+      const pctA = Math.round((wA / n) * 100);
+      const pctB = Math.round((wB / n) * 100);
+      const pctT = Math.round((ties / n) * 100);
+      const winRateA = wA / n;
+      const winRateB = wB / n;
+      const minRate = Math.min(winRateA, winRateB);
+      const warn = minRate < 0.45 ? '⚠' : '';
+      lines.push(`| ${orgSlug(orgId)} | ${vA} vs ${vB} | ${n} | ${wA} (${pctA}%) | ${ties} (${pctT}%) | ${wB} (${pctB}%) | ${Math.round(minRate * 100)}% | ${warn} |`);
+    }
+  }
+  lines.push('');
+
+  // Top 3 winning rationales per versie-paar (insight in WAAROM een versie wint)
+  for (const pair of versionPairs) {
+    const [vA, vB] = pair.split('::');
+    const rows = pwRecent.filter((r) => r.bot_version_a === vA && r.bot_version_b === vB);
+    if (rows.length === 0) continue;
+    lines.push(`### Voorbeeld rationales — ${vA} vs ${vB}`);
+    lines.push('');
+    const wins = rows.filter((r) => r.winner === 'A' && r.judge_rationale).slice(0, 3);
+    const losses = rows.filter((r) => r.winner === 'B' && r.judge_rationale).slice(0, 3);
+    if (wins.length > 0) {
+      lines.push(`**${vA} won:**`);
+      for (const w of wins) {
+        const q = qById.get(w.question_id as string);
+        lines.push(`- _${q?.slug ?? '?'}_ (conf=${w.confidence ?? '-'}): ${w.judge_rationale}`);
+      }
+      lines.push('');
+    }
+    if (losses.length > 0) {
+      lines.push(`**${vB} won:**`);
+      for (const l of losses) {
+        const q = qById.get(l.question_id as string);
+        lines.push(`- _${q?.slug ?? '?'}_ (conf=${l.confidence ?? '-'}): ${l.judge_rationale}`);
+      }
+      lines.push('');
+    }
+  }
 }
 lines.push('');
 
@@ -449,6 +639,141 @@ for (const v of versionsForHeader) {
 }
 lines.push('');
 
+// 4g. V0.7 — Productie-drempel-gate. Per versie: passeert alle drempels?
+// Niet alleen averages — ook p95 latency, hallucinatie-rate, etc.
+// Bij faal: exit-code 1. Drempels staan in PRODUCTION_THRESHOLDS bovenaan
+// het bestand — STARTWAARDEN; kalibreer na 2-3 echte runs.
+lines.push('## V0.7 — Productie-drempel-gate (klant-bereidheid)');
+lines.push('');
+lines.push('Per versie: passeert deze de minimale drempels om naar betalende klanten te gaan?');
+lines.push('');
+lines.push(`> ℹ️ **Gate-scope**: alleen kandidaat-versies (\`EVAL_DEFAULT_VERSIONS\` = ${EVAL_DEFAULT_VERSIONS.join(', ')}) triggeren exit-code 1. Historische versies worden voor referentie getoond maar blokkeren de report-run niet.`);
+lines.push('');
+
+type ThresholdCheck = {
+  label: string;
+  actual: string;
+  target: string;
+  pass: boolean;
+};
+
+function p95(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.floor(0.95 * sorted.length));
+  return sorted[idx];
+}
+
+let anyVersionFailed = false;
+for (const v of versionsForHeader) {
+  const vRows = latestRuns.filter((r) => r.bot_version === v);
+  if (vRows.length === 0) continue;
+
+  const checks: ThresholdCheck[] = [];
+  const T = PRODUCTION_THRESHOLDS;
+
+  // Aggregates
+  const avgC = avgOf(vRows, (r) => r.score_correctness);
+  const zeroC = vRows.filter((r) => r.score_correctness === 0).length / vRows.length;
+  const avgP = avgOf(vRows, (r) => r.score_completeness);
+  const avgG = avgOf(vRows, (r) => r.score_grounding);
+  const prRows = vRows.filter((r) => r.production_ready !== null);
+  const prRate = prRows.length === 0 ? null
+    : prRows.filter((r) => r.production_ready === true).length / prRows.length;
+  const lenRows = vRows.filter((r) => r.answer_length_appropriate !== null);
+  const lenRate = lenRows.length === 0 ? null
+    : lenRows.filter((r) => r.answer_length_appropriate === 'right_length').length / lenRows.length;
+  const citationRows = vRows.filter((r) => r.source_citation_binding !== null);
+  const citationRate = citationRows.length === 0 ? null
+    : citationRows.filter((r) => r.source_citation_binding === true).length / citationRows.length;
+  const avgTone = avgOf(vRows, (r) => r.score_tone_match as number | null);
+  const routeRows = vRows.filter((r) => r.score_route_correct !== null);
+  const routeRate = routeRows.length === 0 ? null
+    : routeRows.filter((r) => r.score_route_correct === true).length / routeRows.length;
+  const metaRows = vRows.filter((r) => r.score_meta_talk_present !== null);
+  const metaRate = metaRows.length === 0 ? null
+    : metaRows.filter((r) => r.score_meta_talk_present === true).length / metaRows.length;
+  const recallRows = vRows.filter((r) => r.retrieval_recall_at_k !== null);
+  const avgRecall = avgOf(recallRows, (r) => Number(r.retrieval_recall_at_k));
+  const mrrRows = vRows.filter((r) => r.retrieval_mrr !== null);
+  const avgMrr = avgOf(mrrRows, (r) => Number(r.retrieval_mrr));
+  const totalMsValues: number[] = [];
+  const firstTokenMsValues: number[] = [];
+  for (const r of vRows) {
+    const st = parseStageTimings(r.stage_timings_ms);
+    if (st?.total_ms !== undefined) totalMsValues.push(st.total_ms);
+    if (st?.first_token_ms !== undefined) firstTokenMsValues.push(st.first_token_ms);
+  }
+  const p95Total = p95(totalMsValues);
+  const p95FirstToken = p95(firstTokenMsValues);
+  const violations = vRows.filter((r) => r.must_not_violation === true).length;
+
+  // Build checks. Skip checks waar de actual NULL is (geen data) — anders
+  // faalt elke versie zonder pairwise/persona-rijen automatisch.
+  function addCheck(label: string, actual: number | null, target: number, op: '>=' | '<=' | '=='): void {
+    if (actual === null) {
+      checks.push({ label, actual: '—', target: `${op}${target}`, pass: true /* skip */ });
+      return;
+    }
+    const pass = op === '>=' ? actual >= target : op === '<=' ? actual <= target : actual === target;
+    // p95 latencies en p95 first_token zijn ms (toFixed(0)); andere zijn
+    // rates of averages (toFixed(2)). Heuristiek op label is robuuster dan
+    // op de waarde zelf.
+    const isMs = label.includes('p95');
+    const fmtA = isMs ? actual.toFixed(0) : actual.toFixed(2);
+    checks.push({ label, actual: fmtA, target: `${op}${target}`, pass });
+  }
+
+  addCheck('avg correctness', avgC, T.minAvgCorrectness, '>=');
+  addCheck('zero-correctness rate', zeroC, T.maxZeroCorrectnessRate, '<=');
+  addCheck('avg completeness', avgP, T.minAvgCompleteness, '>=');
+  addCheck('avg grounding', avgG, T.minAvgGrounding, '>=');
+  addCheck('production-ready rate', prRate, T.minProductionReadyRate, '>=');
+  addCheck('right-length rate', lenRate, T.minRightLengthRate, '>=');
+  addCheck('source-citation rate', citationRate, T.minSourceCitationBindingRate, '>=');
+  addCheck('avg tone-match', avgTone, T.minAvgToneMatch, '>=');
+  addCheck('route-correct rate', routeRate, T.minRouteCorrectRate, '>=');
+  addCheck('meta-talk rate', metaRate, T.maxMetaTalkRate, '<=');
+  addCheck('avg recall@k', avgRecall, T.minAvgRecallAtK, '>=');
+  addCheck('avg MRR', avgMrr, T.minAvgMrr, '>=');
+  addCheck('p95 total_ms', p95Total, T.maxP95TotalMs, '<=');
+  addCheck('p95 first_token_ms', p95FirstToken, T.maxP95FirstTokenMs, '<=');
+  // Must-not violations hardgrens (=0): aparte check omdat het integer is.
+  checks.push({
+    label: 'must-not violations',
+    actual: String(violations),
+    target: '=0',
+    pass: violations === 0,
+  });
+
+  const failed = checks.filter((c) => !c.pass && c.actual !== '—');
+  // Alleen kandidaat-versies (EVAL_DEFAULT_VERSIONS) triggeren exit-1.
+  // Historische versies tonen we voor referentie maar blokkeren niet —
+  // anders zou een report-run op een DB met oude failing v0.5-rows altijd
+  // exit-1 geven, ook al gaat de PR alleen over v0.7.
+  const isCandidate = EVAL_DEFAULT_VERSIONS.includes(v);
+  if (failed.length > 0 && isCandidate) anyVersionFailed = true;
+  const candidateTag = isCandidate ? '🎯 kandidaat — ' : '📜 historisch — ';
+  const verdict = failed.length === 0
+    ? '✅ PRODUCTIE-KLAAR'
+    : isCandidate
+      ? `❌ FAALT op ${failed.length} drempel(s)`
+      : `⚠ ${failed.length} drempel(s) ge-mist (alleen referentie)`;
+
+  lines.push(`### ${v} — ${candidateTag}${verdict} (n=${vRows.length})`);
+  lines.push('');
+  lines.push('| drempel | actual | target | status |');
+  lines.push('|---------|--------|--------|--------|');
+  for (const c of checks) {
+    const status = c.actual === '—' ? '— (geen data)' : c.pass ? '✓' : '✗';
+    lines.push(`| ${c.label} | ${c.actual} | ${c.target} | ${status} |`);
+  }
+  lines.push('');
+}
+
+lines.push('_Drempels zijn STARTWAARDEN (zie `PRODUCTION_THRESHOLDS` in `scripts/v0-eval-report.ts`). Kalibreer na 2-3 echte multi-org runs._');
+lines.push('');
+
 // (Multi-run variance sectie weggehaald — was alleen relevant bij --runs > 1
 // en gaf in de praktijk een lege/ruisige tabel. Multi-run data blijft wel in
 // de CSV voor handmatige spreadsheet-analyse.)
@@ -461,10 +786,11 @@ for (const q of questions) {
   const text = q.question as string;
   const diff = q.difficulty as string;
   const tags = (q.tags as string[]).join(', ');
-  lines.push(`### ${slug}`);
+  const qOrg = orgSlug(q.organization_id as string | null);
+  lines.push(`### [${qOrg}] ${slug}`);
   lines.push('');
   lines.push(`**Vraag:** ${text}`);
-  lines.push(`**Difficulty:** ${diff} · **Tags:** ${tags || '—'}`);
+  lines.push(`**Difficulty:** ${diff} · **Tags:** ${tags || '—'} · **Org:** ${qOrg}`);
   lines.push('');
   lines.push(`**Gold answer:** ${q.gold_answer}`);
   if ((q.gold_facts as string[]).length > 0) {
@@ -519,7 +845,7 @@ const csvLines: string[] = [];
 // eval-latency-stats.ts, gelijk aan PhaseTimings declaratie in rag.ts.
 const stageCsvHeaders = STAGE_KEYS.join(',');
 csvLines.push(
-  `slug,difficulty,question_type,bot_version,hyde_mode_actual,hyde_mode_requested,run_index,correctness,completeness,grounding,recall_at_k,mrr,must_not_violation,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error,${stageCsvHeaders}`,
+  `slug,org_slug,difficulty,question_type,bot_version,hyde_mode_actual,hyde_mode_requested,run_index,correctness,completeness,grounding,route_correct,meta_talk_present,production_ready,answer_length_appropriate,source_citation_binding,score_tone_match,recall_at_k,mrr,must_not_violation,bot_kind,bot_latency_ms,bot_cost_usd,judge_cost_usd,judge_parse_error,${stageCsvHeaders}`,
 );
 // CSV gebruikt allLatestVariance zodat multi-run rows allemaal in spreadsheet
 // belanden voor variance-analyse, niet alleen run_index=0.
@@ -535,6 +861,7 @@ for (const q of questions) {
     csvLines.push(
       [
         q.slug,
+        orgSlug(q.organization_id as string | null),
         q.difficulty,
         qType,
         r.bot_version,
@@ -544,6 +871,12 @@ for (const q of questions) {
         r.score_correctness ?? '',
         r.score_completeness ?? '',
         r.score_grounding ?? '',
+        r.score_route_correct === null || r.score_route_correct === undefined ? '' : (r.score_route_correct ? 'true' : 'false'),
+        r.score_meta_talk_present === null || r.score_meta_talk_present === undefined ? '' : (r.score_meta_talk_present ? 'true' : 'false'),
+        r.production_ready === null || r.production_ready === undefined ? '' : (r.production_ready ? 'true' : 'false'),
+        (r.answer_length_appropriate as string | null) ?? '',
+        r.source_citation_binding === null || r.source_citation_binding === undefined ? '' : (r.source_citation_binding ? 'true' : 'false'),
+        r.score_tone_match ?? '',
         r.retrieval_recall_at_k ?? '',
         r.retrieval_mrr ?? '',
         r.must_not_violation ? 'true' : 'false',
@@ -583,7 +916,20 @@ for (const pair of versionModePairs) {
     `  ${v.padEnd(7)} ${mode.padEnd(11)}  C=${fmt(c)}  P=${fmt(p)}  G=${fmt(g)}  →  ${fmt(overall)}/5  (n=${vRows.length})`,
   );
 }
-}
+
+// V0.7 — productie-drempel-gate: exit-code 1 als een KANDIDAAT-versie
+// (EVAL_DEFAULT_VERSIONS) faalt op de drempels. Zo wordt het rapport CI-
+// achtig: een PR die regressies introduceert faalt de eval-step. Oude
+// historische versies blokkeren niet — anders zou een DB met oude failing
+// v0.5-rows altijd exit-1 geven, ook bij PR's die alleen v0.7 raken.
+if (anyVersionFailed) {
+  console.log('');
+  console.log(`⚠ Eén of meer KANDIDAAT-versies (${EVAL_DEFAULT_VERSIONS.join(', ')}) falen productie-drempels.`);
+  console.log('  Zie sectie "V0.7 — Productie-drempel-gate" in het rapport.');
+  console.log('  Exit-code 1.');
+  process.exit(1);
+} // closes if(anyVersionFailed)
+} // closes async function main()
 
 main().catch((err) => {
   console.error('✗ Onverwachte fout:', err);
