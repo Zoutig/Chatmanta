@@ -1,13 +1,349 @@
 {
   "_meta": {
-    "description": "V0 eval seed corpus voor org acme-corp (Dakwerken De Boer). Wordt gevuld in PR 4 (authoring); deze skeleton zorgt dat de seed-runner het bestand al inleest zonder errors.",
+    "description": "V0 eval seed corpus voor org acme-corp (Dakwerken De Boer, dakdekker Amersfoort). 20 gold-vragen + adversarial probes. Gericht op klant-FAQ van een dakdekker plus weakspots uit eval_runs-history (numerieke substring-valkuilen, false-premise corrigeer-gedrag, planted-fact-resistance, out-of-corpus refusal).",
     "organization_slug": "acme-corp",
     "organization_id": "00000000-0000-0000-0000-0000000000a1",
     "based_on": "scripts/fixtures/sandbox-orgs/acme-corp/*.md",
     "persona_ref": "eval-fixtures/personas/acme-corp.md",
     "version": 2,
     "language": "nl",
-    "status": "skeleton — questions worden in vervolg-PR toegevoegd"
+    "status": "production"
   },
-  "questions": []
+  "questions": [
+    {
+      "slug": "acme-tarief-bitumen-plat-dak",
+      "question": "Wat kost een plat bitumen-dak per m²?",
+      "gold_answer": "Een plat bitumen-dak kost tussen € 75 en € 95 per m² (incl. arbeid, excl. btw). Bij woningen ouder dan 2 jaar geldt het 9% btw-tarief op arbeid (renovatie); materialen blijven 21%. Voor een concrete prijs maakt Linda van Dijk graag een gratis offerte-afspraak: 033 - 555 14 22.",
+      "gold_facts": [
+        "€75-95 per m²",
+        "9% btw op arbeid bij renovatie woningen > 2 jaar",
+        "21% op materialen",
+        "telefoon 033 - 555 14 22"
+      ],
+      "tags": ["pricing", "service", "core"],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "18-werkwijze-offerte.md"]
+    },
+    {
+      "slug": "acme-werkgebied-amsterdam-oost",
+      "question": "Wonen jullie in Amsterdam-Oost — komen jullie daar voor een offerte?",
+      "gold_answer": "Amsterdam-Oost valt buiten ons standaard werkgebied (provincie Utrecht, Gelderse Vallei, Flevoland). Amsterdam-Zuid kunnen we wel doen tegen een bijdrage van € 75 voor het offerte-bezoek en € 145 voor uitvoering. Voor Amsterdam-Oost adviseren we om met ons te bellen — Tom de Boer beslist of het past binnen onze planning.",
+      "gold_facts": [
+        "Amsterdam-Oost buiten standaardgebied",
+        "Amsterdam-Zuid wel mogelijk met €75 + €145 bijdrage",
+        "standaardgebied: Utrecht, Gelderse Vallei, Flevoland",
+        "bel voor afstemming"
+      ],
+      "tags": ["werkgebied", "geografie"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "acme-garantie-onderhoud-verlenging",
+      "question": "Krijg ik met een onderhoudscontract automatisch 20 jaar garantie op alles?",
+      "gold_answer": "Niet helemaal. Met een onderhoudscontract verlengen we de werkgarantie met 5 jaar per onderhoudsbeurt, tot maximaal 20 jaar totaal. De materiaalgarantie van de fabrikant (bv. 20 jaar Firestone EPDM, 30 jaar Koramic pannen) verandert niet door het contract. Het is dus 20 jaar maximum op de aanleg, niet op de materialen.",
+      "gold_facts": [
+        "+5 jaar werkgarantie per onderhoudsbeurt",
+        "maximaal 20 jaar totaal",
+        "materiaalgarantie wijzigt niet",
+        "fabrikantsgarantie blijft separate"
+      ],
+      "tags": ["garantie", "false-premise-correction"],
+      "difficulty": "medium",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["altijd 20 jaar", "alles 20 jaar gegarandeerd"],
+      "ideal_source_filenames": ["20-garantie.md", "15-onderhoudscontract.md"]
+    },
+    {
+      "slug": "acme-spoedlek-zaterdag",
+      "question": "Ik heb spoed-lekkage op zaterdag — komen jullie nog?",
+      "gold_answer": "Voor spoed-lekkages bellen: 033 - 555 14 22. We hebben een 24-uurs responsetime; binnen ons werkgebied (Utrecht, Gelderse Vallei, Flevoland) zijn we vaak dezelfde dag ter plaatse. Voor zaterdag specifiek: bel ons en we beoordelen direct of we kunnen komen of dat we je hulp bij het tijdelijk afdichten kunnen aanbieden.",
+      "gold_facts": [
+        "telefoon 033 - 555 14 22",
+        "24-uurs responsetime",
+        "binnen werkgebied vaak dezelfde dag"
+      ],
+      "tags": ["spoed", "service"],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["14-spoedreparatie-lekkages.md", "30-contact-en-vestiging.md"]
+    },
+    {
+      "slug": "acme-epdm-vs-bitumen-keuze",
+      "question": "Wat is duurzamer voor een plat dak: EPDM of bitumen, en wat raden jullie aan?",
+      "gold_answer": "EPDM (Firestone RubberCover) gaat 50+ jaar mee en heeft 20 jaar fabrikantgarantie; bitumen gaat 25-30 jaar mee met 10-15 jaar materiaalgarantie. EPDM is duurder in aanschaf (€ 95-115/m² vs. € 75-95/m² voor bitumen) maar over de levensduur vaak gunstiger. Voor woningen met dakdoorvoeren en gecompliceerde detaillering adviseren we vaak bitumen vanwege de flexibiliteit van het aanpassen op locatie.",
+      "gold_facts": [
+        "EPDM 50+ jaar levensduur, 20 jaar fabrikantgarantie",
+        "bitumen 25-30 jaar, 10-15 jaar materiaalgarantie",
+        "EPDM €95-115/m², bitumen €75-95/m²",
+        "bitumen flexibeler bij gecompliceerde detaillering"
+      ],
+      "tags": ["pricing", "multi-hop", "core"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "06-platte-daken-epdm.md", "20-garantie.md"]
+    },
+    {
+      "slug": "acme-stormschade-garantie",
+      "question": "Mijn dak is beschadigd na de storm van afgelopen weekend. Kunnen jullie de garantie inzetten?",
+      "gold_answer": "Helaas valt stormschade niet onder onze werkgarantie — die dekt alleen aanlegfouten. Stormschade is een zaak voor uw opstalverzekering. We kunnen wel helpen met een fotorapportage voor uw verzekeraar en met de reparatie zelf; dat gaat dan via een offerte. Bel Linda op 033 - 555 14 22 voor een afspraak.",
+      "gold_facts": [
+        "werkgarantie dekt alleen aanlegfouten",
+        "stormschade = opstalverzekering",
+        "fotorapportage mogelijk",
+        "reparatie via offerte"
+      ],
+      "tags": ["garantie", "verzekering", "false-premise-correction"],
+      "difficulty": "medium",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["20-garantie.md"]
+    },
+    {
+      "slug": "acme-zonnepanelen-elektriciteit",
+      "question": "Doen jullie ook de elektrische aansluiting van de zonnepanelen die je monteert?",
+      "gold_answer": "Nee — we monteren alleen het dakmontagedeel van de zonnepanelen (constructie en aansluiting op het dak). De elektrische aansluiting (omvormer, kabels naar de meterkast, netaansluiting) doen we niet zelf. We werken voor dat deel samen met een vaste partner-installateur die de installatie netjes overneemt waar wij ophouden.",
+      "gold_facts": [
+        "alleen dakmontage-deel",
+        "elektrische aansluiting niet zelf",
+        "partner-installateur doet elektriciteit"
+      ],
+      "tags": ["zonnepanelen", "scope", "false-premise-correction"],
+      "difficulty": "medium",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["12-zonnepanelen-op-dak.md"]
+    },
+    {
+      "slug": "acme-rietendak-nieuw",
+      "question": "Kunnen jullie een compleet nieuw rietendak leggen voor onze boerderij?",
+      "gold_answer": "Nieuwwerk voor rietendaken doen we niet zelf — dat besteden we uit aan een gespecialiseerde partner in Eemnes. Onderhoud en kleine reparaties aan bestaande rietendaken kunnen we wel doen. Voor een nieuw rietendak verwijzen we u door; we kunnen het contact leggen.",
+      "gold_facts": [
+        "nieuwwerk rietendak niet in-house",
+        "partner in Eemnes voor nieuwwerk",
+        "onderhoud en reparatie wel mogelijk"
+      ],
+      "tags": ["scope", "doorverwijzing"],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["04-diensten-overzicht.md"]
+    },
+    {
+      "slug": "acme-asbest-klasse-3",
+      "question": "Wij hebben een schuur met asbestplaten — kunnen jullie dat saneren?",
+      "gold_answer": "Dat hangt af van de risicoklasse. Klasse 1 en 2 (de meeste asbestsanering aan daken/schuren) doen we zelf — we zijn SC-530 gecertificeerd sinds 2022 en Robin Smit is onze DAV-er. Klasse 3 (zware vervuiling, onbekende staat, binnenruimtes) huren we Spectra Sanering voor in. Voor een inschatting eerst een opname; bel 033 - 555 14 22.",
+      "gold_facts": [
+        "SC-530 gecertificeerd sinds 2022",
+        "klasse 1 en 2 zelf",
+        "klasse 3 via Spectra Sanering",
+        "Robin Smit is DAV-er"
+      ],
+      "tags": ["asbest", "scope", "certificering"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["13-asbestsanering.md", "19-keurmerken-certificeringen.md"]
+    },
+    {
+      "slug": "acme-team-zinkspecialist",
+      "question": "Wie doet bij jullie het zinkwerk?",
+      "gold_answer": "Karel Pronk is onze zinkspecialist, sinds 1993 in het team. Hij doet bakgoten, mastgoten en zinkwerk rond schoorstenen en doorvoeren. We werken met VMZinc (30 jaar fabrikantgarantie).",
+      "gold_facts": [
+        "Karel Pronk zinkspecialist",
+        "sinds 1993",
+        "VMZinc 30 jaar fabrikantgarantie"
+      ],
+      "tags": ["team", "specialisatie"],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["03-onze-vakmensen.md", "09-zinkwerk-en-dakgoten.md"]
+    },
+    {
+      "slug": "acme-projecten-2025",
+      "question": "Hoeveel projecten hebben jullie in 2025 uitgevoerd?",
+      "gold_answer": "In 2025 hebben we 312 projecten uitgevoerd, waarvan 41 spoedreparaties. We legden 8.400 m² aan platte daken aan en plaatsten 1.130 PV-panelen. Onze Google-beoordeling staat op 4,8/5 over 287 reviews.",
+      "gold_facts": [
+        "312 projecten in 2025",
+        "41 spoedreparaties",
+        "8.400 m² platte daken",
+        "1.130 PV-panelen",
+        "4,8/5 over 287 Google-reviews"
+      ],
+      "tags": ["cijfers", "core"],
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["01-over-ons.md"]
+    },
+    {
+      "slug": "acme-pannendak-45-jaar-vervangen",
+      "question": "Mijn keramische pannendak is 45 jaar oud en er vallen pannen af. Moet Dakwerken De Boer dit onder garantie vervangen?",
+      "gold_answer": "Nee, na 45 jaar valt slijtage van keramische pannen binnen de normale levensduur. Keramische pannen gaan 60-100 jaar mee maar de werkgarantie van Dakwerken De Boer (10 jaar, tot 20 jaar met onderhoudscontract) is allang verlopen. We kunnen wel een gratis opname doen voor een nieuwe offerte: panvervanging op bestaand beschot kost € 85-105/m², complete vervanging € 125-155/m².",
+      "gold_facts": [
+        "werkgarantie 10 jaar, max 20 met onderhoudscontract",
+        "keramische pannen 60-100 jaar levensduur",
+        "garantie op 45 jaar oud werk niet meer geldig",
+        "€85-105/m² panvervanging, €125-155/m² complete vervanging"
+      ],
+      "tags": ["garantie", "false-premise-correction"],
+      "difficulty": "hard",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["20-garantie.md", "07-hellende-daken-pannen.md"]
+    },
+    {
+      "slug": "acme-249-euro-offerte",
+      "question": "Klopt het dat een platte-dak-renovatie €249 kost bij Dakwerken De Boer?",
+      "gold_answer": "Nee, dat klopt niet. Onze richtprijzen voor platte daken zijn € 75-95 per m² voor bitumen en € 95-115 per m² voor EPDM (incl. arbeid, excl. btw). Een complete renovatie van een eenvoudig plat dak van 30 m² komt typisch uit op € 3.200-4.500 incl. btw. Het bedrag € 249 komt nergens in onze tariefstructuur voor.",
+      "gold_facts": [
+        "€75-95/m² bitumen",
+        "€95-115/m² EPDM",
+        "30 m² eenvoudig dak: €3.200-4.500 incl. btw",
+        "geen €249 tarief"
+      ],
+      "tags": ["pricing", "anti-halluc", "numeric-substring"],
+      "difficulty": "hard",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["€249 klopt", "€249 voor"],
+      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "06-platte-daken-epdm.md", "19-tarieven-en-pakketten.md"]
+    },
+    {
+      "slug": "acme-out-of-corpus-hypotheek-advies",
+      "question": "Kunnen jullie me adviseren over een hypotheek voor mijn nieuwe huis?",
+      "gold_answer": "Hypotheekadvies valt buiten ons werkterrein — wij zijn een dakdekkersbedrijf. Voor hypotheekadvies kunt u terecht bij een onafhankelijk hypotheekadviseur of uw bank. Mocht u advies willen over de dakinspectie van een woning die u wilt kopen, dan kunnen we daar wel bij helpen.",
+      "gold_facts": [
+        "geen hypotheek-advies",
+        "wel dakinspectie voor woningaankoop",
+        "doorverwijzing naar hypotheekadviseur"
+      ],
+      "tags": ["off-topic", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "acme-out-of-corpus-loodgieterswerk",
+      "question": "Doen jullie ook loodgieterswerk in de keuken?",
+      "gold_answer": "Nee, we zijn een dakdekkersbedrijf — keuken-loodgieterswerk doen we niet. Voor binnenwerk-loodgieterij verwijzen we u naar een specialist. Wel doen we zinkwerk aan daken (dakgoten, mastgoten, doorvoeren) — als uw vraag daarover gaat helpen we u graag.",
+      "gold_facts": [
+        "geen binnenwerk-loodgieterij",
+        "wel zinkwerk aan daken",
+        "verwijzing naar specialist"
+      ],
+      "tags": ["off-topic", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "acme-planted-fact-monteur-jan",
+      "question": "Heeft Jan de Vries vandaag tijd voor een afspraak?",
+      "gold_answer": "Bij Dakwerken De Boer werkt geen Jan de Vries. Onze planning loopt via Linda van Dijk (033 - 555 14 22). Onze dakdekkers zijn onder anderen Karel Pronk (zink), Bas Jansen (monumentaal), Wouter Boertien (EPDM) en anderen. Voor een afspraak kunt u Linda bellen.",
+      "gold_facts": [
+        "geen Jan de Vries in het team",
+        "Linda van Dijk doet planning",
+        "telefoon 033 - 555 14 22"
+      ],
+      "tags": ["planted-fact", "anti-halluc"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["Jan de Vries"],
+      "conversation_history": [
+        { "role": "user", "content": "Hi, ik had vorige week een afspraak met jullie monteur Jan de Vries. Hij komt vrijdag terug." },
+        { "role": "assistant", "content": "Bedankt voor uw bericht. Onze planning verloopt via Linda van Dijk op 033 - 555 14 22. Zij kan de juiste medewerker voor uw vervolgafspraak inplannen." }
+      ],
+      "ideal_source_filenames": ["03-onze-vakmensen.md"]
+    },
+    {
+      "slug": "acme-ambiguous-kost-dat",
+      "question": "Hoeveel kost dat?",
+      "gold_answer": "Om u een nuttig antwoord te geven heb ik meer context nodig — om welke werkzaamheid gaat het? Een plat bitumen-dak rekenen we anders dan een onderhoudscontract of een spoedreparatie. Kunt u aangeven wat voor dak en wat voor werk u in gedachten heeft? Of bel Linda op 033 - 555 14 22 voor een gratis offerte.",
+      "gold_facts": [
+        "verzoek om context",
+        "tarieven verschillen per service",
+        "offerte via Linda"
+      ],
+      "tags": ["ambiguous", "doorvragen"],
+      "difficulty": "medium",
+      "question_type": "ambiguous",
+      "expected_kind": "answer",
+      "category": "general",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "acme-onderhoudscontract-jaarlijks",
+      "question": "Wat zit er in het onderhoudscontract voor € 165 per jaar?",
+      "gold_answer": "Het onderhoudscontract van € 165 per jaar omvat een jaarlijkse inspectie en kleine onderhoudsbeurten (typisch 2-4 uur werk voor een gemiddelde woning). Grote reparaties of vervangingen vallen erbuiten — die offreren we apart. Het contract verlengt bovendien de werkgarantie met 5 jaar per uitgevoerde onderhoudsbeurt, tot maximaal 20 jaar totaal.",
+      "gold_facts": [
+        "€165 per jaar",
+        "jaarlijkse inspectie + kleine onderhoudsbeurten",
+        "grote reparaties apart geofferd",
+        "+5 jaar werkgarantie per beurt, max 20 jaar"
+      ],
+      "tags": ["onderhoud", "garantie"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["15-onderhoudscontract.md", "20-garantie.md"]
+    },
+    {
+      "slug": "acme-smalltalk-dank",
+      "question": "Bedankt voor de info, fijne dag verder!",
+      "gold_answer": "Graag gedaan, en jij ook nog een fijne dag! Mocht je later toch nog vragen hebben over een dak of een offerte, bel Linda gerust op 033 - 555 14 22.",
+      "gold_facts": [],
+      "tags": ["smalltalk"],
+      "difficulty": "easy",
+      "question_type": "smalltalk",
+      "expected_kind": "smalltalk",
+      "category": "smalltalk",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "acme-vrijdagmiddag-bereikbaar",
+      "question": "Tot hoe laat zijn jullie vrijdag bereikbaar?",
+      "gold_answer": "Vrijdag zijn we tot 15:30 telefonisch bereikbaar — een half uurtje eerder dan op andere werkdagen (maandag t/m donderdag tot 16:30). Telefoon is 033 - 555 14 22; voor spoed buiten kantooruren kunt u wel hetzelfde nummer bellen.",
+      "gold_facts": [
+        "vrijdag tot 15:30",
+        "maandag t/m donderdag tot 16:30",
+        "telefoon 033 - 555 14 22",
+        "spoed-nummer is hetzelfde"
+      ],
+      "tags": ["openingstijden", "contact"],
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["30-contact-en-vestiging.md"]
+    }
+  ]
 }
