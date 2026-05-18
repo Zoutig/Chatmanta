@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "description": "V0 eval seed corpus voor org initech (Bakker & Vermeer Accountants). Wordt gevuld in PR 4 (authoring); deze skeleton zorgt dat de seed-runner het bestand al inleest zonder errors.",
+    "organization_slug": "initech",
+    "organization_id": "00000000-0000-0000-0000-0000000000a3",
+    "based_on": "scripts/fixtures/sandbox-orgs/initech/*.md",
+    "persona_ref": "eval-fixtures/personas/initech.md",
+    "version": 2,
+    "language": "nl",
+    "status": "skeleton — questions worden in vervolg-PR toegevoegd"
+  },
+  "questions": []
+}

@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "description": "V0 eval seed corpus voor org globex-inc (FysioPlus Utrecht). Wordt gevuld in PR 4 (authoring); deze skeleton zorgt dat de seed-runner het bestand al inleest zonder errors.",
+    "organization_slug": "globex-inc",
+    "organization_id": "00000000-0000-0000-0000-0000000000a2",
+    "based_on": "scripts/fixtures/sandbox-orgs/globex-inc/*.md",
+    "persona_ref": "eval-fixtures/personas/globex-inc.md",
+    "version": 2,
+    "language": "nl",
+    "status": "skeleton — questions worden in vervolg-PR toegevoegd"
+  },
+  "questions": []
+}
