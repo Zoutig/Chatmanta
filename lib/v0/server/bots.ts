@@ -771,8 +771,7 @@ Geen referentie in de huidige vraag? Sla STAP 0 over.
 //   - €249-class hallucinatie wordt nu correct gevangen door numericFallback=false
 // ---------------------------------------------------------------------------
 
-// Bridging-block — toegevoegd aan v0.6 systemPrompt. Staat los voor leesbaarheid
-// en zodat V0_6_PREBRIDGE (eval-baseline) hem kan weglaten.
+// Bridging-block — toegevoegd aan v0.6 systemPrompt. Staat los voor leesbaarheid.
 //
 // Iteratie 2 (na eval-run die liet zien dat iteratie 1 te vaag was): de LLM
 // ankerd graag op detail-lijsten van plaatsnamen en behandelt die als
@@ -840,23 +839,6 @@ const V0_6: BotConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// v0.6-prebridge — TIJDELIJKE eval-baseline.
-//
-// Identiek aan V0_6, behalve dat de bridging-allowance uit systemPrompt
-// ontbreekt. Bestaat ALLEEN om in de eval een eerlijke A/B te draaien tegen
-// het bridging-effect. Wordt in een vervolg-commit verwijderd zodra de eval
-// is goedgekeurd. Niet zichtbaar in productie-UI default — alleen via ?v=.
-// ---------------------------------------------------------------------------
-const V0_6_PREBRIDGE: BotConfig = {
-  ...V0_6,
-  version: 'v0.6-prebridge',
-  label: 'v0.6 (pre-bridging baseline — eval-only)',
-  description:
-    'Eval-only baseline: clone of v0.6 with the bridging-allowance prompt-block removed. Used to measure bridging-patch impact via A/B eval. Will be removed in cleanup commit post-merge.',
-  systemPrompt: V0_5.systemPrompt,
-};
-
-// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
@@ -865,7 +847,6 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_3.version]: V0_3,
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
-  [V0_6_PREBRIDGE.version]: V0_6_PREBRIDGE,
   [V0_6.version]: V0_6,
 };
 
@@ -879,9 +860,6 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_3.version,
   V0_4.version,
   V0_5.version,
-  // v0.6-prebridge: tijdelijke eval-baseline naast v0.6. Komt in EVAL_DEFAULT_VERSIONS
-  // (slice(-2) = [prebridge, v0.6]) zodat de A/B-meting automatisch goed loopt.
-  V0_6_PREBRIDGE.version,
   V0_6.version,
 ];
 
