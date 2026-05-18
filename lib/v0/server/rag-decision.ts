@@ -178,16 +178,21 @@ export function decideRagStrategy(input: DecisionInput): RagDecision {
   const hasClearWinner =
     top1Top2Gap !== null && top1Top2Gap >= rerankMargin;
 
-  // ---- careful path: weak retrieval OF samengesteld OF harde feiten ----
+  // ---- careful path: weak/none retrieval, en (op v0.6.2) ook composite ----
+  // V0.6.3 verandert dit: composite-query gaat alleen naar careful als
+  // bot.compositeQueryPath === 'careful' (= v0.6.2 default). Bij 'standard'
+  // (v0.6.3+) blijft careful gereserveerd voor echt-zwakke retrieval.
+  // Reden: prep-diagnostics liet zien dat careful op composite-queries
+  // -0.37 onder v0.5 scoorde op zelfde question_ids (zie v063-prep doc).
   const hasComposite = subQueryCount > 1;
-  const isCareful =
-    retrievalStrength === 'weak' ||
-    retrievalStrength === 'none' ||
-    hasComposite;
-  if (isCareful) {
+  const compositePath = bot.compositeQueryPath ?? 'careful';
+  const carefulByRetrieval =
+    retrievalStrength === 'weak' || retrievalStrength === 'none';
+  const carefulByComposite = hasComposite && compositePath === 'careful';
+  if (carefulByRetrieval || carefulByComposite) {
     if (retrievalStrength === 'weak') reasonCodes.push('careful:weak-retrieval');
     if (retrievalStrength === 'none') reasonCodes.push('careful:no-retrieval');
-    if (hasComposite) reasonCodes.push('careful:composite-query');
+    if (carefulByComposite) reasonCodes.push('careful:composite-query');
     // careful: alle kwaliteitslagen aan, behalve cascade bij weak (zou priors invullen)
     const cascadeSafe =
       retrievalStrength === 'medium' || retrievalStrength === 'strong';
@@ -204,11 +209,14 @@ export function decideRagStrategy(input: DecisionInput): RagDecision {
     };
   }
 
-  // ---- fast path: strong retrieval + clear winner + single query ----
+  // ---- fast path: strong retrieval + clear winner + (geen composite OR
+  // compositePath='standard' om composite-queries niet permanent te blokkeren) ----
+  const canFastWithComposite = !hasComposite || compositePath === 'standard';
   const isFast =
-    retrievalStrength === 'strong' && hasClearWinner && !hasComposite;
+    retrievalStrength === 'strong' && hasClearWinner && canFastWithComposite;
   if (isFast) {
-    reasonCodes.push('fast:strong-retrieval', 'fast:clear-winner', 'fast:single-query');
+    reasonCodes.push('fast:strong-retrieval', 'fast:clear-winner');
+    reasonCodes.push(hasComposite ? 'fast:composite-allowed' : 'fast:single-query');
     return {
       path: 'fast',
       retrievalStrength,
@@ -222,7 +230,11 @@ export function decideRagStrategy(input: DecisionInput): RagDecision {
     };
   }
 
-  // ---- standard path: medium retrieval, of strong-zonder-clear-winner ----
+  // ---- standard path: medium retrieval, of strong-zonder-clear-winner,
+  // of (v0.6.3) composite-query met niet-strong retrieval ----
+  if (hasComposite && compositePath === 'standard') {
+    reasonCodes.push('standard:composite-redirected');
+  }
   reasonCodes.push(
     retrievalStrength === 'strong' && !hasClearWinner
       ? 'standard:strong-but-ambiguous'

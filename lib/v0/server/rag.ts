@@ -2194,6 +2194,7 @@ KRITISCHE FORMAT-REGELS:
         chunks: chunkInputs,
         threshold: bot.claimVerificationThreshold,
         hardFactCheck: bot.adaptiveHardFactVerification === true,
+        hardFactNumericFallback: bot.hardFactNumericFallback,
       });
       claimVerifyEmbedTokens = result.embedTokens;
       claimVerifyEmbedCost = result.costUsd;
@@ -2406,6 +2407,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           chunks: chunkInputs2,
           threshold: bot.claimVerificationThreshold,
           hardFactCheck: bot.adaptiveHardFactVerification === true,
+          hardFactNumericFallback: bot.hardFactNumericFallback,
         });
         regenerateRatio = Number.isFinite(verifyResult2.confidence)
           ? verifyResult2.confidence

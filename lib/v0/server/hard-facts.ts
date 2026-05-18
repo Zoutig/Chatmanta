@@ -245,11 +245,19 @@ export type HardFactSupport = {
  *
  *  - Leeg `facts` per categorie → niets te checken → supported=true.
  *  - Missing wordt geprefixt met categorie ("money:50", "phone:0612345678")
- *    zodat logging duidelijk laat zien wat ontbreekt. */
+ *    zodat logging duidelijk laat zien wat ontbreekt.
+ *
+ *  Options:
+ *  - numericFallback (default true) — bepaalt of money/percent/number
+ *    cross-categorie kunnen matchen. v0.6.1/v0.6.2 gedrag = true. v0.6.3+
+ *    zet dit op false om €249-class hallucinaties te vangen waar "249"
+ *    enkel als substring in een chunk voorkomt zonder valuta-context. */
 export function hardFactsSupportedBySources(
   facts: ExtractedHardFacts,
   sourceTexts: string[],
+  options?: { numericFallback?: boolean },
 ): HardFactSupport {
+  const numericFallback = options?.numericFallback !== false;
   if (!sourceTexts || sourceTexts.length === 0) {
     // Geen sources om tegen te checken — alleen 'supported' als ook geen
     // facts om te bewijzen. Anders alles missing.
@@ -287,30 +295,30 @@ export function hardFactsSupportedBySources(
       } as ExtractedHardFacts,
     );
 
-  // Cross-category fallback: money kan ook gewoon als getal in source staan
-  // (bv "kost 50 per maand" zonder euro-teken — onwaarschijnlijk maar wel
-  // veilig). Voeg money/percentage waarden ook toe aan numbers voor
-  // vergelijking — wel niet andersom (numbers→money zou onnodig false
-  // positives geven).
-  const numbersWithFallback = new Set([
-    ...sourceFacts.numbers,
-    ...sourceFacts.money,
-    ...sourceFacts.percentages,
-  ]);
-  const moneyWithFallback = new Set([
-    ...sourceFacts.money,
-    ...sourceFacts.numbers,
-  ]);
+  // Cross-category fallback (v0.6.1/v0.6.2 default): money/percent kunnen
+  // matchen tegen generieke `numbers` in source — vangt "kost 50 per maand"
+  // zonder euro-teken. Maar geeft ook false positives: "€249 Business tier"
+  // passeert als "249" als substring in een chunk staat (bv. pricing-tabel
+  // "€0,07 / extra | 300 gesprekken"). V0.6.3 schakelt deze fallback uit.
+  const numbersWithFallback = numericFallback
+    ? new Set([
+        ...sourceFacts.numbers,
+        ...sourceFacts.money,
+        ...sourceFacts.percentages,
+      ])
+    : new Set(sourceFacts.numbers);
+  const moneyWithFallback = numericFallback
+    ? new Set([...sourceFacts.money, ...sourceFacts.numbers])
+    : new Set(sourceFacts.money);
 
   const missing: string[] = [];
 
   for (const v of facts.money) {
     if (!moneyWithFallback.has(v)) missing.push(`money:${v}`);
   }
-  const percentagesWithFallback = new Set([
-    ...sourceFacts.percentages,
-    ...sourceFacts.numbers,
-  ]);
+  const percentagesWithFallback = numericFallback
+    ? new Set([...sourceFacts.percentages, ...sourceFacts.numbers])
+    : new Set(sourceFacts.percentages);
   for (const v of facts.percentages) {
     if (!percentagesWithFallback.has(v)) {
       missing.push(`percentage:${v}`);

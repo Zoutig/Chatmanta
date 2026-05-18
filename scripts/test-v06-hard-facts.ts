@@ -187,13 +187,64 @@ show('multiple chunks: fact mag in WILLEKEURIG welke source staan', () => {
   assert.equal(r.supported, true);
 });
 
-show('fallback: money-waarde als generic number in source ook OK', () => {
+show('fallback: money-waarde als generic number in source ook OK (default behaviour)', () => {
   // Antwoord heeft money:50, source heeft kale 50 zonder valuta-teken
   const facts = extractHardFacts('Prijs €50.');
   const sources = ['We rekenen 50 per maand.'];
   const r = hardFactsSupportedBySources(facts, sources);
   // Money-fallback: cross-check tegen generic numbers
   assert.equal(r.supported, true);
+});
+
+// ---------------------------------------------------------------------------
+// V0.6.3 — numericFallback option (default true, v0.6.3 zet false)
+// ---------------------------------------------------------------------------
+
+show('v0.6.3: numericFallback=false → "249" in pricing-tabel passeert NIET als €249', () => {
+  // Reproduceer de v0.6.1/v0.6.2 false-positive: corpus heeft "249" als
+  // substring (bv. "300 gesprekken | €0,07 / extra | 249 chars max").
+  // Bot hallucineert "Business tier €249/maand". v0.6.3 moet dit vangen.
+  const facts = extractHardFacts('De Business-tier kost €249 per maand.');
+  const sources = ['Pricing-tabel: 300 gesprekken | €0,07 / extra | max 249 chars.'];
+  const rDefault = hardFactsSupportedBySources(facts, sources); // fallback=true
+  const rStrict = hardFactsSupportedBySources(facts, sources, { numericFallback: false });
+  // Met fallback (v0.6.1/v0.6.2 default): false positive → supported=true
+  assert.equal(rDefault.supported, true);
+  // Zonder fallback (v0.6.3): correct → unsupported
+  assert.equal(rStrict.supported, false);
+  assert.ok(rStrict.missing.includes('money:249'));
+});
+
+show('v0.6.3: numericFallback=false → €50 zonder valuta in source = unsupported', () => {
+  // De gespiegelde test: legitieme cross-format dekking (€50 vs "50") werkt
+  // niet meer in strict-mode. Dat is een bewuste trade-off — valuta in
+  // source moet expliciet zijn.
+  const facts = extractHardFacts('Prijs €50.');
+  const sources = ['We rekenen 50 per maand.']; // geen valuta-teken
+  const r = hardFactsSupportedBySources(facts, sources, { numericFallback: false });
+  assert.equal(r.supported, false);
+  assert.ok(r.missing.includes('money:50'));
+});
+
+show('v0.6.3: numericFallback=false → cross-format met valuta-teken WEL OK', () => {
+  // "€50" in answer ≈ "50 euro" in source: beide zijn money — vinden elkaar
+  // zonder fallback nodig.
+  const facts = extractHardFacts('Prijs €50.');
+  const sources = ['Onze tarief: 50 euro per maand.'];
+  const r = hardFactsSupportedBySources(facts, sources, { numericFallback: false });
+  assert.equal(r.supported, true);
+});
+
+show('v0.6.3: numericFallback=false → percentages-fallback ook uitgeschakeld', () => {
+  // "50%" in answer vs "50" als generic number in source — zonder fallback
+  // geen match. Met fallback wel (oude v0.6.2-gedrag).
+  // NB: gebruik 50 ipv 5 — NUMBER_RE matcht alleen \d{2,} (≥2 cijfers).
+  const facts = extractHardFacts('Korting 50%.');
+  const sources = ['We hebben 50 producten gepubliceerd.']; // "50" als generic number
+  const rDefault = hardFactsSupportedBySources(facts, sources);
+  const rStrict = hardFactsSupportedBySources(facts, sources, { numericFallback: false });
+  assert.equal(rDefault.supported, true); // v0.6.1/v0.6.2 gedrag
+  assert.equal(rStrict.supported, false); // v0.6.3 gedrag
 });
 
 // ---------------------------------------------------------------------------
