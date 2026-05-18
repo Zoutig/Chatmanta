@@ -1029,6 +1029,12 @@ export type PhaseTimings = {
   followups_ms?: number;
   cascade_ms?: number;
   total_ms: number;
+  /** V0.7 eval-v2: time-to-first-token vanaf stream-start (ms). Gemerged
+      door de eval-runner (scripts/v0-eval-run.ts) op basis van het eerste
+      content-bearing event uit runRagQueryStreaming — niet door rag.ts
+      zelf ge-set. Op streaming-paden = tijd tot eerste answer-delta; op
+      smalltalk/fallback = tijd tot het terminal event (geen streaming). */
+  first_token_ms?: number;
 };
 
 export type ChatResponse =
