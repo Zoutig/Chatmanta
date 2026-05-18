@@ -128,15 +128,21 @@ function cosineSim(a: number[], b: number[]): number {
  *   (regex op geld/percentages/datums/etc.) en check of die letterlijk of
  *   genormaliseerd in de chunks staan. Aanvulling op embedding-similarity die
  *   wel vector-shape matcht maar verkeerde getallen niet onderscheidt.
+ * @param hardFactNumericFallback v0.6.3 — bepaalt of de hard-fact verifier
+ *   money/percent cross-categorie mag matchen tegen generieke numbers in
+ *   source. Default true (v0.6.1/v0.6.2 gedrag). v0.6.3 zet false om
+ *   €249-class hallucinaties te vangen.
  */
 export async function verifyClaims(args: {
   answerText: string;
   chunks: { id: string; text: string }[];
   threshold: number;
   hardFactCheck?: boolean;
+  hardFactNumericFallback?: boolean;
 }): Promise<ClaimVerificationResult> {
   const claims = splitIntoClaims(args.answerText);
   const hardFactCheck = args.hardFactCheck === true;
+  const hardFactNumericFallback = args.hardFactNumericFallback !== false;
 
   if (claims.length === 0) {
     return {
@@ -166,7 +172,9 @@ export async function verifyClaims(args: {
         facts.phones.length >
       0;
     if (!hasAnyFact) return claim;
-    const support = hardFactsSupportedBySources(facts, sourceTexts);
+    const support = hardFactsSupportedBySources(facts, sourceTexts, {
+      numericFallback: hardFactNumericFallback,
+    });
     return {
       ...claim,
       hardFacts: facts,

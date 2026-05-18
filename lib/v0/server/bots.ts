@@ -241,6 +241,24 @@ export type BotConfig = {
    */
   knowledgeGapLogging?: boolean;
   /**
+   * v0.6.3: welk decision-pad krijgt een composite query (subQueryCount > 1)?
+   * v0.6.2-diagnose: composite-queries gingen naar 'careful', dat triggerde
+   * shouldRegenerateClaims=true en gaf op 2 specifieke cases zware regressie
+   * (-2.00 en -1.67 vs v0.5). v0.6.3 zet dit op 'standard' zodat alleen
+   * weak-retrieval echt careful wordt. Default 'careful' (= v0.6.2-gedrag).
+   */
+  compositeQueryPath?: 'careful' | 'standard';
+  /**
+   * v0.6.3: gebruikt hard-fact verifier de generieke `numbers`-set als
+   * fallback om money-claims te ondersteunen? V0.6.1/v0.6.2 deden dat
+   * (default true) maar dat geeft false-positives: "€249 Business tier"
+   * passeert als "249" als substring ergens in een chunk voorkomt
+   * (bv. pricing-tabel "300 gesprekken | €0,07 / extra"). v0.6.3 zet dit
+   * op false zodat money alleen matcht tegen source-money. Default true
+   * (= v0.6.1/v0.6.2-gedrag voor append-only).
+   */
+  hardFactNumericFallback?: boolean;
+  /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
    * omdat v0.4 met cascade nooit dezelfde latency haalt als v0.1.
@@ -708,72 +726,56 @@ Geen referentie in de huidige vraag? Sla STAP 0 over.
 };
 
 // ---------------------------------------------------------------------------
-// v0.6.1 — hard-fact verifier + matched-span context (PR-A van v0.6 split)
+// v0.6 — adaptive RAG + hard-facts + matched-span (collapse van v0.6.1/v0.6.2/v0.6.3 experiment)
 //
-// Append-only — V0_1 t/m V0_5 blijven ongewijzigd zodat eval-vergelijkingen
-// reproduceerbaar zijn. Twee orthogonale grounding-features:
+// Tot stand gekomen via een 3-staging-versies experiment (v0.6.1/v0.6.2/v0.6.3,
+// gemerged in PR #46/#47/v0.6.3-collapse). Geen append-only chain meer — alle
+// experimentele winsten zitten in deze ene v0.6 versie:
 //
-//   * matchedSpanContext: format chunks in answer-context als plain-text
-//     `MATCHED_SPAN:` + `SURROUNDING_CONTEXT:` blokken (small-chunk als
-//     precision-anker, parent-content voor nuance) i.p.v. één parent-blob.
-//     De LLM weet daardoor preciezer welk fragment de match veroorzaakte.
+//   1. matched-span context format (uit v0.6.1) — small als anker, parent als
+//      nuance. De LLM weet preciezer welk fragment de match veroorzaakte.
 //
-//   * adaptiveHardFactVerification: post-hoc check of harde feiten in het
-//     antwoord (geld/percentages/datums/aantallen/e-mail/URL/telefoon)
-//     letterlijk of genormaliseerd in de chunks staan. Aanvulling op de
-//     embedding-similarity claim-check die wel vector-shape matcht maar
-//     verkeerde getallen niet onderscheidt. Missing facts → claim-regenerate
-//     met stricter prompt (bestaande v0.5 flow, hergebruikt).
+//   2. hard-fact verifier (uit v0.6.1, getuned in v0.6.3) — post-hoc regex op
+//      antwoord (geld/percentages/datums/aantallen/e-mail/URL/telefoon) +
+//      check tegen chunks. Missing facts → claim-regenerate. NumericFallback
+//      uit zodat "€249" niet matcht op losse "249" substring in chunks.
 //
-// Verifieerbaar via:
-//   - eval grounding-delta op hard-fact testcases (fixtures/eval-hard-facts.json)
-//   - vergelijking v0.5 vs v0.6.1, runs=2, met Phase 0 noise-baseline als
-//     significantie-drempel (2× stddev).
+//   3. adaptive RAG decision-layer (uit v0.6.2) — 3 paden (fast/standard/
+//      careful). Simpele FAQ-vragen mogen het 'fast'-pad nemen (skip
+//      rerank/verify/cascade); moeilijke (weak retrieval) krijgen 'careful'.
+//
+//   4. Empirisch gekalibreerde thresholds (uit v0.6.3, n=93 corpus-meting) —
+//      strong=0.56 (≈ p75), weak=0.50 (≈ p20). Max top1Sim is 0.664 in NL +
+//      text-embedding-3-small, dus de oude 0.62 was praktisch onbereikbaar.
+//
+//   5. compositeQueryPath='standard' (uit v0.6.3) — composite-queries gaan
+//      naar standard, niet careful. Reden: prep-diagnostics liet zien dat
+//      careful op composite -0.37 onder v0.5 scoorde op identieke queries.
+//
+//   6. Selectieve multi-turn rewrite + gap_kind classificatie (uit v0.6.2).
+//
+// Eval-resultaten (2026-05-18, n=69, 4-versie shoot-out):
+//   - must-not violations: 7 unique slugs (v0.6.1=8, v0.6.2=10) — best
+//   - cost: $0.0009/q (3.4× goedkoper dan v0.6.1)
+//   - latency p50: 5321ms
+//   - overall judge avg: 3.15/5 (binnen 0.19 van v0.6.1's 3.34 = noise-band)
+//   - planted_fact violations: 0 (v0.6.2 had 2 — regressie gefixt)
+//   - €249-class hallucinatie wordt nu correct gevangen door numericFallback=false
 // ---------------------------------------------------------------------------
-const V0_6_1: BotConfig = {
+const V0_6: BotConfig = {
   ...V0_5,
-  version: 'v0.6.1',
-  label: 'v0.6.1 — hard-facts + matched-span',
+  version: 'v0.6',
+  label: 'v0.6 — adaptive RAG + hard-facts + matched-span',
   description:
-    'v0.5 + matched-span context format (small als anker, parent als nuance) + hard-fact verifier op antwoord (geld/datums/percentages/aantallen/e-mail/URL/telefoon). Bij ungrounded harde feiten triggert claim-regenerate met stricter prompt.',
+    'Productie-versie v0.6 — gestaagde combinatie van: matched-span context, hard-fact verifier zonder numeric-fallback, adaptive decision-layer (fast/standard/careful), threshold-tuning (strong 0.56, weak 0.50), composite-query naar standard. Anti-hallucinatie zwaarder gewogen dan judge-score-completeness; cost ~$0.0009/query.',
+  // Hard-fact + matched-span (uit v0.6.1 generatie)
   matchedSpanContext: true,
   adaptiveHardFactVerification: true,
-  // Latency-budget licht omhoog t.o.v. v0.5: hard-fact verifier kost ~50ms
-  // regex op het antwoord + 0-1 extra normaliserings-passes per claim.
-  evalBudgetMs: 6500,
-  evalBudgetUsd: 0.0050,
-};
-
-// ---------------------------------------------------------------------------
-// v0.6.2 — adaptive RAG (PR-B van v0.6 split)
-//
-// Append-only — V0_1 t/m V0_6_1 blijven byte-identiek. Bouwt voort op v0.6.1
-// (erft hard-fact verifier + matched-span context).
-//
-// Doel: niet alle zware stages op elke query. Simpele FAQ-vragen (sterke
-// retrieval + zelfstandige vraag + duidelijke top1-top2 gap) krijgen het
-// 'fast'-pad — geen rerank/cascade/claim-verify/followups. Moeilijke vragen
-// (zwakke retrieval, samengesteld, harde feiten in antwoord) krijgen 'careful'
-// — alle stages aan. Daartussen blijft 'standard' = v0.6.1-pad.
-//
-// De adaptive-thresholds (0.45 weak, 0.62 strong, 0.08 margin) zijn schattingen
-// op basis van de v0.5/v0.6.1 top1Sim-distributie; te tunen na eval-run.
-// retrievalTopK 5→8 + rerankInputMax 10→20: meer kandidaten voor de reranker,
-// maar finalContextMaxChunks=5 zorgt dat de answer-context niet groeit.
-//
-// knowledgeGapLogging zet gap_kind in extras → query_log.gap_kind voor fijnere
-// classificatie dan alleen kind='fallback'. adaptiveHistoryResolution maakt
-// de multi-turn addon conditioneel op keyword-heuristic (needsHistoryResolution).
-// ---------------------------------------------------------------------------
-const V0_6_2: BotConfig = {
-  ...V0_6_1,
-  version: 'v0.6.2',
-  label: 'v0.6.2 — adaptive RAG',
-  description:
-    'v0.6.1 + adaptive decision-layer (fast/standard/careful 3 paden) + retrievalTopK 8 + selectieve multi-turn rewrite + gap_kind classificatie. Doel: simpele vragen sneller, complexe vragen met alle kwaliteitslagen aan.',
+  hardFactNumericFallback: false,
+  // Adaptive RAG (uit v0.6.2 generatie)
   adaptiveRag: true,
-  adaptiveWeakTopSim: 0.45,
-  adaptiveStrongTopSim: 0.62,
+  adaptiveWeakTopSim: 0.50,
+  adaptiveStrongTopSim: 0.56,
   adaptiveRerankMargin: 0.08,
   adaptiveCascadeMinTopSim: 0.60,
   retrievalTopK: 8,
@@ -781,10 +783,12 @@ const V0_6_2: BotConfig = {
   finalContextMaxChunks: 5,
   adaptiveHistoryResolution: true,
   knowledgeGapLogging: true,
-  // Latency-budget omlaag t.o.v. v0.6.1: 'fast'-pad skipt enkele stages,
-  // dus gemiddelde p50 moet lager. Bij 'careful'-pad mag het hoger — daar
-  // staat de budget-skip-logica voor.
+  compositeQueryPath: 'standard',
+  // Latency-budget — gemeten avg 6670ms; 5500ms target is ambitieus maar
+  // haalbaar als fast-path daadwerkelijk triggert. Aangepast in v0.7 als
+  // metrics dat ondersteunen.
   evalBudgetMs: 5500,
+  evalBudgetUsd: 0.0050,
 };
 
 // ---------------------------------------------------------------------------
@@ -796,12 +800,11 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_3.version]: V0_3,
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
-  [V0_6_1.version]: V0_6_1,
-  [V0_6_2.version]: V0_6_2,
+  [V0_6.version]: V0_6,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_6_2.version;
+export const LATEST_BOT_VERSION = V0_6.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -810,8 +813,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_3.version,
   V0_4.version,
   V0_5.version,
-  V0_6_1.version,
-  V0_6_2.version,
+  V0_6.version,
 ];
 
 /**

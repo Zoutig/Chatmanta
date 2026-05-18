@@ -60,7 +60,10 @@ function show(label: string, fn: () => void) {
 }
 
 const v05 = BOTS['v0.5'];
-const v061 = BOTS['v0.6.1'];
+// v0.6 inherit'd matchedSpanContext=true van het v0.6.1-experiment.
+// Voor test-purposes blijft de variable-naam `v061` om de assertions
+// stabiel te houden — het IS dezelfde matched-span feature.
+const v061 = BOTS['v0.6'];
 
 const sampleChunks: ChunkLike[] = [
   {
