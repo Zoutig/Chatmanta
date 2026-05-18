@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { HubBackground } from '../components/home/hub-background';
 import { HubCard } from '../components/home/hub-card';
 import { AnimatedThemeToggler } from '../components/ui/animated-theme-toggler';
+import { HomeAccentPicker } from './components/home-accent-picker';
 
 export const metadata: Metadata = {
   title: 'ChatManta · Home',
@@ -17,6 +18,7 @@ export default function HomePage() {
       style={{ background: '#02060c', color: '#eaf6fb' }}
     >
       <HubBackground />
+      <HomeAccentPicker />
 
       {/* Top-bar */}
       <header className="relative z-10 flex items-center justify-between px-5 md:px-10 pt-6 md:pt-8">
