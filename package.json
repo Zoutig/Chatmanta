@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@ark-ui/react": "^5.36.2",
     "@paper-design/shaders-react": "^0.0.76",
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/ssr": "^0.10.3",
