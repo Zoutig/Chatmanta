@@ -21,8 +21,8 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: '/commandcenter', label: 'Dashboard', icon: 'command', status: 'live' },
   { href: '/commandcenter/tasks', label: 'Taken', icon: 'list', status: 'live' },
-  { href: '/commandcenter/roadmap', label: 'Roadmap', icon: 'sparkle', status: 'soon' },
-  { href: '/commandcenter/milestones', label: 'Milestones', icon: 'check', status: 'soon' },
+  { href: '/commandcenter/roadmap', label: 'Roadmap', icon: 'sparkle', status: 'live' },
+  { href: '/commandcenter/milestones', label: 'Milestones', icon: 'check', status: 'live' },
   { href: '/commandcenter/checkins', label: 'Check-ins', icon: 'refresh', status: 'soon' },
   { href: '/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'soon' },
   { href: '/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'soon' },

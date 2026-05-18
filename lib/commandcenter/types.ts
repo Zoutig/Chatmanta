@@ -141,3 +141,86 @@ export function compareTasks(a: Task, b: Task): number {
   if (da !== db) return da < db ? -1 : 1;
   return STATUS_RANK[a.status] - STATUS_RANK[b.status];
 }
+
+// ---------------------------------------------------------------------------
+// Milestone types — PR 2 toevoeging.
+// SQL-CHECK-constraints in 0026_commandcenter_milestones.sql spiegelen exact
+// MILESTONE_STATUSES.
+// ---------------------------------------------------------------------------
+
+export const MILESTONE_STATUSES = [
+  'Niet gestart',
+  'Bezig',
+  'Geblokkeerd',
+  'Afgerond',
+] as const;
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
+
+export type Milestone = {
+  id: string;
+  title: string;
+  description: string | null;
+  roadmapPhase: RoadmapPhase;
+  owner: Owner;
+  status: MilestoneStatus;
+  deadline: string | null;
+  acceptanceCriteria: string[];
+  linkedTaskIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MilestoneInput = {
+  title: string;
+  description?: string | null;
+  roadmapPhase?: RoadmapPhase;
+  owner?: Owner;
+  status?: MilestoneStatus;
+  deadline?: string | null;
+  acceptanceCriteria?: string[];
+  linkedTaskIds?: string[];
+};
+
+export type MilestonePatch = Partial<Omit<MilestoneInput, 'title'>> & { title?: string };
+
+export const MILESTONE_DEFAULTS = {
+  status: 'Niet gestart' as MilestoneStatus,
+  owner: 'Nog toe te wijzen' as Owner,
+  roadmapPhase: 'v1' as RoadmapPhase,
+};
+
+const MILESTONE_STATUS_RANK: Record<MilestoneStatus, number> = {
+  Bezig: 0,
+  Geblokkeerd: 1,
+  'Niet gestart': 2,
+  Afgerond: 3,
+};
+
+export function compareMilestones(a: Milestone, b: Milestone): number {
+  const sr = MILESTONE_STATUS_RANK[a.status] - MILESTONE_STATUS_RANK[b.status];
+  if (sr !== 0) return sr;
+  const da = a.deadline ?? '9999-12-31';
+  const db = b.deadline ?? '9999-12-31';
+  if (da !== db) return da < db ? -1 : 1;
+  return a.title.localeCompare(b.title);
+}
+
+/** Voortgang: afgeronde-milestones / totaal (zie goal-prompt §25). Fallback
+ *  naar taken als er geen milestones in de fase zijn. Returns 0..1. */
+export function computePhaseProgress(
+  milestones: Milestone[],
+  tasks: Task[],
+  phase: RoadmapPhase,
+): { done: number; total: number; ratio: number; source: 'milestones' | 'tasks' | 'empty' } {
+  const phaseMs = milestones.filter((m) => m.roadmapPhase === phase);
+  if (phaseMs.length > 0) {
+    const done = phaseMs.filter((m) => m.status === 'Afgerond').length;
+    return { done, total: phaseMs.length, ratio: done / phaseMs.length, source: 'milestones' };
+  }
+  const phaseTasks = tasks.filter((t) => t.roadmapPhase === phase);
+  if (phaseTasks.length > 0) {
+    const done = phaseTasks.filter((t) => t.status === 'Klaar').length;
+    return { done, total: phaseTasks.length, ratio: done / phaseTasks.length, source: 'tasks' };
+  }
+  return { done: 0, total: 0, ratio: 0, source: 'empty' };
+}

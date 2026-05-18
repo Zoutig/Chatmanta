@@ -5,10 +5,12 @@
 // rood/oranje — bewust afwijkend van het globale palet zodat ze "schreeuwen".
 
 import type {
+  MilestoneStatus,
   Owner,
   Priority,
   TaskStatus,
 } from '@/lib/commandcenter/types';
+import type { PhaseStatus } from '@/lib/commandcenter/roadmap-phases';
 
 type ChipProps = {
   label: string;
@@ -125,6 +127,103 @@ export function OverdueBadge() {
       border="rgba(220,90,90,0.46)"
       color="#ffb3b3"
     />
+  );
+}
+
+export function MilestoneStatusBadge({ status }: { status: MilestoneStatus }) {
+  const map: Record<MilestoneStatus, Omit<ChipProps, 'label'>> = {
+    'Niet gestart': {
+      bg: 'rgba(120,200,230,0.06)',
+      border: 'rgba(120,200,230,0.16)',
+      color: 'rgba(207,232,240,0.6)',
+    },
+    Bezig: {
+      bg: 'rgba(140,200,120,0.10)',
+      border: 'rgba(140,200,120,0.28)',
+      color: '#b7e9a3',
+    },
+    Geblokkeerd: {
+      bg: 'rgba(220,90,90,0.12)',
+      border: 'rgba(220,90,90,0.34)',
+      color: '#f1a5a5',
+    },
+    Afgerond: {
+      bg: 'color-mix(in oklab, var(--manta-accent) 14%, transparent)',
+      border: 'color-mix(in oklab, var(--manta-accent) 32%, transparent)',
+      color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+    },
+  };
+  return <Chip label={status} {...map[status]} />;
+}
+
+export function PhaseStatusBadge({ status }: { status: PhaseStatus }) {
+  const map: Record<PhaseStatus, Omit<ChipProps, 'label'>> = {
+    'Niet gestart': {
+      bg: 'rgba(120,200,230,0.06)',
+      border: 'rgba(120,200,230,0.16)',
+      color: 'rgba(207,232,240,0.6)',
+    },
+    Actief: {
+      bg: 'color-mix(in oklab, var(--manta-accent) 18%, transparent)',
+      border: 'color-mix(in oklab, var(--manta-accent) 40%, transparent)',
+      color: 'color-mix(in oklab, var(--manta-accent) 32%, #ffffff)',
+    },
+    'Bijna klaar': {
+      bg: 'rgba(140,200,120,0.10)',
+      border: 'rgba(140,200,120,0.28)',
+      color: '#b7e9a3',
+    },
+    Afgerond: {
+      bg: 'rgba(120,200,230,0.05)',
+      border: 'rgba(120,200,230,0.12)',
+      color: 'rgba(155,213,224,0.55)',
+    },
+    Gepauzeerd: {
+      bg: 'rgba(230,180,90,0.10)',
+      border: 'rgba(230,180,90,0.30)',
+      color: '#f0d39a',
+    },
+  };
+  return <Chip label={status} {...map[status]} />;
+}
+
+export function ProgressBar({
+  ratio,
+  height = 6,
+  tone = 'default',
+}: {
+  ratio: number;
+  height?: number;
+  tone?: 'default' | 'muted';
+}) {
+  const pct = Math.max(0, Math.min(1, ratio)) * 100;
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      style={{
+        width: '100%',
+        height,
+        borderRadius: 999,
+        background: 'rgba(255,255,255,0.05)',
+        overflow: 'hidden',
+        border: '1px solid rgba(120,200,230,0.10)',
+      }}
+    >
+      <div
+        style={{
+          width: `${pct}%`,
+          height: '100%',
+          background:
+            tone === 'muted'
+              ? 'rgba(155,213,224,0.45)'
+              : 'linear-gradient(90deg, color-mix(in oklab, var(--manta-accent) 70%, transparent), color-mix(in oklab, var(--manta-accent) 100%, transparent))',
+          transition: 'width 320ms ease',
+        }}
+      />
+    </div>
   );
 }
 

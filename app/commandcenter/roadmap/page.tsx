@@ -1,7 +1,4 @@
-// Command Center — Dashboard (default route).
-//
-// Server-side data-fetch: ensureSeeded() en ensureMilestonesSeeded() runnen
-// idempotent op eerste load zodat de cockpit direct gevuld is.
+// Command Center — Roadmap pagina.
 
 import { ensureSeeded, listTasks } from '@/lib/commandcenter/server/storage';
 import {
@@ -9,11 +6,11 @@ import {
   listMilestones,
   resolvePhaseStatuses,
 } from '@/lib/commandcenter/server/milestones';
-import { DashboardClient } from './components/dashboard-client';
+import { RoadmapClient } from '../components/roadmap-client';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CommandCenterDashboardPage() {
+export default async function CommandCenterRoadmapPage() {
   await ensureSeeded();
   await ensureMilestonesSeeded();
   const [tasks, milestones, phaseStatuses] = await Promise.all([
@@ -22,8 +19,8 @@ export default async function CommandCenterDashboardPage() {
     resolvePhaseStatuses(),
   ]);
   return (
-    <DashboardClient
-      initialTasks={tasks}
+    <RoadmapClient
+      tasks={tasks}
       milestones={milestones}
       phaseStatuses={phaseStatuses}
     />

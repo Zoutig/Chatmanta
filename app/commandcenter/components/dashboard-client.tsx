@@ -1,13 +1,14 @@
 'use client';
 
 // DashboardClient — orkestreert modal-state + render van alle dashboard
-// secties. Server component (page.tsx) levert initialTasks; na een mutatie
-// triggert de server-action revalidatePath waardoor de page re-rendert en
-// we verse data binnenkrijgen.
+// secties. Server component (page.tsx) levert initialTasks + milestones +
+// phaseStatuses; na een mutatie triggert de server-action revalidatePath
+// waardoor de page re-rendert en we verse data binnenkrijgen.
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { Task } from '@/lib/commandcenter/types';
+import type { Milestone, RoadmapPhase, Task } from '@/lib/commandcenter/types';
+import type { PhaseStatus } from '@/lib/commandcenter/roadmap-phases';
 import { OwnerTodoPanel } from './owner-todo-panel';
 import { TaskModal } from './task-modal';
 import {
@@ -16,10 +17,21 @@ import {
   FocusOfWeek,
   OverduePanel,
   QuickStats,
+  RoadmapProgress,
 } from './dashboard-widgets';
 import { Icon } from '@/app/components/svg-icons';
 
-export function DashboardClient({ initialTasks }: { initialTasks: Task[] }) {
+type DashboardClientProps = {
+  initialTasks: Task[];
+  milestones: Milestone[];
+  phaseStatuses: Record<RoadmapPhase, PhaseStatus>;
+};
+
+export function DashboardClient({
+  initialTasks,
+  milestones,
+  phaseStatuses,
+}: DashboardClientProps) {
   const router = useRouter();
   const [editing, setEditing] = useState<Task | null>(null);
   const [mode, setMode] = useState<'closed' | 'create' | 'edit'>('closed');
@@ -130,7 +142,13 @@ export function DashboardClient({ initialTasks }: { initialTasks: Task[] }) {
       <OverduePanel tasks={initialTasks} onTaskClick={openEdit} />
       <DecisionsNeededPanel tasks={initialTasks} onTaskClick={openEdit} />
 
-      {/* Roadmap placeholder — PR 2 */}
+      <RoadmapProgress
+        tasks={initialTasks}
+        milestones={milestones}
+        phaseStatuses={phaseStatuses}
+      />
+
+      {/* Placeholder voor PR 3 features */}
       <section
         style={{
           background: 'rgba(255,255,255,0.02)',
@@ -141,8 +159,8 @@ export function DashboardClient({ initialTasks }: { initialTasks: Task[] }) {
           fontSize: 13,
         }}
       >
-        Roadmap-voortgang, milestones, check-ins, beslissingen en sales-pipeline
-        komen in de volgende PRs.
+        Wekelijkse check-ins, beslissingenlog en sales-pipeline komen in de
+        volgende PR.
       </section>
 
       <TaskModal

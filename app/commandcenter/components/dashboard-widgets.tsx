@@ -1,13 +1,20 @@
 'use client';
 
 // Dashboard widgets — QuickStats, BlockedPanel, OverduePanel,
-// DecisionsNeededPanel, FocusOfWeek. Allemaal presentational + click-to-edit
-// via onTaskClick.
+// DecisionsNeededPanel, FocusOfWeek, RoadmapProgress. Allemaal presentational
+// + click-to-edit via onTaskClick.
 
-import type { Task } from '@/lib/commandcenter/types';
-import { isOverdue } from '@/lib/commandcenter/types';
+import Link from 'next/link';
+import {
+  computePhaseProgress,
+  isOverdue,
+  type Milestone,
+  type RoadmapPhase,
+  type Task,
+} from '@/lib/commandcenter/types';
+import { getActivePhase, getPhaseInfo, type PhaseStatus } from '@/lib/commandcenter/roadmap-phases';
 import { TaskCard } from './task-card';
-import { OwnerBadge } from './badges';
+import { MilestoneStatusBadge, OwnerBadge, PhaseStatusBadge, ProgressBar } from './badges';
 
 // ---------------------------------------------------------------------------
 // QuickStats
@@ -392,4 +399,177 @@ function getWeekNumber(date: Date): number {
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+// ---------------------------------------------------------------------------
+// RoadmapProgress — dashboard-widget voor de actieve fase.
+// ---------------------------------------------------------------------------
+
+export function RoadmapProgress({
+  tasks,
+  milestones,
+  phaseStatuses,
+}: {
+  tasks: Task[];
+  milestones: Milestone[];
+  phaseStatuses: Record<RoadmapPhase, PhaseStatus>;
+}) {
+  const activePhase = getActivePhase();
+  const info = getPhaseInfo(activePhase);
+  const status = phaseStatuses[activePhase];
+  const progress = computePhaseProgress(milestones, tasks, activePhase);
+  const phaseMs = milestones.filter((m) => m.roadmapPhase === activePhase);
+  const openMs = phaseMs.filter((m) => m.status !== 'Afgerond').slice(0, 4);
+  const linkedP1 = tasks
+    .filter((t) => t.roadmapPhase === activePhase && t.priority === 'P1' && t.status !== 'Klaar')
+    .slice(0, 3);
+
+  return (
+    <section
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid color-mix(in oklab, var(--manta-accent) 22%, transparent)',
+        borderRadius: 18,
+        padding: 20,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 17,
+              fontWeight: 600,
+              fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+              letterSpacing: '-0.01em',
+              color: '#eaf6fb',
+            }}
+          >
+            Roadmap-voortgang · {info.label}
+          </h3>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'rgba(207,232,240,0.6)' }}>
+            {info.goal}
+          </p>
+        </div>
+        <PhaseStatusBadge status={status} />
+      </header>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            fontSize: 12,
+          }}
+        >
+          <span style={{ color: 'rgba(207,232,240,0.55)' }}>
+            {progress.source === 'milestones'
+              ? `${progress.done} / ${progress.total} milestones afgerond`
+              : progress.source === 'tasks'
+                ? `${progress.done} / ${progress.total} taken klaar (fallback)`
+                : 'Nog niets ingepland'}
+          </span>
+          {progress.total > 0 && (
+            <span style={{ color: '#eaf6fb', fontWeight: 600 }}>
+              {Math.round(progress.ratio * 100)}%
+            </span>
+          )}
+        </div>
+        {progress.total > 0 && (
+          <ProgressBar ratio={progress.ratio} tone={progress.source === 'tasks' ? 'muted' : 'default'} />
+        )}
+      </div>
+
+      {(openMs.length > 0 || linkedP1.length > 0) && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12,
+          }}
+        >
+          {openMs.length > 0 && (
+            <div>
+              <h4
+                style={{
+                  margin: '0 0 6px',
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'rgba(207,232,240,0.5)',
+                  fontWeight: 500,
+                }}
+              >
+                Open milestones
+              </h4>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {openMs.map((m) => (
+                  <li key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MilestoneStatusBadge status={m.status} />
+                    <span style={{ fontSize: 13, color: '#eaf6fb' }}>{m.title}</span>
+                  </li>
+                ))}
+                {phaseMs.length - openMs.length > 0 && (
+                  <li style={{ fontSize: 11.5, color: 'rgba(155,213,224,0.55)' }}>
+                    + {phaseMs.length - openMs.length} meer afgerond
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          {linkedP1.length > 0 && (
+            <div>
+              <h4
+                style={{
+                  margin: '0 0 6px',
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'rgba(207,232,240,0.5)',
+                  fontWeight: 500,
+                }}
+              >
+                P1-taken in deze fase
+              </h4>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {linkedP1.map((t) => (
+                  <li key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <OwnerBadge owner={t.owner} />
+                    <span style={{ fontSize: 13, color: '#eaf6fb' }}>{t.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Link
+        href="/commandcenter/roadmap"
+        style={{
+          fontSize: 12.5,
+          color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+          textDecoration: 'none',
+          marginTop: 2,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        Open volledige roadmap →
+      </Link>
+    </section>
+  );
 }
