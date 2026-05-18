@@ -134,7 +134,8 @@ export default function HomePage() {
               iconName="panel-right"
               title="Klant-experience · Widget"
               description="Bekijk en test de klantzijde van de chatwidget."
-              badge="Binnenkort"
+              href="/widget"
+              cta="Open demo"
             />
           </div>
 
