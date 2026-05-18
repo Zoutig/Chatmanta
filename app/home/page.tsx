@@ -119,6 +119,14 @@ export default function HomePage() {
               cta="Open admintool"
             />
             <HubCard
+              variant="primary"
+              iconName="command"
+              title="Command Center"
+              description="Founder cockpit voor taken, roadmap en testklanten."
+              href="/commandcenter"
+              cta="Open command center"
+            />
+            <HubCard
               iconName="monitor"
               title="Klantendashboard v0"
               description="Bekijk klantdata, instellingen en prestaties."
