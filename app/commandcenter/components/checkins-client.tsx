@@ -54,15 +54,13 @@ export function CheckInsClient({ checkIns }: Props) {
               fontWeight: 700,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.02em',
-              background: 'linear-gradient(180deg, #f3fbff 0%, #b8dfe9 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: 'var(--fg)',
               backgroundClip: 'text',
             }}
           >
             Wekelijkse check-ins
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: 14, color: 'rgba(207,232,240,0.62)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--fg-muted)' }}>
             Korte retro per week: wat afgerond, wat niet, en de 3 prioriteiten
             voor de week erna.
           </p>
@@ -73,7 +71,7 @@ export function CheckInsClient({ checkIns }: Props) {
           style={{
             background: 'var(--manta-accent)',
             border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-            color: '#03171a',
+            color: 'var(--accent-fg)',
             padding: '10px 16px',
             borderRadius: 12,
             fontSize: 13.5,
@@ -94,10 +92,10 @@ export function CheckInsClient({ checkIns }: Props) {
       {checkIns.length === 0 && (
         <div
           style={{
-            border: '1px dashed rgba(120,200,230,0.18)',
+            border: '1px dashed var(--border-strong)',
             borderRadius: 16,
             padding: 32,
-            color: 'rgba(207,232,240,0.55)',
+            color: 'var(--fg-muted)',
             fontSize: 14,
             textAlign: 'center',
           }}
@@ -114,8 +112,8 @@ export function CheckInsClient({ checkIns }: Props) {
             <article
               key={c.id}
               style={{
-                background: 'rgba(255,255,255,0.025)',
-                border: '1px solid rgba(120,200,230,0.12)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
                 borderRadius: 14,
                 padding: 16,
               }}
@@ -144,7 +142,7 @@ export function CheckInsClient({ checkIns }: Props) {
                     style={{
                       margin: '2px 0 0',
                       fontSize: 12,
-                      color: 'rgba(207,232,240,0.55)',
+                      color: 'var(--fg-muted)',
                     }}
                   >
                     {c.date} · {c.attendees.length > 0 ? c.attendees.join(', ') : 'Geen aanwezigen'}
@@ -156,8 +154,8 @@ export function CheckInsClient({ checkIns }: Props) {
                     onClick={() => setExpandedId(expanded ? null : c.id)}
                     style={{
                       background: 'transparent',
-                      border: '1px solid rgba(120,200,230,0.18)',
-                      color: 'rgba(207,232,240,0.78)',
+                      border: '1px solid var(--border-strong)',
+                      color: 'var(--fg)',
                       padding: '6px 10px',
                       borderRadius: 8,
                       fontSize: 12,
@@ -171,8 +169,8 @@ export function CheckInsClient({ checkIns }: Props) {
                     onClick={() => openEdit(c)}
                     style={{
                       background: 'transparent',
-                      border: '1px solid rgba(120,200,230,0.18)',
-                      color: 'rgba(207,232,240,0.78)',
+                      border: '1px solid var(--border-strong)',
+                      color: 'var(--fg)',
                       padding: '6px 10px',
                       borderRadius: 8,
                       fontSize: 12,
@@ -201,8 +199,8 @@ export function CheckInsClient({ checkIns }: Props) {
                     <span
                       key={i}
                       style={{
-                        background: 'rgba(120,200,230,0.08)',
-                        border: '1px solid rgba(120,200,230,0.16)',
+                        background: 'var(--border)',
+                        border: '1px solid var(--border-strong)',
                         borderRadius: 999,
                         padding: '3px 10px',
                         fontSize: 11.5,
@@ -223,7 +221,7 @@ export function CheckInsClient({ checkIns }: Props) {
                     gridTemplateColumns: '1fr 1fr',
                     gap: 14,
                     fontSize: 13,
-                    color: 'rgba(207,232,240,0.82)',
+                    color: 'var(--fg)',
                   }}
                 >
                   <Section title="Afgerond" text={c.completed} />
@@ -268,7 +266,7 @@ function Section({ title, text }: { title: string; text: string }) {
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
-          color: 'rgba(207,232,240,0.55)',
+          color: 'var(--fg-muted)',
           fontWeight: 500,
         }}
       >
@@ -278,7 +276,7 @@ function Section({ title, text }: { title: string; text: string }) {
         style={{
           margin: '4px 0 0',
           whiteSpace: 'pre-wrap',
-          color: text ? 'rgba(207,232,240,0.82)' : 'rgba(207,232,240,0.38)',
+          color: text ? 'var(--fg)' : 'var(--fg-faint)',
         }}
       >
         {text || '—'}
@@ -296,14 +294,14 @@ function BulletSection({ title, items }: { title: string; items: string[] }) {
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
-          color: 'rgba(207,232,240,0.55)',
+          color: 'var(--fg-muted)',
           fontWeight: 500,
         }}
       >
         {title}
       </h4>
       {items.length === 0 ? (
-        <p style={{ margin: '4px 0 0', color: 'rgba(207,232,240,0.38)' }}>—</p>
+        <p style={{ margin: '4px 0 0', color: 'var(--fg-faint)' }}>—</p>
       ) : (
         <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
           {items.map((x, i) => (

@@ -71,7 +71,7 @@ export function MilestonesClient({ milestones, tasks }: Props) {
               fontWeight: 700,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.02em',
-              color: '#eaf6fb',
+              color: 'var(--fg)',
             }}
           >
             Milestones
@@ -80,7 +80,7 @@ export function MilestonesClient({ milestones, tasks }: Props) {
             style={{
               margin: '6px 0 0',
               fontSize: 13.5,
-              color: 'rgba(207,232,240,0.62)',
+              color: 'var(--fg-muted)',
             }}
           >
             {milestones.length} milestone{milestones.length === 1 ? '' : 's'} — {visible.length} zichtbaar.
@@ -92,7 +92,7 @@ export function MilestonesClient({ milestones, tasks }: Props) {
           style={{
             background: 'var(--manta-accent)',
             border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-            color: '#03171a',
+            color: 'var(--accent-fg)',
             padding: '10px 16px',
             borderRadius: 12,
             fontSize: 13.5,
@@ -133,12 +133,12 @@ export function MilestonesClient({ milestones, tasks }: Props) {
         <p
           style={{
             fontSize: 13.5,
-            color: 'rgba(207,232,240,0.5)',
+            color: 'var(--fg-muted)',
             fontStyle: 'italic',
             padding: 24,
             textAlign: 'center',
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(120,200,230,0.12)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 14,
           }}
         >
@@ -150,8 +150,8 @@ export function MilestonesClient({ milestones, tasks }: Props) {
             display: 'flex',
             flexDirection: 'column',
             gap: 8,
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(120,200,230,0.12)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 14,
             padding: 10,
           }}
@@ -164,11 +164,11 @@ export function MilestonesClient({ milestones, tasks }: Props) {
               style={{
                 textAlign: 'left',
                 background: 'transparent',
-                border: '1px solid rgba(120,200,230,0.10)',
+                border: '1px solid var(--border)',
                 borderRadius: 10,
                 padding: '12px 14px',
                 cursor: 'pointer',
-                color: '#eaf6fb',
+                color: 'var(--fg)',
                 display: 'grid',
                 gridTemplateColumns: 'minmax(0, 1fr) auto',
                 gap: 12,
@@ -180,19 +180,19 @@ export function MilestonesClient({ milestones, tasks }: Props) {
                   style={{
                     fontSize: 14,
                     fontWeight: 500,
-                    color: m.status === 'Afgerond' ? 'rgba(207,232,240,0.55)' : '#eaf6fb',
+                    color: m.status === 'Afgerond' ? 'var(--fg-muted)' : 'var(--fg)',
                     textDecoration: m.status === 'Afgerond' ? 'line-through' : 'none',
                   }}
                 >
                   {m.title}
                 </span>
                 {m.description && (
-                  <span style={{ fontSize: 12.5, color: 'rgba(207,232,240,0.58)' }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--fg-muted)' }}>
                     {m.description}
                   </span>
                 )}
                 {m.acceptanceCriteria.length > 0 && (
-                  <span style={{ fontSize: 11.5, color: 'rgba(155,213,224,0.55)' }}>
+                  <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
                     {m.acceptanceCriteria.length} acceptatie-criteri
                     {m.acceptanceCriteria.length === 1 ? 'um' : 'a'}
                     {m.linkedTaskIds.length > 0 &&
@@ -206,9 +206,9 @@ export function MilestonesClient({ milestones, tasks }: Props) {
                     fontSize: 11,
                     padding: '3px 8px',
                     borderRadius: 999,
-                    background: 'rgba(120,200,230,0.05)',
-                    border: '1px solid rgba(120,200,230,0.14)',
-                    color: 'rgba(155,213,224,0.7)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-strong)',
+                    color: 'var(--fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em',
                   }}
@@ -217,7 +217,7 @@ export function MilestonesClient({ milestones, tasks }: Props) {
                 </span>
                 <MilestoneStatusBadge status={m.status} />
                 <OwnerBadge owner={m.owner} />
-                <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.55)' }}>
+                <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                   {formatDeadline(m.deadline)}
                 </span>
               </div>
@@ -254,13 +254,13 @@ function FilterChip({
       style={{
         background: active
           ? 'color-mix(in oklab, var(--manta-accent) 18%, transparent)'
-          : 'rgba(255,255,255,0.03)',
+          : 'var(--surface)',
         border: active
           ? '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
-          : '1px solid rgba(120,200,230,0.14)',
+          : '1px solid var(--border-strong)',
         color: active
           ? 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)'
-          : 'rgba(207,232,240,0.72)',
+          : 'var(--fg)',
         padding: '6px 12px',
         borderRadius: 999,
         fontSize: 12.5,

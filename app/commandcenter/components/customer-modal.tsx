@@ -18,6 +18,13 @@ import {
   updateCustomerAction,
 } from '@/app/actions/commandcenter';
 import { Icon } from '@/app/components/svg-icons';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select';
 
 type Props = {
   open: boolean;
@@ -93,16 +100,16 @@ const labelStyle: React.CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'rgba(207,232,240,0.55)',
+  color: 'var(--fg-muted)',
   fontWeight: 500,
 };
 const fieldStyle: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(120,200,230,0.16)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 10,
   padding: '8px 12px',
-  color: '#eaf6fb',
+  color: 'var(--fg)',
   fontSize: 14,
   outline: 'none',
 };
@@ -185,7 +192,7 @@ export function CustomerModal({
         position: 'fixed',
         inset: 0,
         zIndex: 50,
-        background: 'rgba(2, 6, 12, 0.74)',
+        background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
@@ -199,14 +206,13 @@ export function CustomerModal({
         style={{
           width: '100%',
           maxWidth: 720,
-          background:
-            'linear-gradient(180deg, rgba(20,32,42,0.94), rgba(10,18,26,0.94))',
-          border: '1px solid rgba(120,200,230,0.18)',
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--border-strong)',
           borderRadius: 20,
           boxShadow:
-            '0 24px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04)',
+            '0 24px 80px -24px rgba(0,0,0,0.45), inset 0 1px 0 var(--surface-2)',
           padding: 24,
-          color: '#eaf6fb',
+          color: 'var(--fg)',
         }}
       >
         <div
@@ -233,14 +239,14 @@ export function CustomerModal({
             aria-label="Sluit"
             style={{
               background: 'transparent',
-              border: '1px solid rgba(120,200,230,0.18)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 999,
               width: 32,
               height: 32,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'rgba(207,232,240,0.7)',
+              color: 'var(--fg-muted)',
               cursor: 'pointer',
             }}
           >
@@ -308,31 +314,35 @@ export function CustomerModal({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => set('status', e.target.value as CustomerStatus)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {CUSTOMER_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => set('status', v as CustomerStatus)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CUSTOMER_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Eigenaar</label>
-              <select
-                value={form.owner}
-                onChange={(e) => set('owner', e.target.value as Owner)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {OWNERS.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select
+                  value={form.owner}
+                  onValueChange={(v) => set('owner', v as Owner)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OWNERS.map((o) => (
+                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -373,7 +383,7 @@ export function CustomerModal({
               alignItems: 'center',
               gap: 8,
               fontSize: 13,
-              color: 'rgba(207,232,240,0.78)',
+              color: 'var(--fg)',
               cursor: 'pointer',
             }}
           >
@@ -389,7 +399,7 @@ export function CustomerModal({
             <p
               style={{
                 fontSize: 13,
-                color: '#f1a5a5',
+                color: 'var(--err)',
                 margin: 0,
                 background: 'rgba(220,90,90,0.10)',
                 border: '1px solid rgba(220,90,90,0.30)',
@@ -419,7 +429,7 @@ export function CustomerModal({
                 style={{
                   background: confirmDelete ? 'rgba(220,90,90,0.18)' : 'transparent',
                   border: '1px solid rgba(220,90,90,0.34)',
-                  color: '#f1a5a5',
+                  color: 'var(--err)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -444,8 +454,8 @@ export function CustomerModal({
                 disabled={pending}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(120,200,230,0.18)',
-                  color: 'rgba(207,232,240,0.7)',
+                  border: '1px solid var(--border-strong)',
+                  color: 'var(--fg-muted)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -460,10 +470,10 @@ export function CustomerModal({
                 onClick={submit}
                 disabled={pending}
                 style={{
-                  background: 'var(--manta-accent)',
+                  background: 'var(--manta-accent, var(--accent))',
                   border:
-                    '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-                  color: '#03171a',
+                    '1px solid color-mix(in oklab, var(--manta-accent, var(--accent)) 50%, transparent)',
+                  color: 'var(--accent-fg)',
                   padding: '8px 16px',
                   borderRadius: 10,
                   fontSize: 13,

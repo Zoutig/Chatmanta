@@ -88,9 +88,7 @@ export function DashboardClient({
               fontWeight: 700,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.02em',
-              background: 'linear-gradient(180deg, #f3fbff 0%, #b8dfe9 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: 'var(--fg)',
               backgroundClip: 'text',
             }}
           >
@@ -100,7 +98,7 @@ export function DashboardClient({
             style={{
               margin: '6px 0 0',
               fontSize: 14,
-              color: 'rgba(207,232,240,0.62)',
+              color: 'var(--fg-muted)',
             }}
           >
             Founder cockpit voor taken, roadmap, beslissingen en testklanten.
@@ -112,7 +110,7 @@ export function DashboardClient({
           style={{
             background: 'var(--manta-accent)',
             border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-            color: '#03171a',
+            color: 'var(--accent-fg)',
             padding: '10px 16px',
             borderRadius: 12,
             fontSize: 13.5,

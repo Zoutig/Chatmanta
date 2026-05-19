@@ -6,6 +6,7 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   MILESTONE_DEFAULTS,
+  ROADMAP_PHASES,
   type Milestone,
   type MilestoneInput,
   type MilestonePatch,
@@ -202,17 +203,8 @@ export async function resolvePhaseStatuses(): Promise<Record<RoadmapPhase, Phase
   const map: Partial<Record<RoadmapPhase, PhaseStatus>> = {};
   for (const s of stored) map[s.phase] = s.status;
   const out: Record<string, PhaseStatus> = {};
-  for (const info of [
-    'Backlog',
-    'v0',
-    'v0.5',
-    'v0.6',
-    'v1',
-    'v2',
-    'v3',
-    'Later',
-  ] as RoadmapPhase[]) {
-    out[info] = map[info] ?? getPhaseInfo(info).defaultStatus;
+  for (const phase of ROADMAP_PHASES) {
+    out[phase] = map[phase] ?? getPhaseInfo(phase).defaultStatus;
   }
   return out as Record<RoadmapPhase, PhaseStatus>;
 }

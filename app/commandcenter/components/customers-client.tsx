@@ -69,15 +69,13 @@ export function CustomersClient({ customers }: Props) {
               fontWeight: 700,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.02em',
-              background: 'linear-gradient(180deg, #f3fbff 0%, #b8dfe9 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: 'var(--fg)',
               backgroundClip: 'text',
             }}
           >
             Testklanten pipeline
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: 14, color: 'rgba(207,232,240,0.62)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--fg-muted)' }}>
             Van eerste idee tot betaalde klant. Niels = outreach, Sebastiaan =
             tech-demo, Samen = gesprekken / beslissingen.
           </p>
@@ -87,7 +85,7 @@ export function CustomersClient({ customers }: Props) {
             style={{
               display: 'inline-flex',
               gap: 0,
-              border: '1px solid rgba(120,200,230,0.18)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 10,
               overflow: 'hidden',
             }}
@@ -103,7 +101,7 @@ export function CustomersClient({ customers }: Props) {
                       ? 'color-mix(in oklab, var(--manta-accent) 16%, transparent)'
                       : 'transparent',
                   border: 'none',
-                  color: view === v ? '#eaf6fb' : 'rgba(207,232,240,0.68)',
+                  color: view === v ? 'var(--fg)' : 'var(--fg)',
                   padding: '7px 14px',
                   fontSize: 12,
                   cursor: 'pointer',
@@ -119,7 +117,7 @@ export function CustomersClient({ customers }: Props) {
             style={{
               background: 'var(--manta-accent)',
               border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-              color: '#03171a',
+              color: 'var(--accent-fg)',
               padding: '10px 16px',
               borderRadius: 12,
               fontSize: 13.5,
@@ -151,7 +149,7 @@ export function CustomersClient({ customers }: Props) {
                 key={s}
                 style={{
                   background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(120,200,230,0.10)',
+                  border: '1px solid var(--border)',
                   borderRadius: 14,
                   padding: 12,
                   display: 'flex',
@@ -172,7 +170,7 @@ export function CustomersClient({ customers }: Props) {
                   <span
                     style={{
                       fontSize: 11,
-                      color: 'rgba(207,232,240,0.55)',
+                      color: 'var(--fg-muted)',
                       fontWeight: 500,
                     }}
                   >
@@ -187,12 +185,12 @@ export function CustomersClient({ customers }: Props) {
                       onClick={() => openEdit(c)}
                       style={{
                         textAlign: 'left',
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(120,200,230,0.10)',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
                         borderRadius: 10,
                         padding: 10,
                         cursor: 'pointer',
-                        color: '#eaf6fb',
+                        color: 'var(--fg)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 4,
@@ -208,7 +206,7 @@ export function CustomersClient({ customers }: Props) {
                         {c.companyName}
                       </div>
                       {c.contactPerson && (
-                        <div style={{ fontSize: 12, color: 'rgba(207,232,240,0.62)' }}>
+                        <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                           {c.contactPerson}
                         </div>
                       )}
@@ -216,7 +214,7 @@ export function CustomersClient({ customers }: Props) {
                         <div
                           style={{
                             fontSize: 11.5,
-                            color: 'rgba(155,213,224,0.7)',
+                            color: 'var(--fg-muted)',
                             fontStyle: 'italic',
                           }}
                         >
@@ -257,11 +255,11 @@ export function CustomersClient({ customers }: Props) {
                     onClick={() => openCreate(s)}
                     style={{
                       background: 'transparent',
-                      border: '1px dashed rgba(120,200,230,0.20)',
+                      border: '1px dashed var(--border-bright)',
                       borderRadius: 10,
                       padding: '6px 10px',
                       fontSize: 12,
-                      color: 'rgba(155,213,224,0.6)',
+                      color: 'var(--fg-muted)',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -281,10 +279,10 @@ export function CustomersClient({ customers }: Props) {
           {customers.length === 0 ? (
             <div
               style={{
-                border: '1px dashed rgba(120,200,230,0.18)',
+                border: '1px dashed var(--border-strong)',
                 borderRadius: 16,
                 padding: 32,
-                color: 'rgba(207,232,240,0.55)',
+                color: 'var(--fg-muted)',
                 fontSize: 14,
                 textAlign: 'center',
               }}
@@ -299,12 +297,12 @@ export function CustomersClient({ customers }: Props) {
                 onClick={() => openEdit(c)}
                 style={{
                   textAlign: 'left',
-                  background: 'rgba(255,255,255,0.025)',
-                  border: '1px solid rgba(120,200,230,0.12)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
                   borderRadius: 12,
                   padding: 14,
                   cursor: 'pointer',
-                  color: '#eaf6fb',
+                  color: 'var(--fg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -327,7 +325,7 @@ export function CustomersClient({ customers }: Props) {
                           marginLeft: 8,
                           fontSize: 12,
                           fontWeight: 400,
-                          color: 'rgba(207,232,240,0.55)',
+                          color: 'var(--fg-muted)',
                         }}
                       >
                         · {c.companyType}
@@ -338,7 +336,7 @@ export function CustomersClient({ customers }: Props) {
                     <div
                       style={{
                         fontSize: 12,
-                        color: 'rgba(155,213,224,0.7)',
+                        color: 'var(--fg-muted)',
                         fontStyle: 'italic',
                       }}
                     >
@@ -350,7 +348,7 @@ export function CustomersClient({ customers }: Props) {
                   <CustomerStatusBadge status={c.status} />
                   <OwnerBadge owner={c.owner} />
                   {c.lastContactDate && (
-                    <span style={{ fontSize: 11, color: 'rgba(207,232,240,0.5)' }}>
+                    <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
                       Laatst: {c.lastContactDate}
                     </span>
                   )}

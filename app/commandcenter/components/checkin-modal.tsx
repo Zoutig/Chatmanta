@@ -108,16 +108,16 @@ const labelStyle: React.CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'rgba(207,232,240,0.55)',
+  color: 'var(--fg-muted)',
   fontWeight: 500,
 };
 const fieldStyle: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(120,200,230,0.16)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 10,
   padding: '8px 12px',
-  color: '#eaf6fb',
+  color: 'var(--fg)',
   fontSize: 14,
   outline: 'none',
 };
@@ -212,12 +212,12 @@ export function CheckInModal({ open, checkIn, onClose, onSaved }: Props) {
           maxWidth: 760,
           background:
             'linear-gradient(180deg, rgba(20,32,42,0.94), rgba(10,18,26,0.94))',
-          border: '1px solid rgba(120,200,230,0.18)',
+          border: '1px solid var(--border-strong)',
           borderRadius: 20,
           boxShadow:
-            '0 24px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04)',
+            '0 24px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 var(--surface-2)',
           padding: 24,
-          color: '#eaf6fb',
+          color: 'var(--fg)',
         }}
       >
         <div
@@ -244,14 +244,14 @@ export function CheckInModal({ open, checkIn, onClose, onSaved }: Props) {
             aria-label="Sluit"
             style={{
               background: 'transparent',
-              border: '1px solid rgba(120,200,230,0.18)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 999,
               width: 32,
               height: 32,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'rgba(207,232,240,0.7)',
+              color: 'var(--fg-muted)',
               cursor: 'pointer',
             }}
           >
@@ -389,7 +389,7 @@ export function CheckInModal({ open, checkIn, onClose, onSaved }: Props) {
             <p
               style={{
                 fontSize: 13,
-                color: '#f1a5a5',
+                color: 'var(--err)',
                 margin: 0,
                 background: 'rgba(220,90,90,0.10)',
                 border: '1px solid rgba(220,90,90,0.30)',
@@ -419,7 +419,7 @@ export function CheckInModal({ open, checkIn, onClose, onSaved }: Props) {
                 style={{
                   background: confirmDelete ? 'rgba(220,90,90,0.18)' : 'transparent',
                   border: '1px solid rgba(220,90,90,0.34)',
-                  color: '#f1a5a5',
+                  color: 'var(--err)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -444,8 +444,8 @@ export function CheckInModal({ open, checkIn, onClose, onSaved }: Props) {
                 disabled={pending}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(120,200,230,0.18)',
-                  color: 'rgba(207,232,240,0.7)',
+                  border: '1px solid var(--border-strong)',
+                  color: 'var(--fg-muted)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -463,7 +463,7 @@ export function CheckInModal({ open, checkIn, onClose, onSaved }: Props) {
                   background: 'var(--manta-accent)',
                   border:
                     '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-                  color: '#03171a',
+                  color: 'var(--accent-fg)',
                   padding: '8px 16px',
                   borderRadius: 10,
                   fontSize: 13,

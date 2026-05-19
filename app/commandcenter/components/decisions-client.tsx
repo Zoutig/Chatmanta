@@ -77,15 +77,13 @@ export function DecisionsClient({ decisions }: Props) {
               fontWeight: 700,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.02em',
-              background: 'linear-gradient(180deg, #f3fbff 0%, #b8dfe9 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: 'var(--fg)',
               backgroundClip: 'text',
             }}
           >
             Beslissingen
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: 14, color: 'rgba(207,232,240,0.62)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--fg-muted)' }}>
             Logboek van product-, scope- en organisatie-keuzes. Eén plek waar
             &ldquo;dat hadden we toch besloten?&rdquo; opgezocht kan worden.
           </p>
@@ -96,7 +94,7 @@ export function DecisionsClient({ decisions }: Props) {
           style={{
             background: 'var(--manta-accent)',
             border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-            color: '#03171a',
+            color: 'var(--accent-fg)',
             padding: '10px 16px',
             borderRadius: 12,
             fontSize: 13.5,
@@ -133,8 +131,8 @@ export function DecisionsClient({ decisions }: Props) {
                   : 'transparent',
                 border: active
                   ? '1px solid color-mix(in oklab, var(--manta-accent) 34%, transparent)'
-                  : '1px solid rgba(120,200,230,0.16)',
-                color: active ? '#eaf6fb' : 'rgba(207,232,240,0.7)',
+                  : '1px solid var(--border-strong)',
+                color: active ? 'var(--fg)' : 'var(--fg-muted)',
                 borderRadius: 999,
                 padding: '6px 12px',
                 fontSize: 12,
@@ -153,11 +151,11 @@ export function DecisionsClient({ decisions }: Props) {
           onChange={(e) => setSearch(e.target.value)}
           style={{
             width: 220,
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(120,200,230,0.16)',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-strong)',
             borderRadius: 10,
             padding: '7px 12px',
-            color: '#eaf6fb',
+            color: 'var(--fg)',
             fontSize: 13,
             outline: 'none',
           }}
@@ -167,10 +165,10 @@ export function DecisionsClient({ decisions }: Props) {
       {filtered.length === 0 ? (
         <div
           style={{
-            border: '1px dashed rgba(120,200,230,0.18)',
+            border: '1px dashed var(--border-strong)',
             borderRadius: 16,
             padding: 32,
-            color: 'rgba(207,232,240,0.55)',
+            color: 'var(--fg-muted)',
             fontSize: 14,
             textAlign: 'center',
           }}
@@ -186,12 +184,12 @@ export function DecisionsClient({ decisions }: Props) {
               onClick={() => openEdit(d)}
               style={{
                 textAlign: 'left',
-                background: 'rgba(255,255,255,0.025)',
-                border: '1px solid rgba(120,200,230,0.12)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
                 borderRadius: 14,
                 padding: 16,
                 cursor: 'pointer',
-                color: '#eaf6fb',
+                color: 'var(--fg)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
@@ -224,8 +222,8 @@ export function DecisionsClient({ decisions }: Props) {
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
-                        color: 'rgba(207,232,240,0.55)',
-                        background: 'rgba(255,255,255,0.04)',
+                        color: 'var(--fg-muted)',
+                        background: 'var(--surface-2)',
                         border: '1px solid rgba(255,255,255,0.10)',
                         borderRadius: 999,
                         padding: '2px 8px',
@@ -240,7 +238,7 @@ export function DecisionsClient({ decisions }: Props) {
                 <p
                   style={{
                     margin: 0,
-                    color: 'rgba(207,232,240,0.82)',
+                    color: 'var(--fg)',
                     fontSize: 13.5,
                   }}
                 >
@@ -251,7 +249,7 @@ export function DecisionsClient({ decisions }: Props) {
                 <p
                   style={{
                     margin: 0,
-                    color: 'rgba(207,232,240,0.55)',
+                    color: 'var(--fg-muted)',
                     fontSize: 12.5,
                     fontStyle: 'italic',
                   }}
@@ -268,13 +266,13 @@ export function DecisionsClient({ decisions }: Props) {
                   marginTop: 2,
                 }}
               >
-                <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.55)' }}>
+                <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                   {d.date}
                 </span>
-                <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.4)' }}>·</span>
+                <span style={{ fontSize: 12, color: 'var(--fg-faint)' }}>·</span>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {d.decidedBy.length === 0 ? (
-                    <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.4)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--fg-faint)' }}>
                       Niemand
                     </span>
                   ) : (
@@ -283,7 +281,7 @@ export function DecisionsClient({ decisions }: Props) {
                 </div>
                 {d.reviewDate && (
                   <>
-                    <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.4)' }}>·</span>
+                    <span style={{ fontSize: 12, color: 'var(--fg-faint)' }}>·</span>
                     <span style={{ fontSize: 12, color: '#f0d39a' }}>
                       Herzien {d.reviewDate}
                     </span>

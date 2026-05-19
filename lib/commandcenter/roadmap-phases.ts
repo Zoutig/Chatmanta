@@ -50,28 +50,6 @@ export const PHASE_INFO: PhaseInfo[] = [
     defaultStatus: 'Afgerond',
   },
   {
-    phase: 'v0.5',
-    label: 'v0.5 — Werkende interne demo',
-    goal: 'Intern bruikbaar en testbaar maken.',
-    focus: ['betere RAG', 'stabielere antwoorden', 'basis widget', 'testdata', 'bugfixes', 'logging'],
-    defaultStatus: 'Afgerond',
-  },
-  {
-    phase: 'v0.6',
-    label: 'v0.6 — Kwaliteit en betrouwbaarheid',
-    goal: 'Sneller, correcter en betrouwbaarder maken.',
-    focus: [
-      'betere retrieval',
-      'betere bronselectie',
-      'betere fallback wanneer info ontbreekt',
-      'evaluatieset',
-      'latency verbeteren',
-      'hallucinaties verminderen',
-      'antwoordkwaliteit meten',
-    ],
-    defaultStatus: 'Actief',
-  },
-  {
     phase: 'v1',
     label: 'v1 — Eerste praktijkversie',
     goal: 'Bruikbaar voor eerste testklanten.',
@@ -125,5 +103,5 @@ export function getPhaseInfo(phase: RoadmapPhase): PhaseInfo {
 
 /** Welke fase is "actief" — gebruikt op het dashboard voor de focus-widget. */
 export function getActivePhase(): RoadmapPhase {
-  return 'v0.6';
+  return 'v0';
 }
