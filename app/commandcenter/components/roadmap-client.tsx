@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import {
   computePhaseProgress,
+  isMilestoneEffectivelyDone,
   type Milestone,
   type RoadmapPhase,
   type Task,
@@ -228,7 +229,7 @@ function PhaseCard({
             style={{
               background: 'transparent',
               border: '1px solid color-mix(in oklab, var(--manta-accent) 40%, transparent)',
-              color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+              color: 'var(--manta-accent, var(--accent))',
               padding: '6px 12px',
               borderRadius: 10,
               fontSize: 12.5,
@@ -271,6 +272,11 @@ function PhaseCard({
         {progress.total > 0 && (
           <ProgressBar ratio={progress.ratio} tone={progress.source === 'tasks' ? 'muted' : 'default'} />
         )}
+        {progress.source === 'milestones' && progress.taskStats.total > 0 && (
+          <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
+            Taken in deze fase: {progress.taskStats.done} / {progress.taskStats.total} klaar — beweegt live mee
+          </span>
+        )}
       </div>
 
       {/* Focus tags */}
@@ -310,7 +316,10 @@ function PhaseCard({
             Milestones ({milestones.length})
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {milestones.map((m) => (
+            {milestones.map((m) => {
+              const autoDone = m.status !== 'Afgerond' && isMilestoneEffectivelyDone(m, tasks);
+              const looksDone = m.status === 'Afgerond' || autoDone;
+              return (
               <button
                 key={m.id}
                 type="button"
@@ -333,13 +342,31 @@ function PhaseCard({
                     style={{
                       fontSize: 13.5,
                       fontWeight: 500,
-                      color: m.status === 'Afgerond' ? 'var(--fg-muted)' : 'var(--fg)',
-                      textDecoration: m.status === 'Afgerond' ? 'line-through' : 'none',
+                      color: looksDone ? 'var(--fg-muted)' : 'var(--fg)',
+                      textDecoration: looksDone ? 'line-through' : 'none',
                     }}
                   >
                     {m.title}
                   </span>
-                  <span style={{ display: 'inline-flex', gap: 6 }}>
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {autoDone && (
+                      <span
+                        title="Alle gekoppelde taken zijn klaar — open milestone om handmatig op 'Afgerond' te zetten."
+                        style={{
+                          fontSize: 10.5,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          padding: '2px 7px',
+                          borderRadius: 999,
+                          background: 'var(--bd-success-bg)',
+                          border: '1px solid var(--bd-success-border)',
+                          color: 'var(--bd-success-fg)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Auto-klaar
+                      </span>
+                    )}
                     <MilestoneStatusBadge status={m.status} />
                     <OwnerBadge owner={m.owner} />
                   </span>
@@ -370,7 +397,8 @@ function PhaseCard({
                   </span>
                 )}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -203,24 +203,62 @@ export function compareMilestones(a: Milestone, b: Milestone): number {
   return a.title.localeCompare(b.title);
 }
 
+/** Een milestone telt als "effectief afgerond" zodra status='Afgerond', óf
+ *  zodra alle gekoppelde taken (linkedTaskIds) op status='Klaar' staan.
+ *  Zo beweegt roadmap-voortgang live mee met taken zonder DB-write. */
+export function isMilestoneEffectivelyDone(m: Milestone, tasks: Task[]): boolean {
+  if (m.status === 'Afgerond') return true;
+  if (m.linkedTaskIds.length === 0) return false;
+  const linked = tasks.filter((t) => m.linkedTaskIds.includes(t.id));
+  return (
+    linked.length === m.linkedTaskIds.length &&
+    linked.every((t) => t.status === 'Klaar')
+  );
+}
+
+export type PhaseProgress = {
+  done: number;
+  total: number;
+  ratio: number;
+  source: 'milestones' | 'tasks' | 'empty';
+  /** Taken-stats voor deze fase — altijd berekend zodat UI ook bij
+   *  milestones-source een secundaire taken-regel kan tonen. */
+  taskStats: { done: number; total: number };
+};
+
 /** Voortgang: afgeronde-milestones / totaal (zie goal-prompt §25). Fallback
  *  naar taken als er geen milestones in de fase zijn. Returns 0..1. */
 export function computePhaseProgress(
   milestones: Milestone[],
   tasks: Task[],
   phase: RoadmapPhase,
-): { done: number; total: number; ratio: number; source: 'milestones' | 'tasks' | 'empty' } {
+): PhaseProgress {
+  const phaseTasks = tasks.filter((t) => t.roadmapPhase === phase);
+  const taskStats = {
+    done: phaseTasks.filter((t) => t.status === 'Klaar').length,
+    total: phaseTasks.length,
+  };
   const phaseMs = milestones.filter((m) => m.roadmapPhase === phase);
   if (phaseMs.length > 0) {
-    const done = phaseMs.filter((m) => m.status === 'Afgerond').length;
-    return { done, total: phaseMs.length, ratio: done / phaseMs.length, source: 'milestones' };
+    const done = phaseMs.filter((m) => isMilestoneEffectivelyDone(m, tasks)).length;
+    return {
+      done,
+      total: phaseMs.length,
+      ratio: done / phaseMs.length,
+      source: 'milestones',
+      taskStats,
+    };
   }
-  const phaseTasks = tasks.filter((t) => t.roadmapPhase === phase);
-  if (phaseTasks.length > 0) {
-    const done = phaseTasks.filter((t) => t.status === 'Klaar').length;
-    return { done, total: phaseTasks.length, ratio: done / phaseTasks.length, source: 'tasks' };
+  if (taskStats.total > 0) {
+    return {
+      done: taskStats.done,
+      total: taskStats.total,
+      ratio: taskStats.done / taskStats.total,
+      source: 'tasks',
+      taskStats,
+    };
   }
-  return { done: 0, total: 0, ratio: 0, source: 'empty' };
+  return { done: 0, total: 0, ratio: 0, source: 'empty', taskStats };
 }
 
 // ---------------------------------------------------------------------------
