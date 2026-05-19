@@ -29,6 +29,10 @@ const NAV: NavItem[] = [
   { href: '/commandcenter/projects', label: 'Projectgebieden', icon: 'folder', status: 'live' },
 ];
 
+// Accent met fallback: --manta-accent is opt-in (alleen actief onder data-style="glass"),
+// dus binnen Command Center pakken we --accent als die niet gezet is.
+const ACCENT = 'var(--manta-accent, var(--accent))';
+
 export function CommandShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -36,8 +40,8 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
     <div
       style={{
         minHeight: '100vh',
-        background: '#02060c',
-        color: '#eaf6fb',
+        background: 'var(--bg)',
+        color: 'var(--fg)',
         display: 'grid',
         gridTemplateColumns: 'minmax(220px, 240px) 1fr',
       }}
@@ -49,10 +53,12 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
           top: 0,
           alignSelf: 'start',
           height: '100vh',
-          background: 'rgba(255,255,255,0.025)',
-          borderRight: '1px solid rgba(120,200,230,0.10)',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--border)',
           padding: '22px 16px',
           overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <Link
@@ -63,7 +69,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
             gap: 10,
             marginBottom: 26,
             textDecoration: 'none',
-            color: '#eaf6fb',
+            color: 'var(--fg)',
           }}
         >
           <div
@@ -72,7 +78,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
             style={{
               width: 28,
               height: 18,
-              backgroundColor: 'var(--manta-accent)',
+              backgroundColor: ACCENT,
               WebkitMaskImage: "url('/logo/mono-mark.png')",
               maskImage: "url('/logo/mono-mark.png')",
               WebkitMaskSize: 'contain',
@@ -113,15 +119,15 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
                   fontSize: 13.5,
                   fontWeight: 500,
                   color: active
-                    ? '#eaf6fb'
+                    ? 'var(--fg)'
                     : disabled
-                      ? 'rgba(207,232,240,0.36)'
-                      : 'rgba(207,232,240,0.72)',
+                      ? 'var(--fg-faint)'
+                      : 'var(--fg-muted)',
                   background: active
-                    ? 'color-mix(in oklab, var(--manta-accent) 14%, transparent)'
+                    ? `color-mix(in oklab, ${ACCENT} 14%, transparent)`
                     : 'transparent',
                   border: active
-                    ? '1px solid color-mix(in oklab, var(--manta-accent) 30%, transparent)'
+                    ? `1px solid color-mix(in oklab, ${ACCENT} 30%, transparent)`
                     : '1px solid transparent',
                   cursor: disabled ? 'not-allowed' : 'pointer',
                 }}
@@ -134,9 +140,9 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
                       fontSize: 10,
                       textTransform: 'uppercase',
                       letterSpacing: '0.08em',
-                      color: 'rgba(155,213,224,0.48)',
-                      background: 'rgba(120,200,230,0.06)',
-                      border: '1px solid rgba(120,200,230,0.14)',
+                      color: 'var(--fg-faint)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
                       borderRadius: 999,
                       padding: '2px 6px',
                     }}
@@ -163,9 +169,9 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
 
         <div
           style={{
-            marginTop: 28,
+            marginTop: 'auto',
             paddingTop: 18,
-            borderTop: '1px solid rgba(120,200,230,0.10)',
+            borderTop: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -174,7 +180,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/home"
             style={{
-              color: 'rgba(155,213,224,0.7)',
+              color: 'var(--fg-muted)',
               fontSize: 12,
               textDecoration: 'none',
               display: 'inline-flex',

@@ -10,8 +10,7 @@ import { MilestonesClient } from '../components/milestones-client';
 export const dynamic = 'force-dynamic';
 
 export default async function CommandCenterMilestonesPage() {
-  await ensureSeeded();
-  await ensureMilestonesSeeded();
+  await Promise.all([ensureSeeded(), ensureMilestonesSeeded()]);
   const [milestones, tasks] = await Promise.all([listMilestones(), listTasks()]);
   return <MilestonesClient milestones={milestones} tasks={tasks} />;
 }

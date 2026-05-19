@@ -22,6 +22,13 @@ import {
   updateMilestoneAction,
 } from '@/app/actions/commandcenter';
 import { Icon } from '@/app/components/svg-icons';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select';
 
 type Props = {
   open: boolean;
@@ -92,16 +99,16 @@ const labelStyle: React.CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'rgba(207,232,240,0.55)',
+  color: 'var(--fg-muted)',
   fontWeight: 500,
 };
 const fieldStyle: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(120,200,230,0.16)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 10,
   padding: '8px 12px',
-  color: '#eaf6fb',
+  color: 'var(--fg)',
   fontSize: 14,
   outline: 'none',
 };
@@ -199,7 +206,7 @@ export function MilestoneModal({
         position: 'fixed',
         inset: 0,
         zIndex: 50,
-        background: 'rgba(2, 6, 12, 0.74)',
+        background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
@@ -213,18 +220,17 @@ export function MilestoneModal({
         style={{
           width: '100%',
           maxWidth: 720,
-          background:
-            'linear-gradient(180deg, rgba(20,32,42,0.94), rgba(10,18,26,0.94))',
-          border: '1px solid rgba(120,200,230,0.18)',
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--border-strong)',
           borderRadius: 20,
           boxShadow:
-            '0 24px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04)',
+            '0 24px 80px -24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
           padding: 24,
-          color: '#eaf6fb',
+          color: 'var(--fg)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em' }}>
+          <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }}>
             {isEdit ? 'Milestone bewerken' : 'Nieuwe milestone'}
           </h2>
           <button
@@ -233,14 +239,14 @@ export function MilestoneModal({
             aria-label="Sluit"
             style={{
               background: 'transparent',
-              border: '1px solid rgba(120,200,230,0.18)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 999,
               width: 32,
               height: 32,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'rgba(207,232,240,0.7)',
+              color: 'var(--fg-muted)',
               cursor: 'pointer',
             }}
           >
@@ -265,48 +271,45 @@ export function MilestoneModal({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Roadmapfase</label>
-              <select
-                value={form.roadmapPhase}
-                onChange={(e) => set('roadmapPhase', e.target.value as RoadmapPhase)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {ROADMAP_PHASES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.roadmapPhase} onValueChange={(v) => set('roadmapPhase', v as RoadmapPhase)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROADMAP_PHASES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => set('status', e.target.value as MilestoneStatus)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {MILESTONE_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.status} onValueChange={(v) => set('status', v as MilestoneStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MILESTONE_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Eigenaar</label>
-              <select
-                value={form.owner}
-                onChange={(e) => set('owner', e.target.value as Owner)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {OWNERS.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.owner} onValueChange={(v) => set('owner', v as Owner)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OWNERS.map((o) => (
+                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Deadline</label>
@@ -350,8 +353,8 @@ export function MilestoneModal({
                   marginTop: 6,
                   maxHeight: 180,
                   overflowY: 'auto',
-                  background: 'rgba(255,255,255,0.025)',
-                  border: '1px solid rgba(120,200,230,0.12)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
                   borderRadius: 10,
                   padding: 8,
                   display: 'flex',
@@ -372,7 +375,7 @@ export function MilestoneModal({
                         fontSize: 13,
                         cursor: 'pointer',
                         borderRadius: 6,
-                        background: checked ? 'rgba(120,200,230,0.06)' : 'transparent',
+                        background: checked ? 'var(--surface-3)' : 'transparent',
                       }}
                     >
                       <input
@@ -380,11 +383,11 @@ export function MilestoneModal({
                         checked={checked}
                         onChange={() => toggleLinkedTask(t.id)}
                       />
-                      <span style={{ flex: 1, color: '#eaf6fb' }}>{t.title}</span>
+                      <span style={{ flex: 1, color: 'var(--fg)' }}>{t.title}</span>
                       <span
                         style={{
                           fontSize: 11,
-                          color: 'rgba(207,232,240,0.5)',
+                          color: 'var(--fg-muted)',
                           textTransform: 'uppercase',
                           letterSpacing: '0.06em',
                         }}
@@ -402,7 +405,7 @@ export function MilestoneModal({
             <p
               style={{
                 fontSize: 13,
-                color: '#f1a5a5',
+                color: 'var(--err)',
                 margin: 0,
                 background: 'rgba(220,90,90,0.10)',
                 border: '1px solid rgba(220,90,90,0.30)',
@@ -432,7 +435,7 @@ export function MilestoneModal({
                 style={{
                   background: confirmDelete ? 'rgba(220,90,90,0.18)' : 'transparent',
                   border: '1px solid rgba(220,90,90,0.34)',
-                  color: '#f1a5a5',
+                  color: 'var(--err)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -457,8 +460,8 @@ export function MilestoneModal({
                 disabled={pending}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(120,200,230,0.18)',
-                  color: 'rgba(207,232,240,0.7)',
+                  border: '1px solid var(--border-strong)',
+                  color: 'var(--fg-muted)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -473,9 +476,9 @@ export function MilestoneModal({
                 onClick={submit}
                 disabled={pending}
                 style={{
-                  background: 'var(--manta-accent)',
-                  border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-                  color: '#03171a',
+                  background: 'var(--manta-accent, var(--accent))',
+                  border: '1px solid color-mix(in oklab, var(--manta-accent, var(--accent)) 50%, transparent)',
+                  color: 'var(--accent-fg)',
                   padding: '8px 16px',
                   borderRadius: 10,
                   fontSize: 13,
