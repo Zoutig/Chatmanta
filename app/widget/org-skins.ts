@@ -19,22 +19,16 @@ export type OrgSkin = {
   companyName: string;
   /** Korte 1-regel tagline onder de bedrijfsnaam in de header. */
   tagline: string;
-  /** Hero-content (groot blok bovenaan). */
-  hero: {
-    eyebrow: string;
-    title: string;
-    subtitle: string;
-    primaryCta: string;
-    secondaryCta: string;
-  };
-  /** 3-4 feature-cards in de "wat we doen"-sectie. */
-  features: Array<{ title: string; body: string }>;
-  /** 2-3 pricing/service-tiers. */
-  pricing: Array<{ name: string; price: string; perks: string[] }>;
-  /** Korte over-ons / contact-tekst onderaan. */
-  about: { title: string; body: string };
   /** Quick-reply chips die de widget toont bij eerste opening. */
   suggestedQuestions: string[];
+  /**
+   * Sub-pagina's die de fake-website rendert. Elke entry mapt 1:1 naar een
+   * markdown-bestand in `scripts/fixtures/sandbox-orgs/<slug>/`. De eerste
+   * entry is de "home" — `/widget` redirect daar naartoe. Orgs zonder
+   * markdown-bronnen (zoals `dev-org`) krijgen een lege array en worden
+   * uitgesloten via `ORG_SLUGS_WIDGET`.
+   */
+  pages: Array<{ slug: string; navLabel: string; mdFile: string }>;
   /** Primary accent kleur (HEX). Gebruikt voor knoppen, links, accents. */
   primaryColor: string;
   /** Achtergrondkleur van de hele fake-site. */
@@ -49,59 +43,15 @@ const DEV_ORG: OrgSkin = {
   slug: 'dev-org',
   companyName: 'ChatManta',
   tagline: 'AI-klantcontact voor het MKB',
-  hero: {
-    eyebrow: 'CHATMANTA · DEMO',
-    title: 'De vragen van je klanten, 24/7 beantwoord.',
-    subtitle:
-      'Een AI-chatbot die jouw website en documenten kent als zijn broekzak. Klanten krijgen direct antwoord — jij houdt tijd over voor het werk dat ertoe doet.',
-    primaryCta: 'Vraag een demo aan',
-    secondaryCta: 'Lees meer',
-  },
-  features: [
-    {
-      title: 'Leest jouw website',
-      body: 'We crawlen je site, bouwen een kennisbasis en houden die automatisch up-to-date.',
-    },
-    {
-      title: 'Geen hallucinaties',
-      body: 'Antwoorden komen uit jouw content. Geen verzonnen feiten, geen losse gokjes.',
-    },
-    {
-      title: 'In jouw stijl',
-      body: 'Toon, kleur en woordkeuze passen we aan op jouw merk — niet op een generieke AI-stem.',
-    },
-    {
-      title: 'Snel te installeren',
-      body: 'Eén script-tag op je site en je bent live. Wij doen de zware techniek.',
-    },
-  ],
-  pricing: [
-    {
-      name: 'Starter',
-      price: '€49 / mnd',
-      perks: ['1 website', 'tot 500 chats / maand', 'e-mail support'],
-    },
-    {
-      name: 'Groei',
-      price: '€129 / mnd',
-      perks: ['3 websites', 'tot 2000 chats / maand', 'priority support'],
-    },
-    {
-      name: 'Schaal',
-      price: 'Op maat',
-      perks: ['onbeperkte websites', 'custom branding', 'eigen account-manager'],
-    },
-  ],
-  about: {
-    title: 'Over ChatManta',
-    body: 'ChatManta is een product van Jorion Solutions. We helpen MKB-bedrijven om hun klantcontact te automatiseren zonder de menselijke toon te verliezen.',
-  },
   suggestedQuestions: [
     'Wat doet ChatManta precies?',
     'Wat kost het per maand?',
     'Voor wie is dit bedoeld?',
     'Hoe lang duurt installeren?',
   ],
+  // Dev-org heeft geen markdown-bronnen in scripts/fixtures/. Wordt
+  // uitgesloten van de widget-demo via ORG_SLUGS_WIDGET.
+  pages: [],
   primaryColor: '#00CC9B',
   bgColor: '#0a1118',
   textColor: '#eaf6fb',
@@ -112,58 +62,20 @@ const ACME_CORP: OrgSkin = {
   slug: 'acme-corp',
   companyName: 'Dakwerken De Boer',
   tagline: 'Vakwerk op uw dak — al sinds 1987',
-  hero: {
-    eyebrow: 'DAKWERKEN DE BOER',
-    title: 'Een dak waar u jaren op kunt rekenen.',
-    subtitle:
-      'Hellende daken, platte daken, dakgoten en zinkwerk — wij zijn de vakman die het werk eerlijk doet. Vraag vrijblijvend een inspectie aan.',
-    primaryCta: 'Inspectie aanvragen',
-    secondaryCta: 'Bel direct',
-  },
-  features: [
-    {
-      title: 'Hellende daken',
-      body: 'Pannendaken, leien, dakkapellen en isolatie. Wij vervangen en herstellen vakkundig.',
-    },
-    {
-      title: 'Platte daken',
-      body: 'EPDM, bitumen en PVC dakbedekking. Onderhoud, vernieuwing en lekkage-reparatie.',
-    },
-    {
-      title: 'Dakgoten & zink',
-      body: 'Nieuwe goten, reparatie en zinkwerk rondom schoorstenen en dakkapellen.',
-    },
-    {
-      title: 'Spoedreparatie',
-      body: 'Bij lekkage staan we binnen 24 uur op uw dak — ook in het weekend.',
-    },
-  ],
-  pricing: [
-    {
-      name: 'Inspectie',
-      price: '€95 incl. btw',
-      perks: ['volledige dakcheck', 'foto-rapportage', 'kostenraming'],
-    },
-    {
-      name: 'Onderhoud',
-      price: '€250 / jaar',
-      perks: ['jaarlijkse inspectie', 'kleine reparaties', 'voorrang bij spoed'],
-    },
-    {
-      name: 'Renovatie',
-      price: 'Op maat',
-      perks: ['volledige offerte', 'eigen materialen of merk', '10 jaar garantie'],
-    },
-  ],
-  about: {
-    title: 'Over Dakwerken De Boer',
-    body: 'Drie generaties dakdekkers in de regio. We werken alleen met materialen die we zelf zouden gebruiken en geven 10 jaar garantie op nieuw werk.',
-  },
   suggestedQuestions: [
     'Komen jullie ook bij mij in de buurt?',
     'Wat kost een dakinspectie?',
     'Doen jullie ook spoedreparaties?',
     'Hoe lang duurt een nieuw dak?',
+  ],
+  pages: [
+    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md' },
+    { slug: 'diensten', navLabel: 'Diensten', mdFile: '04-diensten-overzicht.md' },
+    { slug: 'spoed', navLabel: 'Spoed', mdFile: '14-spoedreparatie-lekkages.md' },
+    { slug: 'onderhoud', navLabel: 'Onderhoud', mdFile: '15-onderhoudscontract.md' },
+    { slug: 'werkgebied', navLabel: 'Werkgebied', mdFile: '16-werkgebied.md' },
+    { slug: 'faq', navLabel: 'FAQ', mdFile: '17-faq.md' },
+    { slug: 'contact', navLabel: 'Contact', mdFile: '30-contact-en-vestiging.md' },
   ],
   primaryColor: '#c4471c',
   bgColor: '#1a1612',
@@ -175,58 +87,20 @@ const GLOBEX_INC: OrgSkin = {
   slug: 'globex-inc',
   companyName: 'FysioPlus Utrecht',
   tagline: 'Beweging zonder pijn — in het hart van de stad',
-  hero: {
-    eyebrow: 'FYSIOPLUS UTRECHT',
-    title: 'Weer fit, zonder gedoe.',
-    subtitle:
-      'Algemene fysiotherapie, manuele therapie en sportblessures. Korte wachttijden, persoonlijke aanpak en behandelingen die werken.',
-    primaryCta: 'Afspraak inplannen',
-    secondaryCta: 'Vergoeding checken',
-  },
-  features: [
-    {
-      title: 'Algemene fysio',
-      body: 'Rugklachten, nek, schouder, knie — we beoordelen, behandelen en geven oefeningen mee.',
-    },
-    {
-      title: 'Manuele therapie',
-      body: 'Gespecialiseerde behandeling voor gewrichtsklachten. Onze therapeuten zijn extra geschoold.',
-    },
-    {
-      title: 'Sportfysio',
-      body: 'Snel terug naar je sport — van hardloopblessure tot tenniselleboog.',
-    },
-    {
-      title: 'Hands-on revalidatie',
-      body: 'Na een operatie of langdurig probleem: een traject op maat, met de fysio als coach.',
-    },
-  ],
-  pricing: [
-    {
-      name: 'Eerste consult',
-      price: '€48',
-      perks: ['intake + onderzoek', 'eerste behandeling', 'oefenschema'],
-    },
-    {
-      name: 'Vervolgbehandeling',
-      price: '€37',
-      perks: ['25–30 minuten', 'manuele technieken', 'voortgangsverslag'],
-    },
-    {
-      name: 'Sportscreening',
-      price: '€75',
-      perks: ['blessurepreventie', 'beweegtest', 'persoonlijk advies'],
-    },
-  ],
-  about: {
-    title: 'Over FysioPlus Utrecht',
-    body: 'Twee praktijken in het centrum van Utrecht. Wij geloven dat fysiotherapie efficiënt en menselijk hoort te zijn — geen lange wachtkamers, wel echte aandacht.',
-  },
   suggestedQuestions: [
     'Heb ik een verwijzing van de huisarts nodig?',
     'Wordt fysio vergoed door mijn verzekering?',
     'Doen jullie aan manuele therapie?',
     'Hoe lang duurt een behandeling?',
+  ],
+  pages: [
+    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md' },
+    { slug: 'behandelingen', navLabel: 'Behandelingen', mdFile: '04-behandelingen-overzicht.md' },
+    { slug: 'manuele-therapie', navLabel: 'Manuele therapie', mdFile: '06-manuele-therapie.md' },
+    { slug: 'tarieven', navLabel: 'Tarieven', mdFile: '18-tarieven.md' },
+    { slug: 'vergoeding', navLabel: 'Vergoeding', mdFile: '17-zorgverzekering-vergoeding.md' },
+    { slug: 'eerste-afspraak', navLabel: 'Eerste afspraak', mdFile: '19-eerste-afspraak.md' },
+    { slug: 'faq', navLabel: 'FAQ', mdFile: '20-faq.md' },
   ],
   primaryColor: '#1e9a7c',
   bgColor: '#f7faf9',
@@ -238,58 +112,20 @@ const INITECH: OrgSkin = {
   slug: 'initech',
   companyName: 'Bakker & Vermeer Accountants',
   tagline: 'Cijfers die voor u werken',
-  hero: {
-    eyebrow: 'BAKKER & VERMEER',
-    title: 'Uw boekhouding zonder zorgen.',
-    subtitle:
-      'Boekhouding, belastingaangiften en zakelijk advies voor ZZP, MKB en familiebedrijven. Een vast aanspreekpunt — geen wisselende gezichten.',
-    primaryCta: 'Vrijblijvend kennismaken',
-    secondaryCta: 'Tarieven bekijken',
-  },
-  features: [
-    {
-      title: 'Boekhouding',
-      body: 'Maandelijkse verwerking, btw-aangiften en jaarrekening. Wij regelen het — u ondertekent.',
-    },
-    {
-      title: 'Belastingaangifte',
-      body: 'IB, VPB en btw. We rekenen door wat fiscaal het beste uitkomt, en leggen het ook uit.',
-    },
-    {
-      title: 'Zakelijk advies',
-      body: 'Van startersbegeleiding tot bedrijfsoverdracht — strategisch sparren met iemand die de cijfers kent.',
-    },
-    {
-      title: 'Online dossier',
-      body: 'Uw stukken in één veilige omgeving. Bonnetjes upload je via de app.',
-    },
-  ],
-  pricing: [
-    {
-      name: 'ZZP',
-      price: 'vanaf €65 / mnd',
-      perks: ['boekhouding + btw', 'IB-aangifte inclusief', 'online dossier'],
-    },
-    {
-      name: 'MKB',
-      price: 'vanaf €175 / mnd',
-      perks: ['boekhouding + jaarrekening', 'VPB + IB', 'kwartaalbespreking'],
-    },
-    {
-      name: 'Advies',
-      price: '€135 / uur',
-      perks: ['strategisch sparren', 'fiscaal advies', 'overname-begeleiding'],
-    },
-  ],
-  about: {
-    title: 'Over Bakker & Vermeer',
-    body: 'Sinds 2009 een vast adres voor ondernemers die hun cijfers wél belangrijk vinden, maar er liever niet zelf mee bezig zijn. Klein team, vaste contactpersoon, geen verrassingen op de factuur.',
-  },
   suggestedQuestions: [
     'Doen jullie ook ZZP-aangiften?',
     'Wat kost de boekhouding per maand?',
     'Hoe werkt het online dossier?',
     'Helpen jullie ook bij een bedrijfsovername?',
+  ],
+  pages: [
+    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md' },
+    { slug: 'diensten', navLabel: 'Diensten', mdFile: '05-diensten-overzicht.md' },
+    { slug: 'zzp', navLabel: 'ZZP', mdFile: '15-zzp-pakketten.md' },
+    { slug: 'mkb', navLabel: 'MKB', mdFile: '16-mkb-pakketten.md' },
+    { slug: 'tarieven', navLabel: 'Tarieven', mdFile: '19-tarieven-en-pakketten.md' },
+    { slug: 'online-dossier', navLabel: 'Online dossier', mdFile: '21-software-tooling.md' },
+    { slug: 'contact', navLabel: 'Contact', mdFile: '31-contact-en-bereikbaarheid.md' },
   ],
   primaryColor: '#1d4a8e',
   bgColor: '#f4f6fa',
@@ -311,7 +147,31 @@ export const ORG_SLUGS_ORDERED: OrgSlug[] = [
   'initech',
 ];
 
+/**
+ * Orgs die in de `/widget` demo-rotatie meedoen — alleen orgs met
+ * markdown-bronnen (`pages.length > 0`). Dev-org valt af omdat er geen
+ * fixtures voor zijn. Wordt gebruikt door de demo-dropdown en de
+ * cookie→eerste-pagina redirect in `app/widget/page.tsx`.
+ */
+export const ORG_SLUGS_WIDGET: OrgSlug[] = ORG_SLUGS_ORDERED.filter(
+  (s) => ORG_SKINS[s].pages.length > 0,
+);
+
 export function getSkin(slug: string): OrgSkin {
   if (slug in ORG_SKINS) return ORG_SKINS[slug as OrgSlug];
   return DEV_ORG;
+}
+
+/**
+ * Vind een `OrgSkin.pages` entry op basis van slug+pageSlug, of `null`
+ * als de combinatie niet bestaat. Gebruikt door de markdown-loader voor
+ * path-traversal-validatie: pageSlug moet expliciet in de curated lijst
+ * staan voor we een .md-pad samenstellen.
+ */
+export function findPage(
+  slug: string,
+  pageSlug: string,
+): { slug: string; navLabel: string; mdFile: string } | null {
+  const skin = getSkin(slug);
+  return skin.pages.find((p) => p.slug === pageSlug) ?? null;
 }
