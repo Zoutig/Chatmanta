@@ -399,3 +399,54 @@ export function compareCustomers(a: TestCustomer, b: TestCustomer): number {
   if (da !== db) return da < db ? 1 : -1;
   return a.companyName.localeCompare(b.companyName);
 }
+
+// ---------------------------------------------------------------------------
+// Assistant types — Command Center chatbot (migration 0028).
+// ---------------------------------------------------------------------------
+
+export const ASSISTANT_ROLES = ['user', 'assistant', 'tool', 'system'] as const;
+export type AssistantRole = (typeof ASSISTANT_ROLES)[number];
+
+export type AssistantThread = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+};
+
+/** OpenAI-format tool-call op een assistant-turn. */
+export type AssistantToolCall = {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string; // JSON-encoded
+  };
+};
+
+/** Payload op role='tool' messages: resultaat van een server-side tool-execute.
+ *  `beforeState` wordt door /api/commandcenter/assistant/undo gelezen. */
+export type AssistantToolResult = {
+  ok: boolean;
+  item?: unknown;
+  beforeState?: unknown;
+  error?: string;
+  undone?: boolean;
+};
+
+export type AssistantMessage = {
+  id: string;
+  threadId: string;
+  role: AssistantRole;
+  content: string | null;
+  toolCalls: AssistantToolCall[] | null;
+  toolCallId: string | null;
+  toolName: string | null;
+  toolResult: AssistantToolResult | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
+  createdAt: string;
+};
