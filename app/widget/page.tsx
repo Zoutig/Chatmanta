@@ -1,40 +1,28 @@
-// Demo-platform voor de klant-experience widget.
+// /widget — root redirect naar de juiste org+page.
 //
-// Server component die de WidgetDemo client-orchestrator boot-strapt met:
-//   - alle V0 bot-versies (voor de dropdown)
-//   - default-org via bestaande v0_active_org cookie (zelfde gedrag als
-//     /admintool) zodat de demo voelt als een natuurlijke voortzetting
-//     van de admin-context
+// Sinds de demo multi-page is verspreid hij over /widget/[slug]/[page].
+// Deze root-route bepaalt welke org de bezoeker als laatste gebruikte
+// (via v0_active_org cookie) en stuurt hem door naar haar eerste pagina.
+// Cookie-slug die niet meer in de widget-rotatie zit (bv. dev-org dat
+// geen markdown-bronnen heeft) valt terug op de eerste ORG_SLUGS_WIDGET.
 //
-// /widget valt onder de V0 page-gate in proxy.ts — gebruiker moet ingelogd
-// zijn met V0_DEMO_PASSWORD. Voor prospect-demo's: Sebastiaan tikt het
-// password van tevoren in.
+// /widget valt onder de V0 page-gate in proxy.ts — bezoeker moet eerst
+// V0_DEMO_PASSWORD invoeren.
 
-import type { Metadata } from 'next';
-import { BOTS, BOT_VERSIONS_ORDERED, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
+import { redirect } from 'next/navigation';
+
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
-import { WidgetDemo } from './widget-demo';
+import { getSkin, ORG_SLUGS_WIDGET } from './org-skins';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'ChatManta · Widget-demo',
-  description: 'Demo-platform — bekijk hoe de ChatManta-widget eruitziet op een klant-website.',
-};
+export default async function WidgetRootRedirect() {
+  const active = await getActiveOrgFromCookies();
 
-export default async function WidgetDemoPage() {
-  const activeOrg = await getActiveOrgFromCookies();
+  const targetSlug = ORG_SLUGS_WIDGET.includes(active.slug)
+    ? active.slug
+    : ORG_SLUGS_WIDGET[0];
 
-  const bots = BOT_VERSIONS_ORDERED.map((v) => ({
-    version: v,
-    label: BOTS[v].label,
-  }));
-
-  return (
-    <WidgetDemo
-      initialOrgSlug={activeOrg.slug}
-      initialBotVersion={LATEST_BOT_VERSION}
-      bots={bots}
-    />
-  );
+  const firstPage = getSkin(targetSlug).pages[0];
+  redirect(`/widget/${targetSlug}/${firstPage.slug}`);
 }

@@ -1,45 +1,54 @@
 'use client';
 
-// Orchestrator voor /widget demo-platform.
+// Persistent shell rond élke /widget/[slug]/[page] route.
 //
-// Top-bar: org-dropdown + bot-dropdown + reset. Tile-rendering: <FakeSite/>
-// per skin + <ChatMantaWidget/> linksonder. State leeft hier zodat zowel de
-// fake-site als de widget tegelijk meebewegen bij elke switch.
-//
-// De widget krijgt een key={`${org}-${bot}`} zodat chat-history reset bij
-// elke switch — gewenst gedrag voor sales-demo's.
+// Wat hier leeft:
+//   - De top demo-bar (org-dropdown / bot-dropdown / reset / home-link).
+//     Org-switch doet router.push naar de nieuwe org's eerste pagina.
+//     Bot-switch en reset zijn client-state.
+//   - De ChatManta-widget. Hij hangt vast aan dit layout-segment, dus
+//     overleeft een pagina-navigatie binnen dezelfde org. Bij wissel
+//     van [slug] unmount Next.js deze hele subtree → chat reset.
+//   - {children} = <FakeSite>{page body}</FakeSite> uit de layout.
 
 import { useState } from 'react';
-import { FakeSite } from './components/fake-site';
-import { ChatMantaWidget } from './components/chatmanta-widget';
-import { getSkin, ORG_SLUGS_ORDERED } from './org-skins';
-import type { OrgSlug } from '@/lib/v0/server/active-org';
+import { useRouter } from 'next/navigation';
+
+import { ChatMantaWidget } from './chatmanta-widget';
+import { getSkin, ORG_SLUGS_WIDGET, type OrgSkin } from '../org-skins';
 
 export type BotOption = {
   version: string;
   label: string;
 };
 
-export type WidgetDemoProps = {
-  initialOrgSlug: OrgSlug;
-  initialBotVersion: string;
+export type WidgetShellProps = {
+  skin: OrgSkin;
   bots: BotOption[];
+  initialBotVersion: string;
+  children: React.ReactNode;
 };
 
-export function WidgetDemo({
-  initialOrgSlug,
-  initialBotVersion,
+export function WidgetShell({
+  skin,
   bots,
-}: WidgetDemoProps) {
-  const [orgSlug, setOrgSlug] = useState<OrgSlug>(initialOrgSlug);
+  initialBotVersion,
+  children,
+}: WidgetShellProps) {
+  const router = useRouter();
   const [botVersion, setBotVersion] = useState<string>(initialBotVersion);
   const [resetKey, setResetKey] = useState(0);
 
-  const skin = getSkin(orgSlug);
+  const handleOrgChange = (newSlug: string) => {
+    if (newSlug === skin.slug) return;
+    const firstPage = getSkin(newSlug).pages[0];
+    if (!firstPage) return;
+    router.push(`/widget/${newSlug}/${firstPage.slug}`);
+  };
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
-      {/* Demo-bar — duidelijk geen onderdeel van de fake site */}
+      {/* Demo-bar */}
       <div
         style={{
           position: 'fixed',
@@ -76,9 +85,9 @@ export function WidgetDemo({
         </span>
         <DemoSelect
           label="Klant"
-          value={orgSlug}
-          onChange={(v) => setOrgSlug(v as OrgSlug)}
-          options={ORG_SLUGS_ORDERED.map((s) => ({
+          value={skin.slug}
+          onChange={handleOrgChange}
+          options={ORG_SLUGS_WIDGET.map((s) => ({
             value: s,
             label: getSkin(s).companyName,
           }))}
@@ -121,11 +130,11 @@ export function WidgetDemo({
         </a>
       </div>
 
-      <FakeSite skin={skin} />
+      {children}
 
       <ChatMantaWidget
-        key={`${orgSlug}-${botVersion}-${resetKey}`}
-        orgSlug={orgSlug}
+        key={`${botVersion}-${resetKey}`}
+        orgSlug={skin.slug}
         botVersion={botVersion}
         companyName={skin.companyName}
         primaryColor={skin.primaryColor}
