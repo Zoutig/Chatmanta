@@ -16,7 +16,9 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
 import { BOTS, BOT_VERSIONS_ORDERED, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
-import { getSkin, ORG_SLUGS_WIDGET } from '../org-skins';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import type { OrgSlug } from '@/lib/v0/server/active-org';
+import { applyWidgetOverrides, getSkin, ORG_SLUGS_WIDGET } from '../org-skins';
 import { WidgetShell } from '../components/widget-shell';
 import { FakeSite } from '../components/fake-site';
 
@@ -44,14 +46,39 @@ export default async function OrgLayout({ params, children }: LayoutProps) {
     notFound();
   }
 
-  const skin = getSkin(slug);
+  const baseSkin = getSkin(slug);
+  // Lees klantendashboard-overrides voor deze org. Skin-zichtbare velden
+  // (suggestedQuestions = starter-questions) mergen we in de skin; widget-
+  // kleuren lopen via widgetOverrides (zie onder) en raken landing-page
+  // NIET — eerder leak: de hele FakeSite veranderde mee.
+  const orgSettings = await getOrgSettings(slug as OrgSlug);
+  const skin = applyWidgetOverrides(baseSkin, {
+    starterQuestions: orgSettings.chatbot.starterQuestions,
+  });
+
   const bots = BOT_VERSIONS_ORDERED.map((v) => ({
     version: v,
     label: BOTS[v].label,
   }));
 
   return (
-    <WidgetShell skin={skin} bots={bots} initialBotVersion={LATEST_BOT_VERSION}>
+    <WidgetShell
+      skin={skin}
+      bots={bots}
+      initialBotVersion={LATEST_BOT_VERSION}
+      widgetOverrides={{
+        position: orgSettings.widget.position,
+        headerTitle: orgSettings.widget.title,
+        headerSubtitle: orgSettings.widget.subtitle,
+        isActive: orgSettings.widget.isActive,
+        logoColor: orgSettings.widget.logoColor,
+        widgetBgColor: orgSettings.widget.widgetBgColor,
+        pulseColor: orgSettings.widget.pulseColor,
+        headerColor: orgSettings.widget.headerColor,
+        logoStyle: orgSettings.widget.logoStyle,
+        customLogoDataUrl: orgSettings.widget.customLogoDataUrl,
+      }}
+    >
       <FakeSite skin={skin}>{children}</FakeSite>
     </WidgetShell>
   );

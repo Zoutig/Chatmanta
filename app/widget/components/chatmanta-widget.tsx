@@ -15,7 +15,6 @@
 // Streaming-pattern is overgenomen uit app/components/chat-shell.tsx:230-360.
 // React 19 batched updates → flushSync per delta voor zichtbare streaming.
 
-import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
@@ -30,6 +29,27 @@ export type ChatMantaWidgetProps = {
   companyName: string;
   primaryColor: string;
   suggested: string[];
+  /**
+   * Klantendashboard-overrides — komen via /widget/[slug]/layout.tsx uit
+   * `v0_org_settings.widget`. Optioneel: ontbrekende velden vallen terug op
+   * de skin- of widget-defaults.
+   */
+  position?: 'bottom-right' | 'bottom-left';
+  /** Override de header-titel (default: companyName). */
+  headerTitle?: string;
+  /** Optionele subtitel onder de header-titel. */
+  headerSubtitle?: string;
+  /** Als false → render niets (klant heeft de widget gepauzeerd). */
+  isActive?: boolean;
+  /** Granulaire kleur-overrides — fallback op primaryColor wanneer ongezet. */
+  logoColor?: string;
+  widgetBgColor?: string; // FAB-knop achtergrond (default wit)
+  pulseColor?: string;
+  headerColor?: string; // header + send-button + user-bubble
+  /** Welk icoon op de FAB? */
+  logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
+  /** Base64 data-URL voor 'custom-logo'. */
+  customLogoDataUrl?: string | null;
 };
 
 export function ChatMantaWidget({
@@ -38,7 +58,30 @@ export function ChatMantaWidget({
   companyName,
   primaryColor,
   suggested,
+  position = 'bottom-right',
+  headerTitle,
+  headerSubtitle,
+  isActive = true,
+  logoColor,
+  widgetBgColor,
+  pulseColor,
+  headerColor,
+  logoStyle = 'brand-mark',
+  customLogoDataUrl,
 }: ChatMantaWidgetProps) {
+  // Side-aware positioning voor FAB, panel en tooltip.
+  const sideStyle = position === 'bottom-left' ? { left: 24 } : { right: 24 };
+  const tooltipSideStyle = position === 'bottom-left' ? { left: 0 } : { right: 0 };
+  const displayTitle = headerTitle?.trim() || companyName;
+
+  // Granulaire kleur-resolutie met primaryColor als fallback. Eén plek om de
+  // semantiek te lezen i.p.v. tien `?? primaryColor` ternaries verspreid in JSX.
+  const c = {
+    logo: logoColor || primaryColor,
+    widgetBg: widgetBgColor || '#ffffff',
+    pulse: pulseColor || primaryColor,
+    header: headerColor || primaryColor,
+  };
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -180,13 +223,17 @@ export function ChatMantaWidget({
 
   const showTooltipNow = (tooltipVisible || tooltipHovered) && !open;
 
+  // Klant heeft expliciet gepauzeerd — niets renderen, ook geen FAB. Late-
+  // return moet ná alle hooks staan (rules-of-hooks).
+  if (!isActive) return null;
+
   return (
     <>
-      {/* FAB-container rechtsonder — bevat pulse-ring, button en tooltip */}
+      {/* FAB-container (links of rechts onder) — bevat pulse-ring, button en tooltip */}
       <div
         style={{
           position: 'fixed',
-          right: 24,
+          ...sideStyle,
           bottom: 24,
           width: 56,
           height: 56,
@@ -204,7 +251,7 @@ export function ChatMantaWidget({
               position: 'absolute',
               inset: 0,
               borderRadius: '50%',
-              background: primaryColor,
+              background: c.pulse,
               opacity: 0.45,
               animation: 'chatmanta-pulse 2.4s ease-out infinite',
               pointerEvents: 'none',
@@ -218,7 +265,7 @@ export function ChatMantaWidget({
           aria-hidden={!showTooltipNow}
           style={{
             position: 'absolute',
-            right: 0,
+            ...tooltipSideStyle,
             bottom: 'calc(100% + 12px)',
             background: '#0e1014',
             color: '#ffffff',
@@ -235,7 +282,7 @@ export function ChatMantaWidget({
             fontFamily: 'var(--font-inter), system-ui, sans-serif',
           }}
         >
-          Hoi! <span style={{ color: primaryColor, fontWeight: 600 }}>Heb je een vraag?</span>
+          Hoi! <span style={{ color: c.header, fontWeight: 600 }}>Heb je een vraag?</span>
           <span
             aria-hidden="true"
             style={{
@@ -259,7 +306,7 @@ export function ChatMantaWidget({
             width: 56,
             height: 56,
             borderRadius: '50%',
-            background: '#ffffff',
+            background: c.widgetBg,
             border: `1px solid rgba(0,0,0,0.06)`,
             cursor: 'pointer',
             boxShadow: '0 12px 32px -8px rgba(0,0,0,0.32), 0 4px 12px rgba(0,0,0,0.18)',
@@ -282,18 +329,7 @@ export function ChatMantaWidget({
               : 'scale(1)';
           }}
         >
-          {open ? (
-            <CloseIcon />
-          ) : (
-            <Image
-              src="/logo/mark.png"
-              alt=""
-              width={36}
-              height={36}
-              priority
-              style={{ objectFit: 'contain' }}
-            />
-          )}
+          {open ? <CloseIcon /> : <FabLogo style={logoStyle} color={c.logo} customDataUrl={customLogoDataUrl ?? null} />}
         </button>
       </div>
 
@@ -318,10 +354,10 @@ export function ChatMantaWidget({
       {open && (
         <div
           role="dialog"
-          aria-label={`${companyName} chat`}
+          aria-label={`${displayTitle} chat`}
           style={{
             position: 'fixed',
-            right: 24,
+            ...sideStyle,
             bottom: 96,
             width: 380,
             height: 560,
@@ -341,8 +377,8 @@ export function ChatMantaWidget({
           {/* Header */}
           <div
             style={{
-              background: primaryColor,
-              color: bestForegroundOn(primaryColor),
+              background: c.header,
+              color: bestForegroundOn(c.header),
               padding: '14px 18px',
               display: 'flex',
               alignItems: 'center',
@@ -350,9 +386,9 @@ export function ChatMantaWidget({
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{companyName}</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{displayTitle}</span>
               <span style={{ fontSize: 11, opacity: 0.85 }}>
-                Online · meestal binnen seconden antwoord
+                {headerSubtitle?.trim() || 'Online · meestal binnen seconden antwoord'}
               </span>
             </div>
             <button
@@ -387,7 +423,7 @@ export function ChatMantaWidget({
           >
             {/* Welkomstbericht */}
             {messages.length === 0 && (
-              <BotBubble color={primaryColor}>
+              <BotBubble color={c.header}>
                 Hoi! Ik ben de digitale assistent van <strong>{companyName}</strong>.
                 Stel je vraag — ik zoek het op in onze content.
               </BotBubble>
@@ -395,11 +431,11 @@ export function ChatMantaWidget({
 
             {messages.map((m) =>
               m.role === 'user' ? (
-                <UserBubble key={m.id} color={primaryColor}>
+                <UserBubble key={m.id} color={c.header}>
                   {m.content}
                 </UserBubble>
               ) : (
-                <BotBubble key={m.id} color={primaryColor}>
+                <BotBubble key={m.id} color={c.header}>
                   {m.streaming && !m.content ? <TypingDots /> : renderMarkdownLite(m.content)}
                   {m.streaming && m.content ? <Caret /> : null}
                 </BotBubble>
@@ -421,7 +457,7 @@ export function ChatMantaWidget({
                       textAlign: 'left',
                       background: '#ffffff',
                       color: '#0e1014',
-                      border: `1px solid ${withAlpha(primaryColor, 0.32)}`,
+                      border: `1px solid ${withAlpha(c.header, 0.32)}`,
                       borderRadius: 10,
                       padding: '8px 12px',
                       fontSize: 13,
@@ -430,7 +466,7 @@ export function ChatMantaWidget({
                       transition: 'background 120ms',
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = withAlpha(primaryColor, 0.08);
+                      (e.currentTarget as HTMLButtonElement).style.background = withAlpha(c.header, 0.08);
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLButtonElement).style.background = '#ffffff';
@@ -484,8 +520,8 @@ export function ChatMantaWidget({
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                background: pending || !input.trim() ? '#d1d5db' : primaryColor,
-                color: bestForegroundOn(primaryColor),
+                background: pending || !input.trim() ? '#d1d5db' : c.header,
+                color: bestForegroundOn(c.header),
                 border: 'none',
                 cursor: pending || !input.trim() ? 'not-allowed' : 'pointer',
                 display: 'flex',
@@ -689,6 +725,64 @@ function Dot({ delay }: { delay: number }) {
         background: '#9ca3af',
         animation: 'chatmanta-bounce 1.1s infinite ease-in-out',
         animationDelay: `${delay}ms`,
+      }}
+    />
+  );
+}
+
+// FAB-logo — kiest tussen drie varianten op basis van `logoStyle`. Voor de
+// twee mask-varianten gebruiken we CSS `mask-image` + `background-color`
+// zodat de klant z'n eigen `logoColor` ziet doorkomen. Custom-uploads
+// renderen we als `<img>` zonder color-treatment.
+function FabLogo({
+  style,
+  color,
+  customDataUrl,
+}: {
+  style: 'brand-mark' | 'chat-bubble' | 'custom-logo';
+  color: string;
+  customDataUrl: string | null;
+}) {
+  if (style === 'custom-logo' && customDataUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- runtime base64 data-URL, niet door next/image te optimizen.
+      <img
+        src={customDataUrl}
+        alt=""
+        style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 6 }}
+      />
+    );
+  }
+
+  if (style === 'chat-bubble') {
+    return (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9.5l-4 4v-4H5.5c-.83 0-1.5-.67-1.5-1.5v-9z"
+          fill={color}
+        />
+      </svg>
+    );
+  }
+
+  // Default: ChatManta brand-mark als CSS-mask zodat `color` doorkomt.
+  return (
+    <span
+      role="img"
+      aria-label=""
+      style={{
+        display: 'inline-block',
+        width: 36,
+        height: 22,
+        backgroundColor: color,
+        WebkitMaskImage: "url('/logo/mono-mark.png')",
+        maskImage: "url('/logo/mono-mark.png')",
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
       }}
     />
   );

@@ -34,8 +34,10 @@ export async function setActiveOrgAction(
     });
     // Hele tree opnieuw renderen — admintool/page.tsx leest cookie en
     // geeft alle org-gescopte data (threads, docs, usage) door aan de
-    // ChatShell.
+    // ChatShell. Klantendashboard layout leest dezelfde cookie en moet
+    // ook re-renderen op org-switch.
     revalidatePath('/admintool');
+    revalidatePath('/klantendashboard', 'layout');
     return { slug: validSlug };
   });
 }

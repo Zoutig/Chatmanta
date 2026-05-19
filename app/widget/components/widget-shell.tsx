@@ -27,6 +27,19 @@ export type WidgetShellProps = {
   bots: BotOption[];
   initialBotVersion: string;
   children: React.ReactNode;
+  /** Klantendashboard-overrides die naar ChatMantaWidget gaan. */
+  widgetOverrides?: {
+    position?: 'bottom-right' | 'bottom-left';
+    headerTitle?: string;
+    headerSubtitle?: string;
+    isActive?: boolean;
+    logoColor?: string;
+    widgetBgColor?: string;
+    pulseColor?: string;
+    headerColor?: string;
+    logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
+    customLogoDataUrl?: string | null;
+  };
 };
 
 export function WidgetShell({
@@ -34,6 +47,7 @@ export function WidgetShell({
   bots,
   initialBotVersion,
   children,
+  widgetOverrides,
 }: WidgetShellProps) {
   const router = useRouter();
   const [botVersion, setBotVersion] = useState<string>(initialBotVersion);
@@ -139,6 +153,16 @@ export function WidgetShell({
         companyName={skin.companyName}
         primaryColor={skin.primaryColor}
         suggested={skin.suggestedQuestions}
+        position={widgetOverrides?.position}
+        headerTitle={widgetOverrides?.headerTitle}
+        headerSubtitle={widgetOverrides?.headerSubtitle}
+        isActive={widgetOverrides?.isActive}
+        logoColor={widgetOverrides?.logoColor}
+        widgetBgColor={widgetOverrides?.widgetBgColor}
+        pulseColor={widgetOverrides?.pulseColor}
+        headerColor={widgetOverrides?.headerColor}
+        logoStyle={widgetOverrides?.logoStyle}
+        customLogoDataUrl={widgetOverrides?.customLogoDataUrl}
       />
     </div>
   );
