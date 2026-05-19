@@ -12,6 +12,17 @@
 
 import type { OrgSlug } from '@/lib/v0/server/active-org';
 
+/**
+ * Soort pagina-template dat de fake-site rendert voor deze entry.
+ * - `hero`     — uitgebreide hero + alternating section-bands ("Over ons" e.d.)
+ * - `services` — services-grid met cards, emoji-icons, eyebrows ("Diensten")
+ * - `pricing`  — tabellen → price-cards met middle-highlight ("Tarieven")
+ * - `faq`      — H3-vragen als expandable cards onder H2-categorieën
+ * - `contact`  — contact-cards met telefoon/email/adres + info-secties
+ * - `standard` — fallback: hero (icon) + alternating section-bands
+ */
+export type PageKind = 'hero' | 'services' | 'pricing' | 'faq' | 'contact' | 'standard';
+
 export type OrgSkin = {
   /** Stable identifier — matcht KNOWN_ORGS slug. */
   slug: OrgSlug;
@@ -26,9 +37,10 @@ export type OrgSkin = {
    * markdown-bestand in `scripts/fixtures/sandbox-orgs/<slug>/`. De eerste
    * entry is de "home" — `/widget` redirect daar naartoe. Orgs zonder
    * markdown-bronnen (zoals `dev-org`) krijgen een lege array en worden
-   * uitgesloten via `ORG_SLUGS_WIDGET`.
+   * uitgesloten via `ORG_SLUGS_WIDGET`. `kind` bepaalt welke page-template
+   * de site-renderer gebruikt (`lib/widget/page-templates/`).
    */
-  pages: Array<{ slug: string; navLabel: string; mdFile: string }>;
+  pages: Array<{ slug: string; navLabel: string; mdFile: string; kind: PageKind }>;
   /** Primary accent kleur (HEX). Gebruikt voor knoppen, links, accents. */
   primaryColor: string;
   /** Achtergrondkleur van de hele fake-site. */
@@ -69,13 +81,13 @@ const ACME_CORP: OrgSkin = {
     'Hoe lang duurt een nieuw dak?',
   ],
   pages: [
-    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md' },
-    { slug: 'diensten', navLabel: 'Diensten', mdFile: '04-diensten-overzicht.md' },
-    { slug: 'spoed', navLabel: 'Spoed', mdFile: '14-spoedreparatie-lekkages.md' },
-    { slug: 'onderhoud', navLabel: 'Onderhoud', mdFile: '15-onderhoudscontract.md' },
-    { slug: 'werkgebied', navLabel: 'Werkgebied', mdFile: '16-werkgebied.md' },
-    { slug: 'faq', navLabel: 'FAQ', mdFile: '17-faq.md' },
-    { slug: 'contact', navLabel: 'Contact', mdFile: '30-contact-en-vestiging.md' },
+    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md', kind: 'hero' },
+    { slug: 'diensten', navLabel: 'Diensten', mdFile: '04-diensten-overzicht.md', kind: 'services' },
+    { slug: 'spoed', navLabel: 'Spoed', mdFile: '14-spoedreparatie-lekkages.md', kind: 'standard' },
+    { slug: 'onderhoud', navLabel: 'Onderhoud', mdFile: '15-onderhoudscontract.md', kind: 'standard' },
+    { slug: 'werkgebied', navLabel: 'Werkgebied', mdFile: '16-werkgebied.md', kind: 'standard' },
+    { slug: 'faq', navLabel: 'FAQ', mdFile: '17-faq.md', kind: 'faq' },
+    { slug: 'contact', navLabel: 'Contact', mdFile: '30-contact-en-vestiging.md', kind: 'contact' },
   ],
   primaryColor: '#c4471c',
   bgColor: '#1a1612',
@@ -94,13 +106,13 @@ const GLOBEX_INC: OrgSkin = {
     'Hoe lang duurt een behandeling?',
   ],
   pages: [
-    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md' },
-    { slug: 'behandelingen', navLabel: 'Behandelingen', mdFile: '04-behandelingen-overzicht.md' },
-    { slug: 'manuele-therapie', navLabel: 'Manuele therapie', mdFile: '06-manuele-therapie.md' },
-    { slug: 'tarieven', navLabel: 'Tarieven', mdFile: '18-tarieven.md' },
-    { slug: 'vergoeding', navLabel: 'Vergoeding', mdFile: '17-zorgverzekering-vergoeding.md' },
-    { slug: 'eerste-afspraak', navLabel: 'Eerste afspraak', mdFile: '19-eerste-afspraak.md' },
-    { slug: 'faq', navLabel: 'FAQ', mdFile: '20-faq.md' },
+    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md', kind: 'hero' },
+    { slug: 'behandelingen', navLabel: 'Behandelingen', mdFile: '04-behandelingen-overzicht.md', kind: 'services' },
+    { slug: 'manuele-therapie', navLabel: 'Manuele therapie', mdFile: '06-manuele-therapie.md', kind: 'standard' },
+    { slug: 'tarieven', navLabel: 'Tarieven', mdFile: '18-tarieven.md', kind: 'pricing' },
+    { slug: 'vergoeding', navLabel: 'Vergoeding', mdFile: '17-zorgverzekering-vergoeding.md', kind: 'standard' },
+    { slug: 'eerste-afspraak', navLabel: 'Eerste afspraak', mdFile: '19-eerste-afspraak.md', kind: 'standard' },
+    { slug: 'faq', navLabel: 'FAQ', mdFile: '20-faq.md', kind: 'faq' },
   ],
   primaryColor: '#1e9a7c',
   bgColor: '#f7faf9',
@@ -119,13 +131,13 @@ const INITECH: OrgSkin = {
     'Helpen jullie ook bij een bedrijfsovername?',
   ],
   pages: [
-    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md' },
-    { slug: 'diensten', navLabel: 'Diensten', mdFile: '05-diensten-overzicht.md' },
-    { slug: 'zzp', navLabel: 'ZZP', mdFile: '15-zzp-pakketten.md' },
-    { slug: 'mkb', navLabel: 'MKB', mdFile: '16-mkb-pakketten.md' },
-    { slug: 'tarieven', navLabel: 'Tarieven', mdFile: '19-tarieven-en-pakketten.md' },
-    { slug: 'online-dossier', navLabel: 'Online dossier', mdFile: '21-software-tooling.md' },
-    { slug: 'contact', navLabel: 'Contact', mdFile: '31-contact-en-bereikbaarheid.md' },
+    { slug: 'over-ons', navLabel: 'Over ons', mdFile: '01-over-ons.md', kind: 'hero' },
+    { slug: 'diensten', navLabel: 'Diensten', mdFile: '05-diensten-overzicht.md', kind: 'services' },
+    { slug: 'zzp', navLabel: 'ZZP', mdFile: '15-zzp-pakketten.md', kind: 'standard' },
+    { slug: 'mkb', navLabel: 'MKB', mdFile: '16-mkb-pakketten.md', kind: 'standard' },
+    { slug: 'tarieven', navLabel: 'Tarieven', mdFile: '19-tarieven-en-pakketten.md', kind: 'pricing' },
+    { slug: 'online-dossier', navLabel: 'Online dossier', mdFile: '21-software-tooling.md', kind: 'standard' },
+    { slug: 'contact', navLabel: 'Contact', mdFile: '31-contact-en-bereikbaarheid.md', kind: 'contact' },
   ],
   primaryColor: '#1d4a8e',
   bgColor: '#f4f6fa',
@@ -171,7 +183,7 @@ export function getSkin(slug: string): OrgSkin {
 export function findPage(
   slug: string,
   pageSlug: string,
-): { slug: string; navLabel: string; mdFile: string } | null {
+): { slug: string; navLabel: string; mdFile: string; kind: PageKind } | null {
   const skin = getSkin(slug);
   return skin.pages.find((p) => p.slug === pageSlug) ?? null;
 }
