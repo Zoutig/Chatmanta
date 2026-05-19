@@ -5,7 +5,7 @@
 // action die de settings persisteert in een chatbot_settings tabel.
 
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
-import { getMockChatbotSettings } from '@/lib/v0/klantendashboard/mock/chatbot-settings';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { PageHeader } from '../components/page-header';
 import { SettingsForm } from './components/settings-form';
 
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function InstellingenPage() {
   const activeOrg = await getActiveOrgFromCookies();
-  const settings = getMockChatbotSettings(activeOrg.slug);
+  const { chatbot: settings } = await getOrgSettings(activeOrg.slug);
 
   return (
     <>
@@ -22,7 +22,7 @@ export default async function InstellingenPage() {
         subtitle="Hier bepaal je hoe je chatbot zich gedraagt — naam, taal, toon, en wat hij doet als hij een antwoord niet weet."
       />
 
-      <SettingsForm initial={settings} />
+      <SettingsForm key={activeOrg.slug} initial={settings} />
     </>
   );
 }

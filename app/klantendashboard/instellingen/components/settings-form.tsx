@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Check, Save } from 'lucide-react';
+import { saveChatbotSettingsAction } from '../../actions';
 import type {
   AnswerLength,
   ChatbotSettings,
@@ -29,16 +30,28 @@ const LANG_LABEL: Record<Language, string> = {
 export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
   const [s, setS] = useState<ChatbotSettings>(initial);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   function update<K extends keyof ChatbotSettings>(key: K, value: ChatbotSettings[K]) {
     setS((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
+    setError(null);
   }
 
   function save() {
-    // Mock — in V1 wordt dit een server action die de settings persisteert.
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaved(false);
+    setError(null);
+    startTransition(async () => {
+      const res = await saveChatbotSettingsAction(s);
+      if (res.ok) {
+        setS(res.chatbot);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } else {
+        setError(res.error);
+      }
+    });
   }
 
   return (
@@ -332,6 +345,9 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
           boxShadow: '0 8px 24px -10px rgba(0,0,0,0.35)',
         }}
       >
+        {error && (
+          <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>
+        )}
         {saved && (
           <span
             style={{
@@ -345,13 +361,15 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
             <Check size={14} /> Opgeslagen
           </span>
         )}
-        <button type="submit" className="klant-btn" data-variant="primary">
-          <Save size={14} strokeWidth={1.8} /> Instellingen opslaan
+        <button
+          type="submit"
+          className="klant-btn"
+          data-variant="primary"
+          disabled={pending}
+        >
+          <Save size={14} strokeWidth={1.8} /> {pending ? 'Bezig…' : 'Instellingen opslaan'}
         </button>
       </div>
-      <p style={{ fontSize: 12, color: 'var(--klant-fg-dim)', textAlign: 'right', marginTop: -8 }}>
-        In v0 zijn deze instellingen alleen lokaal — bij V1 worden ze persistent opgeslagen.
-      </p>
     </form>
   );
 }

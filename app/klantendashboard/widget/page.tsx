@@ -6,8 +6,7 @@
 // prospects — we linken er heen vanuit live-status.
 
 import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
-import { getMockWidgetSettings } from '@/lib/v0/klantendashboard/mock/widget-settings';
-import { getMockChatbotSettings } from '@/lib/v0/klantendashboard/mock/chatbot-settings';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { PageHeader } from '../components/page-header';
 import { WidgetForm } from './components/widget-form';
 
@@ -15,8 +14,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function WidgetPage() {
   const activeOrg = await getActiveOrgFromCookies();
-  const widget = getMockWidgetSettings(activeOrg.slug);
-  const settings = getMockChatbotSettings(activeOrg.slug);
+  const orgSettings = await getOrgSettings(activeOrg.slug);
+  const widget = orgSettings.widget;
+  const settings = orgSettings.chatbot;
 
   return (
     <>
@@ -26,6 +26,7 @@ export default async function WidgetPage() {
       />
 
       <WidgetForm
+        key={activeOrg.slug}
         initial={widget}
         chatbotName={settings.chatbotName}
         welcomeMessage={settings.welcomeMessage}

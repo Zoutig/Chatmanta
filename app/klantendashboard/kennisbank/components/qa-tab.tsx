@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { MessageSquareText, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  deleteQAItemAction,
+  setQAActiveAction,
+  upsertQAItemAction,
+} from '../../actions';
 import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 
 type DraftQA = Omit<ManualQA, 'id' | 'updatedAt'> & { id?: string };
@@ -13,6 +18,8 @@ function emptyDraft(): DraftQA {
 export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
   const [items, setItems] = useState<ManualQA[]>(initialQA);
   const [editing, setEditing] = useState<DraftQA | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   function openNew() {
     setEditing(emptyDraft());
@@ -32,44 +39,43 @@ export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
     if (!editing) return;
     if (!editing.question.trim() || !editing.answer.trim()) return;
     const now = new Date().toISOString();
-    if (editing.id) {
-      setItems((arr) =>
-        arr.map((x) =>
-          x.id === editing.id
-            ? {
-                ...x,
-                question: editing.question,
-                answer: editing.answer,
-                category: editing.category || undefined,
-                active: editing.active,
-                updatedAt: now,
-              }
-            : x,
-        ),
-      );
-    } else {
-      setItems((arr) => [
-        {
-          id: `qa-${Date.now()}`,
-          question: editing.question,
-          answer: editing.answer,
-          category: editing.category || undefined,
-          active: editing.active,
-          updatedAt: now,
-        },
-        ...arr,
-      ]);
-    }
-    setEditing(null);
+    const item: ManualQA = {
+      id: editing.id ?? `qa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      question: editing.question,
+      answer: editing.answer,
+      category: editing.category || undefined,
+      active: editing.active,
+      updatedAt: now,
+    };
+    setError(null);
+    startTransition(async () => {
+      const res = await upsertQAItemAction(item);
+      if (res.ok) {
+        setItems(res.qa);
+        setEditing(null);
+      } else {
+        setError(res.error);
+      }
+    });
   }
 
   function toggleActive(id: string) {
-    setItems((arr) => arr.map((x) => (x.id === id ? { ...x, active: !x.active } : x)));
+    const target = items.find((x) => x.id === id);
+    if (!target) return;
+    startTransition(async () => {
+      const res = await setQAActiveAction(id, !target.active);
+      if (res.ok) setItems(res.qa);
+      else setError(res.error);
+    });
   }
 
   function remove(id: string) {
     if (!confirm('Q&A verwijderen?')) return;
-    setItems((arr) => arr.filter((x) => x.id !== id));
+    startTransition(async () => {
+      const res = await deleteQAItemAction(id);
+      if (res.ok) setItems(res.qa);
+      else setError(res.error);
+    });
   }
 
   return (
@@ -94,6 +100,20 @@ export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
           <Plus size={14} strokeWidth={2} /> Nieuwe Q&amp;A
         </button>
       </div>
+
+      {error && (
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 'var(--klant-r-sm)',
+            background: 'var(--klant-danger-soft)',
+            color: 'var(--klant-danger)',
+            fontSize: 13,
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="klant-empty">
@@ -337,9 +357,9 @@ export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
                 onClick={save}
                 className="klant-btn"
                 data-variant="primary"
-                disabled={!editing.question.trim() || !editing.answer.trim()}
+                disabled={pending || !editing.question.trim() || !editing.answer.trim()}
               >
-                Opslaan
+                {pending ? 'Bezig…' : 'Opslaan'}
               </button>
             </div>
           </div>

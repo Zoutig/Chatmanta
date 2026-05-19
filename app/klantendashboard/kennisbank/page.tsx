@@ -7,7 +7,7 @@
 import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { listDocs } from '@/lib/v0/server/rag';
 import { getMockWebsitePages } from '@/lib/v0/klantendashboard/mock/website-pages';
-import { getMockManualQA } from '@/lib/v0/klantendashboard/mock/manual-qa';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { DocumentSummary } from '@/lib/v0/klantendashboard/types';
 import { PageHeader } from '../components/page-header';
 import { TabsNav } from '../components/tabs';
@@ -42,11 +42,12 @@ export default async function KennisbankPage({
   const activeOrg = await getActiveOrgFromCookies();
   const orgId = KNOWN_ORGS[activeOrg.slug].id;
 
-  const [rawDocs, mockWebsite, mockQA] = await Promise.all([
+  const [rawDocs, mockWebsite, settings] = await Promise.all([
     listDocs(orgId).catch(() => []),
     Promise.resolve(getMockWebsitePages(activeOrg.slug)),
-    Promise.resolve(getMockManualQA(activeOrg.slug)),
+    getOrgSettings(activeOrg.slug),
   ]);
+  const qa = settings.qa;
 
   // Real DB docs naar UI-shape mappen.
   const docs: DocumentSummary[] = rawDocs.map((d) => ({
@@ -72,13 +73,13 @@ export default async function KennisbankPage({
         tabs={[
           { key: 'documenten', label: 'Documenten', count: docs.length },
           { key: 'website', label: 'Website', count: mockWebsite.length },
-          { key: 'qa', label: 'Handmatige Q&A', count: mockQA.length },
+          { key: 'qa', label: 'Handmatige Q&A', count: qa.length },
         ]}
       />
 
-      {activeTab === 'documenten' && <DocumentsTab initialDocs={docs} />}
-      {activeTab === 'website' && <WebsiteTab initialPages={mockWebsite} />}
-      {activeTab === 'qa' && <QATab initialQA={mockQA} />}
+      {activeTab === 'documenten' && <DocumentsTab key={activeOrg.slug} initialDocs={docs} />}
+      {activeTab === 'website' && <WebsiteTab key={activeOrg.slug} initialPages={mockWebsite} />}
+      {activeTab === 'qa' && <QATab key={activeOrg.slug} initialQA={qa} />}
     </>
   );
 }

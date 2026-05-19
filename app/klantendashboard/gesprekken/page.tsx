@@ -8,10 +8,13 @@ import Link from 'next/link';
 import { ArrowRight, MessagesSquare } from 'lucide-react';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { listConversations } from '@/lib/v0/klantendashboard/server/conversations';
+import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
 import { PageHeader } from '../components/page-header';
 import { StatusBadge } from '../components/status-badge';
+import { TabsNav } from '../components/tabs';
 import { FilterBar } from './components/filter-bar';
+import { TopQuestionsTab } from './components/top-questions-tab';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,15 +40,20 @@ function formatDateTime(iso: string): string {
 export default async function GesprekkenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; view?: string }>;
 }) {
-  const { filter: rawFilter } = await searchParams;
+  const { filter: rawFilter, view: rawView } = await searchParams;
   const filter: ConversationFilter = VALID_FILTERS.includes(rawFilter as ConversationFilter)
     ? (rawFilter as ConversationFilter)
     : 'last_30_days';
+  const view: 'gesprekken' | 'top-questions' =
+    rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
 
   const activeOrg = await getActiveOrgFromCookies();
-  const items = await listConversations(activeOrg.slug, filter);
+  const [items, topQuestions] = await Promise.all([
+    listConversations(activeOrg.slug, filter),
+    getTopQuestions(activeOrg.slug, 20),
+  ]);
 
   const unansweredCount = items.filter((x) => x.status === 'unanswered').length;
 
@@ -56,9 +64,20 @@ export default async function GesprekkenPage({
         subtitle="Hier zie je wat bezoekers aan je chatbot vragen — en waar je chatbot nog tekortschiet."
       />
 
-      <FilterBar active={filter} />
+      <TabsNav
+        basePath="/klantendashboard/gesprekken"
+        paramName="view"
+        active={view}
+        tabs={[
+          { key: 'gesprekken', label: 'Alle gesprekken', count: items.length },
+          { key: 'top-questions', label: 'Meest gestelde vragen', count: topQuestions.length },
+        ]}
+      />
 
-      {items.length === 0 ? (
+      {view === 'top-questions' && <TopQuestionsTab initial={topQuestions} />}
+      {view === 'gesprekken' && <FilterBar active={filter} />}
+
+      {view === 'gesprekken' && items.length === 0 ? (
         <div className="klant-empty">
           <div className="klant-empty-icon">
             <MessagesSquare size={26} strokeWidth={1.6} />
@@ -78,7 +97,7 @@ export default async function GesprekkenPage({
                 : 'Zodra je widget live staat, verschijnen hier de gesprekken van je bezoekers.'}
           </p>
         </div>
-      ) : (
+      ) : view === 'gesprekken' ? (
         <>
           {unansweredCount > 0 && filter !== 'unanswered' && (
             <div
@@ -155,7 +174,7 @@ export default async function GesprekkenPage({
             </table>
           </div>
         </>
-      )}
+      ) : null}
     </>
   );
 }

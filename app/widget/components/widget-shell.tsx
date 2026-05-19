@@ -27,6 +27,13 @@ export type WidgetShellProps = {
   bots: BotOption[];
   initialBotVersion: string;
   children: React.ReactNode;
+  /** Klantendashboard-overrides die naar ChatMantaWidget gaan. */
+  widgetOverrides?: {
+    position?: 'bottom-right' | 'bottom-left';
+    headerTitle?: string;
+    headerSubtitle?: string;
+    isActive?: boolean;
+  };
 };
 
 export function WidgetShell({
@@ -34,6 +41,7 @@ export function WidgetShell({
   bots,
   initialBotVersion,
   children,
+  widgetOverrides,
 }: WidgetShellProps) {
   const router = useRouter();
   const [botVersion, setBotVersion] = useState<string>(initialBotVersion);
@@ -139,6 +147,10 @@ export function WidgetShell({
         companyName={skin.companyName}
         primaryColor={skin.primaryColor}
         suggested={skin.suggestedQuestions}
+        position={widgetOverrides?.position}
+        headerTitle={widgetOverrides?.headerTitle}
+        headerSubtitle={widgetOverrides?.headerSubtitle}
+        isActive={widgetOverrides?.isActive}
       />
     </div>
   );

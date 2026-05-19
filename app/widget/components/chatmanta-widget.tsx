@@ -30,6 +30,18 @@ export type ChatMantaWidgetProps = {
   companyName: string;
   primaryColor: string;
   suggested: string[];
+  /**
+   * Klantendashboard-overrides — komen via /widget/[slug]/layout.tsx uit
+   * `v0_org_settings.widget`. Optioneel: ontbrekende velden vallen terug op
+   * de skin- of widget-defaults.
+   */
+  position?: 'bottom-right' | 'bottom-left';
+  /** Override de header-titel (default: companyName). */
+  headerTitle?: string;
+  /** Optionele subtitel onder de header-titel. */
+  headerSubtitle?: string;
+  /** Als false → render niets (klant heeft de widget gepauzeerd). */
+  isActive?: boolean;
 };
 
 export function ChatMantaWidget({
@@ -38,7 +50,15 @@ export function ChatMantaWidget({
   companyName,
   primaryColor,
   suggested,
+  position = 'bottom-right',
+  headerTitle,
+  headerSubtitle,
+  isActive = true,
 }: ChatMantaWidgetProps) {
+  // Side-aware positioning voor FAB, panel en tooltip.
+  const sideStyle = position === 'bottom-left' ? { left: 24 } : { right: 24 };
+  const tooltipSideStyle = position === 'bottom-left' ? { left: 0 } : { right: 0 };
+  const displayTitle = headerTitle?.trim() || companyName;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -180,13 +200,17 @@ export function ChatMantaWidget({
 
   const showTooltipNow = (tooltipVisible || tooltipHovered) && !open;
 
+  // Klant heeft expliciet gepauzeerd — niets renderen, ook geen FAB. Late-
+  // return moet ná alle hooks staan (rules-of-hooks).
+  if (!isActive) return null;
+
   return (
     <>
-      {/* FAB-container rechtsonder — bevat pulse-ring, button en tooltip */}
+      {/* FAB-container (links of rechts onder) — bevat pulse-ring, button en tooltip */}
       <div
         style={{
           position: 'fixed',
-          right: 24,
+          ...sideStyle,
           bottom: 24,
           width: 56,
           height: 56,
@@ -218,7 +242,7 @@ export function ChatMantaWidget({
           aria-hidden={!showTooltipNow}
           style={{
             position: 'absolute',
-            right: 0,
+            ...tooltipSideStyle,
             bottom: 'calc(100% + 12px)',
             background: '#0e1014',
             color: '#ffffff',
@@ -318,10 +342,10 @@ export function ChatMantaWidget({
       {open && (
         <div
           role="dialog"
-          aria-label={`${companyName} chat`}
+          aria-label={`${displayTitle} chat`}
           style={{
             position: 'fixed',
-            right: 24,
+            ...sideStyle,
             bottom: 96,
             width: 380,
             height: 560,
@@ -350,9 +374,9 @@ export function ChatMantaWidget({
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{companyName}</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{displayTitle}</span>
               <span style={{ fontSize: 11, opacity: 0.85 }}>
-                Online · meestal binnen seconden antwoord
+                {headerSubtitle?.trim() || 'Online · meestal binnen seconden antwoord'}
               </span>
             </div>
             <button

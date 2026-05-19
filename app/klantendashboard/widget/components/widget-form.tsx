@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import {
   Bot,
   Check,
@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { StatusBadge } from '../../components/status-badge';
+import { saveWidgetSettingsAction } from '../../actions';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 
 type Section = 'install' | 'design' | 'preview' | 'status';
@@ -32,6 +33,8 @@ export function WidgetForm({
   const [openSection, setOpenSection] = useState<Section>('install');
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   const embedCode = `<script src="https://cdn.chatmanta.nl/widget.js" data-chatbot-id="${workspaceId}"></script>`;
 
@@ -44,11 +47,30 @@ export function WidgetForm({
   function update<K extends keyof WidgetSettings>(key: K, value: WidgetSettings[K]) {
     setW((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
+    setError(null);
+  }
+
+  /** Persist een (deel)patch naar de DB; bij success togglet de feedback-badge. */
+  function persist(patch: Partial<WidgetSettings>) {
+    const next = { ...w, ...patch };
+    setW(next);
+    setSaved(false);
+    setError(null);
+    startTransition(async () => {
+      const res = await saveWidgetSettingsAction(patch);
+      if (res.ok) {
+        setW(res.widget);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } else {
+        setError(res.error);
+      }
+    });
   }
 
   function save() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    // Sla de volledige client-state op (= alle ongesaveerde uiterlijk-velden).
+    persist(w);
   }
 
   return (
@@ -211,6 +233,9 @@ export function WidgetForm({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
+          {error && (
+            <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>
+          )}
           {saved && (
             <span
               style={{
@@ -224,8 +249,14 @@ export function WidgetForm({
               <Check size={14} /> Opgeslagen
             </span>
           )}
-          <button type="button" onClick={save} className="klant-btn" data-variant="primary">
-            Uiterlijk opslaan
+          <button
+            type="button"
+            onClick={save}
+            className="klant-btn"
+            data-variant="primary"
+            disabled={pending}
+          >
+            {pending ? 'Bezig…' : 'Uiterlijk opslaan'}
           </button>
         </div>
       </Collapsible>
@@ -279,28 +310,33 @@ export function WidgetForm({
           {w.isActive ? (
             <button
               type="button"
-              onClick={() => update('isActive', false)}
+              onClick={() => persist({ isActive: false })}
               className="klant-btn"
+              disabled={pending}
             >
               <Pause size={14} strokeWidth={1.8} /> Widget pauzeren
             </button>
           ) : (
             <button
               type="button"
-              onClick={() => update('isActive', true)}
+              onClick={() => persist({ isActive: true })}
               className="klant-btn"
               data-variant="primary"
+              disabled={pending}
             >
               <Play size={14} strokeWidth={1.8} /> Widget activeren
             </button>
           )}
           <button
             type="button"
-            onClick={() => {
-              update('lastCheckedAt', new Date().toISOString());
-              update('isInstalled', true);
-            }}
+            onClick={() =>
+              persist({
+                lastCheckedAt: new Date().toISOString(),
+                isInstalled: true,
+              })
+            }
             className="klant-btn"
+            disabled={pending}
           >
             <RefreshCw size={14} strokeWidth={1.8} /> Installatie testen
           </button>
