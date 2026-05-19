@@ -1,0 +1,497 @@
+/* V0 Klantendashboard — scoped design-tokens.
+ *
+ * Bewust *niet* in app/globals.css gemerged: het dashboard heeft zijn eigen
+ * tone (klantvriendelijk, rustig, hub-light met dark optie) terwijl de rest
+ * van de app (admintool, /widget, /home) een eigen visuele identiteit houdt.
+ * Door tokens te scopen op `[data-klant-scope]` voorkom je dat een wijziging
+ * in deze file de admintool kan kapotmaken — en omgekeerd.
+ *
+ * Theme-switching gebeurt via het bestaande [data-theme="light"|"dark"]
+ * attribuut op <html>, gezet door lib/v0/hooks/use-theme.ts. */
+
+[data-klant-scope] {
+  /* Defaults = dark abyss, blijft consistent met de rest van ChatManta. */
+  --klant-bg: #050b14;
+  --klant-bg-elev: #0a131f;
+  --klant-bg-elev-2: #0f1c2c;
+  --klant-surface: rgba(255, 255, 255, 0.04);
+  --klant-surface-hover: rgba(255, 255, 255, 0.07);
+  --klant-border: rgba(120, 200, 230, 0.14);
+  --klant-border-strong: rgba(120, 200, 230, 0.28);
+  --klant-fg: #e6f1f7;
+  --klant-fg-muted: #8aa3b3;
+  --klant-fg-dim: #5a7384;
+  --klant-accent: var(--manta-accent, #4dd6e8);
+  --klant-accent-soft: color-mix(in oklab, var(--manta-accent, #4dd6e8) 14%, transparent);
+  --klant-accent-strong: color-mix(in oklab, var(--manta-accent, #4dd6e8) 60%, transparent);
+
+  /* Semantic colors */
+  --klant-success: #34d399;
+  --klant-success-soft: rgba(52, 211, 153, 0.14);
+  --klant-warning: #fbbf24;
+  --klant-warning-soft: rgba(251, 191, 36, 0.14);
+  --klant-danger: #f87171;
+  --klant-danger-soft: rgba(248, 113, 113, 0.14);
+  --klant-info: #60a5fa;
+  --klant-info-soft: rgba(96, 165, 250, 0.14);
+
+  /* Radii */
+  --klant-r-sm: 6px;
+  --klant-r-md: 10px;
+  --klant-r-lg: 14px;
+  --klant-r-xl: 20px;
+  --klant-r-2xl: 28px;
+
+  --klant-sidebar-w: 248px;
+  --klant-topbar-h: 60px;
+}
+
+/* Light-mode tokens — best-effort scope-beperkt tot het klantendashboard.
+ * Per memory tailwind_v4_postcss_quirk: blijf bij CSS-vars + inline styles
+ * waar Tailwind class-based selectors silent gedropt zouden kunnen worden. */
+[data-theme='light'] [data-klant-scope] {
+  --klant-bg: #f8fafc;
+  --klant-bg-elev: #ffffff;
+  --klant-bg-elev-2: #f1f5f9;
+  --klant-surface: rgba(15, 23, 42, 0.03);
+  --klant-surface-hover: rgba(15, 23, 42, 0.06);
+  --klant-border: rgba(15, 23, 42, 0.10);
+  --klant-border-strong: rgba(15, 23, 42, 0.20);
+  --klant-fg: #0f172a;
+  --klant-fg-muted: #475569;
+  --klant-fg-dim: #94a3b8;
+  --klant-accent-soft: color-mix(in oklab, var(--manta-accent, #0ea5b8) 10%, transparent);
+  --klant-accent-strong: color-mix(in oklab, var(--manta-accent, #0ea5b8) 50%, transparent);
+
+  --klant-success-soft: rgba(5, 150, 105, 0.10);
+  --klant-warning-soft: rgba(202, 138, 4, 0.10);
+  --klant-danger-soft: rgba(220, 38, 38, 0.10);
+  --klant-info-soft: rgba(37, 99, 235, 0.10);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Reusable klant-* utilities
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.klant-shell {
+  display: grid;
+  grid-template-columns: var(--klant-sidebar-w) 1fr;
+  grid-template-rows: var(--klant-topbar-h) 1fr;
+  min-height: 100vh;
+  background: var(--klant-bg);
+  color: var(--klant-fg);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.klant-sidebar {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  background: var(--klant-bg-elev);
+  border-right: 1px solid var(--klant-border);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.klant-topbar {
+  grid-row: 1;
+  grid-column: 2;
+  background: var(--klant-bg-elev);
+  border-bottom: 1px solid var(--klant-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.klant-main {
+  grid-row: 2;
+  grid-column: 2;
+  padding: 28px 32px 56px;
+  max-width: 1400px;
+  width: 100%;
+}
+
+/* Card — generic surface */
+.klant-card {
+  background: var(--klant-bg-elev);
+  border: 1px solid var(--klant-border);
+  border-radius: var(--klant-r-lg);
+  padding: 20px;
+}
+
+.klant-card-glass {
+  background: var(--klant-surface);
+  border: 1px solid var(--klant-border);
+  border-radius: var(--klant-r-xl);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  padding: 24px;
+}
+
+/* Page header */
+.klant-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.klant-page-title {
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--klant-fg);
+  margin: 0;
+}
+
+.klant-page-sub {
+  font-size: 14px;
+  color: var(--klant-fg-muted);
+  margin: 6px 0 0;
+  max-width: 640px;
+}
+
+/* Section header (within a page) */
+.klant-section-title {
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--klant-fg);
+  margin: 0 0 6px;
+}
+
+.klant-section-help {
+  font-size: 13px;
+  color: var(--klant-fg-muted);
+  margin: 0 0 16px;
+}
+
+/* Nav item */
+.klant-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--klant-r-md);
+  font-size: 14px;
+  color: var(--klant-fg-muted);
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.klant-nav-item:hover {
+  background: var(--klant-surface);
+  color: var(--klant-fg);
+}
+
+.klant-nav-item[data-active='true'] {
+  background: var(--klant-accent-soft);
+  color: var(--klant-fg);
+  border-color: var(--klant-border-strong);
+  font-weight: 500;
+}
+
+.klant-nav-item svg {
+  flex-shrink: 0;
+}
+
+/* Status pill */
+.klant-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.klant-status::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.klant-status[data-tone='neutral'] {
+  background: var(--klant-surface);
+  color: var(--klant-fg-muted);
+  border: 1px solid var(--klant-border);
+}
+
+.klant-status[data-tone='success'] {
+  background: var(--klant-success-soft);
+  color: var(--klant-success);
+}
+
+.klant-status[data-tone='warning'] {
+  background: var(--klant-warning-soft);
+  color: var(--klant-warning);
+}
+
+.klant-status[data-tone='danger'] {
+  background: var(--klant-danger-soft);
+  color: var(--klant-danger);
+}
+
+.klant-status[data-tone='info'] {
+  background: var(--klant-info-soft);
+  color: var(--klant-info);
+}
+
+.klant-status[data-tone='accent'] {
+  background: var(--klant-accent-soft);
+  color: var(--klant-accent);
+}
+
+/* Button — minimal alternative to the global Button when scope-specific
+ * sizes/spacing are easier inline. */
+.klant-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--klant-r-md);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--klant-border);
+  background: var(--klant-surface);
+  color: var(--klant-fg);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.klant-btn:hover {
+  background: var(--klant-surface-hover);
+  border-color: var(--klant-border-strong);
+}
+
+.klant-btn[data-variant='primary'] {
+  background: var(--klant-accent);
+  border-color: var(--klant-accent);
+  color: #03171a;
+}
+
+.klant-btn[data-variant='primary']:hover {
+  background: color-mix(in oklab, var(--klant-accent) 88%, black);
+}
+
+.klant-btn[data-variant='ghost'] {
+  background: transparent;
+  border-color: transparent;
+}
+
+.klant-btn[data-variant='ghost']:hover {
+  background: var(--klant-surface);
+}
+
+.klant-btn[data-variant='danger'] {
+  background: transparent;
+  border-color: var(--klant-danger-soft);
+  color: var(--klant-danger);
+}
+
+.klant-btn[data-variant='danger']:hover {
+  background: var(--klant-danger-soft);
+}
+
+/* Metric cards grid */
+.klant-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+/* Empty state */
+.klant-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 24px;
+  gap: 14px;
+  border: 1px dashed var(--klant-border);
+  border-radius: var(--klant-r-xl);
+  background: var(--klant-surface);
+}
+
+.klant-empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--klant-accent-soft);
+  display: grid;
+  place-items: center;
+  color: var(--klant-accent);
+}
+
+.klant-empty-title {
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--klant-fg);
+  margin: 0;
+}
+
+.klant-empty-sub {
+  font-size: 14px;
+  color: var(--klant-fg-muted);
+  max-width: 420px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Form inputs */
+.klant-input,
+.klant-textarea,
+.klant-select {
+  width: 100%;
+  background: var(--klant-bg);
+  border: 1px solid var(--klant-border);
+  border-radius: var(--klant-r-md);
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--klant-fg);
+  font-family: inherit;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.klant-input:focus,
+.klant-textarea:focus,
+.klant-select:focus {
+  outline: none;
+  border-color: var(--klant-accent);
+  background: var(--klant-bg-elev);
+}
+
+.klant-textarea {
+  min-height: 100px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.klant-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--klant-fg);
+  margin-bottom: 6px;
+}
+
+.klant-hint {
+  font-size: 12px;
+  color: var(--klant-fg-dim);
+  margin-top: 4px;
+}
+
+/* Tables */
+.klant-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.klant-table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--klant-fg-dim);
+  text-transform: uppercase;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--klant-border);
+}
+
+.klant-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--klant-border);
+  vertical-align: middle;
+}
+
+.klant-table tr:last-child td {
+  border-bottom: none;
+}
+
+.klant-table tr:hover td {
+  background: var(--klant-surface);
+}
+
+/* Tabs */
+.klant-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--klant-border);
+  margin-bottom: 20px;
+}
+
+.klant-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--klant-fg-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.klant-tab:hover {
+  color: var(--klant-fg);
+}
+
+.klant-tab[data-active='true'] {
+  color: var(--klant-accent);
+  border-bottom-color: var(--klant-accent);
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .klant-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--klant-topbar-h) auto 1fr;
+  }
+  .klant-sidebar {
+    grid-row: 2;
+    grid-column: 1;
+    position: relative;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px 14px;
+    border-right: none;
+    border-bottom: 1px solid var(--klant-border);
+  }
+  .klant-main {
+    grid-row: 3;
+    grid-column: 1;
+    padding: 20px 16px 48px;
+  }
+  .klant-nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .klant-page-title {
+    font-size: 22px;
+  }
+}

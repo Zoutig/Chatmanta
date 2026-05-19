@@ -1,0 +1,167 @@
+import Link from 'next/link';
+import { Check, Circle, Loader2 } from 'lucide-react';
+import type { SetupStep } from '@/lib/v0/klantendashboard/types';
+
+export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
+  const doneCount = steps.filter((s) => s.status === 'completed').length;
+  const total = steps.length;
+  const pct = Math.round((doneCount / total) * 100);
+
+  return (
+    <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <h3 className="klant-section-title">Aan de slag</h3>
+          <p className="klant-section-help">
+            {doneCount === total
+              ? 'Alle stappen voltooid! Je chatbot staat klaar.'
+              : `${doneCount} van ${total} stappen voltooid — klik door om de rest te doen.`}
+          </p>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--klant-fg-muted)' }}>{pct}%</div>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        style={{
+          height: 4,
+          background: 'var(--klant-surface)',
+          borderRadius: 999,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: 'var(--klant-accent)',
+            transition: 'width 200ms ease',
+          }}
+        />
+      </div>
+
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {steps.map((step) => (
+          <li key={step.id}>
+            <StepRow step={step} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function StepRow({ step }: { step: SetupStep }) {
+  const inner = (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '10px 4px',
+        borderRadius: 'var(--klant-r-sm)',
+        transition: 'background 120ms ease',
+      }}
+    >
+      <StepIcon status={step.status} />
+      <span
+        style={{
+          flex: 1,
+          fontSize: 14,
+          color:
+            step.status === 'completed'
+              ? 'var(--klant-fg-muted)'
+              : step.status === 'in_progress'
+                ? 'var(--klant-fg)'
+                : 'var(--klant-fg)',
+          textDecoration: step.status === 'completed' ? 'line-through' : 'none',
+        }}
+      >
+        {step.title}
+      </span>
+      {step.status === 'in_progress' && (
+        <span
+          style={{
+            fontSize: 11,
+            padding: '2px 8px',
+            borderRadius: 999,
+            background: 'var(--klant-info-soft)',
+            color: 'var(--klant-info)',
+            fontWeight: 500,
+          }}
+        >
+          Bezig
+        </span>
+      )}
+    </div>
+  );
+
+  if (!step.href || step.status === 'completed') {
+    return inner;
+  }
+  return (
+    <Link href={step.href} style={{ textDecoration: 'none', display: 'block' }}>
+      {inner}
+    </Link>
+  );
+}
+
+function StepIcon({ status }: { status: SetupStep['status'] }) {
+  if (status === 'completed') {
+    return (
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 999,
+          background: 'var(--klant-success-soft)',
+          color: 'var(--klant-success)',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        <Check size={13} strokeWidth={2.5} />
+      </div>
+    );
+  }
+  if (status === 'in_progress') {
+    return (
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 999,
+          background: 'var(--klant-info-soft)',
+          color: 'var(--klant-info)',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        <Loader2 size={13} strokeWidth={2} />
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 999,
+        border: '1.5px dashed var(--klant-border-strong)',
+        display: 'grid',
+        placeItems: 'center',
+        color: 'var(--klant-fg-dim)',
+      }}
+    >
+      <Circle size={9} strokeWidth={0} fill="none" />
+    </div>
+  );
+}

@@ -119,10 +119,12 @@ export default function HomePage() {
               cta="Open admintool"
             />
             <HubCard
+              variant="primary"
               iconName="monitor"
               title="Klantendashboard v0"
-              description="Bekijk klantdata, instellingen en prestaties."
-              badge="Binnenkort"
+              description="Beheer je chatbot, bronnen, widget en gesprekken."
+              href="/klantendashboard"
+              cta="Open dashboard"
             />
             <HubCard
               iconName="globe"
