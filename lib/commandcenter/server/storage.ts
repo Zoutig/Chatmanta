@@ -178,18 +178,28 @@ export async function deleteTask(id: string): Promise<void> {
 // Seed
 // ---------------------------------------------------------------------------
 
-/** Idempotent: alleen seeden als de tabel leeg is. */
+/** Idempotent: alleen seeden als de tabel leeg is.
+ *  Module-level cache zodat we niet bij elke request een COUNT(*) RTT doen
+ *  zodra we weten dat de tabel al gevuld is. */
+let _tasksSeeded = false;
+
 export async function ensureSeeded(): Promise<{ seeded: boolean; count: number }> {
+  if (_tasksSeeded) return { seeded: false, count: -1 };
+
   const { count, error } = await sb()
     .from('cc_tasks')
     .select('id', { count: 'exact', head: true });
   if (error) throw new Error(`ensureSeeded count failed: ${error.message}`);
-  if ((count ?? 0) > 0) return { seeded: false, count: count ?? 0 };
+  if ((count ?? 0) > 0) {
+    _tasksSeeded = true;
+    return { seeded: false, count: count ?? 0 };
+  }
 
   const rows = SEED_TASKS.map((t) => inputToRow(t));
   const { error: insertErr, count: inserted } = await sb()
     .from('cc_tasks')
     .insert(rows, { count: 'exact' });
   if (insertErr) throw new Error(`ensureSeeded insert failed: ${insertErr.message}`);
+  _tasksSeeded = true;
   return { seeded: true, count: inserted ?? rows.length };
 }

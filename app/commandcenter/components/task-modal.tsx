@@ -31,6 +31,13 @@ import {
   updateTaskAction,
 } from '@/app/actions/commandcenter';
 import { Icon } from '@/app/components/svg-icons';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select';
 
 type Props = {
   open: boolean;
@@ -116,16 +123,16 @@ const labelStyle: React.CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'rgba(207,232,240,0.55)',
+  color: 'var(--fg-muted)',
   fontWeight: 500,
 };
 const fieldStyle: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(120,200,230,0.16)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 10,
   padding: '8px 12px',
-  color: '#eaf6fb',
+  color: 'var(--fg)',
   fontSize: 14,
   outline: 'none',
 };
@@ -204,7 +211,7 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
         position: 'fixed',
         inset: 0,
         zIndex: 50,
-        background: 'rgba(2, 6, 12, 0.74)',
+        background: 'rgba(0, 0, 0, 0.55)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
@@ -218,14 +225,13 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
         style={{
           width: '100%',
           maxWidth: 720,
-          background:
-            'linear-gradient(180deg, rgba(20,32,42,0.94), rgba(10,18,26,0.94))',
-          border: '1px solid rgba(120,200,230,0.18)',
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--border-strong)',
           borderRadius: 20,
           boxShadow:
-            '0 24px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04)',
+            '0 24px 80px -24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
           padding: 24,
-          color: '#eaf6fb',
+          color: 'var(--fg)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -235,6 +241,7 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
               fontSize: 20,
               fontWeight: 600,
               letterSpacing: '-0.01em',
+              color: 'var(--fg)',
             }}
           >
             {isEdit ? 'Taak bewerken' : 'Nieuwe taak'}
@@ -245,14 +252,14 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
             aria-label="Sluit"
             style={{
               background: 'transparent',
-              border: '1px solid rgba(120,200,230,0.18)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 999,
               width: 32,
               height: 32,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'rgba(207,232,240,0.7)',
+              color: 'var(--fg-muted)',
               cursor: 'pointer',
             }}
           >
@@ -277,42 +284,45 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Eigenaar</label>
-              <select
-                value={form.owner}
-                onChange={(e) => set('owner', e.target.value as Owner)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {OWNERS.map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.owner} onValueChange={(v) => set('owner', v as Owner)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OWNERS.map((o) => (
+                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => set('status', e.target.value as TaskStatus)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {TASK_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.status} onValueChange={(v) => set('status', v as TaskStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TASK_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Prioriteit</label>
-              <select
-                value={form.priority}
-                onChange={(e) => set('priority', e.target.value as Priority)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.priority} onValueChange={(v) => set('priority', v as Priority)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Deadline</label>
@@ -328,54 +338,58 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Projectgebied</label>
-              <select
-                value={form.projectArea}
-                onChange={(e) => set('projectArea', e.target.value as ProjectArea)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {PROJECT_AREAS.map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.projectArea} onValueChange={(v) => set('projectArea', v as ProjectArea)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_AREAS.map((a) => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Roadmapfase</label>
-              <select
-                value={form.roadmapPhase}
-                onChange={(e) => set('roadmapPhase', e.target.value as RoadmapPhase)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {ROADMAP_PHASES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.roadmapPhase} onValueChange={(v) => set('roadmapPhase', v as RoadmapPhase)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROADMAP_PHASES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Impact</label>
-              <select
-                value={form.impact}
-                onChange={(e) => set('impact', e.target.value as Impact)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {IMPACTS.map((i) => (
-                  <option key={i} value={i}>{i}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.impact} onValueChange={(v) => set('impact', v as Impact)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {IMPACTS.map((i) => (
+                      <SelectItem key={i} value={i}>{i}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Moeite</label>
-              <select
-                value={form.effort}
-                onChange={(e) => set('effort', e.target.value as Effort)}
-                style={{ ...fieldStyle, marginTop: 6 }}
-              >
-                {EFFORTS.map((e2) => (
-                  <option key={e2} value={e2}>{e2}</option>
-                ))}
-              </select>
+              <div style={{ marginTop: 6 }}>
+                <Select value={form.effort} onValueChange={(v) => set('effort', v as Effort)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EFFORTS.map((e2) => (
+                      <SelectItem key={e2} value={e2}>{e2}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -428,7 +442,7 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
             <p
               style={{
                 fontSize: 13,
-                color: '#f1a5a5',
+                color: 'var(--err)',
                 margin: 0,
                 background: 'rgba(220,90,90,0.10)',
                 border: '1px solid rgba(220,90,90,0.30)',
@@ -460,7 +474,7 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
                     ? 'rgba(220,90,90,0.18)'
                     : 'transparent',
                   border: '1px solid rgba(220,90,90,0.34)',
-                  color: '#f1a5a5',
+                  color: 'var(--err)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -485,8 +499,8 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
                 disabled={pending}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(120,200,230,0.18)',
-                  color: 'rgba(207,232,240,0.7)',
+                  border: '1px solid var(--border-strong)',
+                  color: 'var(--fg-muted)',
                   padding: '8px 14px',
                   borderRadius: 10,
                   fontSize: 13,
@@ -501,9 +515,9 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
                 onClick={submit}
                 disabled={pending}
                 style={{
-                  background: 'var(--manta-accent)',
-                  border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-                  color: '#03171a',
+                  background: 'var(--manta-accent, var(--accent))',
+                  border: '1px solid color-mix(in oklab, var(--manta-accent, var(--accent)) 50%, transparent)',
+                  color: 'var(--accent-fg)',
                   padding: '8px 16px',
                   borderRadius: 10,
                   fontSize: 13,

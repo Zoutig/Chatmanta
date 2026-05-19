@@ -11,8 +11,7 @@ import { RoadmapClient } from '../components/roadmap-client';
 export const dynamic = 'force-dynamic';
 
 export default async function CommandCenterRoadmapPage() {
-  await ensureSeeded();
-  await ensureMilestonesSeeded();
+  await Promise.all([ensureSeeded(), ensureMilestonesSeeded()]);
   const [tasks, milestones, phaseStatuses] = await Promise.all([
     listTasks(),
     listMilestones(),

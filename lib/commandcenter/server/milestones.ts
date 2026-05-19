@@ -143,12 +143,20 @@ export async function deleteMilestone(id: string): Promise<void> {
   if (error) throw new Error(`deleteMilestone failed: ${error.message}`);
 }
 
+// Module-level cache: skip de COUNT(*) RTT zodra we weten dat seed gedaan is.
+let _milestonesSeeded = false;
+
 export async function ensureMilestonesSeeded(): Promise<{ seeded: boolean; count: number }> {
+  if (_milestonesSeeded) return { seeded: false, count: -1 };
+
   const { count, error } = await sb()
     .from('cc_milestones')
     .select('id', { count: 'exact', head: true });
   if (error) throw new Error(`ensureMilestonesSeeded count failed: ${error.message}`);
-  if ((count ?? 0) > 0) return { seeded: false, count: count ?? 0 };
+  if ((count ?? 0) > 0) {
+    _milestonesSeeded = true;
+    return { seeded: false, count: count ?? 0 };
+  }
 
   const rows = SEED_MILESTONES.map((m) => inputToRow(m));
   const { error: insertErr, count: inserted } = await sb()
@@ -156,6 +164,7 @@ export async function ensureMilestonesSeeded(): Promise<{ seeded: boolean; count
     .insert(rows, { count: 'exact' });
   if (insertErr)
     throw new Error(`ensureMilestonesSeeded insert failed: ${insertErr.message}`);
+  _milestonesSeeded = true;
   return { seeded: true, count: inserted ?? rows.length };
 }
 
