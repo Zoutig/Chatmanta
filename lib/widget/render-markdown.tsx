@@ -165,7 +165,7 @@ export function renderMarkdown(raw: string, theme: MarkdownTheme): ReactNode {
 // ---------------------------------------------------------------------------
 const INLINE_PATTERN = /(\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|\[[^\]\n]+?\]\([^)\n]*?\)|`[^`\n]+?`)/g;
 
-function renderInline(text: string, theme: MarkdownTheme): ReactNode {
+export function renderInline(text: string, theme: MarkdownTheme): ReactNode {
   if (!text) return null;
   const parts = text.split(INLINE_PATTERN).filter((p) => p !== undefined);
   return (
