@@ -46,15 +46,13 @@ export function ProjectsClient({ tasks, milestones }: Props) {
             fontWeight: 700,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
             letterSpacing: '-0.02em',
-            background: 'linear-gradient(180deg, #f3fbff 0%, #b8dfe9 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: 'var(--fg)',
             backgroundClip: 'text',
           }}
         >
           Projectgebieden
         </h1>
-        <p style={{ margin: '6px 0 0', fontSize: 14, color: 'rgba(207,232,240,0.62)' }}>
+        <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--fg-muted)' }}>
           Per gebied: open taken, owners, blockers en milestones. Klik op een
           gebied om de filtered takenlijst te openen.
         </p>
@@ -87,8 +85,8 @@ export function ProjectsClient({ tasks, milestones }: Props) {
             <article
               key={area}
               style={{
-                background: 'rgba(255,255,255,0.025)',
-                border: '1px solid rgba(120,200,230,0.12)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
                 borderRadius: 16,
                 padding: 16,
                 display: 'flex',
@@ -117,9 +115,9 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                 <span
                   style={{
                     fontSize: 11,
-                    color: 'rgba(207,232,240,0.55)',
-                    background: 'rgba(120,200,230,0.06)',
-                    border: '1px solid rgba(120,200,230,0.14)',
+                    color: 'var(--fg-muted)',
+                    background: 'var(--surface-3)',
+                    border: '1px solid var(--border-strong)',
                     borderRadius: 999,
                     padding: '2px 8px',
                   }}
@@ -132,7 +130,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                 style={{
                   margin: 0,
                   fontSize: 12.5,
-                  color: 'rgba(207,232,240,0.6)',
+                  color: 'var(--fg-muted)',
                   lineHeight: 1.45,
                 }}
               >
@@ -176,7 +174,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: '#f1a5a5',
+                    color: 'var(--err)',
                     background: 'rgba(220,90,90,0.08)',
                     border: '1px solid rgba(220,90,90,0.24)',
                     borderRadius: 8,
@@ -196,9 +194,9 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                         fontSize: 10,
                         textTransform: 'uppercase',
                         letterSpacing: '0.08em',
-                        color: 'rgba(155,213,224,0.65)',
-                        background: 'rgba(120,200,230,0.06)',
-                        border: '1px solid rgba(120,200,230,0.14)',
+                        color: 'var(--fg-muted)',
+                        background: 'var(--surface-3)',
+                        border: '1px solid var(--border-strong)',
                         borderRadius: 999,
                         padding: '2px 8px',
                       }}
@@ -214,7 +212,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                   style={{
                     marginTop: 4,
                     paddingTop: 8,
-                    borderTop: '1px solid rgba(120,200,230,0.08)',
+                    borderTop: '1px solid var(--border)',
                   }}
                 >
                   <div
@@ -222,7 +220,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                       fontSize: 10,
                       textTransform: 'uppercase',
                       letterSpacing: '0.08em',
-                      color: 'rgba(207,232,240,0.5)',
+                      color: 'var(--fg-muted)',
                       marginBottom: 4,
                     }}
                   >
@@ -232,7 +230,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                     {areaMilestones.slice(0, 3).map((m) => (
                       <li
                         key={m.id}
-                        style={{ color: 'rgba(207,232,240,0.72)', marginBottom: 2 }}
+                        style={{ color: 'var(--fg)', marginBottom: 2 }}
                       >
                         {m.title}
                       </li>
@@ -246,7 +244,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                 style={{
                   marginTop: 4,
                   fontSize: 12,
-                  color: 'rgba(155,213,224,0.78)',
+                  color: 'var(--fg)',
                   textDecoration: 'none',
                 }}
               >
@@ -267,6 +265,6 @@ const countChipStyle: React.CSSProperties = {
 };
 const countNumStyle: React.CSSProperties = {
   fontSize: 11.5,
-  color: 'rgba(207,232,240,0.62)',
+  color: 'var(--fg-muted)',
   fontWeight: 500,
 };

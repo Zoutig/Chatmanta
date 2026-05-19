@@ -20,6 +20,13 @@ import {
 import { setPhaseStatusAction } from '@/app/actions/commandcenter';
 import { Icon } from '@/app/components/svg-icons';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select';
+import {
   MilestoneStatusBadge,
   OwnerBadge,
   PhaseStatusBadge,
@@ -67,12 +74,12 @@ export function RoadmapClient({ tasks, milestones, phaseStatuses }: Props) {
             fontWeight: 700,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
             letterSpacing: '-0.02em',
-            color: '#eaf6fb',
+            color: 'var(--fg)',
           }}
         >
           Roadmap
         </h1>
-        <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'rgba(207,232,240,0.62)' }}>
+        <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--fg-muted)' }}>
           Voortgang per fase — afgeronde milestones / totaal, of taken-fallback waar geen milestones zijn.
         </p>
       </header>
@@ -147,11 +154,11 @@ function PhaseCard({
     <section
       style={{
         background: isActive
-          ? 'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 10%, transparent), rgba(255,255,255,0.025))'
-          : 'rgba(255,255,255,0.025)',
+          ? 'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 10%, transparent), var(--surface))'
+          : 'var(--surface)',
         border: isActive
           ? '1px solid color-mix(in oklab, var(--manta-accent) 30%, transparent)'
-          : '1px solid rgba(120,200,230,0.12)',
+          : '1px solid var(--border)',
         borderRadius: 18,
         padding: 22,
         display: 'flex',
@@ -177,7 +184,7 @@ function PhaseCard({
                 fontWeight: 600,
                 fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
                 letterSpacing: '-0.01em',
-                color: '#eaf6fb',
+                color: 'var(--fg)',
               }}
             >
               {info.label}
@@ -188,7 +195,7 @@ function PhaseCard({
             style={{
               margin: '6px 0 0',
               fontSize: 13,
-              color: 'rgba(207,232,240,0.62)',
+              color: 'var(--fg-muted)',
               lineHeight: 1.5,
             }}
           >
@@ -196,30 +203,25 @@ function PhaseCard({
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <select
-            value={status}
-            disabled={pending}
-            onChange={(e) => {
-              const next = e.target.value as PhaseStatus;
-              startTransition(() => onStatusChange(next));
-            }}
-            style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(120,200,230,0.16)',
-              borderRadius: 10,
-              padding: '6px 10px',
-              color: '#eaf6fb',
-              fontSize: 12.5,
-              outline: 'none',
-              cursor: pending ? 'wait' : 'pointer',
-            }}
-          >
-            {PHASE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <div style={{ minWidth: 160, opacity: pending ? 0.6 : 1 }}>
+            <Select
+              value={status}
+              disabled={pending}
+              onValueChange={(v) => {
+                const next = v as PhaseStatus;
+                startTransition(() => onStatusChange(next));
+              }}
+            >
+              <SelectTrigger style={{ padding: '6px 10px', fontSize: 12.5 }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PHASE_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <button
             type="button"
             onClick={onAddMilestone}
@@ -253,7 +255,7 @@ function PhaseCard({
             fontSize: 12,
           }}
         >
-          <span style={{ color: 'rgba(207,232,240,0.55)' }}>
+          <span style={{ color: 'var(--fg-muted)' }}>
             {progress.source === 'milestones'
               ? `Milestones: ${progress.done} / ${progress.total} afgerond`
               : progress.source === 'tasks'
@@ -261,7 +263,7 @@ function PhaseCard({
                 : 'Nog niets ingepland in deze fase'}
           </span>
           {progress.total > 0 && (
-            <span style={{ color: '#eaf6fb', fontWeight: 600 }}>
+            <span style={{ color: 'var(--fg)', fontWeight: 600 }}>
               {Math.round(progress.ratio * 100)}%
             </span>
           )}
@@ -281,9 +283,9 @@ function PhaseCard({
                 fontSize: 11,
                 padding: '3px 8px',
                 borderRadius: 999,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(120,200,230,0.12)',
-                color: 'rgba(207,232,240,0.65)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--fg-muted)',
               }}
             >
               {f}
@@ -301,7 +303,7 @@ function PhaseCard({
               fontSize: 12,
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: 'rgba(207,232,240,0.5)',
+              color: 'var(--fg-muted)',
               fontWeight: 500,
             }}
           >
@@ -315,12 +317,12 @@ function PhaseCard({
                 onClick={() => onEditMilestone(m)}
                 style={{
                   textAlign: 'left',
-                  background: 'rgba(255,255,255,0.025)',
-                  border: '1px solid rgba(120,200,230,0.12)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
                   borderRadius: 12,
                   padding: '10px 12px',
                   cursor: 'pointer',
-                  color: '#eaf6fb',
+                  color: 'var(--fg)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 6,
@@ -331,7 +333,7 @@ function PhaseCard({
                     style={{
                       fontSize: 13.5,
                       fontWeight: 500,
-                      color: m.status === 'Afgerond' ? 'rgba(207,232,240,0.55)' : '#eaf6fb',
+                      color: m.status === 'Afgerond' ? 'var(--fg-muted)' : 'var(--fg)',
                       textDecoration: m.status === 'Afgerond' ? 'line-through' : 'none',
                     }}
                   >
@@ -348,7 +350,7 @@ function PhaseCard({
                       margin: 0,
                       paddingLeft: 18,
                       fontSize: 12,
-                      color: 'rgba(207,232,240,0.58)',
+                      color: 'var(--fg-muted)',
                       lineHeight: 1.5,
                     }}
                   >
@@ -356,14 +358,14 @@ function PhaseCard({
                       <li key={i}>{c}</li>
                     ))}
                     {m.acceptanceCriteria.length > 3 && (
-                      <li style={{ color: 'rgba(207,232,240,0.42)' }}>
+                      <li style={{ color: 'var(--fg-faint)' }}>
                         + {m.acceptanceCriteria.length - 3} meer
                       </li>
                     )}
                   </ul>
                 )}
                 {m.linkedTaskIds.length > 0 && (
-                  <span style={{ fontSize: 11.5, color: 'rgba(155,213,224,0.55)' }}>
+                  <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
                     Gekoppeld aan {m.linkedTaskIds.length} {m.linkedTaskIds.length === 1 ? 'taak' : 'taken'}
                   </span>
                 )}
@@ -382,7 +384,7 @@ function PhaseCard({
               fontSize: 12,
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: 'rgba(207,232,240,0.5)',
+              color: 'var(--fg-muted)',
               fontWeight: 500,
             }}
           >
@@ -399,9 +401,9 @@ function PhaseCard({
                   fontSize: 12,
                   padding: '4px 10px',
                   borderRadius: 999,
-                  background: 'rgba(255,255,255,0.025)',
-                  border: '1px solid rgba(120,200,230,0.12)',
-                  color: t.status === 'Klaar' ? 'rgba(207,232,240,0.45)' : '#eaf6fb',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  color: t.status === 'Klaar' ? 'var(--fg-faint)' : 'var(--fg)',
                   textDecoration: t.status === 'Klaar' ? 'line-through' : 'none',
                 }}
               >
@@ -414,7 +416,7 @@ function PhaseCard({
               <span
                 style={{
                   fontSize: 12,
-                  color: 'rgba(155,213,224,0.55)',
+                  color: 'var(--fg-muted)',
                   padding: '4px 10px',
                 }}
               >

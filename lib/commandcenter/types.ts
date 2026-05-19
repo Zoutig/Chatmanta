@@ -28,8 +28,6 @@ export type ProjectArea = (typeof PROJECT_AREAS)[number];
 export const ROADMAP_PHASES = [
   'Backlog',
   'v0',
-  'v0.5',
-  'v0.6',
   'v1',
   'v2',
   'v3',

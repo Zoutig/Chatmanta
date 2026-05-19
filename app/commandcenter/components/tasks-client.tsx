@@ -112,7 +112,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               fontWeight: 700,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.02em',
-              color: '#eaf6fb',
+              color: 'var(--fg)',
             }}
           >
             Taken
@@ -121,7 +121,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
             style={{
               margin: '6px 0 0',
               fontSize: 13.5,
-              color: 'rgba(207,232,240,0.62)',
+              color: 'var(--fg-muted)',
             }}
           >
             {initialTasks.length} taken in totaal — {visible.length} zichtbaar.
@@ -133,7 +133,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
           style={{
             background: 'var(--manta-accent)',
             border: '1px solid color-mix(in oklab, var(--manta-accent) 50%, transparent)',
-            color: '#03171a',
+            color: 'var(--accent-fg)',
             padding: '10px 16px',
             borderRadius: 12,
             fontSize: 13.5,
@@ -162,13 +162,13 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                 style={{
                   background: active
                     ? 'color-mix(in oklab, var(--manta-accent) 18%, transparent)'
-                    : 'rgba(255,255,255,0.03)',
+                    : 'var(--surface)',
                   border: active
                     ? '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
-                    : '1px solid rgba(120,200,230,0.14)',
+                    : '1px solid var(--border-strong)',
                   color: active
                     ? 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)'
-                    : 'rgba(207,232,240,0.72)',
+                    : 'var(--fg)',
                   padding: '6px 12px',
                   borderRadius: 999,
                   fontSize: 12.5,
@@ -189,13 +189,13 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               gap: 8,
               flex: '1 1 240px',
               maxWidth: 380,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(120,200,230,0.14)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 10,
               padding: '6px 10px',
             }}
           >
-            <Icon name="search" size={14} className="text-[rgba(207,232,240,0.5)]" />
+            <Icon name="search" size={14} className="text-[var(--fg-muted)]" />
             <input
               type="search"
               placeholder="Zoek in taken…"
@@ -206,7 +206,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: '#eaf6fb',
+                color: 'var(--fg)',
                 fontSize: 13.5,
               }}
             />
@@ -217,7 +217,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               alignItems: 'center',
               gap: 6,
               fontSize: 12.5,
-              color: 'rgba(207,232,240,0.6)',
+              color: 'var(--fg-muted)',
               cursor: 'pointer',
             }}
           >
@@ -236,12 +236,12 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
         <p
           style={{
             fontSize: 13.5,
-            color: 'rgba(207,232,240,0.5)',
+            color: 'var(--fg-muted)',
             fontStyle: 'italic',
             padding: 24,
             textAlign: 'center',
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(120,200,230,0.12)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 14,
           }}
         >
@@ -256,7 +256,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               <section key={o} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <header style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <OwnerBadge owner={o} />
-                  <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.5)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                     {list.length} {list.length === 1 ? 'taak' : 'taken'}
                   </span>
                 </header>
@@ -304,8 +304,8 @@ function TaskTable({
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(120,200,230,0.12)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
         borderRadius: 14,
         overflow: 'hidden',
       }}
@@ -321,7 +321,7 @@ function TaskTable({
           <tr
             style={{
               background: 'rgba(255,255,255,0.02)',
-              borderBottom: '1px solid rgba(120,200,230,0.10)',
+              borderBottom: '1px solid var(--border)',
             }}
           >
             <Th>Taak</Th>
@@ -339,11 +339,11 @@ function TaskTable({
               onClick={() => onClick(t)}
               style={{
                 cursor: 'pointer',
-                borderBottom: '1px solid rgba(120,200,230,0.06)',
+                borderBottom: '1px solid var(--surface-3)',
                 transition: 'background-color 140ms ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(120,200,230,0.04)';
+                e.currentTarget.style.backgroundColor = 'var(--surface-2)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -353,7 +353,7 @@ function TaskTable({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span
                     style={{
-                      color: t.status === 'Klaar' ? 'rgba(207,232,240,0.45)' : '#eaf6fb',
+                      color: t.status === 'Klaar' ? 'var(--fg-faint)' : 'var(--fg)',
                       textDecoration: t.status === 'Klaar' ? 'line-through' : 'none',
                       fontWeight: 500,
                     }}
@@ -361,7 +361,7 @@ function TaskTable({
                     {t.title}
                   </span>
                   {t.nextAction && t.status !== 'Klaar' && (
-                    <span style={{ fontSize: 12, color: 'rgba(207,232,240,0.55)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                       → {t.nextAction}
                     </span>
                   )}
@@ -387,7 +387,7 @@ function TaskTable({
               </Td>
               <Td>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: isOverdue(t) ? '#ffb3b3' : 'rgba(207,232,240,0.7)' }}>
+                  <span style={{ color: isOverdue(t) ? '#ffb3b3' : 'var(--fg-muted)' }}>
                     {formatDeadline(t.deadline)}
                   </span>
                   {isOverdue(t) && <OverdueBadge />}
@@ -397,7 +397,7 @@ function TaskTable({
                 <span
                   style={{
                     fontSize: 11.5,
-                    color: 'rgba(155,213,224,0.65)',
+                    color: 'var(--fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -422,7 +422,7 @@ function Th({ children }: { children: React.ReactNode }) {
         fontSize: 11,
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
-        color: 'rgba(207,232,240,0.48)',
+        color: 'var(--fg-muted)',
         fontWeight: 500,
       }}
     >
@@ -437,7 +437,7 @@ function Td({ children }: { children: React.ReactNode }) {
       style={{
         padding: '12px 14px',
         verticalAlign: 'top',
-        color: '#eaf6fb',
+        color: 'var(--fg)',
       }}
     >
       {children}

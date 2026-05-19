@@ -1,14 +1,14 @@
-// Seed milestones uit goal-prompt §11.3 — v0.6 + v1 voorbeelden.
+// Seed milestones uit goal-prompt §11.3 — v0 + v1 voorbeelden.
 // ensureMilestonesSeeded() in storage.ts gebruikt deze als initiële set zodat
 // het roadmap-scherm direct gevuld is.
 
 import type { MilestoneInput } from './types';
 
 export const SEED_MILESTONES: MilestoneInput[] = [
-  // v0.6 milestones
+  // v0 milestones
   {
     title: 'RAG pipeline geeft correcte antwoorden op testset',
-    roadmapPhase: 'v0.6',
+    roadmapPhase: 'v0',
     owner: 'Sebastiaan',
     status: 'Bezig',
     acceptanceCriteria: [
@@ -18,7 +18,7 @@ export const SEED_MILESTONES: MilestoneInput[] = [
   },
   {
     title: 'Chatbot geeft veilige fallback bij ontbrekende info',
-    roadmapPhase: 'v0.6',
+    roadmapPhase: 'v0',
     owner: 'Sebastiaan',
     status: 'Bezig',
     acceptanceCriteria: [
@@ -28,14 +28,14 @@ export const SEED_MILESTONES: MilestoneInput[] = [
   },
   {
     title: 'Gemiddelde antwoordtijd acceptabel',
-    roadmapPhase: 'v0.6',
+    roadmapPhase: 'v0',
     owner: 'Sebastiaan',
     status: 'Niet gestart',
     acceptanceCriteria: ['p50 < 4s end-to-end', 'p95 < 8s end-to-end'],
   },
   {
     title: 'Testdata en evals zijn opgezet',
-    roadmapPhase: 'v0.6',
+    roadmapPhase: 'v0',
     owner: 'Sebastiaan',
     status: 'Bezig',
     acceptanceCriteria: [
@@ -45,7 +45,7 @@ export const SEED_MILESTONES: MilestoneInput[] = [
   },
   {
     title: 'Widget werkt stabiel op testsite',
-    roadmapPhase: 'v0.6',
+    roadmapPhase: 'v0',
     owner: 'Sebastiaan',
     status: 'Niet gestart',
     acceptanceCriteria: ['Geen crashes op desktop + mobiel', 'Initial load < 200ms'],
