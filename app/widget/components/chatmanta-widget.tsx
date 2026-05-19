@@ -2,8 +2,11 @@
 
 // ChatManta-widget voor de /widget demo-pagina.
 //
-// FAB linksonder → open/dicht-paneel met streaming-chat tegen /api/v0/chat.
-// Suggested-questions chips bij eerste opening. "Powered by ChatManta"-footer.
+// FAB rechtsonder → open/dicht-paneel met streaming-chat tegen /api/v0/chat.
+// FAB toont het ChatManta brand-mark logo, pulseert subtiel als gesloten,
+// en heeft een tooltip "Hoi! Heb je een vraag?" die ~4s na page-load
+// éénmalig pop-upt en bij hover terugkomt. Suggested-questions chips bij
+// eerste opening. "Powered by ChatManta"-footer.
 //
 // MVP-scope: alleen het kale chat-pad. Geen bronnen-view, geen claim-tabs,
 // geen latency-snapshot — die zijn admintool-features. Sources/claims/etc.
@@ -12,6 +15,7 @@
 // Streaming-pattern is overgenomen uit app/components/chat-shell.tsx:230-360.
 // React 19 batched updates → flushSync per delta voor zichtbare streaming.
 
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
@@ -39,6 +43,8 @@ export function ChatMantaWidget({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [pending, setPending] = useState(false);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipHovered, setTooltipHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -61,6 +67,19 @@ export function ChatMantaWidget({
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
+
+  // Tooltip auto-show: 1× verschijnen 4s na mount, dan 6s zichtbaar, dan weg.
+  // Daarna alleen nog op hover. Zodra de chat opent worden de timers gewist
+  // door de cleanup en gate `showTooltipNow` extra op `!open`.
+  useEffect(() => {
+    if (open) return;
+    const showTimer = setTimeout(() => setTooltipVisible(true), 4000);
+    const hideTimer = setTimeout(() => setTooltipVisible(false), 10000);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [open]);
 
   const send = useCallback(
     async (question: string) => {
@@ -159,45 +178,124 @@ export function ChatMantaWidget({
 
   const showSuggested = !open ? false : messages.length === 0 && !pending;
 
+  const showTooltipNow = (tooltipVisible || tooltipHovered) && !open;
+
   return (
     <>
-      {/* FAB linksonder */}
-      <button
-        type="button"
-        aria-label={open ? 'Sluit chat' : 'Open chat'}
-        onClick={() => setOpen((v) => !v)}
+      {/* FAB-container rechtsonder — bevat pulse-ring, button en tooltip */}
+      <div
         style={{
           position: 'fixed',
-          left: 24,
+          right: 24,
           bottom: 24,
           width: 56,
           height: 56,
-          borderRadius: '50%',
-          background: primaryColor,
-          color: bestForegroundOn(primaryColor),
-          border: 'none',
-          cursor: 'pointer',
-          boxShadow: '0 12px 32px -8px rgba(0,0,0,0.32), 0 4px 12px rgba(0,0,0,0.18)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           zIndex: 9999,
-          transition: 'transform 180ms ease, box-shadow 180ms ease',
-          transform: open ? 'scale(0.9)' : 'scale(1)',
         }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = open
-            ? 'scale(0.94)'
-            : 'scale(1.05)';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = open
-            ? 'scale(0.9)'
-            : 'scale(1)';
-        }}
+        onMouseEnter={() => setTooltipHovered(true)}
+        onMouseLeave={() => setTooltipHovered(false)}
       >
-        {open ? <CloseIcon /> : <ChatIcon />}
-      </button>
+        {/* Pulse-ring achter de FAB — alleen zichtbaar als chat gesloten is.
+            Per render gegenereerd met primaryColor zodat hij de org-context volgt. */}
+        {!open && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: '50%',
+              background: primaryColor,
+              opacity: 0.45,
+              animation: 'chatmanta-pulse 2.4s ease-out infinite',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {/* Tooltip boven de FAB — state-driven, geen :hover (iOS Safari) */}
+        <div
+          role="status"
+          aria-hidden={!showTooltipNow}
+          style={{
+            position: 'absolute',
+            right: 0,
+            bottom: 'calc(100% + 12px)',
+            background: '#0e1014',
+            color: '#ffffff',
+            padding: '8px 14px',
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 12px 32px -8px rgba(0,0,0,0.32)',
+            opacity: showTooltipNow ? 1 : 0,
+            transform: showTooltipNow ? 'translateY(0)' : 'translateY(6px)',
+            pointerEvents: showTooltipNow ? 'auto' : 'none',
+            transition: 'opacity 220ms ease, transform 220ms ease',
+            fontFamily: 'var(--font-inter), system-ui, sans-serif',
+          }}
+        >
+          Hoi! <span style={{ color: primaryColor, fontWeight: 600 }}>Heb je een vraag?</span>
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              right: 22,
+              bottom: -4,
+              width: 8,
+              height: 8,
+              background: '#0e1014',
+              transform: 'rotate(45deg)',
+            }}
+          />
+        </div>
+
+        <button
+          type="button"
+          aria-label={open ? 'Sluit chat' : 'Open chat'}
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            position: 'relative',
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: '#ffffff',
+            border: `1px solid rgba(0,0,0,0.06)`,
+            cursor: 'pointer',
+            boxShadow: '0 12px 32px -8px rgba(0,0,0,0.32), 0 4px 12px rgba(0,0,0,0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 180ms ease, box-shadow 180ms ease',
+            transform: open ? 'scale(0.9)' : 'scale(1)',
+            padding: 0,
+            overflow: 'hidden',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = open
+              ? 'scale(0.94)'
+              : 'scale(1.06)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = open
+              ? 'scale(0.9)'
+              : 'scale(1)';
+          }}
+        >
+          {open ? (
+            <CloseIcon />
+          ) : (
+            <Image
+              src="/logo/mark.png"
+              alt=""
+              width={36}
+              height={36}
+              priority
+              style={{ objectFit: 'contain' }}
+            />
+          )}
+        </button>
+      </div>
 
       {/* Keyframes — inline om de Tailwind v4 PostCSS-drop-quirk te omzeilen. */}
       <style>{`
@@ -209,6 +307,11 @@ export function ChatMantaWidget({
           0%, 50% { opacity: 1; }
           50.01%, 100% { opacity: 0; }
         }
+        @keyframes chatmanta-pulse {
+          0% { transform: scale(1); opacity: 0.45; }
+          80% { transform: scale(1.55); opacity: 0; }
+          100% { transform: scale(1.55); opacity: 0; }
+        }
       `}</style>
 
       {/* Paneel */}
@@ -218,7 +321,7 @@ export function ChatMantaWidget({
           aria-label={`${companyName} chat`}
           style={{
             position: 'fixed',
-            left: 24,
+            right: 24,
             bottom: 96,
             width: 380,
             height: 560,
@@ -632,16 +735,9 @@ function renderMarkdownLite(text: string): React.ReactNode {
 }
 
 // ---------------------------------------------------------------------------
-// Icons (inline SVG — geen extra dep)
+// Icons (inline SVG — geen extra dep). De FAB toont nu het ChatManta brand-
+// mark logo i.p.v. een generieke chat-bubble, dus alleen Close + Send blijven.
 // ---------------------------------------------------------------------------
-function ChatIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
-}
-
 function CloseIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

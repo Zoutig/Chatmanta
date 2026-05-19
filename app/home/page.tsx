@@ -120,6 +120,14 @@ export default function HomePage() {
             />
             <HubCard
               variant="primary"
+              iconName="command"
+              title="Command Center"
+              description="Founder cockpit voor taken, roadmap en testklanten."
+              href="/commandcenter"
+              cta="Open command center"
+            />
+            <HubCard
+              variant="primary"
               iconName="monitor"
               title="Klantendashboard v0"
               description="Beheer je chatbot, bronnen, widget en gesprekken."
