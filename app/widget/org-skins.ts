@@ -179,28 +179,23 @@ export function findPage(
 /**
  * Klantendashboard-overrides → skin-velden.
  *
- * Het klantendashboard kan een aantal widget-eigenschappen overschrijven
- * (primaryColor, suggested questions). Landing-page-velden (companyName,
- * hero, pages, bgColor/textColor/cardColor) blijven uit de skin — daar
- * heeft de klant nog geen controle over.
+ * BELANGRIJK: deze helper raakt skin.primaryColor *niet* aan. Dat veld
+ * wordt door FakeSite gebruikt voor de hele landing-page (buttons, links,
+ * accents) en moet de org-default volgen — anders verandert de hele
+ * demo-website mee wanneer de klant alleen de widget-kleur wijzigt.
  *
- * Veld-bronnen:
- *   - primaryColor: widget.primaryColor (als gezet)
- *   - suggestedQuestions: chatbot.starterQuestions (als niet leeg)
- *
- * Returns een nieuwe `OrgSkin` zodat callers het object kunnen meegeven aan
- * de bestaande ChatMantaWidget-props zonder shape-wijziging.
+ * Widget-kleuren lopen daarom direct via `widgetOverrides` naar
+ * ChatMantaWidget (zie WidgetShell). Hier mergen we alleen velden die
+ * écht in de skin horen (suggested questions = starter-questions).
  */
 export function applyWidgetOverrides(
   skin: OrgSkin,
   overrides: {
-    primaryColor?: string;
     starterQuestions?: string[];
   },
 ): OrgSkin {
   return {
     ...skin,
-    primaryColor: overrides.primaryColor || skin.primaryColor,
     suggestedQuestions:
       overrides.starterQuestions && overrides.starterQuestions.length > 0
         ? overrides.starterQuestions

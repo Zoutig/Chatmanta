@@ -165,10 +165,45 @@ export type ChatbotSettings = {
 export type WidgetPosition = 'bottom-right' | 'bottom-left';
 export type WidgetTheme = 'light' | 'dark' | 'auto';
 
+/**
+ * Hoe ziet het icoon op de FAB eruit?
+ *
+ * - 'brand-mark'  → het ChatManta-merkteken (mask in `logoColor`)
+ * - 'chat-bubble' → een generieke chat-bubble (mask in `logoColor`)
+ * - 'custom-logo' → een eigen geüploade afbeelding (geen color-mask, gebruik
+ *                   `customLogoDataUrl` als bron)
+ */
+export type WidgetLogoStyle = 'brand-mark' | 'chat-bubble' | 'custom-logo';
+
 export type WidgetSettings = {
-  primaryColor: string; // hex
+  /**
+   * Legacy hoofdkleur — gebruikt als fallback voor de granulaire velden
+   * hieronder wanneer die niet expliciet zijn gezet. Voor nieuwe orgs valt
+   * hij dus terug op deze waarde, en wijzigen van dit veld alleen heeft
+   * effect op elementen waar geen specifieke kleur is ingesteld.
+   */
+  primaryColor: string;
+
+  /**
+   * Granulaire widget-kleuren. Optioneel — bij undefined valt de UI terug
+   * op `primaryColor`. Dat maakt backwards-compat triviaal: oude DB-rijen
+   * met alleen `primaryColor` blijven werken alsof alles die kleur heeft.
+   */
+  logoColor?: string; // ChatManta-mark of chat-bubble icoon
+  widgetBgColor?: string; // FAB-knop achtergrond
+  pulseColor?: string; // pulse-ring achter de FAB
+  headerColor?: string; // header bij geopende widget + verstuurknop
+
+  /** Welk icoon wordt op de FAB getoond? */
+  logoStyle: WidgetLogoStyle;
+  /**
+   * base64 data-URL van het geüploade logo (alleen relevant als
+   * logoStyle === 'custom-logo'). Server-side persisted in `widget` jsonb.
+   * Hard cap op 200KB om de row klein te houden.
+   */
+  customLogoDataUrl: string | null;
+
   position: WidgetPosition;
-  avatarUrl: string | null;
   title: string;
   subtitle: string;
   launcherText: string;

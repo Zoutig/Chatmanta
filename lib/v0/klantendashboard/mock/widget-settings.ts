@@ -11,7 +11,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   'dev-org': {
     primaryColor: '#4dd6e8',
     position: 'bottom-right',
-    avatarUrl: null,
+    logoStyle: 'brand-mark',
+    customLogoDataUrl: null,
     title: 'Hoi! Hoe kan ik je helpen?',
     subtitle: 'Wij reageren meestal binnen een paar minuten.',
     launcherText: 'Chat met ons',
@@ -23,7 +24,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   'acme-corp': {
     primaryColor: '#d97706',
     position: 'bottom-right',
-    avatarUrl: null,
+    logoStyle: 'brand-mark',
+    customLogoDataUrl: null,
     title: 'Vraag het Dakwerken De Boer',
     subtitle: 'Stel je vraag over daken, lekkages of offertes.',
     launcherText: 'Stel je vraag',
@@ -35,7 +37,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   'globex-inc': {
     primaryColor: '#0891b2',
     position: 'bottom-right',
-    avatarUrl: null,
+    logoStyle: 'brand-mark',
+    customLogoDataUrl: null,
     title: 'FysioPlus chat-assistent',
     subtitle: 'Vraag naar afspraken, vergoedingen en behandelingen.',
     launcherText: 'Open chat',
@@ -47,7 +50,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   initech: {
     primaryColor: '#475569',
     position: 'bottom-right',
-    avatarUrl: null,
+    logoStyle: 'brand-mark',
+    customLogoDataUrl: null,
     title: 'Bakker & Vermeer · advies',
     subtitle: 'Snel antwoord op je administratie- en belastingvraag.',
     launcherText: 'Stel je vraag',

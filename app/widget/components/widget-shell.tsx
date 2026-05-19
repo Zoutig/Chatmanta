@@ -33,6 +33,12 @@ export type WidgetShellProps = {
     headerTitle?: string;
     headerSubtitle?: string;
     isActive?: boolean;
+    logoColor?: string;
+    widgetBgColor?: string;
+    pulseColor?: string;
+    headerColor?: string;
+    logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
+    customLogoDataUrl?: string | null;
   };
 };
 
@@ -151,6 +157,12 @@ export function WidgetShell({
         headerTitle={widgetOverrides?.headerTitle}
         headerSubtitle={widgetOverrides?.headerSubtitle}
         isActive={widgetOverrides?.isActive}
+        logoColor={widgetOverrides?.logoColor}
+        widgetBgColor={widgetOverrides?.widgetBgColor}
+        pulseColor={widgetOverrides?.pulseColor}
+        headerColor={widgetOverrides?.headerColor}
+        logoStyle={widgetOverrides?.logoStyle}
+        customLogoDataUrl={widgetOverrides?.customLogoDataUrl}
       />
     </div>
   );

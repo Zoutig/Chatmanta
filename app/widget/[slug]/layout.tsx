@@ -47,13 +47,12 @@ export default async function OrgLayout({ params, children }: LayoutProps) {
   }
 
   const baseSkin = getSkin(slug);
-  // Lees klantendashboard-overrides voor deze org en merge ze in de skin.
-  // Per V0-keuze worden alleen widget-zichtbare velden (primaryColor +
-  // starterQuestions) overgenomen; landing-page-content (hero/features/
-  // pricing) blijft uit de skin omdat de klant daar nog geen knoppen voor heeft.
+  // Lees klantendashboard-overrides voor deze org. Skin-zichtbare velden
+  // (suggestedQuestions = starter-questions) mergen we in de skin; widget-
+  // kleuren lopen via widgetOverrides (zie onder) en raken landing-page
+  // NIET — eerder leak: de hele FakeSite veranderde mee.
   const orgSettings = await getOrgSettings(slug as OrgSlug);
   const skin = applyWidgetOverrides(baseSkin, {
-    primaryColor: orgSettings.widget.primaryColor,
     starterQuestions: orgSettings.chatbot.starterQuestions,
   });
 
@@ -72,6 +71,12 @@ export default async function OrgLayout({ params, children }: LayoutProps) {
         headerTitle: orgSettings.widget.title,
         headerSubtitle: orgSettings.widget.subtitle,
         isActive: orgSettings.widget.isActive,
+        logoColor: orgSettings.widget.logoColor,
+        widgetBgColor: orgSettings.widget.widgetBgColor,
+        pulseColor: orgSettings.widget.pulseColor,
+        headerColor: orgSettings.widget.headerColor,
+        logoStyle: orgSettings.widget.logoStyle,
+        customLogoDataUrl: orgSettings.widget.customLogoDataUrl,
       }}
     >
       <FakeSite skin={skin}>{children}</FakeSite>

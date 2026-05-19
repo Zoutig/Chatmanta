@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import {
   Bot,
   Check,
@@ -11,10 +11,16 @@ import {
   Pause,
   Play,
   RefreshCw,
+  Upload,
+  X,
 } from 'lucide-react';
 import { StatusBadge } from '../../components/status-badge';
 import { saveWidgetSettingsAction } from '../../actions';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
+
+// Max 200KB voor base64-data-URL — anders wordt de jsonb-row te zwaar.
+const MAX_LOGO_BYTES = 200 * 1024;
+const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 
 type Section = 'install' | 'design' | 'preview' | 'status';
 
@@ -35,6 +41,16 @@ export function WidgetForm({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Granulaire kleur-resolutie zodat de UI altijd waarden toont, ook als alleen
+  // primaryColor gezet is (backwards-compat).
+  const resolvedColors = {
+    logo: w.logoColor || w.primaryColor,
+    bg: w.widgetBgColor || '#ffffff',
+    pulse: w.pulseColor || w.primaryColor,
+    header: w.headerColor || w.primaryColor,
+  };
 
   const embedCode = `<script src="https://cdn.chatmanta.nl/widget.js" data-chatbot-id="${workspaceId}"></script>`;
 
@@ -71,6 +87,31 @@ export function WidgetForm({
   function save() {
     // Sla de volledige client-state op (= alle ongesaveerde uiterlijk-velden).
     persist(w);
+  }
+
+  function handleLogoUpload(file: File) {
+    setError(null);
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setError(`Bestandstype niet ondersteund. Kies een PNG, JPG, WebP of SVG.`);
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setError(
+        `Bestand is te groot (${(file.size / 1024).toFixed(0)} KB). Max ${MAX_LOGO_BYTES / 1024} KB.`,
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      persist({ logoStyle: 'custom-logo', customLogoDataUrl: dataUrl });
+    };
+    reader.onerror = () => setError('Kon bestand niet lezen.');
+    reader.readAsDataURL(file);
+  }
+
+  function clearCustomLogo() {
+    persist({ logoStyle: 'brand-mark', customLogoDataUrl: null });
   }
 
   return (
@@ -144,6 +185,186 @@ export function WidgetForm({
         open={openSection === 'design'}
         onToggle={() => setOpenSection(openSection === 'design' ? 'preview' : 'design')}
       >
+        {/* Kleuren-blok — 4 granulaire pickers met visuele uitleg. */}
+        <div style={{ marginBottom: 18 }}>
+          <h4
+            style={{
+              margin: '0 0 4px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--klant-fg)',
+            }}
+          >
+            Kleuren
+          </h4>
+          <p
+            style={{
+              fontSize: 12,
+              color: 'var(--klant-fg-muted)',
+              margin: '0 0 12px',
+              lineHeight: 1.5,
+            }}
+          >
+            Stel de kleuren in voor verschillende delen van je widget. Niet-ingestelde
+            velden vallen automatisch terug op de hoofdkleur.
+          </p>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 10,
+            }}
+          >
+            <ColorPicker
+              label="Logo-kleur"
+              hint="ChatManta-mark of chat-bubble"
+              value={resolvedColors.logo}
+              onChange={(v) => update('logoColor', v)}
+            />
+            <ColorPicker
+              label="Achtergrond-knop"
+              hint="Rond bolletje rechtsonder"
+              value={resolvedColors.bg}
+              onChange={(v) => update('widgetBgColor', v)}
+            />
+            <ColorPicker
+              label="Pulse-ring"
+              hint="Animatie rond gesloten knop"
+              value={resolvedColors.pulse}
+              onChange={(v) => update('pulseColor', v)}
+            />
+            <ColorPicker
+              label="Header + verstuurknop"
+              hint="Bovenkant + send-button"
+              value={resolvedColors.header}
+              onChange={(v) => update('headerColor', v)}
+            />
+          </div>
+        </div>
+
+        {/* Logo-stijl */}
+        <div style={{ marginBottom: 18 }}>
+          <h4
+            style={{
+              margin: '0 0 4px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--klant-fg)',
+            }}
+          >
+            Icoon op de chatknop
+          </h4>
+          <p
+            style={{
+              fontSize: 12,
+              color: 'var(--klant-fg-muted)',
+              margin: '0 0 12px',
+              lineHeight: 1.5,
+            }}
+          >
+            Kies wat bezoekers zien op de chat-knop voordat ze hem openen.
+          </p>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 8,
+            }}
+          >
+            <LogoChoice
+              active={w.logoStyle === 'brand-mark'}
+              onClick={() => update('logoStyle', 'brand-mark')}
+              label="ChatManta-mark"
+              hint="Subtiel merkteken — kleurt mee met logo-kleur."
+              preview={<MarkPreview color={resolvedColors.logo} />}
+            />
+            <LogoChoice
+              active={w.logoStyle === 'chat-bubble'}
+              onClick={() => update('logoStyle', 'chat-bubble')}
+              label="Chat-bubbel"
+              hint="Universeel pictogram, herkenbaar voor elke bezoeker."
+              preview={<BubblePreview color={resolvedColors.logo} />}
+            />
+            <LogoChoice
+              active={w.logoStyle === 'custom-logo'}
+              onClick={() => {
+                if (w.customLogoDataUrl) {
+                  update('logoStyle', 'custom-logo');
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              label="Eigen logo uploaden"
+              hint="PNG, JPG, WebP of SVG · max 200 KB."
+              preview={
+                w.customLogoDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={w.customLogoDataUrl}
+                    alt=""
+                    style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 6 }}
+                  />
+                ) : (
+                  <Upload size={22} strokeWidth={1.6} style={{ color: 'var(--klant-fg-muted)' }} />
+                )
+              }
+            />
+          </div>
+
+          {w.logoStyle === 'custom-logo' && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: '10px 12px',
+                background: 'var(--klant-surface)',
+                borderRadius: 'var(--klant-r-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="klant-btn"
+                disabled={pending}
+              >
+                <Upload size={13} strokeWidth={1.8} />
+                {w.customLogoDataUrl ? 'Vervangen' : 'Bestand kiezen'}
+              </button>
+              {w.customLogoDataUrl && (
+                <button
+                  type="button"
+                  onClick={clearCustomLogo}
+                  className="klant-btn"
+                  data-variant="danger"
+                  disabled={pending}
+                >
+                  <X size={13} strokeWidth={1.8} />
+                  Verwijderen
+                </button>
+              )}
+              <span style={{ fontSize: 12, color: 'var(--klant-fg-dim)' }}>
+                Tip: vierkant logo, transparante achtergrond, ongeveer 100 × 100 pixels.
+              </span>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ALLOWED_LOGO_TYPES.join(',')}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleLogoUpload(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
+
+        {/* Overige uiterlijk-velden */}
         <div
           style={{
             display: 'grid',
@@ -151,29 +372,6 @@ export function WidgetForm({
             gap: 14,
           }}
         >
-          <Field label="Primaire kleur">
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="color"
-                value={w.primaryColor}
-                onChange={(e) => update('primaryColor', e.target.value)}
-                style={{
-                  width: 40,
-                  height: 36,
-                  border: '1px solid var(--klant-border)',
-                  borderRadius: 'var(--klant-r-sm)',
-                  background: 'none',
-                  cursor: 'pointer',
-                }}
-              />
-              <input
-                className="klant-input"
-                value={w.primaryColor}
-                onChange={(e) => update('primaryColor', e.target.value)}
-                style={{ fontFamily: 'var(--font-mono), monospace', fontSize: 13 }}
-              />
-            </div>
-          </Field>
           <Field label="Positie">
             <div style={{ display: 'flex', gap: 6 }}>
               <button
@@ -486,6 +684,11 @@ function WidgetMockup({
   chatbotName: string;
   welcomeMessage: string;
 }) {
+  const c = {
+    logo: settings.logoColor || settings.primaryColor,
+    bg: settings.widgetBgColor || '#ffffff',
+    header: settings.headerColor || settings.primaryColor,
+  };
   return (
     <div
       style={{
@@ -531,7 +734,7 @@ function WidgetMockup({
         <div
           style={{
             padding: '12px 14px',
-            background: settings.primaryColor,
+            background: c.header,
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -586,31 +789,187 @@ function WidgetMockup({
         </div>
       </div>
 
-      {/* Launcher button */}
+      {/* Launcher knop — toont logo-keuze van de klant op de FAB-achtergrond */}
       <button
         type="button"
         style={{
           position: 'absolute',
           bottom: 20,
           [settings.position === 'bottom-left' ? 'left' : 'right']: 20,
-          padding: '10px 16px',
-          background: settings.primaryColor,
+          width: 52,
+          height: 52,
+          padding: 0,
+          background: c.bg,
           color: '#fff',
-          border: 'none',
+          border: '1px solid rgba(0,0,0,0.06)',
           borderRadius: 999,
-          fontSize: 13,
-          fontWeight: 500,
           cursor: 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 8,
+          justifyContent: 'center',
           boxShadow: '0 6px 16px -4px rgba(0,0,0,0.30)',
         }}
+        aria-label="Open chat (preview)"
       >
-        <Bot size={14} strokeWidth={1.8} />
-        {settings.launcherText}
+        {settings.logoStyle === 'custom-logo' && settings.customLogoDataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={settings.customLogoDataUrl}
+            alt=""
+            style={{ width: 30, height: 30, objectFit: 'contain', borderRadius: 4 }}
+          />
+        ) : settings.logoStyle === 'chat-bubble' ? (
+          <BubblePreview color={c.logo} />
+        ) : (
+          <MarkPreview color={c.logo} />
+        )}
       </button>
     </div>
+  );
+}
+
+function ColorPicker({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        padding: 10,
+        background: 'var(--klant-surface)',
+        borderRadius: 'var(--klant-r-md)',
+        border: '1px solid var(--klant-border)',
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--klant-fg)' }}>{label}</span>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            width: 34,
+            height: 30,
+            border: '1px solid var(--klant-border)',
+            borderRadius: 'var(--klant-r-sm)',
+            background: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            flexShrink: 0,
+          }}
+        />
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="klant-input"
+          style={{
+            fontFamily: 'var(--font-mono), monospace',
+            fontSize: 12,
+            padding: '6px 8px',
+          }}
+        />
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--klant-fg-dim)' }}>{hint}</span>
+    </label>
+  );
+}
+
+function LogoChoice({
+  active,
+  onClick,
+  label,
+  hint,
+  preview,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  hint: string;
+  preview: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: 12,
+        textAlign: 'left',
+        borderRadius: 'var(--klant-r-md)',
+        border: '1px solid ' + (active ? 'var(--klant-accent)' : 'var(--klant-border)'),
+        background: active ? 'var(--klant-accent-soft)' : 'var(--klant-surface)',
+        color: 'var(--klant-fg)',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        position: 'relative',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          height: 56,
+          borderRadius: 'var(--klant-r-sm)',
+          background: '#ffffff',
+          border: '1px solid var(--klant-border)',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        {preview}
+      </div>
+      <span style={{ fontWeight: 600, fontSize: 13 }}>{label}</span>
+      <span style={{ fontSize: 11, color: 'var(--klant-fg-muted)', lineHeight: 1.4 }}>{hint}</span>
+      {active && (
+        <Check
+          size={14}
+          strokeWidth={2.2}
+          style={{ position: 'absolute', top: 10, right: 10, color: 'var(--klant-accent)' }}
+        />
+      )}
+    </button>
+  );
+}
+
+function MarkPreview({ color }: { color: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 36,
+        height: 22,
+        backgroundColor: color,
+        WebkitMaskImage: "url('/logo/mono-mark.png')",
+        maskImage: "url('/logo/mono-mark.png')",
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+      }}
+    />
+  );
+}
+
+function BubblePreview({ color }: { color: string }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9.5l-4 4v-4H5.5c-.83 0-1.5-.67-1.5-1.5v-9z"
+        fill={color}
+      />
+    </svg>
   );
 }
 
