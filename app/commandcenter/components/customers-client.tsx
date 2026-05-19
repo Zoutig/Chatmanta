@@ -148,7 +148,7 @@ export function CustomersClient({ customers }: Props) {
               <section
                 key={s}
                 style={{
-                  background: 'rgba(255,255,255,0.02)',
+                  background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 14,
                   padding: 12,
@@ -237,9 +237,9 @@ export function CustomersClient({ customers }: Props) {
                               fontSize: 10,
                               textTransform: 'uppercase',
                               letterSpacing: '0.06em',
-                              color: '#f0d39a',
-                              background: 'rgba(230,180,90,0.10)',
-                              border: '1px solid rgba(230,180,90,0.30)',
+                              color: 'var(--bd-warn-fg)',
+                              background: 'var(--bd-warn-bg)',
+                              border: '1px solid var(--bd-warn-border)',
                               borderRadius: 999,
                               padding: '1px 6px',
                             }}

@@ -282,7 +282,7 @@ export function DecisionsClient({ decisions }: Props) {
                 {d.reviewDate && (
                   <>
                     <span style={{ fontSize: 12, color: 'var(--fg-faint)' }}>·</span>
-                    <span style={{ fontSize: 12, color: '#f0d39a' }}>
+                    <span style={{ fontSize: 12, color: 'var(--bd-warn-fg)' }}>
                       Herzien {d.reviewDate}
                     </span>
                   </>

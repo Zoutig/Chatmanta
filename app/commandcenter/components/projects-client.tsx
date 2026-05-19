@@ -175,8 +175,8 @@ export function ProjectsClient({ tasks, milestones }: Props) {
                   style={{
                     fontSize: 12,
                     color: 'var(--err)',
-                    background: 'rgba(220,90,90,0.08)',
-                    border: '1px solid rgba(220,90,90,0.24)',
+                    background: 'var(--bd-danger-bg)',
+                    border: '1px solid var(--bd-danger-border)',
                     borderRadius: 8,
                     padding: '6px 10px',
                   }}

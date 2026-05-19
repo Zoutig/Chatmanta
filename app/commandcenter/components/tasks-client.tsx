@@ -167,7 +167,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                     ? '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
                     : '1px solid var(--border-strong)',
                   color: active
-                    ? 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)'
+                    ? 'var(--manta-accent, var(--accent))'
                     : 'var(--fg)',
                   padding: '6px 12px',
                   borderRadius: 999,
@@ -320,7 +320,7 @@ function TaskTable({
         <thead>
           <tr
             style={{
-              background: 'rgba(255,255,255,0.02)',
+              background: 'var(--surface)',
               borderBottom: '1px solid var(--border)',
             }}
           >
@@ -387,7 +387,7 @@ function TaskTable({
               </Td>
               <Td>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: isOverdue(t) ? '#ffb3b3' : 'var(--fg-muted)' }}>
+                  <span style={{ color: isOverdue(t) ? 'var(--bd-danger-fg)' : 'var(--fg-muted)' }}>
                     {formatDeadline(t.deadline)}
                   </span>
                   {isOverdue(t) && <OverdueBadge />}

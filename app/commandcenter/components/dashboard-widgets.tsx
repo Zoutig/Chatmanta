@@ -36,8 +36,8 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(120,200,230,0.12)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 14,
         padding: '14px 16px',
         display: 'flex',
@@ -51,7 +51,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
-          color: 'rgba(207,232,240,0.5)',
+          color: 'var(--fg-muted)',
           fontWeight: 500,
         }}
       >
@@ -62,7 +62,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
           fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
           fontSize: 24,
           fontWeight: 600,
-          color: accent ?? '#eaf6fb',
+          color: accent ?? 'var(--fg)',
           lineHeight: 1,
         }}
       >
@@ -95,8 +95,8 @@ export function QuickStats({ tasks }: { tasks: Task[] }) {
       <Stat label="Sebastiaan" value={seb} />
       <Stat label="Niels" value={niels} />
       <Stat label="Samen" value={samen} />
-      <Stat label="Geblokkeerd" value={blocked} accent={blocked > 0 ? '#f1a5a5' : undefined} />
-      <Stat label="Te laat" value={overdue} accent={overdue > 0 ? '#ffb3b3' : undefined} />
+      <Stat label="Geblokkeerd" value={blocked} accent={blocked > 0 ? 'var(--bd-danger-fg)' : undefined} />
+      <Stat label="Te laat" value={overdue} accent={overdue > 0 ? 'var(--bd-danger-fg)' : undefined} />
       <Stat label="In review" value={review} />
     </div>
   );
@@ -118,8 +118,8 @@ export function BlockedPanel({
   return (
     <section
       style={{
-        background: 'rgba(220,90,90,0.06)',
-        border: '1px solid rgba(220,90,90,0.30)',
+        background: 'var(--bd-danger-bg)',
+        border: '1px solid var(--bd-danger-border)',
         borderRadius: 18,
         padding: 20,
         display: 'flex',
@@ -134,12 +134,12 @@ export function BlockedPanel({
             fontSize: 17,
             fontWeight: 600,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            color: '#f1a5a5',
+            color: 'var(--bd-danger-fg)',
           }}
         >
           Geblokkeerd
         </h3>
-        <span style={{ fontSize: 12, color: 'rgba(241,165,165,0.7)' }}>
+        <span style={{ fontSize: 12, color: 'color-mix(in oklab, var(--bd-danger-fg) 75%, transparent)' }}>
           ({blocked.length} {blocked.length === 1 ? 'taak' : 'taken'})
         </span>
       </header>
@@ -173,8 +173,8 @@ export function OverduePanel({
   return (
     <section
       style={{
-        background: 'rgba(220,90,90,0.06)',
-        border: '1px solid rgba(220,90,90,0.28)',
+        background: 'var(--bd-danger-bg)',
+        border: '1px solid var(--bd-danger-border)',
         borderRadius: 18,
         padding: 20,
         display: 'flex',
@@ -189,12 +189,12 @@ export function OverduePanel({
             fontSize: 17,
             fontWeight: 600,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            color: '#ffb3b3',
+            color: 'var(--bd-danger-fg)',
           }}
         >
           Te laat
         </h3>
-        <span style={{ fontSize: 12, color: 'rgba(255,179,179,0.7)' }}>
+        <span style={{ fontSize: 12, color: 'color-mix(in oklab, var(--bd-danger-fg) 75%, transparent)' }}>
           ({overdue.length})
         </span>
       </header>
@@ -230,8 +230,8 @@ export function DecisionsNeededPanel({
   return (
     <section
       style={{
-        background: 'rgba(230,180,90,0.05)',
-        border: '1px solid rgba(230,180,90,0.26)',
+        background: 'var(--bd-warn-bg)',
+        border: '1px solid var(--bd-warn-border)',
         borderRadius: 18,
         padding: 20,
         display: 'flex',
@@ -246,12 +246,12 @@ export function DecisionsNeededPanel({
             fontSize: 17,
             fontWeight: 600,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            color: '#f0d39a',
+            color: 'var(--bd-warn-fg)',
           }}
         >
           Beslissingen nodig
         </h3>
-        <span style={{ fontSize: 12, color: 'rgba(240,211,154,0.7)' }}>
+        <span style={{ fontSize: 12, color: 'color-mix(in oklab, var(--bd-warn-fg) 75%, transparent)' }}>
           ({decisions.length})
         </span>
       </header>
@@ -301,7 +301,7 @@ export function FocusOfWeek({
     <section
       style={{
         background:
-          'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 12%, transparent), rgba(255,255,255,0.025))',
+          'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 12%, transparent), var(--surface))',
         border: '1px solid color-mix(in oklab, var(--manta-accent) 30%, transparent)',
         borderRadius: 20,
         padding: 22,
@@ -325,7 +325,7 @@ export function FocusOfWeek({
             fontSize: 19,
             fontWeight: 600,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            color: '#eaf6fb',
+            color: 'var(--fg)',
             letterSpacing: '-0.01em',
           }}
         >
@@ -336,7 +336,7 @@ export function FocusOfWeek({
             fontSize: 11,
             textTransform: 'uppercase',
             letterSpacing: '0.10em',
-            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            color: 'var(--manta-accent, var(--accent))',
             background: 'color-mix(in oklab, var(--manta-accent) 14%, transparent)',
             border: '1px solid color-mix(in oklab, var(--manta-accent) 30%, transparent)',
             borderRadius: 999,
@@ -352,7 +352,7 @@ export function FocusOfWeek({
           style={{
             margin: 0,
             fontSize: 13,
-            color: 'rgba(207,232,240,0.5)',
+            color: 'var(--fg-muted)',
             fontStyle: 'italic',
           }}
         >
@@ -384,7 +384,7 @@ export function FocusOfWeek({
                   borderRadius: 999,
                   background: 'color-mix(in oklab, var(--manta-accent) 22%, transparent)',
                   border: '1px solid color-mix(in oklab, var(--manta-accent) 40%, transparent)',
-                  color: 'color-mix(in oklab, var(--manta-accent) 35%, #ffffff)',
+                  color: 'var(--manta-accent, var(--accent))',
                   fontSize: 13,
                   fontWeight: 600,
                   display: 'inline-flex',
@@ -439,7 +439,7 @@ export function RoadmapProgress({
   return (
     <section
       style={{
-        background: 'rgba(255,255,255,0.025)',
+        background: 'var(--surface)',
         border: '1px solid color-mix(in oklab, var(--manta-accent) 22%, transparent)',
         borderRadius: 18,
         padding: 20,
@@ -465,12 +465,12 @@ export function RoadmapProgress({
               fontWeight: 600,
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               letterSpacing: '-0.01em',
-              color: '#eaf6fb',
+              color: 'var(--fg)',
             }}
           >
             Roadmap-voortgang · {info.label}
           </h3>
-          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'rgba(207,232,240,0.6)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-muted)' }}>
             {info.goal}
           </p>
         </div>
@@ -486,7 +486,7 @@ export function RoadmapProgress({
             fontSize: 12,
           }}
         >
-          <span style={{ color: 'rgba(207,232,240,0.55)' }}>
+          <span style={{ color: 'var(--fg-muted)' }}>
             {progress.source === 'milestones'
               ? `${progress.done} / ${progress.total} milestones afgerond`
               : progress.source === 'tasks'
@@ -494,7 +494,7 @@ export function RoadmapProgress({
                 : 'Nog niets ingepland'}
           </span>
           {progress.total > 0 && (
-            <span style={{ color: '#eaf6fb', fontWeight: 600 }}>
+            <span style={{ color: 'var(--fg)', fontWeight: 600 }}>
               {Math.round(progress.ratio * 100)}%
             </span>
           )}
@@ -520,7 +520,7 @@ export function RoadmapProgress({
                   fontSize: 11,
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
-                  color: 'rgba(207,232,240,0.5)',
+                  color: 'var(--fg-muted)',
                   fontWeight: 500,
                 }}
               >
@@ -530,11 +530,11 @@ export function RoadmapProgress({
                 {openMs.map((m) => (
                   <li key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <MilestoneStatusBadge status={m.status} />
-                    <span style={{ fontSize: 13, color: '#eaf6fb' }}>{m.title}</span>
+                    <span style={{ fontSize: 13, color: 'var(--fg)' }}>{m.title}</span>
                   </li>
                 ))}
                 {phaseMs.length - openMs.length > 0 && (
-                  <li style={{ fontSize: 11.5, color: 'rgba(155,213,224,0.55)' }}>
+                  <li style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
                     + {phaseMs.length - openMs.length} meer afgerond
                   </li>
                 )}
@@ -549,7 +549,7 @@ export function RoadmapProgress({
                   fontSize: 11,
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
-                  color: 'rgba(207,232,240,0.5)',
+                  color: 'var(--fg-muted)',
                   fontWeight: 500,
                 }}
               >
@@ -559,7 +559,7 @@ export function RoadmapProgress({
                 {linkedP1.map((t) => (
                   <li key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <OwnerBadge owner={t.owner} />
-                    <span style={{ fontSize: 13, color: '#eaf6fb' }}>{t.title}</span>
+                    <span style={{ fontSize: 13, color: 'var(--fg)' }}>{t.title}</span>
                   </li>
                 ))}
               </ul>
@@ -572,7 +572,7 @@ export function RoadmapProgress({
         href="/commandcenter/roadmap"
         style={{
           fontSize: 12.5,
-          color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+          color: 'var(--manta-accent, var(--accent))',
           textDecoration: 'none',
           marginTop: 2,
           display: 'inline-flex',
@@ -595,18 +595,18 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
     return (
       <section
         style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px dashed rgba(120,200,230,0.18)',
+          background: 'var(--surface)',
+          border: '1px dashed var(--border-strong)',
           borderRadius: 16,
           padding: 18,
-          color: 'rgba(207,232,240,0.55)',
+          color: 'var(--fg-muted)',
           fontSize: 13,
         }}
       >
         Nog geen check-ins.{' '}
         <Link
           href="/commandcenter/checkins"
-          style={{ color: 'rgba(155,213,224,0.85)', textDecoration: 'underline' }}
+          style={{ color: 'var(--bd-info-fg)', textDecoration: 'underline' }}
         >
           Begin met een wekelijkse check-in
         </Link>{' '}
@@ -618,8 +618,8 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
   return (
     <section
       style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(120,200,230,0.12)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 16,
         padding: 18,
         display: 'flex',
@@ -651,7 +651,7 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
             style={{
               margin: '2px 0 0',
               fontSize: 12,
-              color: 'rgba(207,232,240,0.55)',
+              color: 'var(--fg-muted)',
             }}
           >
             {latest.date}
@@ -662,7 +662,7 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
           href="/commandcenter/checkins"
           style={{
             fontSize: 12,
-            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            color: 'var(--manta-accent, var(--accent))',
             textDecoration: 'none',
           }}
         >
@@ -676,7 +676,7 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
               fontSize: 11,
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: 'rgba(207,232,240,0.5)',
+              color: 'var(--fg-muted)',
               marginBottom: 6,
             }}
           >
@@ -684,14 +684,14 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
           </div>
           <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.5 }}>
             {latest.nextPriorities.slice(0, 3).map((p, i) => (
-              <li key={i} style={{ color: 'rgba(207,232,240,0.84)' }}>
+              <li key={i} style={{ color: 'var(--fg)' }}>
                 {p}
               </li>
             ))}
           </ol>
         </div>
       ) : (
-        <p style={{ margin: 0, fontSize: 13, color: 'rgba(207,232,240,0.5)' }}>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)' }}>
           Geen prioriteiten gezet voor deze week.
         </p>
       )}
@@ -709,11 +709,11 @@ export function ActiveDecisions({ decisions }: { decisions: Decision[] }) {
     return (
       <section
         style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px dashed rgba(120,200,230,0.18)',
+          background: 'var(--surface)',
+          border: '1px dashed var(--border-strong)',
           borderRadius: 16,
           padding: 18,
-          color: 'rgba(207,232,240,0.55)',
+          color: 'var(--fg-muted)',
           fontSize: 13,
         }}
       >
@@ -724,8 +724,8 @@ export function ActiveDecisions({ decisions }: { decisions: Decision[] }) {
   return (
     <section
       style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(120,200,230,0.12)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 16,
         padding: 18,
         display: 'flex',
@@ -756,7 +756,7 @@ export function ActiveDecisions({ decisions }: { decisions: Decision[] }) {
           href="/commandcenter/decisions"
           style={{
             fontSize: 12,
-            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            color: 'var(--manta-accent, var(--accent))',
             textDecoration: 'none',
           }}
         >
@@ -773,15 +773,15 @@ export function ActiveDecisions({ decisions }: { decisions: Decision[] }) {
               justifyContent: 'space-between',
               gap: 10,
               padding: '8px 10px',
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(120,200,230,0.08)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
               flexWrap: 'wrap',
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <span style={{ fontSize: 13.5, color: '#eaf6fb' }}>{d.title}</span>
-              <span style={{ fontSize: 11.5, color: 'rgba(207,232,240,0.5)' }}>
+              <span style={{ fontSize: 13.5, color: 'var(--fg)' }}>{d.title}</span>
+              <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
                 {d.date}
               </span>
             </div>
@@ -810,8 +810,8 @@ export function PipelineSnapshot({ customers }: { customers: TestCustomer[] }) {
   return (
     <section
       style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(120,200,230,0.12)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 16,
         padding: 18,
         display: 'flex',
@@ -842,7 +842,7 @@ export function PipelineSnapshot({ customers }: { customers: TestCustomer[] }) {
           href="/commandcenter/customers"
           style={{
             fontSize: 12,
-            color: 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)',
+            color: 'var(--manta-accent, var(--accent))',
             textDecoration: 'none',
           }}
         >
@@ -856,7 +856,7 @@ export function PipelineSnapshot({ customers }: { customers: TestCustomer[] }) {
           gap: 10,
         }}
       >
-        <SmallStat label="Actief / betalend" value={active} accent="#b7e9a3" />
+        <SmallStat label="Actief / betalend" value={active} accent="var(--bd-success-fg)" />
         <SmallStat label="In gesprek" value={inProgress} />
         <SmallStat label="Open leads" value={open} />
         <SmallStat label="Afgewezen" value={counts['Afgewezen / later']} />
@@ -873,7 +873,7 @@ export function PipelineSnapshot({ customers }: { customers: TestCustomer[] }) {
             }}
           >
             <CustomerStatusBadge status={s} />
-            <span style={{ color: 'rgba(207,232,240,0.6)' }}>{counts[s]}</span>
+            <span style={{ color: 'var(--fg-muted)' }}>{counts[s]}</span>
           </span>
         ))}
       </div>
@@ -893,8 +893,8 @@ function SmallStat({
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(120,200,230,0.10)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
         borderRadius: 12,
         padding: '10px 12px',
         display: 'flex',
@@ -907,7 +907,7 @@ function SmallStat({
           fontSize: 10.5,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
-          color: 'rgba(207,232,240,0.5)',
+          color: 'var(--fg-muted)',
           fontWeight: 500,
         }}
       >
@@ -918,7 +918,7 @@ function SmallStat({
           fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
           fontSize: 20,
           fontWeight: 600,
-          color: accent ?? '#eaf6fb',
+          color: accent ?? 'var(--fg)',
           lineHeight: 1,
         }}
       >
