@@ -46,7 +46,7 @@ const OWNER_ACCENT: Record<Owner, string> = {
   Sebastiaan: 'rgba(120,170,255,0.40)',
   Niels: 'rgba(255,150,120,0.40)',
   Samen: 'color-mix(in oklab, var(--manta-accent) 38%, transparent)',
-  'Nog toe te wijzen': 'rgba(207,232,240,0.20)',
+  'Nog toe te wijzen': 'var(--border-bright)',
 };
 
 export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }: Props) {
@@ -61,7 +61,7 @@ export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }:
   return (
     <section
       style={{
-        background: 'rgba(255,255,255,0.025)',
+        background: 'var(--surface)',
         border: `1px solid ${OWNER_ACCENT[owner]}`,
         borderRadius: 18,
         padding: isSmall ? 16 : 20,
@@ -86,7 +86,7 @@ export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }:
             fontWeight: 600,
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
             letterSpacing: '-0.01em',
-            color: '#eaf6fb',
+            color: 'var(--fg)',
           }}
         >
           {owner === 'Samen'
@@ -100,7 +100,7 @@ export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }:
             fontSize: 11,
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
-            color: 'rgba(207,232,240,0.5)',
+            color: 'var(--fg-muted)',
           }}
         >
           {openCount} open
@@ -108,14 +108,14 @@ export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }:
             <>
               {' '}
               ·{' '}
-              <span style={{ color: '#ffb3b3' }}>{overdueCount} te laat</span>
+              <span style={{ color: 'var(--bd-danger-fg)' }}>{overdueCount} te laat</span>
             </>
           )}
           {blockedCount > 0 && (
             <>
               {' '}
               ·{' '}
-              <span style={{ color: '#f1a5a5' }}>{blockedCount} blocked</span>
+              <span style={{ color: 'var(--bd-danger-fg)' }}>{blockedCount} blocked</span>
             </>
           )}
         </span>
@@ -126,7 +126,7 @@ export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }:
           style={{
             margin: 0,
             fontSize: 13,
-            color: 'rgba(207,232,240,0.5)',
+            color: 'var(--fg-muted)',
             fontStyle: 'italic',
             padding: '20px 0',
             textAlign: 'center',
@@ -143,7 +143,7 @@ export function OwnerTodoPanel({ owner, tasks, onTaskClick, variant = 'large' }:
             <p
               style={{
                 fontSize: 12,
-                color: 'rgba(155,213,224,0.55)',
+                color: 'var(--fg-muted)',
                 margin: '4px 0 0',
                 textAlign: 'center',
               }}

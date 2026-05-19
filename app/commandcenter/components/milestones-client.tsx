@@ -259,7 +259,7 @@ function FilterChip({
           ? '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
           : '1px solid var(--border-strong)',
         color: active
-          ? 'color-mix(in oklab, var(--manta-accent) 30%, #ffffff)'
+          ? 'var(--manta-accent, var(--accent))'
           : 'var(--fg)',
         padding: '6px 12px',
         borderRadius: 999,

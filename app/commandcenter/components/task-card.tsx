@@ -36,12 +36,12 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
       style={{
         width: '100%',
         textAlign: 'left',
-        background: 'rgba(255,255,255,0.025)',
+        background: 'var(--surface)',
         border: overdue
-          ? '1px solid rgba(220,90,90,0.30)'
+          ? '1px solid var(--bd-danger-border)'
           : task.status === 'Geblokkeerd'
-            ? '1px solid rgba(220,90,90,0.20)'
-            : '1px solid rgba(120,200,230,0.12)',
+            ? '1px solid var(--bd-danger-border)'
+            : '1px solid var(--border-strong)',
         borderRadius: 14,
         padding: '12px 14px',
         cursor: onClick ? 'pointer' : 'default',
@@ -49,18 +49,18 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
         flexDirection: 'column',
         gap: 8,
         transition: 'border-color 160ms ease, transform 160ms ease',
-        color: '#eaf6fb',
+        color: 'var(--fg)',
       }}
       onMouseEnter={(e) => {
-        if (onClick) e.currentTarget.style.borderColor = 'rgba(120,200,230,0.28)';
+        if (onClick) e.currentTarget.style.borderColor = 'var(--border-bright)';
       }}
       onMouseLeave={(e) => {
         if (!onClick) return;
         e.currentTarget.style.borderColor = overdue
-          ? 'rgba(220,90,90,0.30)'
+          ? 'var(--bd-danger-border)'
           : task.status === 'Geblokkeerd'
-            ? 'rgba(220,90,90,0.20)'
-            : 'rgba(120,200,230,0.12)';
+            ? 'var(--bd-danger-border)'
+            : 'var(--border-strong)';
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -69,7 +69,7 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
             fontSize: 14,
             fontWeight: 500,
             lineHeight: 1.4,
-            color: task.status === 'Klaar' ? 'rgba(207,232,240,0.45)' : '#eaf6fb',
+            color: task.status === 'Klaar' ? 'var(--fg-muted)' : 'var(--fg)',
             textDecoration: task.status === 'Klaar' ? 'line-through' : 'none',
           }}
         >
@@ -83,7 +83,7 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
           style={{
             margin: 0,
             fontSize: 12.5,
-            color: 'rgba(207,232,240,0.62)',
+            color: 'var(--fg-muted)',
             lineHeight: 1.45,
           }}
         >
@@ -96,9 +96,9 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
           style={{
             margin: 0,
             fontSize: 12.5,
-            color: '#f1a5a5',
-            background: 'rgba(220,90,90,0.08)',
-            border: '1px solid rgba(220,90,90,0.22)',
+            color: 'var(--bd-danger-fg)',
+            background: 'var(--bd-danger-bg)',
+            border: '1px solid var(--bd-danger-border)',
             borderRadius: 8,
             padding: '6px 8px',
             lineHeight: 1.4,
@@ -115,11 +115,11 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
           <span
             style={{
               fontSize: 11,
-              color: overdue ? '#ffb3b3' : 'rgba(155,213,224,0.65)',
-              background: overdue ? 'rgba(220,90,90,0.08)' : 'rgba(120,200,230,0.05)',
+              color: overdue ? 'var(--bd-danger-fg)' : 'var(--fg-muted)',
+              background: overdue ? 'var(--bd-danger-bg)' : 'var(--surface)',
               border: overdue
-                ? '1px solid rgba(220,90,90,0.24)'
-                : '1px solid rgba(120,200,230,0.14)',
+                ? '1px solid var(--bd-danger-border)'
+                : '1px solid var(--border-strong)',
               borderRadius: 999,
               padding: '2px 8px',
             }}
@@ -131,7 +131,7 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
           <span
             style={{
               fontSize: 11,
-              color: 'rgba(207,232,240,0.55)',
+              color: 'var(--fg-muted)',
               padding: '2px 6px',
             }}
           >
@@ -142,7 +142,7 @@ export function TaskCard({ task, onClick, showOwner }: Props) {
         <span
           style={{
             fontSize: 10.5,
-            color: 'rgba(155,213,224,0.42)',
+            color: 'var(--fg-muted)',
             textTransform: 'uppercase',
             letterSpacing: '0.06em',
           }}

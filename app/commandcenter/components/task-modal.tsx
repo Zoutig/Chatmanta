@@ -444,8 +444,8 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
                 fontSize: 13,
                 color: 'var(--err)',
                 margin: 0,
-                background: 'rgba(220,90,90,0.10)',
-                border: '1px solid rgba(220,90,90,0.30)',
+                background: 'var(--bd-danger-bg)',
+                border: '1px solid var(--bd-danger-border)',
                 padding: '8px 12px',
                 borderRadius: 10,
               }}
@@ -471,9 +471,9 @@ export function TaskModal({ open, task, onClose, onSaved }: Props) {
                 disabled={pending}
                 style={{
                   background: confirmDelete
-                    ? 'rgba(220,90,90,0.18)'
+                    ? 'var(--bd-danger-bg)'
                     : 'transparent',
-                  border: '1px solid rgba(220,90,90,0.34)',
+                  border: '1px solid var(--bd-danger-border)',
                   color: 'var(--err)',
                   padding: '8px 14px',
                   borderRadius: 10,

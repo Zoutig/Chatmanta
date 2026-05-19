@@ -204,7 +204,7 @@ export function CheckInsClient({ checkIns }: Props) {
                         borderRadius: 999,
                         padding: '3px 10px',
                         fontSize: 11.5,
-                        color: '#bfe1ec',
+                        color: 'var(--bd-info-fg)',
                       }}
                     >
                       {i + 1}. {p}
