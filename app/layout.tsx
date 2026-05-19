@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import './styles/manta.css';
@@ -15,6 +15,15 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: 'ChatManta V0',
   description: 'V0 RAG demo — Jorion Solutions.',
+};
+
+// Mobiele schaling + iOS safe-area. Zonder dit rendert elke mobiele browser
+// de hele app als een 980px-desktop in mini — alle responsive @media rules
+// blijven dan dood.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 // Inline FOUC-prevention: zet <html class="dark"> + data-theme + data-style
