@@ -3,6 +3,8 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { Send, Bot, User, BookOpen, ShieldCheck, AlertTriangle, Sparkle } from 'lucide-react';
 import { askTestQuestion } from '../actions';
+import { WidgetLogo } from '../../components/widget-logo';
+import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 
 type SourceLite = { filename: string | null; excerpt: string };
 
@@ -27,14 +29,15 @@ function deriveConfidence(topSim?: number | null): 'high' | 'medium' | 'low' {
 export function ChatPreview({
   welcomeMessage,
   starterQuestions,
-  chatbotName,
-  primaryColor,
+  widget,
 }: {
   welcomeMessage: string;
   starterQuestions: string[];
-  chatbotName: string;
-  primaryColor: string;
+  widget: WidgetSettings;
 }) {
+  // Granulaire kleuren met fallback op primaryColor — zelfde resolutie als in
+  // widget-form.tsx zodat de testomgeving 1:1 reflecteert wat de klant ziet.
+  const headerColor = widget.headerColor || widget.primaryColor;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [pending, startTransition] = useTransition();
@@ -124,11 +127,13 @@ export function ChatPreview({
           maxHeight: 'min(72vh, 720px)',
         }}
       >
-        {/* Mock widget-header */}
+        {/* Mock widget-header — toont de saved widget-config zoals een
+            bezoeker hem op de website zou zien (logo + titel + subtitel +
+            header-kleur). Komt 1:1 overeen met `WidgetMockup` in widget-form. */}
         <div
           style={{
             padding: '14px 18px',
-            background: primaryColor,
+            background: headerColor,
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -143,13 +148,14 @@ export function ChatPreview({
               background: 'rgba(255,255,255,0.18)',
               display: 'grid',
               placeItems: 'center',
+              overflow: 'hidden',
             }}
           >
-            <Bot size={16} strokeWidth={1.8} />
+            <WidgetLogo widget={widget} size={18} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{chatbotName}</div>
-            <div style={{ fontSize: 11, opacity: 0.8 }}>Reageert meestal binnen een paar seconden</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{widget.title}</div>
+            <div style={{ fontSize: 11, opacity: 0.8 }}>{widget.subtitle}</div>
           </div>
         </div>
 
