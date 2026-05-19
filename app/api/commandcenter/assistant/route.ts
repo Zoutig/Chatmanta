@@ -70,7 +70,7 @@ type ChatMsg =
 export async function POST(req: NextRequest) {
   try {
     await requireV0Auth();
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

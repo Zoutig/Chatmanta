@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatedThemeToggler } from '@/app/components/ui/animated-theme-toggler';
 import { Icon } from '@/app/components/svg-icons';
+import { AssistantPanel } from './assistant-panel';
 
 type IconName = Parameters<typeof Icon>[0]['name'];
 
@@ -43,7 +44,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
         background: 'var(--bg)',
         color: 'var(--fg)',
         display: 'grid',
-        gridTemplateColumns: 'minmax(220px, 240px) 1fr',
+        gridTemplateColumns: 'minmax(220px, 240px) minmax(0, 1fr) auto',
       }}
     >
       {/* Sidebar */}
@@ -199,6 +200,9 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
       <main style={{ padding: '28px 36px 64px', maxWidth: 1280, width: '100%' }}>
         {children}
       </main>
+
+      {/* Right-side assistant panel */}
+      <AssistantPanel />
     </div>
   );
 }

@@ -142,68 +142,7 @@ export function AssistantPanel() {
     return () => clearInterval(t);
   }, [bubbles]);
 
-  // ---- Send message ---------------------------------------------------------
-  const sendMessage = useCallback(async () => {
-    const text = composerValue.trim();
-    if (!text || isStreaming) return;
-    setComposerValue('');
-    const userBubbleId = 'u_' + Date.now();
-    setBubbles((prev) => [...prev, { kind: 'user', id: userBubbleId, text }]);
-    setIsStreaming(true);
-
-    try {
-      const res = await fetch('/api/commandcenter/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          thread_id: activeThreadId ?? undefined,
-          message: text,
-        }),
-      });
-      if (!res.ok || !res.body) {
-        const msg = await res.text();
-        setBubbles((prev) => [
-          ...prev,
-          { kind: 'error', id: 'e_' + Date.now(), text: `Fout: ${msg.slice(0, 200)}` },
-        ]);
-        return;
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let nlIdx: number;
-        // eslint-disable-next-line no-cond-assign
-        while ((nlIdx = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, nlIdx);
-          buffer = buffer.slice(nlIdx + 1);
-          if (!line.trim()) continue;
-          try {
-            const ev = JSON.parse(line) as Record<string, unknown>;
-            handleEvent(ev);
-          } catch {
-            // skip malformed line
-          }
-        }
-      }
-    } catch (err) {
-      setBubbles((prev) => [
-        ...prev,
-        {
-          kind: 'error',
-          id: 'e_' + Date.now(),
-          text: err instanceof Error ? err.message : 'Onbekende netwerk-fout',
-        },
-      ]);
-    } finally {
-      setIsStreaming(false);
-      void reloadThreads();
-    }
-  }, [composerValue, isStreaming, activeThreadId, reloadThreads]);
-
+  // ---- Event handler (declared BEFORE sendMessage zodat dep-array werkt) ----
   const handleEvent = useCallback((ev: Record<string, unknown>) => {
     const type = ev.type as string;
     if (type === 'thread') {
@@ -257,6 +196,68 @@ export function AssistantPanel() {
       ]);
     }
   }, [router]);
+
+  // ---- Send message ---------------------------------------------------------
+  const sendMessage = useCallback(async () => {
+    const text = composerValue.trim();
+    if (!text || isStreaming) return;
+    setComposerValue('');
+    const userBubbleId = 'u_' + Date.now();
+    setBubbles((prev) => [...prev, { kind: 'user', id: userBubbleId, text }]);
+    setIsStreaming(true);
+
+    try {
+      const res = await fetch('/api/commandcenter/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          thread_id: activeThreadId ?? undefined,
+          message: text,
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const msg = await res.text();
+        setBubbles((prev) => [
+          ...prev,
+          { kind: 'error', id: 'e_' + Date.now(), text: `Fout: ${msg.slice(0, 200)}` },
+        ]);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nlIdx = buffer.indexOf('\n');
+        while (nlIdx !== -1) {
+          const line = buffer.slice(0, nlIdx);
+          buffer = buffer.slice(nlIdx + 1);
+          nlIdx = buffer.indexOf('\n');
+          if (!line.trim()) continue;
+          try {
+            const ev = JSON.parse(line) as Record<string, unknown>;
+            handleEvent(ev);
+          } catch {
+            // skip malformed line
+          }
+        }
+      }
+    } catch (err) {
+      setBubbles((prev) => [
+        ...prev,
+        {
+          kind: 'error',
+          id: 'e_' + Date.now(),
+          text: err instanceof Error ? err.message : 'Onbekende netwerk-fout',
+        },
+      ]);
+    } finally {
+      setIsStreaming(false);
+      void reloadThreads();
+    }
+  }, [composerValue, isStreaming, activeThreadId, reloadThreads, handleEvent]);
 
   // ---- Undo ------------------------------------------------------------------
   const handleUndo = useCallback(async (toolCallId: string, undoToken: string) => {
@@ -444,7 +445,8 @@ export function AssistantPanel() {
             Vertel wat er gedaan is of nog moet, ik maak/wijzig taken en check-ins.
             <br />
             <span style={{ color: 'var(--fg-faint)' }}>
-              "Maak P1 taak voor Niels: Vercel-billing checken voor 30 mei."
+              &ldquo;Maak P1 taak voor Niels: Vercel-billing checken voor 30
+              mei.&rdquo;
             </span>
           </div>
         )}
