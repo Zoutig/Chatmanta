@@ -78,6 +78,21 @@ export function resolveOrgIdFromSlug(slug: string): string | null {
 }
 
 /**
+ * Inverse van resolveOrgIdFromSlug: van UUID naar slug. Onbekende ID → null.
+ * Wordt gebruikt door route-handlers die wel een orgId hebben (via
+ * getActiveOrgId) maar een slug nodig hebben om per-org settings/Q&A te
+ * laden uit v0_org_settings (die is op slug gekeyed in de getOrgSettings
+ * wrapper).
+ */
+export function resolveOrgSlugFromId(orgId: string): OrgSlug | null {
+  if (!orgId) return null;
+  for (const slug of ALL_ORG_SLUGS) {
+    if (KNOWN_ORGS[slug].id === orgId) return slug;
+  }
+  return null;
+}
+
+/**
  * Bepaal de actieve org voor deze request. Volgorde:
  *   1. ?org=<slug> query param
  *   2. cookie v0_active_org

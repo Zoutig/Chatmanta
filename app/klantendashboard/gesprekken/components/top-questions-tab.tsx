@@ -16,10 +16,20 @@ function formatDate(iso: string): string {
   });
 }
 
-export function TopQuestionsTab({ initial }: { initial: TopQuestion[] }) {
+export function TopQuestionsTab({
+  initial,
+  existingQAQuestions = [],
+}: {
+  initial: TopQuestion[];
+  /** Vragen die al als actieve Q&A in v0_org_settings.qa staan — initial seed
+   * voor de "✓ In Q&A"-badge zodat die na page-reload zichtbaar blijft. */
+  existingQAQuestions?: string[];
+}) {
   const [items] = useState<TopQuestion[]>(initial);
   const [drafting, setDrafting] = useState<{ question: string; answer: string } | null>(null);
-  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(
+    () => new Set(existingQAQuestions.map((q) => q.trim().toLowerCase())),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 

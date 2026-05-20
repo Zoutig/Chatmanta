@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useTransition, useRef, useEffect } from 'react';
-import { Send, Bot, User, BookOpen, ShieldCheck, AlertTriangle, Sparkle } from 'lucide-react';
+import {
+  Send,
+  Bot,
+  User,
+  BookOpen,
+  ShieldCheck,
+  AlertTriangle,
+  Sparkle,
+  RotateCcw,
+} from 'lucide-react';
 import { askTestQuestion } from '../actions';
 
 type SourceLite = { filename: string | null; excerpt: string };
@@ -24,29 +33,126 @@ function deriveConfidence(topSim?: number | null): 'high' | 'medium' | 'low' {
   return 'low';
 }
 
+// localStorage key per org+bot zodat een org-switch of bot-versie-bump geen
+// stale gesprek toont. Versie-prefix zodat we makkelijk kunnen invalideren als
+// het Message-schema verandert.
+const STORAGE_VERSION = 1;
+const storageKey = (orgSlug: string, botVersion: string) =>
+  `klant-test-chat:v${STORAGE_VERSION}:${orgSlug}:${botVersion}`;
+
+// Aantal turns dat naar de RAG-pipeline gestuurd wordt als history. Sluit aan
+// op de MAX_HISTORY_TURNS-cap in rag.ts — meer doorgeven wordt server-side
+// alsnog afgekapt.
+const HISTORY_TURNS_FOR_RAG = 10;
+
+function loadStored(orgSlug: string, botVersion: string): Message[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(storageKey(orgSlug, botVersion));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((m) => {
+      if (!m || typeof m !== 'object') return false;
+      const r = (m as { role?: unknown }).role;
+      const c = (m as { content?: unknown }).content;
+      return (r === 'user' || r === 'assistant') && typeof c === 'string';
+    }) as Message[];
+  } catch {
+    return [];
+  }
+}
+
+function saveStored(orgSlug: string, botVersion: string, messages: Message[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(storageKey(orgSlug, botVersion), JSON.stringify(messages));
+  } catch {
+    // Quota / serialize errors: stilzwijgend doorgaan — verloren gesprek is geen ramp.
+  }
+}
+
+function clearStored(orgSlug: string, botVersion: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(storageKey(orgSlug, botVersion));
+  } catch {
+    // ignore
+  }
+}
+
 export function ChatPreview({
+  orgSlug,
+  botVersion,
   welcomeMessage,
   starterQuestions,
   chatbotName,
   primaryColor,
 }: {
+  orgSlug: string;
+  botVersion: string;
   welcomeMessage: string;
   starterQuestions: string[];
   chatbotName: string;
   primaryColor: string;
 }) {
+  // Server-render = lege array (geen window). Client-mount hydrateert uit
+  // localStorage in een useEffect — voorkomt SSR/CSR mismatch warnings.
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
   const nextId = (prefix: string) => `${prefix}-${++idRef.current}`;
 
+  // Hydrate from localStorage post-mount. Bij org/bot-switch herhydreren we
+  // — andere context = ander gesprek. Bewust setState binnen useEffect: dit
+  // is de canonical SSR-safe hydratie-pattern (server rendert leeg, client
+  // hydrateert na mount) — useState-initializer kan dit niet zonder
+  // hydration-mismatch warnings. De react-hooks/set-state-in-effect lint
+  // raadt useSyncExternalStore aan, maar dat is overkill voor één-richting
+  // mount-hydratie.
+  useEffect(() => {
+    const stored = loadStored(orgSlug, botVersion);
+    // Bump idRef boven de hoogste gevonden id-suffix zodat nieuwe berichten
+    // geen collision krijgen met gerestoreerde berichten.
+    let maxN = 0;
+    for (const m of stored) {
+      const match = /-(\d+)$/.exec(m.id);
+      if (match) maxN = Math.max(maxN, Number(match[1]));
+    }
+    idRef.current = maxN;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages(stored);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHydrated(true);
+  }, [orgSlug, botVersion]);
+
+  // Persist alle wijzigingen — pas nadat we gehydreerd zijn anders zou de
+  // eerste render (lege array) de stored history overschrijven.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (messages.length === 0) {
+      clearStored(orgSlug, botVersion);
+    } else {
+      saveStored(orgSlug, botVersion, messages);
+    }
+  }, [messages, hydrated, orgSlug, botVersion]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, pending]);
+
+  function resetConversation() {
+    if (pending) return;
+    setMessages([]);
+    setInput('');
+    idRef.current = 0;
+    clearStored(orgSlug, botVersion);
+  }
 
   function send(text: string) {
     const q = text.trim();
@@ -56,10 +162,15 @@ export function ChatPreview({
       role: 'user',
       content: q,
     };
+    // History = laatste N turns vóór deze nieuwe vraag, gemapt naar {role,content}.
+    // Geen streaming-states te filteren — askTestQuestion is synchroon.
+    const historyForRag = messages
+      .slice(-HISTORY_TURNS_FOR_RAG * 2)
+      .map((m) => ({ role: m.role, content: m.content }));
     setMessages((m) => [...m, userMsg]);
     setInput('');
     startTransition(async () => {
-      const res = await askTestQuestion(q);
+      const res = await askTestQuestion(q, historyForRag);
       if (!res.ok) {
         setMessages((m) => [
           ...m,
@@ -147,10 +258,39 @@ export function ChatPreview({
           >
             <Bot size={16} strokeWidth={1.8} />
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{chatbotName}</div>
-            <div style={{ fontSize: 11, opacity: 0.8 }}>Reageert meestal binnen een paar seconden</div>
+            <div style={{ fontSize: 11, opacity: 0.8 }}>
+              {messages.length > 0
+                ? `${messages.filter((m) => m.role === 'user').length} testvragen · gesprek loopt door`
+                : 'Reageert meestal binnen een paar seconden'}
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={resetConversation}
+            disabled={pending || messages.length === 0}
+            title="Start een nieuw gesprek — de geschiedenis wordt gewist"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '4px 10px',
+              borderRadius: 999,
+              background: 'rgba(255,255,255,0.16)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.24)',
+              fontSize: 11,
+              fontWeight: 500,
+              cursor: pending || messages.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: pending || messages.length === 0 ? 0.45 : 1,
+              fontFamily: 'inherit',
+              transition: 'background 120ms ease, opacity 120ms ease',
+            }}
+          >
+            <RotateCcw size={11} strokeWidth={2} />
+            Reset
+          </button>
         </div>
 
         {/* Berichten */}

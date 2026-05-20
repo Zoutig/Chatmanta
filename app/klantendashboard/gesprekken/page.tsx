@@ -9,6 +9,7 @@ import { ArrowRight, MessagesSquare } from 'lucide-react';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { listConversations } from '@/lib/v0/klantendashboard/server/conversations';
 import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
 import { PageHeader } from '../components/page-header';
 import { StatusBadge } from '../components/status-badge';
@@ -50,10 +51,17 @@ export default async function GesprekkenPage({
     rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
 
   const activeOrg = await getActiveOrgFromCookies();
-  const [items, topQuestions] = await Promise.all([
+  const [items, topQuestions, settings] = await Promise.all([
     listConversations(activeOrg.slug, filter),
     getTopQuestions(activeOrg.slug, 20),
+    getOrgSettings(activeOrg.slug),
   ]);
+  // Initial "✓ In Q&A"-badge: alles wat we al in v0_org_settings.qa hebben staan
+  // (case-insensitive match op de vraag-text). Zonder dit zou de badge na page-
+  // reload verdwijnen — savedKeys in TopQuestionsTab is alleen client-state.
+  const existingQAQuestions = settings.qa
+    .filter((q) => q.active)
+    .map((q) => q.question);
 
   const unansweredCount = items.filter((x) => x.status === 'unanswered').length;
 
@@ -74,7 +82,9 @@ export default async function GesprekkenPage({
         ]}
       />
 
-      {view === 'top-questions' && <TopQuestionsTab initial={topQuestions} />}
+      {view === 'top-questions' && (
+        <TopQuestionsTab initial={topQuestions} existingQAQuestions={existingQAQuestions} />
+      )}
       {view === 'gesprekken' && <FilterBar active={filter} />}
 
       {view === 'gesprekken' && items.length === 0 ? (

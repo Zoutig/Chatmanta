@@ -9,17 +9,41 @@
 
 import {
   runRagQueryStreaming,
+  type ChatHistoryTurn,
   type ChatResponse,
   type ChatSource,
 } from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 
 export type TestAnswerResult =
   | { ok: true; response: ChatResponse }
   | { ok: false; error: string };
 
-export async function askTestQuestion(question: string): Promise<TestAnswerResult> {
+// Hard cap op de history-payload zodat een lange test-sessie geen overweldigende
+// token-bill genereert. Spiegelt de cap in /api/v0/chat (parseHistory).
+const MAX_TEST_HISTORY_TURNS = 20;
+const MAX_TEST_HISTORY_CHARS_PER_TURN = 4000;
+
+function sanitizeHistory(input: unknown): ChatHistoryTurn[] {
+  if (!Array.isArray(input)) return [];
+  const out: ChatHistoryTurn[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const role = (item as { role?: unknown }).role;
+    const content = (item as { content?: unknown }).content;
+    if ((role === 'user' || role === 'assistant') && typeof content === 'string' && content.trim()) {
+      out.push({ role, content: content.slice(0, MAX_TEST_HISTORY_CHARS_PER_TURN) });
+    }
+  }
+  return out.slice(-MAX_TEST_HISTORY_TURNS);
+}
+
+export async function askTestQuestion(
+  question: string,
+  history?: ChatHistoryTurn[],
+): Promise<TestAnswerResult> {
   const q = question.trim();
   if (!q) return { ok: false, error: 'Vraag is leeg.' };
   if (q.length > 1000) return { ok: false, error: 'Vraag is te lang (max 1000 tekens).' };
@@ -27,6 +51,9 @@ export async function askTestQuestion(question: string): Promise<TestAnswerResul
   try {
     const activeOrg = await getActiveOrgFromCookies();
     const bot = resolveBot(undefined); // gebruikt LATEST_BOT_VERSION
+    // Q&A items voor de fast-path. Bij faal valt getOrgSettings al stilletjes
+    // terug op mock-defaults; geen extra error-handling nodig hier.
+    const settings = await getOrgSettings(activeOrg.slug);
     let final: ChatResponse | null = null;
     let answerStartSources: ChatSource[] = [];
 
@@ -36,6 +63,8 @@ export async function askTestQuestion(question: string): Promise<TestAnswerResul
       enableRewrite: bot.enableRewriteByDefault,
       bot,
       organizationId: activeOrg.id,
+      history: sanitizeHistory(history),
+      manualQAItems: settings.qa,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         final = ev.response;

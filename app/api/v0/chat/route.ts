@@ -20,7 +20,9 @@ import { logQuery, logBlockedQuery, type HydeMeta } from '@/lib/v0/server/log';
 import { normalizeStyle } from '@/lib/v0/style';
 import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
-import { getActiveOrgId } from '@/lib/v0/server/active-org';
+import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
 
@@ -175,6 +177,22 @@ export async function POST(req: Request) {
   }
 
   const organizationId = getActiveOrgId(req);
+  // Manual Q&A fast-path: probeer de slug af te leiden uit de orgId zodat we
+  // de v0_org_settings.qa-lijst kunnen laden. Lukt dit niet (onbekende
+  // sandbox-org, query-tampering, etc.) dan slaan we Q&A over en draait de
+  // pipeline gewoon als voorheen.
+  const orgSlug = resolveOrgSlugFromId(organizationId);
+  let manualQAItems: ManualQA[] = [];
+  if (orgSlug) {
+    try {
+      const settings = await getOrgSettings(orgSlug);
+      manualQAItems = settings.qa.filter((q) => q.active);
+    } catch {
+      // getOrgSettings doet zelf al fallback op mock-defaults bij DB-fout;
+      // als hij hier toch gooit slaan we Q&A-fast-path stilzwijgend over.
+    }
+  }
+
   const generator = runRagQueryStreaming({
     question,
     threshold,
@@ -186,6 +204,7 @@ export async function POST(req: Request) {
     length,
     organizationId,
     hydeModeOverride: hydeModeRequested,
+    manualQAItems,
   });
 
   const encoder = new TextEncoder();
