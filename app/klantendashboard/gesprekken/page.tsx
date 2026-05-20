@@ -122,6 +122,7 @@ export default async function GesprekkenPage({
             </div>
           )}
           <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="table-scroll">
             <table className="klant-table">
               <thead>
                 <tr>
@@ -172,6 +173,7 @@ export default async function GesprekkenPage({
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       ) : null}
