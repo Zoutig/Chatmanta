@@ -93,14 +93,40 @@ function rowToMessage(r: MessageRow): AssistantMessage {
 // Threads
 // ---------------------------------------------------------------------------
 
+// Hard cap op het aantal actieve (non-archived) threads. Bij het aanmaken
+// van een nieuwe thread wordt teruggesnoeid naar dit aantal zodat we nooit
+// meer dan MAX_ACTIVE_THREADS in de DB hebben staan na een create.
+export const MAX_ACTIVE_THREADS = 3;
+
 function truncateTitle(raw: string): string {
   const trimmed = raw.trim().replace(/\s+/g, ' ');
   if (trimmed.length <= 60) return trimmed || 'Nieuwe chat';
   return trimmed.slice(0, 57) + '...';
 }
 
+// Verwijdert de oudste actieve threads zodat er hooguit `keep` overblijven.
+// Sorteert op updated_at ASC (oudste eerst) en delete in één call via .in().
+async function pruneToMax(keep: number): Promise<void> {
+  const { data, error } = await sb()
+    .from('cc_assistant_threads')
+    .select('id, updated_at')
+    .is('archived_at', null)
+    .order('updated_at', { ascending: true });
+  if (error) throw new Error(`pruneToMax list failed: ${error.message}`);
+  const rows = data ?? [];
+  if (rows.length <= keep) return;
+  const toDelete = rows.slice(0, rows.length - keep).map((r) => r.id as string);
+  const { error: delErr } = await sb()
+    .from('cc_assistant_threads')
+    .delete()
+    .in('id', toDelete);
+  if (delErr) throw new Error(`pruneToMax delete failed: ${delErr.message}`);
+}
+
 export async function createThread(titleHint: string): Promise<AssistantThread> {
   const title = truncateTitle(titleHint);
+  // Ruimte maken vóór insert zodat we na de insert exact MAX_ACTIVE_THREADS hebben.
+  await pruneToMax(MAX_ACTIVE_THREADS - 1);
   const { data, error } = await sb()
     .from('cc_assistant_threads')
     .insert({ title })

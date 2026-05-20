@@ -522,6 +522,11 @@ export function AssistantPanel() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+// Houdt UI-cap in sync met server-side MAX_ACTIVE_THREADS in
+// lib/commandcenter/server/assistant-threads.ts. Hard-coded ipv import om geen
+// extra client/server boundary te kruisen.
+const VISIBLE_THREADS = 3;
+
 function ThreadSwitcher({
   threads,
   activeId,
@@ -534,7 +539,7 @@ function ThreadSwitcher({
   onDelete: (id: string) => void;
 }) {
   if (threads.length === 0) return null;
-  const recent = threads.slice(0, 6);
+  const recent = threads.slice(0, VISIBLE_THREADS);
   return (
     <div
       style={{
@@ -545,41 +550,85 @@ function ThreadSwitcher({
         flexWrap: 'wrap',
       }}
     >
-      {recent.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onSelect(t.id)}
-          onAuxClick={(e) => {
-            if (e.button === 1) {
-              e.preventDefault();
-              onDelete(t.id);
-            }
-          }}
-          title={`${t.title} — middel-klik om te verwijderen`}
-          style={{
-            background:
-              activeId === t.id
-                ? `color-mix(in oklab, ${ACCENT} 18%, transparent)`
-                : 'var(--surface)',
-            border: `1px solid ${
-              activeId === t.id
-                ? `color-mix(in oklab, ${ACCENT} 40%, transparent)`
-                : 'var(--border)'
-            }`,
-            borderRadius: 999,
-            padding: '3px 10px',
-            fontSize: 11.5,
-            color: 'var(--fg)',
-            cursor: 'pointer',
-            maxWidth: 160,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {t.title}
-        </button>
-      ))}
+      {recent.map((t) => {
+        const isActive = activeId === t.id;
+        const border = isActive
+          ? `color-mix(in oklab, ${ACCENT} 40%, transparent)`
+          : 'var(--border)';
+        const bg = isActive
+          ? `color-mix(in oklab, ${ACCENT} 18%, transparent)`
+          : 'var(--surface)';
+        return (
+          <div
+            key={t.id}
+            role="group"
+            aria-label={t.title}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'stretch',
+              background: bg,
+              border: `1px solid ${border}`,
+              borderRadius: 999,
+              maxWidth: 180,
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onSelect(t.id)}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  onDelete(t.id);
+                }
+              }}
+              title={t.title}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '3px 4px 3px 10px',
+                fontSize: 11.5,
+                color: 'var(--fg)',
+                cursor: 'pointer',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: 140,
+                textAlign: 'left',
+              }}
+            >
+              {t.title}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(t.id);
+              }}
+              title="Gesprek verwijderen"
+              aria-label={`Gesprek "${t.title}" verwijderen`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '0 8px 0 4px',
+                color: 'var(--fg-muted)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--fg)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--fg-muted)';
+              }}
+            >
+              <Icon name="x" size={12} />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
