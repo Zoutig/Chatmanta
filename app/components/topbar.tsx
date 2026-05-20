@@ -12,6 +12,8 @@ export function Topbar({
   bots,
   rightOpen,
   onToggleRight,
+  onOpenLeftDrawer,
+  onOpenRightDrawer,
 }: {
   title: string;
   turnCount: number;
@@ -19,10 +21,25 @@ export function Topbar({
   bots: BotMeta[];
   rightOpen: boolean;
   onToggleRight: () => void;
+  /** Mobile-only: opent linker sidebar als off-canvas drawer (<= 880px). */
+  onOpenLeftDrawer?: () => void;
+  /** Mobile-only: opent rechter panel als off-canvas drawer (<= 880px). */
+  onOpenRightDrawer?: () => void;
 }) {
   return (
     <div className="topbar">
       <div className="topbar-left">
+        {onOpenLeftDrawer ? (
+          <button
+            type="button"
+            aria-label="Menu openen"
+            title="Menu"
+            className="topbar-hamburger"
+            onClick={onOpenLeftDrawer}
+          >
+            <Icon name="menu" size={18} />
+          </button>
+        ) : null}
         <div className="topbar-mark" aria-hidden="true">
           <Image src="/logo/mark.png" alt="" width={510} height={270} />
         </div>
@@ -44,7 +61,15 @@ export function Topbar({
           aria-label={rightOpen ? 'Paneel inklappen' : 'Paneel uitklappen'}
           title={rightOpen ? 'Paneel inklappen' : 'Paneel uitklappen'}
           className={`icon-btn${rightOpen ? ' active' : ''}`}
-          onClick={onToggleRight}
+          onClick={() => {
+            // Op mobiel: open als drawer i.p.v. de classic-shell collapse-toggle.
+            if (onOpenRightDrawer && typeof window !== 'undefined' &&
+                window.matchMedia('(max-width: 880px)').matches) {
+              onOpenRightDrawer();
+            } else {
+              onToggleRight();
+            }
+          }}
         >
           <Icon name="panel-right" size={16} />
         </button>

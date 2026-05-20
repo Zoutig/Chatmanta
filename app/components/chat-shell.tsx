@@ -107,6 +107,10 @@ export function ChatShell({
   const [activeCite, setActiveCite] = useState<number | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>('sources');
   const [rightOpen, setRightOpen] = useState(true);
+  // Mobile-drawer state (<= 880px). Op desktop blijft de gewone shell-layout
+  // staan; data-attrs hieronder triggeren alleen de drawer-CSS uit globals.css.
+  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
+  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   // Manta-mode: collapse-states voor zowel linker sidebar als rechter rail.
   // Worden alleen gebruikt als styleMode === 'manta'; in classic/glass blijven
   // de bestaande width-tokens leidend.
@@ -565,7 +569,12 @@ export function ChatShell({
       .filter(Boolean)
       .join(' ');
     return (
-      <div className={appClass}>
+      <div
+        className={appClass}
+        data-mobile-shell="true"
+        data-drawer-left={leftDrawerOpen ? 'true' : 'false'}
+        data-drawer-right={rightDrawerOpen ? 'true' : 'false'}
+      >
         <MantaSidebar
           threads={threads}
           activeThreadId={activeThreadId}
@@ -587,6 +596,7 @@ export function ChatShell({
             bots={bots}
             leftCollapsed={mantaLeftCollapsed}
             onToggleLeft={() => setMantaLeftCollapsed((v) => !v)}
+            onOpenLeftDrawer={() => setLeftDrawerOpen(true)}
           />
 
           <MantaAurora />
@@ -638,12 +648,31 @@ export function ChatShell({
           docs={docs}
           activeOrgId={activeOrgId}
         />
+
+        {leftDrawerOpen || rightDrawerOpen ? (
+          <button
+            type="button"
+            aria-label="Sluit menu"
+            className="drawer-backdrop"
+            onClick={() => {
+              setLeftDrawerOpen(false);
+              setRightDrawerOpen(false);
+            }}
+          />
+        ) : null}
       </div>
     );
   }
 
+  const anyDrawerOpen = leftDrawerOpen || rightDrawerOpen;
+
   return (
-    <div className="app">
+    <div
+      className="app"
+      data-mobile-shell="true"
+      data-drawer-left={leftDrawerOpen ? 'true' : 'false'}
+      data-drawer-right={rightDrawerOpen ? 'true' : 'false'}
+    >
       <Sidebar
         threads={threads}
         activeThreadId={activeThreadId}
@@ -663,6 +692,11 @@ export function ChatShell({
           bots={bots}
           rightOpen={rightOpen}
           onToggleRight={() => setRightOpen((v) => !v)}
+          onOpenLeftDrawer={() => setLeftDrawerOpen(true)}
+          onOpenRightDrawer={() => {
+            setRightOpen(true);
+            setRightDrawerOpen(true);
+          }}
         />
 
         <div className="conversation" ref={convoRef}>
@@ -708,6 +742,19 @@ export function ChatShell({
           onCiteClick={onCiteClick}
           docs={docs}
           activeOrgId={activeOrgId}
+        />
+      ) : null}
+
+      {/* Backdrop voor mobile drawer (alleen zichtbaar via CSS bij open-state). */}
+      {anyDrawerOpen ? (
+        <button
+          type="button"
+          aria-label="Sluit menu"
+          className="drawer-backdrop"
+          onClick={() => {
+            setLeftDrawerOpen(false);
+            setRightDrawerOpen(false);
+          }}
         />
       ) : null}
     </div>

@@ -11,6 +11,7 @@ export function MantaTopbar({
   bots,
   leftCollapsed,
   onToggleLeft,
+  onOpenLeftDrawer,
 }: {
   title: string;
   turnCount: number;
@@ -18,10 +19,23 @@ export function MantaTopbar({
   bots: BotMeta[];
   leftCollapsed: boolean;
   onToggleLeft: () => void;
+  /** Mobile-only: opent linker sidebar als off-canvas drawer (<= 900px). */
+  onOpenLeftDrawer?: () => void;
 }) {
   return (
     <header className="manta-topbar">
       <div className="manta-topbar-left">
+        {onOpenLeftDrawer ? (
+          <button
+            type="button"
+            aria-label="Menu openen"
+            title="Menu"
+            className="topbar-hamburger"
+            onClick={onOpenLeftDrawer}
+          >
+            <Icon name="menu" size={18} />
+          </button>
+        ) : null}
         {leftCollapsed ? (
           <button
             type="button"

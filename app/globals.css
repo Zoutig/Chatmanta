@@ -3022,3 +3022,151 @@ body.body-fixed { overflow: hidden; }
   --phase-followups: #0a8aa6;
   --phase-cascade: #4a5670;
 }
+
+/* ==========================================================================
+   Responsive tokens + mobile-drawer (Phase 2)
+   Append-only — geen edits op bestaande selectors i.v.m. Tailwind v4 PostCSS
+   quirk die nieuwe properties op bestaande rules silent dropt.
+   ========================================================================== */
+:root {
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-split: 880px;
+  --bp-lg: 1100px;
+  --content-padding-x: clamp(16px, 4vw, 36px);
+  --content-padding-y: clamp(20px, 3vh, 32px);
+  --drawer-z: 1000;
+  --drawer-backdrop-z: 999;
+  --drawer-w: min(86vw, 320px);
+}
+
+/* Modal-helper: gebruik op elke dialog/modal-wrapper i.p.v. hardcoded width. */
+.modal-responsive {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+}
+
+/* Hamburger + drawer-close knoppen. Default visible-state per breakpoint. */
+.topbar-hamburger,
+.drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--fg);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms;
+}
+.topbar-hamburger:hover,
+.drawer-close:hover { background: var(--surface); }
+
+/* Desktop: hamburger verbergen — desktop heeft de sidebar gewoon zichtbaar. */
+.topbar-hamburger { display: none; }
+
+/* ===== Main chat-shell mobile drawer (<= 880px) ===== */
+@media (max-width: 880px) {
+  /* Hamburger zichtbaar onder 880px. */
+  .topbar-hamburger { display: inline-flex; }
+
+  /* Sidebar als off-canvas drawer. Hogere specificiteit dan de bestaande
+     ".sidebar { display: none }" via attribuut-selector op .app. */
+  .app[data-mobile-shell] .sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--drawer-w);
+    z-index: var(--drawer-z);
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.4);
+    border-right: 1px solid var(--border);
+  }
+  .app[data-mobile-shell][data-drawer-left="true"] .sidebar {
+    transform: translateX(0);
+  }
+
+  /* Right-panel als drawer aan rechterzijde. */
+  .app[data-mobile-shell] .right-panel {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: var(--drawer-w);
+    z-index: var(--drawer-z);
+    transform: translateX(100%);
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.4);
+    border-left: 1px solid var(--border);
+  }
+  .app[data-mobile-shell][data-drawer-right="true"] .right-panel {
+    transform: translateX(0);
+  }
+
+  /* Hoofd-grid wordt 1-koloms. */
+  .app[data-mobile-shell] {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Backdrop component (gerenderd vanuit React wanneer drawer open). */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: var(--drawer-backdrop-z);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ===== Manta-mode mobile drawer ===== */
+/* manta.css doet "display: none" op .manta-sidebar onder 900px via
+   "html[data-style="manta"] .manta-sidebar". Specificiteit 0,2,1. Wij
+   overriden met 0,3,1 door de data-mobile-shell attribuut-selector
+   tussenin: */
+@media (max-width: 900px) {
+  html[data-style="manta"] .app[data-mobile-shell] .manta-sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--drawer-w);
+    z-index: var(--drawer-z);
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.4);
+  }
+  html[data-style="manta"] .app[data-mobile-shell][data-drawer-left="true"] .manta-sidebar {
+    transform: translateX(0);
+  }
+  html[data-style="manta"] .app[data-mobile-shell] .manta-right-panel {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: var(--drawer-w);
+    z-index: var(--drawer-z);
+    transform: translateX(100%);
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.4);
+  }
+  html[data-style="manta"] .app[data-mobile-shell][data-drawer-right="true"] .manta-right-panel {
+    transform: translateX(0);
+  }
+  html[data-style="manta"] .app[data-mobile-shell] {
+    grid-template-columns: 1fr;
+  }
+}
