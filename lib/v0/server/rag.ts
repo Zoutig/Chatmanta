@@ -261,6 +261,12 @@ function parsePreProcessOutput(raw: string): { kind: 'smalltalk'; reply: string 
 // kan de LLM verwarren met oude context die niet meer relevant is.
 const MAX_HISTORY_TURNS = 4;
 
+// Sliding window voor de main answer-LLM call. Lange threads stuurden eerder
+// tot 20 turns mee, wat TTFT lineair liet groeien met de gespreks-lengte.
+// 8 turns (4 user+assistant paren) dekt empirisch verreweg de meeste
+// conversational follow-ups; oudere context blijft in DB en in client-state.
+export const V0_CHAT_HISTORY_TURNS = 8;
+
 export type ChatHistoryTurn = { role: 'user' | 'assistant'; content: string };
 
 function formatHistoryBlock(history: ChatHistoryTurn[]): string {
@@ -2080,6 +2086,10 @@ KRITISCHE FORMAT-REGELS:
   let chatOutputTokens = 0;
   let chatCostUsd = 0;
   const stopGeneration = tMark('generation_ms');
+  // Sliding window: alléén de laatste N turns gaan mee naar de answer-LLM.
+  // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
+  // ongewijzigd; alleen het LLM-payload-venster is begrensd.
+  const answerHistory = history.slice(-V0_CHAT_HISTORY_TURNS);
   try {
     const stream = await openai().chat.completions.create({
       model: bot.chatModel,
@@ -2089,7 +2099,7 @@ KRITISCHE FORMAT-REGELS:
       stream_options: { include_usage: true },
       messages: [
         { role: 'system', content: styledSystemPrompt },
-        ...history.map((t) => ({ role: t.role, content: t.content })),
+        ...answerHistory.map((t) => ({ role: t.role, content: t.content })),
         { role: 'user', content: userPrompt },
       ],
     });

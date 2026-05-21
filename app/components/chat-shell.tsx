@@ -66,6 +66,11 @@ export type BotFlags = {
 
 export type OrgOption = { slug: string; name: string };
 
+// Render-cap: alleen de laatste N turns staan in de DOM. Voorkomt rerender-storm
+// op lange threads tijdens streaming-deltas. Oudere turns blijven in state én
+// in de DB en verschuiven mee als nieuwe turns worden toegevoegd.
+const RENDER_TAIL = 50;
+
 export function ChatShell({
   botVersion,
   bots,
@@ -520,37 +525,45 @@ export function ChatShell({
         />
       ) : (
         <div className="conversation-inner">
-          {turns.map((t, i) => {
-            const isLast = i === turns.length - 1;
-            return (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                <UserMessage content={t.user} />
-                {t.error ? (
-                  <ErrorMessage
-                    code={t.error.code}
-                    message={t.error.message}
-                    requestId={t.error.requestId}
-                    retryAfterSec={t.error.retryAfterSec}
-                    onRetry={isLast && !pending ? onRetry : undefined}
-                  />
-                ) : t.response ? (
-                  <AssistantMessage
-                    response={t.response}
-                    streamingText={t.streamingText}
-                    pending={isLast && pending}
-                    livePhase={null}
-                    activeCite={isLast ? activeCite : null}
-                    onCiteClick={onCiteClick}
-                    onFollowUp={ask}
-                    onRegenerate={isLast && !pending ? onRegenerate : undefined}
-                    replacementReason={t.replacementReason}
-                  />
-                ) : (
-                  <PendingPlaceholder phase={t.livePhase} botVersion={botVersion} />
-                )}
-              </div>
-            );
-          })}
+          {(() => {
+            const visibleTurns = turns.slice(-RENDER_TAIL);
+            const baseIndex = turns.length - visibleTurns.length;
+            return visibleTurns.map((t, i) => {
+              const absoluteIndex = baseIndex + i;
+              const isLast = absoluteIndex === turns.length - 1;
+              return (
+                <div
+                  key={`turn-${absoluteIndex}`}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+                >
+                  <UserMessage content={t.user} />
+                  {t.error ? (
+                    <ErrorMessage
+                      code={t.error.code}
+                      message={t.error.message}
+                      requestId={t.error.requestId}
+                      retryAfterSec={t.error.retryAfterSec}
+                      onRetry={isLast && !pending ? onRetry : undefined}
+                    />
+                  ) : t.response ? (
+                    <AssistantMessage
+                      response={t.response}
+                      streamingText={t.streamingText}
+                      pending={isLast && pending}
+                      livePhase={null}
+                      activeCite={isLast ? activeCite : null}
+                      onCiteClick={onCiteClick}
+                      onFollowUp={ask}
+                      onRegenerate={isLast && !pending ? onRegenerate : undefined}
+                      replacementReason={t.replacementReason}
+                    />
+                  ) : (
+                    <PendingPlaceholder phase={t.livePhase} botVersion={botVersion} />
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
     </>

@@ -55,7 +55,10 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
       out.push({ role, content: content.slice(0, 4000) });
     }
   }
-  return out.slice(-20); // server-side hard cap
+  // Defense-in-depth tegen kwaadwillende payloads. De werkelijke history-limiet
+  // voor de answer-LLM zit in lib/v0/server/rag.ts (V0_CHAT_HISTORY_TURNS=8);
+  // deze 16 = 2× die waarde, ruim genoeg om alle legitieme requests te accepteren.
+  return out.slice(-16);
 }
 
 export async function POST(req: Request) {
