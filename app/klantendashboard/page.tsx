@@ -145,14 +145,9 @@ export default async function OverviewPage() {
         </div>
       </section>
 
-      {/* Two-column: checklist + recent unanswered */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-          gap: 20,
-        }}
-      >
+      {/* Two-column: checklist + recent unanswered.
+          Onder 880px stapelt de section naar 1 kolom via .grid-2col-stack. */}
+      <section className="grid-2col-stack">
         <SetupChecklist steps={checklist} />
 
         <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

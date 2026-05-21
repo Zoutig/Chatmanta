@@ -4,6 +4,7 @@
 // Wordt door layout.tsx als children-container gebruikt. Client-side voor
 // active-route highlighting via usePathname.
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatedThemeToggler } from '@/app/components/ui/animated-theme-toggler';
@@ -37,9 +38,14 @@ const ACCENT = 'var(--manta-accent, var(--accent))';
 
 export function CommandShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // Mobile-drawer (<= 880px). data-cc-drawer-open op de shell-wrapper
+  // triggert de drawer-CSS in globals.css. Hamburger zit in main-topbar.
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <div
+      className="commandcenter-shell"
+      data-cc-drawer-open={drawerOpen ? 'true' : 'false'}
       style={{
         minHeight: '100vh',
         background: 'var(--bg)',
@@ -50,6 +56,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
     >
       {/* Sidebar */}
       <aside
+        className="commandcenter-sidebar"
         style={{
           position: 'sticky',
           top: 0,
@@ -198,12 +205,40 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main */}
-      <main style={{ padding: '28px 36px 64px', maxWidth: 1280, width: '100%' }}>
+      <main
+        className="commandcenter-main"
+        style={{
+          padding: 'clamp(16px, 4vw, 28px) clamp(16px, 4vw, 36px) 64px',
+          maxWidth: 1280,
+          width: '100%',
+        }}
+      >
+        {/* Mobile hamburger — visible only via globals.css under 880px. */}
+        <button
+          type="button"
+          aria-label="Menu openen"
+          title="Menu"
+          className="commandcenter-hamburger topbar-hamburger"
+          onClick={() => setDrawerOpen(true)}
+          style={{ marginBottom: 12 }}
+        >
+          <Icon name="menu" size={18} />
+        </button>
         {children}
       </main>
 
       {/* Right-side assistant panel */}
       <AssistantPanel />
+
+      {/* Drawer-backdrop — gerenderd op mobiel als de drawer open is. */}
+      {drawerOpen ? (
+        <button
+          type="button"
+          aria-label="Sluit menu"
+          className="drawer-backdrop"
+          onClick={() => setDrawerOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
