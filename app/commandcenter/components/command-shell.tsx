@@ -64,7 +64,10 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
           height: '100vh',
           background: 'var(--surface)',
           borderRight: '1px solid var(--border)',
-          padding: '22px 16px',
+          paddingTop: 'calc(22px + var(--safe-top, 0px))',
+          paddingRight: '16px',
+          paddingBottom: '22px',
+          paddingLeft: '16px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -208,7 +211,10 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
       <main
         className="commandcenter-main"
         style={{
-          padding: 'clamp(16px, 4vw, 28px) clamp(16px, 4vw, 36px) 64px',
+          paddingTop: 'calc(clamp(16px, 4vw, 28px) + var(--safe-top, 0px))',
+          paddingRight: 'calc(clamp(16px, 4vw, 36px) + var(--safe-right, 0px))',
+          paddingBottom: '64px',
+          paddingLeft: 'calc(clamp(16px, 4vw, 36px) + var(--safe-left, 0px))',
           maxWidth: 1280,
           width: '100%',
         }}

@@ -3224,3 +3224,80 @@ body.body-fixed { overflow: hidden; }
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
 }
+
+/* ==========================================================================
+   Safe-area / iPhone-notch polish (PR4)
+   Append-only; geen edits op bestaande selectors (Tailwind v4 PostCSS-quirk).
+   Tokens vallen terug op 0px op viewports zonder safe-area → desktop is
+   bit-identiek aan main.
+
+   viewport-fit=cover staat al in app/layout.tsx (PR1 #68), dus env(...) levert
+   onder iOS Safari de echte inset-waarden.
+   ========================================================================== */
+:where(:root) {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Chat-shell topbar — bestaande: padding 12px 22px. Hogere specificiteit
+   (body .topbar) om PostCSS-quirk te omzeilen. Op iOS schuift de hele
+   topbar omlaag voorbij de notch én weg uit de top-swipe gesture zone. */
+body .topbar {
+  padding-top: calc(12px + var(--safe-top));
+  padding-left: calc(22px + var(--safe-left));
+  padding-right: calc(22px + var(--safe-right));
+}
+
+/* Composer-wrap (chat-route, bottom-fixed). Bestaande: padding 0 24px 22px.
+   Bottom respecteert de iOS home-indicator. */
+body .composer-wrap {
+  padding-bottom: calc(22px + var(--safe-bottom));
+  padding-left: calc(24px + var(--safe-left));
+  padding-right: calc(24px + var(--safe-right));
+}
+
+/* Conversation-area krijgt extra bottom-padding zodat de laatste message
+   niet onder de home-indicator + composer klemt. */
+body .conversation {
+  padding-bottom: calc(180px + var(--safe-bottom));
+}
+
+/* Centered error-page (incl. error-boundary + 404). */
+body .app-error-page {
+  padding-top: calc(40px + var(--safe-top));
+  padding-bottom: calc(40px + var(--safe-bottom));
+  padding-left: calc(20px + var(--safe-left));
+  padding-right: calc(20px + var(--safe-right));
+}
+
+/* Off-canvas drawers: drawer-wrapper zit op top:0, dus de eigen padding-top
+   wordt opgepompt met safe-top zodat de bestaande brand-area onder de notch
+   landt. Eigenaardige sidebars (klant-sidebar gebruikt 18px paddingtop,
+   commandcenter via inline) krijgen hun base-waarde mee zodat de visuele
+   spacing onveranderd is op desktop. */
+@media (max-width: 880px) {
+  .app[data-mobile-shell] .sidebar,
+  .app[data-mobile-shell] .right-panel {
+    padding-top: var(--safe-top);
+  }
+  [data-klant-scope][data-klant-drawer-open="true"] .klant-sidebar {
+    padding-top: calc(18px + var(--safe-top));
+  }
+}
+
+/* Manta-mode drawer (breakpoint 900px ipv 880px — zie manta.css).
+   manta-sidebar-brand heeft een fixed height (--manta-top-h) die al wordt
+   bumped door de safe-top via manta.css; padding-top schuift de inhoud. */
+@media (max-width: 900px) {
+  html[data-style="manta"] .app[data-mobile-shell] .manta-sidebar,
+  html[data-style="manta"] .app[data-mobile-shell] .manta-right-panel {
+    padding-top: var(--safe-top);
+  }
+  html[data-style="manta"] .app[data-mobile-shell] .manta-sidebar-brand {
+    height: auto;
+    min-height: var(--manta-top-h);
+    padding-top: var(--safe-top);
+  }
+}
