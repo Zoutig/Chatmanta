@@ -46,6 +46,10 @@ export type ChatMantaWidgetProps = {
   logoColor?: string;
   widgetBgColor?: string; // FAB-knop achtergrond (default wit)
   pulseColor?: string;
+  /**
+   * Toggle voor de pulse-animatie. Default `true` — false verbergt de ring.
+   */
+  pulseEnabled?: boolean;
   headerColor?: string; // header + send-button + user-bubble
   /** Welk icoon op de FAB? */
   logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
@@ -87,6 +91,7 @@ export function ChatMantaWidget({
   logoColor,
   widgetBgColor,
   pulseColor,
+  pulseEnabled = true,
   headerColor,
   logoStyle = 'brand-mark',
   customLogoDataUrl,
@@ -297,9 +302,10 @@ export function ChatMantaWidget({
         onMouseEnter={() => setTooltipHovered(true)}
         onMouseLeave={() => setTooltipHovered(false)}
       >
-        {/* Pulse-ring achter de FAB — alleen zichtbaar als chat gesloten is.
+        {/* Pulse-ring achter de FAB — alleen zichtbaar als chat gesloten is
+            en de klant pulseEnabled niet expliciet uit heeft gezet.
             Per render gegenereerd met primaryColor zodat hij de org-context volgt. */}
-        {!open && (
+        {!open && pulseEnabled && (
           <span
             aria-hidden="true"
             style={{

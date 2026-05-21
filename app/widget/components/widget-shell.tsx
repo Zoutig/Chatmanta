@@ -36,6 +36,7 @@ export type WidgetShellProps = {
     logoColor?: string;
     widgetBgColor?: string;
     pulseColor?: string;
+    pulseEnabled?: boolean;
     headerColor?: string;
     logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
     customLogoDataUrl?: string | null;
@@ -172,6 +173,7 @@ export function WidgetShell({
         logoColor={widgetOverrides?.logoColor}
         widgetBgColor={widgetOverrides?.widgetBgColor}
         pulseColor={widgetOverrides?.pulseColor}
+        pulseEnabled={widgetOverrides?.pulseEnabled}
         headerColor={widgetOverrides?.headerColor}
         logoStyle={widgetOverrides?.logoStyle}
         customLogoDataUrl={widgetOverrides?.customLogoDataUrl}

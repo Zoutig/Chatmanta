@@ -74,6 +74,7 @@ export default async function OrgLayout({ params, children }: LayoutProps) {
         logoColor: orgSettings.widget.logoColor,
         widgetBgColor: orgSettings.widget.widgetBgColor,
         pulseColor: orgSettings.widget.pulseColor,
+        pulseEnabled: orgSettings.widget.pulseEnabled,
         headerColor: orgSettings.widget.headerColor,
         logoStyle: orgSettings.widget.logoStyle,
         customLogoDataUrl: orgSettings.widget.customLogoDataUrl,
