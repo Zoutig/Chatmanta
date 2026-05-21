@@ -12,6 +12,8 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { askTestQuestion } from '../actions';
+import { WidgetLogo } from '../../components/widget-logo';
+import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 
 type SourceLite = { filename: string | null; excerpt: string };
 
@@ -86,16 +88,17 @@ export function ChatPreview({
   botVersion,
   welcomeMessage,
   starterQuestions,
-  chatbotName,
-  primaryColor,
+  widget,
 }: {
   orgSlug: string;
   botVersion: string;
   welcomeMessage: string;
   starterQuestions: string[];
-  chatbotName: string;
-  primaryColor: string;
+  widget: WidgetSettings;
 }) {
+  // Granulaire kleuren met fallback op primaryColor — zelfde resolutie als in
+  // widget-form.tsx zodat de testomgeving 1:1 reflecteert wat de klant ziet.
+  const headerColor = widget.headerColor || widget.primaryColor;
   // Server-render = lege array (geen window). Client-mount hydrateert uit
   // localStorage in een useEffect — voorkomt SSR/CSR mismatch warnings.
   const [messages, setMessages] = useState<Message[]>([]);
@@ -235,11 +238,13 @@ export function ChatPreview({
           maxHeight: 'min(72vh, 720px)',
         }}
       >
-        {/* Mock widget-header */}
+        {/* Mock widget-header — toont de saved widget-config zoals een
+            bezoeker hem op de website zou zien (logo + titel + subtitel +
+            header-kleur). Komt 1:1 overeen met `WidgetMockup` in widget-form. */}
         <div
           style={{
             padding: '14px 18px',
-            background: primaryColor,
+            background: headerColor,
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -254,16 +259,17 @@ export function ChatPreview({
               background: 'rgba(255,255,255,0.18)',
               display: 'grid',
               placeItems: 'center',
+              overflow: 'hidden',
             }}
           >
-            <Bot size={16} strokeWidth={1.8} />
+            <WidgetLogo widget={widget} size={18} />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{chatbotName}</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{widget.title}</div>
             <div style={{ fontSize: 11, opacity: 0.8 }}>
               {messages.length > 0
                 ? `${messages.filter((m) => m.role === 'user').length} testvragen · gesprek loopt door`
-                : 'Reageert meestal binnen een paar seconden'}
+                : widget.subtitle}
             </div>
           </div>
           <button

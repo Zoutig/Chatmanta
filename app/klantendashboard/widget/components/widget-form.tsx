@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { StatusBadge } from '../../components/status-badge';
+import { BubblePreview, MarkPreview } from '../../components/widget-logo';
 import { saveWidgetSettingsAction } from '../../actions';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 
@@ -938,38 +939,6 @@ function LogoChoice({
         />
       )}
     </button>
-  );
-}
-
-function MarkPreview({ color }: { color: string }) {
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        width: 36,
-        height: 22,
-        backgroundColor: color,
-        WebkitMaskImage: "url('/logo/mono-mark.png')",
-        maskImage: "url('/logo/mono-mark.png')",
-        WebkitMaskSize: 'contain',
-        maskSize: 'contain',
-        WebkitMaskRepeat: 'no-repeat',
-        maskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'center',
-        maskPosition: 'center',
-      }}
-    />
-  );
-}
-
-function BubblePreview({ color }: { color: string }) {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9.5l-4 4v-4H5.5c-.83 0-1.5-.67-1.5-1.5v-9z"
-        fill={color}
-      />
-    </svg>
   );
 }
 
