@@ -46,7 +46,16 @@ export function SignInCard({ next }: { next: string }) {
   };
 
   return (
-    <div className="min-h-screen w-screen relative overflow-hidden flex items-center justify-center" style={{ background: '#02060c' }}>
+    <div
+      className="min-h-screen w-screen relative overflow-hidden flex items-center justify-center"
+      style={{
+        background: '#02060c',
+        paddingTop: 'var(--safe-top, 0px)',
+        paddingBottom: 'var(--safe-bottom, 0px)',
+        paddingLeft: 'var(--safe-left, 0px)',
+        paddingRight: 'var(--safe-right, 0px)',
+      }}
+    >
       {/* Roterende shader-background: kiest random 1 van N varianten per
           page-load uit ./login-background. Vervangt de oude single
           EtheralShadow zodat de login speelser/levendiger oogt. Alle

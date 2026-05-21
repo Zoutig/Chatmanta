@@ -552,3 +552,33 @@
   /* Topbar padding compacter. */
   .klant-topbar { padding: 0 12px !important; gap: 8px; }
 }
+
+/* ==========================================================================
+   Safe-area / iPhone-notch polish (PR4) — Klantendashboard-variant
+   Append-only. --klant-topbar-h groeit met de iOS notch zodat de
+   grid-row 1 hoog genoeg is voor de topbar + safe-top. Topbar zelf
+   krijgt padding-top zodat content onder de notch landt en padding-left/
+   right om in landscape niet onder de notch te kruipen.
+   ========================================================================== */
+.klant-shell {
+  --klant-topbar-h: calc(60px + var(--safe-top, 0px));
+}
+.klant-topbar {
+  padding-top: var(--safe-top, 0px);
+  padding-left: calc(24px + var(--safe-left, 0px));
+  padding-right: calc(24px + var(--safe-right, 0px));
+}
+.klant-main {
+  padding-left: max(32px, calc(32px + var(--safe-left, 0px)));
+  padding-right: max(32px, calc(32px + var(--safe-right, 0px)));
+}
+
+/* Mobile (≤640px): bestaande rule heeft padding-shorthand met !important
+   wat onze longhand zou overschrijven, dus hier ook !important. */
+@media (max-width: 640px) {
+  .klant-topbar {
+    padding-top: var(--safe-top, 0px) !important;
+    padding-left: calc(12px + var(--safe-left, 0px)) !important;
+    padding-right: calc(12px + var(--safe-right, 0px)) !important;
+  }
+}
