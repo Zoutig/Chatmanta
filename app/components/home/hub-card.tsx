@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Icon } from '../svg-icons';
+import { useTheme } from '@/lib/v0/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
 type IconName = Parameters<typeof Icon>[0]['name'];
@@ -28,6 +29,60 @@ export function HubCard({
 }: HubCardProps) {
   const isPrimary = variant === 'primary';
   const disabled = !href;
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
+
+  // Light mode bouwt op witte mesh-bg → cards moeten *solid* opdoemen
+  // ipv glass-transparent. Dark mode = bestaande glass-look (pixel-parity).
+  const cardBg = isPrimary
+    ? isLight
+      ? 'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 18%, var(--bg-elev)) 0%, color-mix(in oklab, var(--manta-accent) 6%, var(--bg-elev)) 55%, color-mix(in oklab, var(--manta-accent) 12%, var(--bg-elev)) 100%)'
+      : 'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 14%, transparent) 0%, rgba(255,255,255,0.04) 55%, color-mix(in oklab, var(--manta-accent) 7%, transparent) 100%)'
+    : isLight
+      ? 'var(--bg-elev)'
+      : 'rgba(255,255,255,0.035)';
+
+  const cardBorder = isPrimary
+    ? isLight
+      ? '1px solid color-mix(in oklab, var(--manta-accent) 55%, transparent)'
+      : '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
+    : isLight
+      ? '1px solid var(--border-strong)'
+      : '1px solid rgba(120,200,230,0.12)';
+
+  const cardShadow = isPrimary
+    ? isLight
+      ? '0 12px 32px -16px color-mix(in oklab, var(--manta-accent) 45%, transparent), 0 2px 6px -2px rgba(20,60,90,0.10), inset 0 1px 0 rgba(255,255,255,0.60)'
+      : '0 14px 40px -18px color-mix(in oklab, var(--manta-accent) 50%, transparent), inset 0 1px 0 rgba(255,255,255,0.05)'
+    : isLight
+      ? '0 8px 24px -16px rgba(20,60,90,0.18), inset 0 1px 0 rgba(255,255,255,0.85)'
+      : '0 8px 30px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.03)';
+
+  const haloShadow = isPrimary
+    ? '0 0 0 1px color-mix(in oklab, var(--manta-accent) 60%, transparent), 0 0 36px color-mix(in oklab, var(--manta-accent) 35%, transparent)'
+    : isLight
+      ? '0 0 0 1px color-mix(in oklab, var(--manta-accent) 35%, transparent)'
+      : '0 0 0 1px rgba(120,200,230,0.28)';
+
+  const iconTileBg = isPrimary
+    ? 'linear-gradient(135deg, color-mix(in oklab, var(--manta-accent) 26%, transparent), color-mix(in oklab, var(--manta-accent) 14%, transparent))'
+    : isLight
+      ? 'color-mix(in oklab, var(--manta-accent) 8%, var(--bg-elev))'
+      : 'rgba(255,255,255,0.05)';
+
+  const iconTileBorder = isPrimary
+    ? '1px solid color-mix(in oklab, var(--manta-accent) 42%, transparent)'
+    : isLight
+      ? '1px solid var(--border-strong)'
+      : '1px solid rgba(120,200,230,0.10)';
+
+  const iconTileColor = isPrimary
+    ? isLight
+      ? 'color-mix(in oklab, var(--manta-accent) 65%, var(--fg))'
+      : 'color-mix(in oklab, var(--manta-accent) 35%, #ffffff)'
+    : isLight
+      ? 'var(--fg)'
+      : '#cfe8f0';
 
   const body = (
     <motion.div
@@ -40,17 +95,11 @@ export function HubCard({
       )}
       style={{
         borderRadius: 'var(--r-xl, 20px)',
-        background: isPrimary
-          ? 'linear-gradient(160deg, color-mix(in oklab, var(--manta-accent) 14%, transparent) 0%, rgba(255,255,255,0.04) 55%, color-mix(in oklab, var(--manta-accent) 7%, transparent) 100%)'
-          : 'rgba(255,255,255,0.035)',
+        background: cardBg,
         backdropFilter: 'blur(20px) saturate(140%)',
         WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-        border: isPrimary
-          ? '1px solid color-mix(in oklab, var(--manta-accent) 38%, transparent)'
-          : '1px solid rgba(120,200,230,0.12)',
-        boxShadow: isPrimary
-          ? '0 14px 40px -18px color-mix(in oklab, var(--manta-accent) 50%, transparent), inset 0 1px 0 rgba(255,255,255,0.05)'
-          : '0 8px 30px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.03)',
+        border: cardBorder,
+        boxShadow: cardShadow,
       }}
     >
       {/* Halo on hover (only primary + interactive) */}
@@ -62,9 +111,7 @@ export function HubCard({
           )}
           style={{
             borderRadius: 'inherit',
-            boxShadow: isPrimary
-              ? '0 0 0 1px color-mix(in oklab, var(--manta-accent) 60%, transparent), 0 0 36px color-mix(in oklab, var(--manta-accent) 35%, transparent)'
-              : '0 0 0 1px rgba(120,200,230,0.28)',
+            boxShadow: haloShadow,
           }}
         />
       )}
@@ -75,15 +122,9 @@ export function HubCard({
           className="flex h-12 w-12 items-center justify-center"
           style={{
             borderRadius: '14px',
-            background: isPrimary
-              ? 'linear-gradient(135deg, color-mix(in oklab, var(--manta-accent) 26%, transparent), color-mix(in oklab, var(--manta-accent) 14%, transparent))'
-              : 'rgba(255,255,255,0.05)',
-            border: isPrimary
-              ? '1px solid color-mix(in oklab, var(--manta-accent) 42%, transparent)'
-              : '1px solid rgba(120,200,230,0.10)',
-            color: isPrimary
-              ? 'color-mix(in oklab, var(--manta-accent) 35%, #ffffff)'
-              : '#cfe8f0',
+            background: iconTileBg,
+            border: iconTileBorder,
+            color: iconTileColor,
           }}
         >
           <Icon name={iconName} size={22} />
@@ -94,9 +135,9 @@ export function HubCard({
             className="text-[11px] font-medium tracking-wide uppercase px-2.5 py-1"
             style={{
               borderRadius: '999px',
-              color: '#9bd5e0',
-              background: 'rgba(120,200,230,0.08)',
-              border: '1px solid rgba(120,200,230,0.18)',
+              color: 'var(--bd-info-fg)',
+              background: 'var(--bd-info-bg)',
+              border: '1px solid var(--bd-info-border)',
               letterSpacing: '0.08em',
             }}
           >
@@ -126,7 +167,7 @@ export function HubCard({
         <h2
           className="text-xl md:text-2xl font-semibold leading-tight"
           style={{
-            color: '#eaf6fb',
+            color: 'var(--fg)',
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
             letterSpacing: '-0.01em',
           }}
@@ -135,7 +176,7 @@ export function HubCard({
         </h2>
         <p
           className="text-sm md:text-[15px] leading-relaxed"
-          style={{ color: 'rgba(207,232,240,0.72)' }}
+          style={{ color: 'var(--fg-muted)' }}
         >
           {description}
         </p>
@@ -154,9 +195,7 @@ export function HubCard({
               !disabled && 'group-hover:translate-x-0.5',
             )}
             style={{
-              color: isPrimary
-                ? 'var(--manta-accent)'
-                : 'rgba(155,213,224,0.85)',
+              color: isPrimary ? 'var(--manta-accent)' : 'var(--fg-muted)',
             }}
           >
             {cta}
