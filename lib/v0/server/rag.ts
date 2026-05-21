@@ -25,6 +25,8 @@ import {
   renderPersonaTemplate,
   type OrgPersona,
 } from './persona';
+import { findMatchingManualQA } from './manual-qa';
+import type { ManualQA } from '../klantendashboard/types';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -1387,6 +1389,14 @@ export async function* runRagQueryStreaming(input: {
    * FALLBACK_MESSAGE te gaan.
    */
   enableGeneralKnowledge?: boolean;
+  /**
+   * Per-org handmatige Q&A items uit v0_org_settings.qa. Wanneer een
+   * inkomende vraag voldoende lijkt op een actief Q&A-item (zie
+   * findMatchingManualQA), antwoorden we direct met dat item — zonder
+   * embed/retrieve/LLM. Maakt de "voortaan direct uit je kennisbank"
+   * belofte uit het klantendashboard waar.
+   */
+  manualQAItems?: ManualQA[];
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
   const tone: Tone = input.tone ?? DEFAULT_TONE;
@@ -1463,6 +1473,53 @@ export async function* runRagQueryStreaming(input: {
     renderPersonaTemplate(bot.systemPrompt, persona),
     { tone, length },
   );
+
+  // 0. Manual Q&A fast-path — vóór preprocess/cache/embed.
+  //
+  // De klant heeft expliciet ingevoerd "vraag X = antwoord Y" via het
+  // klantendashboard Q&A-tab. Als de huidige vraag dichtbij X ligt is dat
+  // sterker signaal dan onze smalltalk-classifier (die "Wat is ChatManta?"
+  // soms als smalltalk markeert) of een gecachte respons (mogelijk ouder dan
+  // de meest recente Q&A-edit). Daarom checken we DIT als allereerste pad —
+  // bespaart bovendien preprocess/embed/retrieve/LLM-cost bij een hit.
+  if (input.manualQAItems && input.manualQAItems.length > 0) {
+    const qaMatch = findMatchingManualQA(original, input.manualQAItems);
+    if (qaMatch) {
+      const qaResponse: ChatResponse = {
+        botVersion: bot.version,
+        tone,
+        length,
+        generalKnowledgeActual: null,
+        kind: 'answer',
+        answer: qaMatch.qa.answer,
+        rewrite: null,
+        sources: [
+          {
+            filename: qaMatch.qa.category
+              ? `Handmatige Q&A · ${qaMatch.qa.category}`
+              : 'Handmatige Q&A',
+            similarity: qaMatch.score,
+            contentExcerpt: qaMatch.qa.question,
+          },
+        ],
+        threshold,
+        embedTokens: 0,
+        chatInputTokens: 0,
+        chatOutputTokens: 0,
+        totalCostUsd: 0,
+        extras: {
+          phaseTimingsMs: {
+            embedding_ms: 0,
+            retrieval_ms: 0,
+            generation_ms: 0,
+            total_ms: Math.round(performance.now() - tPipelineStart),
+          },
+        },
+      };
+      yield { kind: 'answer-done', response: qaResponse };
+      return;
+    }
+  }
 
   // V0.4 latency: bewaar de pre-cache embed-vector op outer scope zodat we
   // hem kunnen hergebruiken bij de fire-and-forget cache-write na het

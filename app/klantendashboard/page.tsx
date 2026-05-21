@@ -13,12 +13,14 @@ import {
   MessagesSquare,
   Sparkles,
 } from 'lucide-react';
-import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
+import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import {
+  countMessagesAllTime,
   getOverviewMetrics,
   getSetupChecklist,
   getUnansweredQuestions,
 } from '@/lib/v0/klantendashboard/server/metrics';
+import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { PageHeader } from './components/page-header';
 import { MetricCard } from './components/metric-card';
 import { StatusBadge } from './components/status-badge';
@@ -29,11 +31,17 @@ export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
   const activeOrg = await getActiveOrgFromCookies();
+  const orgId = KNOWN_ORGS[activeOrg.slug].id;
   const metrics = await getOverviewMetrics(activeOrg.slug);
-  const [checklist, unanswered] = await Promise.all([
-    getSetupChecklist(activeOrg.slug, metrics),
+  const [unanswered, settings, testMessages] = await Promise.all([
     getUnansweredQuestions(activeOrg.slug, 5),
+    getOrgSettings(activeOrg.slug),
+    countMessagesAllTime(orgId),
   ]);
+  const checklist = await getSetupChecklist(activeOrg.slug, metrics, {
+    settingsSaved: settings.updatedAt !== null,
+    testMessagesCount: testMessages,
+  });
 
   const hasAnySource =
     metrics.sources.websitePages + metrics.sources.documents + metrics.sources.qaItems > 0;
