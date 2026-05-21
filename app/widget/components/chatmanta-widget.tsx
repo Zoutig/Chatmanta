@@ -69,8 +69,8 @@ export function ChatMantaWidget({
   logoStyle = 'brand-mark',
   customLogoDataUrl,
 }: ChatMantaWidgetProps) {
-  // Side-aware positioning voor FAB, panel en tooltip.
-  const sideStyle = position === 'bottom-left' ? { left: 24 } : { right: 24 };
+  // Side-aware positioning voor tooltip. FAB/panel-positie wordt verderop
+  // berekend met safe-area-inset + mobile-fullscreen-detectie.
   const tooltipSideStyle = position === 'bottom-left' ? { left: 0 } : { right: 0 };
   const displayTitle = headerTitle?.trim() || companyName;
 
@@ -88,9 +88,22 @@ export function ChatMantaWidget({
   const [pending, setPending] = useState(false);
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipHovered, setTooltipHovered] = useState(false);
+  // <640px = mobiel/smartphone-viewport; paneel rendert fullscreen i.p.v.
+  // 380×560-bubbel. Default false zodat de SSR-render desktop-layout houdt;
+  // mediaQuery wordt na hydration toegepast.
+  const [isMobile, setIsMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 639px)');
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   // Auto-scroll naar onderkant bij nieuwe content.
   useEffect(() => {
@@ -227,17 +240,30 @@ export function ChatMantaWidget({
   // return moet ná alle hooks staan (rules-of-hooks).
   if (!isActive) return null;
 
+  // Side-aware positie met iOS safe-area-inset zodat de FAB op iPhones niet
+  // onder de home-indicator klemt. `calc()` is veilig binnen inline-style.
+  const fabSideStyle =
+    position === 'bottom-left'
+      ? { left: 'calc(24px + env(safe-area-inset-left))' }
+      : { right: 'calc(24px + env(safe-area-inset-right))' };
+
+  // Op mobiel + open verbergen we de FAB; het fullscreen-paneel heeft een
+  // eigen close-knop. Tooltip altijd via opacity (nooit unmount) i.v.m.
+  // useEffect-cleanup.
+  const fabHidden = open && isMobile;
+
   return (
     <>
       {/* FAB-container (links of rechts onder) — bevat pulse-ring, button en tooltip */}
       <div
         style={{
           position: 'fixed',
-          ...sideStyle,
-          bottom: 24,
+          ...fabSideStyle,
+          bottom: 'calc(24px + env(safe-area-inset-bottom))',
           width: 56,
           height: 56,
           zIndex: 9999,
+          display: fabHidden ? 'none' : 'block',
         }}
         onMouseEnter={() => setTooltipHovered(true)}
         onMouseLeave={() => setTooltipHovered(false)}
@@ -355,24 +381,49 @@ export function ChatMantaWidget({
         <div
           role="dialog"
           aria-label={`${displayTitle} chat`}
-          style={{
-            position: 'fixed',
-            ...sideStyle,
-            bottom: 96,
-            width: 380,
-            height: 560,
-            maxHeight: 'calc(100vh - 120px)',
-            background: '#ffffff',
-            color: '#0e1014',
-            borderRadius: 16,
-            boxShadow:
-              '0 28px 72px -16px rgba(0,0,0,0.28), 0 10px 24px -8px rgba(0,0,0,0.16)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            zIndex: 9998,
-            fontFamily: 'var(--font-inter), system-ui, sans-serif',
-          }}
+          style={
+            isMobile
+              ? {
+                  position: 'fixed',
+                  inset: 0,
+                  width: '100vw',
+                  height: '100dvh',
+                  background: '#ffffff',
+                  color: '#0e1014',
+                  borderRadius: 0,
+                  boxShadow: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  zIndex: 9998,
+                  fontFamily: 'var(--font-inter), system-ui, sans-serif',
+                  paddingTop: 'env(safe-area-inset-top)',
+                  paddingBottom: 'env(safe-area-inset-bottom)',
+                  paddingLeft: 'env(safe-area-inset-left)',
+                  paddingRight: 'env(safe-area-inset-right)',
+                }
+              : {
+                  position: 'fixed',
+                  ...(position === 'bottom-left'
+                    ? { left: 'calc(24px + env(safe-area-inset-left))' }
+                    : { right: 'calc(24px + env(safe-area-inset-right))' }),
+                  bottom: 'calc(96px + env(safe-area-inset-bottom))',
+                  width: 'min(380px, calc(100vw - 32px))',
+                  height: 560,
+                  maxHeight:
+                    'calc(100dvh - 120px - env(safe-area-inset-bottom) - env(safe-area-inset-top))',
+                  background: '#ffffff',
+                  color: '#0e1014',
+                  borderRadius: 16,
+                  boxShadow:
+                    '0 28px 72px -16px rgba(0,0,0,0.28), 0 10px 24px -8px rgba(0,0,0,0.16)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  zIndex: 9998,
+                  fontFamily: 'var(--font-inter), system-ui, sans-serif',
+                }
+          }
         >
           {/* Header */}
           <div

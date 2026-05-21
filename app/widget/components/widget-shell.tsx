@@ -62,7 +62,9 @@ export function WidgetShell({
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
-      {/* Demo-bar */}
+      {/* Demo-bar. Op smal scherm: max-width binnen viewport + wrap zodat hij
+          niet over de zijkant valt. borderRadius wordt rechthoekiger als hij
+          wrapt zodat de pills-look niet vreemd uitvalt. */}
       <div
         style={{
           position: 'fixed',
@@ -75,12 +77,16 @@ export function WidgetShell({
           WebkitBackdropFilter: 'blur(12px) saturate(140%)',
           color: '#eaf6fb',
           padding: '8px 14px',
-          borderRadius: 999,
+          borderRadius: 18,
           fontSize: 12,
           fontFamily: 'var(--font-inter), system-ui, sans-serif',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 12,
+          flexWrap: 'wrap',
+          rowGap: 6,
+          maxWidth: 'calc(100vw - 16px)',
           boxShadow: '0 12px 32px -10px rgba(0,0,0,0.4)',
           border: '1px solid rgba(120,200,230,0.18)',
         }}

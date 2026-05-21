@@ -40,10 +40,10 @@ export function FakeSite({
         flexDirection: 'column',
       }}
     >
-      {/* Topbar — bedrijfsnaam + nav */}
+      {/* Topbar — bedrijfsnaam + nav. Clamp-padding krimpt netjes op smal scherm. */}
       <header
         style={{
-          padding: '20px 48px',
+          padding: 'clamp(12px, 4vw, 20px) clamp(16px, 6vw, 48px)',
           borderBottom: `1px solid ${borderColor}`,
           display: 'flex',
           alignItems: 'center',
@@ -113,7 +113,7 @@ export function FakeSite({
       {/* Footer */}
       <footer
         style={{
-          padding: '32px 48px 40px',
+          padding: 'clamp(24px, 5vw, 32px) clamp(16px, 6vw, 48px) clamp(32px, 6vw, 40px)',
           borderTop: `1px solid ${borderColor}`,
           fontSize: 12,
           color: mutedText,
