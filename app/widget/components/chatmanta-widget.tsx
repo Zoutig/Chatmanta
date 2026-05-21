@@ -18,10 +18,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
+import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 
 type Message =
   | { role: 'user'; content: string; id: string }
-  | { role: 'assistant'; content: string; id: string; streaming?: boolean; error?: string };
+  | {
+      role: 'assistant';
+      content: string;
+      id: string;
+      streaming?: boolean;
+      error?: string;
+      // V0.7+ feedback: queryLogId komt binnen via het 'meta'-event vóór de
+      // eerste delta; feedbackState start op 'idle' en wordt door FeedbackButtons-
+      // callbacks gepromoot tot comment-open/submitting/sent-*/error.
+      queryLogId?: string;
+      feedbackState?: FeedbackState;
+      feedbackComment?: string;
+    };
 
 export type ChatMantaWidgetProps = {
   orgSlug: string;
@@ -151,6 +164,70 @@ export function ChatMantaWidget({
       clearTimeout(hideTimer);
     };
   }, [open]);
+
+  // Submit-handler voor de duim-knoppen onder een bot-bubble. Werkt voor
+  // beide ratings; bij 'up' is de comment altijd null (geen disclosure-flow),
+  // bij 'down' kan de bezoeker een toelichting hebben getypt of "Sla over"
+  // hebben geklikt. Idempotent server-side (UNIQUE-conflict → 200).
+  const submitFeedback = useCallback(
+    async (messageId: string, rating: 'up' | 'down') => {
+      // Lees de huidige state ten tijde van submit; useState-functioneel
+      // update voorkomt stale closures wanneer de bezoeker snel achter elkaar
+      // klikt.
+      let queryLogId: string | undefined;
+      let comment = '';
+      flushSync(() => {
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === messageId);
+          if (idx < 0) return prev;
+          const cur = prev[idx];
+          if (cur.role !== 'assistant' || !cur.queryLogId) return prev;
+          queryLogId = cur.queryLogId;
+          comment = cur.feedbackComment ?? '';
+          const next = prev.slice();
+          next[idx] = { ...cur, feedbackState: 'submitting' };
+          return next;
+        });
+      });
+      if (!queryLogId) return;
+
+      try {
+        const res = await fetch('/api/v0/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            queryLogId,
+            rating,
+            comment: rating === 'down' && comment.trim().length > 0 ? comment.trim() : null,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === messageId);
+          if (idx < 0) return prev;
+          const cur = prev[idx];
+          if (cur.role !== 'assistant') return prev;
+          const next = prev.slice();
+          next[idx] = {
+            ...cur,
+            feedbackState: rating === 'up' ? 'sent-up' : 'sent-down',
+          };
+          return next;
+        });
+      } catch {
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === messageId);
+          if (idx < 0) return prev;
+          const cur = prev[idx];
+          if (cur.role !== 'assistant') return prev;
+          const next = prev.slice();
+          next[idx] = { ...cur, feedbackState: 'error' };
+          return next;
+        });
+      }
+    },
+    [],
+  );
 
   const send = useCallback(
     async (question: string) => {
@@ -510,10 +587,35 @@ export function ChatMantaWidget({
                   {m.content}
                 </UserBubble>
               ) : (
-                <BotBubble key={m.id} color={c.header}>
-                  {m.streaming && !m.content ? <TypingDots /> : renderMarkdownLite(m.content)}
-                  {m.streaming && m.content ? <Caret /> : null}
-                </BotBubble>
+                <div
+                  key={m.id}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+                >
+                  <BotBubble color={c.header}>
+                    {m.streaming && !m.content ? <TypingDots /> : renderMarkdownLite(m.content)}
+                    {m.streaming && m.content ? <Caret /> : null}
+                  </BotBubble>
+                  {/* Feedback-knoppen: alleen op afgeronde, niet-fouten messages
+                      met een queryLogId (= meta-event al binnen). Welkomstbubble
+                      zit niet in `messages`-array en wordt dus automatisch
+                      overgeslagen. */}
+                  {!m.streaming && !m.error && m.queryLogId && (
+                    <FeedbackButtons
+                      queryLogId={m.queryLogId}
+                      state={m.feedbackState ?? 'idle'}
+                      comment={m.feedbackComment ?? ''}
+                      accentColor={c.header}
+                      onCommentChange={(next) =>
+                        updateAssistant(setMessages, m.id, { feedbackComment: next })
+                      }
+                      onSubmit={(rating) => void submitFeedback(m.id, rating)}
+                      onOpenComment={() =>
+                        updateAssistant(setMessages, m.id, { feedbackState: 'comment-open' })
+                      }
+                      onSkipComment={() => void submitFeedback(m.id, 'down')}
+                    />
+                  )}
+                </div>
               ),
             )}
 
@@ -646,6 +748,21 @@ function handleEvent(
 ) {
   if (!event || typeof event !== 'object') return;
   const e = event as { kind?: string };
+
+  // Meta-event = eerste in de stream. Hangt de query_log-id aan de actieve
+  // assistant-message; feedback-knoppen worden zo gekoppeld vóór de gebruiker
+  // ze kan klikken.
+  if (e.kind === 'meta') {
+    const queryLogId = (e as { queryLogId?: string }).queryLogId;
+    if (queryLogId) {
+      updateAssistant(setMessages, assistantId, {
+        queryLogId,
+        feedbackState: 'idle',
+        feedbackComment: '',
+      });
+    }
+    return;
+  }
 
   if (e.kind === 'smalltalk' || e.kind === 'fallback') {
     const resp = (e as { response?: ChatResponse }).response;
