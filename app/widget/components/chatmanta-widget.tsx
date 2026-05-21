@@ -50,6 +50,19 @@ export type ChatMantaWidgetProps = {
   logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
   /** Base64 data-URL voor 'custom-logo'. */
   customLogoDataUrl?: string | null;
+  /**
+   * Naam waarmee de bot zich identificeert in de UI (klantendashboard
+   * `chatbot-instellingen → chatbotName`). Wordt boven het welkomstbericht
+   * gerenderd. Leeg/undefined → val terug op `companyName`.
+   */
+  chatbotName?: string;
+  /**
+   * Eerste bot-bubble bij een lege chat. Wanneer ingevuld vervangt het de
+   * hardcoded "Hoi! Ik ben de digitale assistent van X. Stel je vraag…"-
+   * tekst. Bij leeg/undefined valt de UI terug op die default-copy zodat
+   * de demo zonder klantendashboard-data nog steeds prettig leest.
+   */
+  welcomeMessage?: string;
 };
 
 export function ChatMantaWidget({
@@ -68,6 +81,8 @@ export function ChatMantaWidget({
   headerColor,
   logoStyle = 'brand-mark',
   customLogoDataUrl,
+  chatbotName,
+  welcomeMessage,
 }: ChatMantaWidgetProps) {
   // Side-aware positioning voor tooltip. FAB/panel-positie wordt verderop
   // berekend met safe-area-inset + mobile-fullscreen-detectie.
@@ -472,11 +487,20 @@ export function ChatMantaWidget({
               background: '#f7f8fa',
             }}
           >
-            {/* Welkomstbericht */}
+            {/* Welkomstbericht — klantendashboard-override (welcomeMessage) wint
+                van de hardcoded default. Bot-naam (chatbotName) wordt boven het
+                bericht getoond zodat de bezoeker direct ziet met wie hij praat;
+                bij leeg fallback op companyName van de skin. */}
             {messages.length === 0 && (
-              <BotBubble color={c.header}>
-                Hoi! Ik ben de digitale assistent van <strong>{companyName}</strong>.
-                Stel je vraag — ik zoek het op in onze content.
+              <BotBubble color={c.header} authorName={chatbotName?.trim() || companyName}>
+                {welcomeMessage?.trim() ? (
+                  welcomeMessage
+                ) : (
+                  <>
+                    Hoi! Ik ben de digitale assistent van <strong>{companyName}</strong>.
+                    Stel je vraag — ik zoek het op in onze content.
+                  </>
+                )}
               </BotBubble>
             )}
 
@@ -733,7 +757,20 @@ function UserBubble({ children, color }: { children: React.ReactNode; color: str
   );
 }
 
-function BotBubble({ children, color }: { children: React.ReactNode; color: string }) {
+function BotBubble({
+  children,
+  color,
+  authorName,
+}: {
+  children: React.ReactNode;
+  color: string;
+  /**
+   * Optioneel: bot-identiteit boven de bubble (klantendashboard chatbotName).
+   * Bij undefined → geen header — gebruikt door de streaming/normale antwoord-
+   * bubbles waar we het minimal willen houden. Welkomstbubble vult dit altijd.
+   */
+  authorName?: string;
+}) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
       <div
@@ -750,6 +787,19 @@ function BotBubble({ children, color }: { children: React.ReactNode; color: stri
           whiteSpace: 'pre-wrap',
         }}
       >
+        {authorName && (
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#6b7280',
+              marginBottom: 4,
+              letterSpacing: '0.01em',
+            }}
+          >
+            {authorName}
+          </div>
+        )}
         {children}
       </div>
     </div>

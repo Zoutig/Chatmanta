@@ -27,6 +27,7 @@ import {
 } from './persona';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
+import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -1397,10 +1398,31 @@ export async function* runRagQueryStreaming(input: {
    * belofte uit het klantendashboard waar.
    */
   manualQAItems?: ManualQA[];
+  /**
+   * Klantendashboard ChatbotSettings → RAG-overrides. Levert tone+length
+   * defaults (wanneer caller geen expliciete waarde stuurt), extra system-
+   * prompt-instructies (companyDescription, source-strictness, may-mention
+   * toggles, etc.) en een custom fallbackMessage. Body-tone/length van een
+   * admin-call winnen altijd; dit is alléén de saved-default-laag.
+   * Zie lib/v0/klantendashboard/server/build-chatbot-overrides.ts.
+   */
+  chatbotOverrides?: ChatbotPromptOverrides;
 }): AsyncGenerator<StreamEvent, void, void> {
   const { threshold, enableRewrite, bot } = input;
-  const tone: Tone = input.tone ?? DEFAULT_TONE;
-  const length: Length = input.length ?? DEFAULT_LENGTH;
+  // Tone/length-resolutie: explicite request-body wint, daarna de klant-
+  // dashboard default, daarna de pipeline-default. Dit pad maakt
+  // /klantendashboard/instellingen → /widget chat live wired zonder dat
+  // de admin-panel (die wel expliciet tone/length stuurt) gebroken raakt.
+  const tone: Tone = input.tone ?? input.chatbotOverrides?.tone ?? DEFAULT_TONE;
+  const length: Length =
+    input.length ?? input.chatbotOverrides?.length ?? DEFAULT_LENGTH;
+  // Fallback-tekst: klant-override > vaste default. Wordt gebruikt op alle
+  // 'kind: fallback' paden in deze functie. Lege string van de override
+  // telt als "klant heeft niets ingevuld" → terug naar default.
+  const fallbackMessage =
+    input.chatbotOverrides?.fallbackMessage && input.chatbotOverrides.fallbackMessage.length > 0
+      ? input.chatbotOverrides.fallbackMessage
+      : FALLBACK_MESSAGE;
   const orgId = input.organizationId ?? DEV_ORG_ID;
   // V0.6 persona-laag: resolveer hier één keer en gebruik door de hele
   // pipeline (preProcess, main answer, general-knowledge prompt, off-topic
@@ -1467,10 +1489,15 @@ export async function* runRagQueryStreaming(input: {
   // Bouw de samengestelde system prompt één keer; gebruikt door main answer-call
   // en (v0.3) cascade-call. Pre-processor en helper-LLM-calls (rerank, hyde,
   // decompose, follow-ups) gebruiken hun eigen task-specifieke prompts.
-  // Persona-template wordt eerst gerendered, daarna passes buildSystemPrompt
-  // de STIJL-suffix aan.
+  // Volgorde: persona-template → klant-overrides (klantendashboard-instellingen
+  // zoals source-strictness, mayMentionPrices, extraInstructions, …) →
+  // STIJL-suffix (tone + length). Klant-overrides staan ná de persona zodat
+  // ze persona-velden (bedrijfsnaam, audience) kunnen aanvullen, en vóór de
+  // STIJL-suffix omdat die het laatste woord moet hebben over de toon.
+  const baseSystemPrompt = renderPersonaTemplate(bot.systemPrompt, persona);
+  const extras = input.chatbotOverrides?.extraSystemInstructions ?? '';
   const styledSystemPrompt = buildSystemPrompt(
-    renderPersonaTemplate(bot.systemPrompt, persona),
+    extras.length > 0 ? `${baseSystemPrompt}\n\n${extras}` : baseSystemPrompt,
     { tone, length },
   );
 
@@ -1987,7 +2014,8 @@ KRITISCHE FORMAT-REGELS:
         return;
       }
 
-      // rc.category === 'fallback' → val door naar de gewone FALLBACK_MESSAGE.
+      // rc.category === 'fallback' → val door naar de fallback-tekst (klant-
+      // override of default).
       yield {
         kind: 'fallback',
         response: {
@@ -1997,7 +2025,7 @@ KRITISCHE FORMAT-REGELS:
           generalKnowledgeActual: true,
           ...(bot.knowledgeGapLogging ? { gapKind: 'zero_hits' as const } : {}),
           kind: 'fallback',
-          answer: FALLBACK_MESSAGE,
+          answer: fallbackMessage,
           reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}); re-classify=fallback.`,
           topSimilarity: topSim,
           rewrite: rewriteInfo,
@@ -2018,7 +2046,8 @@ KRITISCHE FORMAT-REGELS:
       return;
     }
 
-    // Legacy pad (v0.1-v0.4): vaste fallback zoals voorheen.
+    // Legacy pad (v0.1-v0.4): vaste fallback zoals voorheen — maar wel met
+    // klant-override van fallbackMessage als die er is.
     yield {
       kind: 'fallback',
       response: {
@@ -2028,7 +2057,7 @@ KRITISCHE FORMAT-REGELS:
         generalKnowledgeActual: false,
         ...(bot.knowledgeGapLogging ? { gapKind: 'zero_hits' as const } : {}),
         kind: 'fallback',
-        answer: FALLBACK_MESSAGE,
+        answer: fallbackMessage,
         reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
         topSimilarity: topSim,
         rewrite: rewriteInfo,

@@ -33,7 +33,11 @@ export async function saveWidgetSettingsAction(
     const activeOrg = await getActiveOrgFromCookies();
     const widget = await saveWidgetSettings(activeOrg.slug, patch);
     revalidatePath('/klantendashboard', 'layout');
-    revalidatePath('/widget');
+    // 'layout'-kind invalideert /widget én alle nested [slug]/[page] segmenten.
+    // Zonder die kind blijven de generateStaticParams-prerendered demo-pages
+    // hangen op de oude kleuren/titel — saved widget-config werd dan pas
+    // zichtbaar na een rebuild of cache-TTL.
+    revalidatePath('/widget', 'layout');
     return { widget };
   });
 }
@@ -48,10 +52,12 @@ export async function saveChatbotSettingsAction(
     const activeOrg = await getActiveOrgFromCookies();
     const chatbot = await saveChatbotSettings(activeOrg.slug, patch);
     revalidatePath('/klantendashboard', 'layout');
-    // chatbot-settings beïnvloeden ook de test-chat (welkomstbericht, starter-
-    // questions) en mogelijk later de widget-prompt. Revalidate /widget zodat
-    // het demo-platform consistent blijft.
-    revalidatePath('/widget');
+    // chatbot-settings beïnvloeden het hele /widget demo-platform: starter-
+    // questions, welcomeMessage, chatbotName en (via build-chatbot-overrides
+    // → runRagQueryStreaming) tone, length, system-prompt overrides. 'layout'-
+    // kind invalideert nested [slug]/[page] segmenten zodat saved settings
+    // direct zichtbaar zijn.
+    revalidatePath('/widget', 'layout');
     return { chatbot };
   });
 }

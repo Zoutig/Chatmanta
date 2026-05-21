@@ -39,6 +39,10 @@ export type WidgetShellProps = {
     headerColor?: string;
     logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
     customLogoDataUrl?: string | null;
+    /** Naam waarmee de bot zich voorstelt (chatbot-instellingen → chatbotName). */
+    chatbotName?: string;
+    /** Eerste bot-bubble in de chat (chatbot-instellingen → welcomeMessage). */
+    welcomeMessage?: string;
   };
 };
 
@@ -169,6 +173,8 @@ export function WidgetShell({
         headerColor={widgetOverrides?.headerColor}
         logoStyle={widgetOverrides?.logoStyle}
         customLogoDataUrl={widgetOverrides?.customLogoDataUrl}
+        chatbotName={widgetOverrides?.chatbotName}
+        welcomeMessage={widgetOverrides?.welcomeMessage}
       />
     </div>
   );
