@@ -15,7 +15,7 @@ export default function HomePage() {
   return (
     <main
       className="relative min-h-screen w-full overflow-hidden flex flex-col"
-      style={{ background: '#02060c', color: '#eaf6fb' }}
+      style={{ background: 'var(--bg)', color: 'var(--fg)' }}
     >
       <HubBackground />
       <HomeAccentPicker />
@@ -49,7 +49,7 @@ export default function HomePage() {
               fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
               fontWeight: 700,
               letterSpacing: '-0.01em',
-              color: '#eaf6fb',
+              color: 'var(--fg)',
             }}
           >
             Chat<span style={{ color: 'var(--manta-accent)' }}>Manta</span>
@@ -69,7 +69,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] px-3 py-1 mb-5"
               style={{
                 borderRadius: '999px',
-                color: 'color-mix(in oklab, var(--manta-accent) 35%, #ffffff)',
+                color: 'color-mix(in oklab, var(--manta-accent) 60%, var(--fg))',
                 background:
                   'color-mix(in oklab, var(--manta-accent) 10%, transparent)',
                 border:
@@ -91,7 +91,7 @@ export default function HomePage() {
               style={{
                 fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
                 background:
-                  'linear-gradient(180deg, #f3fbff 0%, #b8dfe9 100%)',
+                  'linear-gradient(180deg, var(--fg) 0%, color-mix(in oklab, var(--fg) 65%, var(--manta-accent)) 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
@@ -102,7 +102,7 @@ export default function HomePage() {
             </h1>
             <p
               className="text-base md:text-lg max-w-xl mx-auto"
-              style={{ color: 'rgba(207,232,240,0.72)' }}
+              style={{ color: 'var(--fg-muted)' }}
             >
               Kies waar je naartoe wilt binnen je ChatManta omgeving.
             </p>
@@ -152,7 +152,7 @@ export default function HomePage() {
           {/* Footer hint */}
           <p
             className="mt-10 md:mt-14 text-center text-xs"
-            style={{ color: 'rgba(155,213,224,0.45)' }}
+            style={{ color: 'var(--fg-dim)' }}
           >
             ChatManta · Jorion Solutions
           </p>

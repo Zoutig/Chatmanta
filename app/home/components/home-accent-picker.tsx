@@ -12,10 +12,11 @@ export function HomeAccentPicker() {
     <Popover.Root>
       <Popover.Trigger
         aria-label="Accent-kleur kiezen"
-        className="fixed bottom-5 left-20 z-20 inline-flex items-center justify-center rounded-xl p-2.5 backdrop-blur-md border border-white/10 hover:border-white/25 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent transition-colors"
+        className="fixed bottom-5 left-20 z-20 inline-flex items-center justify-center rounded-xl p-2.5 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent transition-colors hover:[border-color:var(--border-bright)]"
         style={{
-          background: 'rgba(2,6,12,0.55)',
+          background: 'color-mix(in oklab, var(--bg-elev) 78%, transparent)',
           color: 'var(--manta-accent)',
+          border: '1px solid var(--border-strong)',
         }}
       >
         <Settings className="h-5 w-5" />
@@ -23,20 +24,27 @@ export function HomeAccentPicker() {
       <Portal>
         <Popover.Positioner>
           <Popover.Content
-            className="z-50 rounded-xl border border-white/10 backdrop-blur-md p-3 shadow-xl"
+            className="z-50 rounded-xl backdrop-blur-md p-3 shadow-xl"
             style={{
-              background: 'rgba(2,6,12,0.9)',
-              color: '#eaf6fb',
+              background: 'color-mix(in oklab, var(--bg-elev) 95%, transparent)',
+              color: 'var(--fg)',
+              border: '1px solid var(--border-strong)',
               minWidth: 200,
             }}
           >
             <Popover.Arrow
               className="[--arrow-size:10px]"
               style={{
-                ['--arrow-background' as string]: 'rgba(2,6,12,0.9)',
+                ['--arrow-background' as string]:
+                  'color-mix(in oklab, var(--bg-elev) 95%, transparent)',
               }}
             >
-              <Popover.ArrowTip className="border-t border-l border-white/10" />
+              <Popover.ArrowTip
+                style={{
+                  borderTop: '1px solid var(--border-strong)',
+                  borderLeft: '1px solid var(--border-strong)',
+                }}
+              />
             </Popover.Arrow>
             <Popover.Title className="mb-2 text-xs font-medium uppercase tracking-[0.12em] opacity-70">
               Accent-kleur
