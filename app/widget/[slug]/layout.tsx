@@ -84,6 +84,9 @@ export default async function OrgLayout({ params, children }: LayoutProps) {
         // welcomeMessage wanneer ingevuld; bij leeg vallen we terug op de copy.
         chatbotName: orgSettings.chatbot.chatbotName,
         welcomeMessage: orgSettings.chatbot.welcomeMessage,
+        // Tooltip-tekst boven de chat-knop. Mag `*woord*`-accenten bevatten
+        // → klant ziet die als bold + accent-kleur in de widget-tooltip.
+        launcherText: orgSettings.widget.launcherText,
       }}
     >
       <FakeSite skin={skin}>{children}</FakeSite>

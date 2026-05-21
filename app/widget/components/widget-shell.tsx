@@ -43,6 +43,8 @@ export type WidgetShellProps = {
     chatbotName?: string;
     /** Eerste bot-bubble in de chat (chatbot-instellingen → welcomeMessage). */
     welcomeMessage?: string;
+    /** Tooltip-tekst boven de chat-knop (widget-instellingen → launcherText). */
+    launcherText?: string;
   };
 };
 
@@ -175,6 +177,7 @@ export function WidgetShell({
         customLogoDataUrl={widgetOverrides?.customLogoDataUrl}
         chatbotName={widgetOverrides?.chatbotName}
         welcomeMessage={widgetOverrides?.welcomeMessage}
+        launcherText={widgetOverrides?.launcherText}
       />
     </div>
   );

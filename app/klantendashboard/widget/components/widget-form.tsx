@@ -18,6 +18,7 @@ import { StatusBadge } from '../../components/status-badge';
 import { BubblePreview, MarkPreview } from '../../components/widget-logo';
 import { saveWidgetSettingsAction } from '../../actions';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
+import { formatAccentText } from '@/lib/widget/format-accent';
 
 // Max 200KB voor base64-data-URL — anders wordt de jsonb-row te zwaar.
 const MAX_LOGO_BYTES = 200 * 1024;
@@ -422,13 +423,61 @@ export function WidgetForm({
               onChange={(e) => update('subtitle', e.target.value)}
             />
           </Field>
-          <Field label="Tekst op chatknop">
-            <input
-              className="klant-input"
-              value={w.launcherText}
-              onChange={(e) => update('launcherText', e.target.value)}
-            />
-          </Field>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Field label="Tekst op chatknop">
+              <input
+                className="klant-input"
+                value={w.launcherText}
+                onChange={(e) => update('launcherText', e.target.value)}
+                placeholder="Hoi! *Heb je een vraag?*"
+              />
+              <p
+                style={{
+                  margin: '6px 2px 0',
+                  fontSize: 11.5,
+                  color: 'var(--klant-fg-muted)',
+                  lineHeight: 1.5,
+                }}
+              >
+                Verschijnt als tooltip boven de chat-knop op je website. Zet woorden tussen{' '}
+                <code
+                  style={{
+                    fontFamily: 'var(--font-mono), monospace',
+                    background: 'var(--klant-surface)',
+                    border: '1px solid var(--klant-border)',
+                    borderRadius: 4,
+                    padding: '1px 5px',
+                    fontSize: 11,
+                    color: 'var(--klant-accent)',
+                  }}
+                >
+                  *sterretjes*
+                </code>{' '}
+                om ze te accentueren in je hoofdkleur.
+              </p>
+              {w.launcherText.trim() && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--klant-fg-dim)' }}>
+                    Voorbeeld:
+                  </span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      background: '#0e1014',
+                      color: '#ffffff',
+                      padding: '6px 12px',
+                      borderRadius: 10,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {formatAccentText(w.launcherText, resolvedColors.header)}
+                  </span>
+                </div>
+              )}
+            </Field>
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
