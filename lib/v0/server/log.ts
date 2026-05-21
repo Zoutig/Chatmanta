@@ -34,6 +34,11 @@ function sb(): SupabaseClient {
 }
 
 type QueryLogRow = {
+  // V0.7+: optioneel pre-gegenereerde id zodat de streaming-API de id al
+  // vooruit kan delen met de widget (voor feedback-koppeling) vóór de
+  // logQuery-insert plaatsvindt. Zonder override valt insert terug op de
+  // DB-default `gen_random_uuid()`.
+  id?: string;
   organization_id: string;
   bot_version: string;
   kind: 'smalltalk' | 'answer' | 'fallback' | 'blocked';
@@ -173,6 +178,13 @@ export async function logQuery(
   organizationId: string = DEV_ORG_ID,
   hydeMeta?: HydeMeta,
   requestId?: string,
+  /**
+   * Pre-gegenereerde query_log-id. De /api/v0/chat-route gebruikt dit om de
+   * id al via een meta-event aan de widget mee te geven vóór de log-insert
+   * gebeurt — anders heeft de widget geen koppeling om feedback aan op te
+   * hangen. Bij undefined: DB-default gen_random_uuid().
+   */
+  overrideId?: string,
 ): Promise<void> {
   try {
     // v0.4 retrieval-telemetry + claim verification uit extras (alleen
@@ -344,6 +356,10 @@ export async function logQuery(
             gap_kind: gapKind,
             adaptive_decision: adaptiveDecision,
           };
+
+    // Pre-gegenereerde id van de streaming-route → garandeert dat de id die
+    // de widget al kent (via 'meta'-event) en de uiteindelijke row overeenkomen.
+    if (overrideId) row.id = overrideId;
 
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
     // koppelen. Bij fout: log en stop — claim_verifications zonder query_log_id

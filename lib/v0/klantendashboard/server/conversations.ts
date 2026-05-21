@@ -122,10 +122,11 @@ export async function listConversations(
 
     if (filter === 'unanswered') {
       items = items.filter((x) => x.status === 'unanswered');
-    } else if (filter === 'negative_feedback') {
-      // Feedback-feature bestaat nog niet in v0 — toon empty.
-      items = [];
     }
+    // filter === 'negative_feedback' wordt op page-level afgehandeld via
+    // listNegativeFeedback() + NegativeFeedbackTable; die rendert een eigen
+    // shape (feedback-rij, niet thread-rij), dus deze functie hoeft hem niet
+    // te vertalen.
 
     return items;
   } catch {

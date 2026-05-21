@@ -238,6 +238,28 @@ export type ConversationFilter =
   | 'all';
 
 // ---------------------------------------------------------------------------
+// Negatieve feedback (widget thumbs-down)
+// ---------------------------------------------------------------------------
+
+/**
+ * Eén feedback-rij voor de "Gesprekken → Negatieve feedback"-tab. Combineert
+ * v0_feedback met de bijhorende query_log-row (vraag + bot-antwoord). Rating
+ * staat hier expliciet omdat dezelfde tabel ook 'up' bevat — de dashboard-
+ * view filtert op 'down', maar het type bestrijkt beide.
+ */
+export type NegativeFeedbackItem = {
+  id: string;
+  queryLogId: string;
+  threadId: string | null;
+  rating: 'up' | 'down';
+  comment: string | null;
+  createdAt: string;
+  // Context uit query_log
+  question: string;
+  answer: string;
+  kind: 'smalltalk' | 'answer' | 'fallback';
+};
+
 // Top-vragen drempel (per-org configureerbaar)
 // ---------------------------------------------------------------------------
 
