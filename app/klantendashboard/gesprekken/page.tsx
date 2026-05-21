@@ -8,6 +8,10 @@ import Link from 'next/link';
 import { ArrowRight, MessagesSquare } from 'lucide-react';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { listConversations } from '@/lib/v0/klantendashboard/server/conversations';
+import {
+  listNegativeFeedback,
+  countRecentNegativeFeedback,
+} from '@/lib/v0/klantendashboard/server/feedback';
 import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
@@ -15,6 +19,7 @@ import { PageHeader } from '../components/page-header';
 import { StatusBadge } from '../components/status-badge';
 import { TabsNav } from '../components/tabs';
 import { FilterBar } from './components/filter-bar';
+import { NegativeFeedbackTable } from './components/negative-feedback-table';
 import { TopQuestionsTab } from './components/top-questions-tab';
 
 export const dynamic = 'force-dynamic';
@@ -51,11 +56,14 @@ export default async function GesprekkenPage({
     rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
 
   const activeOrg = await getActiveOrgFromCookies();
-  const [items, topQuestions, settings] = await Promise.all([
-    listConversations(activeOrg.slug, filter),
-    getTopQuestions(activeOrg.slug, 20),
-    getOrgSettings(activeOrg.slug),
-  ]);
+  const [items, topQuestions, settings, negativeFeedback, recentNegativeCount] =
+    await Promise.all([
+      listConversations(activeOrg.slug, filter),
+      getTopQuestions(activeOrg.slug, 20),
+      getOrgSettings(activeOrg.slug),
+      listNegativeFeedback(activeOrg.slug),
+      countRecentNegativeFeedback(activeOrg.slug, 7),
+    ]);
   // Initial "✓ In Q&A"-badge: alles wat we al in v0_org_settings.qa hebben staan
   // (case-insensitive match op de vraag-text). Zonder dit zou de badge na page-
   // reload verdwijnen — savedKeys in TopQuestionsTab is alleen client-state.
@@ -87,28 +95,47 @@ export default async function GesprekkenPage({
       )}
       {view === 'gesprekken' && <FilterBar active={filter} />}
 
-      {view === 'gesprekken' && items.length === 0 ? (
+      {view === 'gesprekken' && filter === 'negative_feedback' ? (
+        <NegativeFeedbackTable items={negativeFeedback} />
+      ) : view === 'gesprekken' && items.length === 0 ? (
         <div className="klant-empty">
           <div className="klant-empty-icon">
             <MessagesSquare size={26} strokeWidth={1.6} />
           </div>
           <h3 className="klant-empty-title">
-            {filter === 'unanswered'
-              ? 'Geen onbeantwoorde vragen'
-              : filter === 'negative_feedback'
-                ? 'Nog geen negatieve feedback'
-                : 'Nog geen gesprekken'}
+            {filter === 'unanswered' ? 'Geen onbeantwoorde vragen' : 'Nog geen gesprekken'}
           </h3>
           <p className="klant-empty-sub">
             {filter === 'unanswered'
               ? 'Mooi! Op dit moment heeft je chatbot alle vragen beantwoord.'
-              : filter === 'negative_feedback'
-                ? 'Bezoekers hebben nog geen negatieve feedback gegeven.'
-                : 'Zodra je widget live staat, verschijnen hier de gesprekken van je bezoekers.'}
+              : 'Zodra je widget live staat, verschijnen hier de gesprekken van je bezoekers.'}
           </p>
         </div>
       ) : view === 'gesprekken' ? (
         <>
+          {recentNegativeCount > 0 && filter !== 'negative_feedback' && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '10px 14px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.28)',
+                borderRadius: 'var(--klant-r-md)',
+                fontSize: 13,
+                color: 'var(--klant-fg)',
+              }}
+            >
+              <strong>{recentNegativeCount}</strong>{' '}
+              {recentNegativeCount === 1 ? 'bezoeker gaf' : 'bezoekers gaven'} negatieve
+              feedback in de laatste 7 dagen.{' '}
+              <Link
+                href="/klantendashboard/gesprekken?filter=negative_feedback"
+                style={{ color: 'var(--klant-accent)' }}
+              >
+                Bekijk
+              </Link>
+            </div>
+          )}
           {unansweredCount > 0 && filter !== 'unanswered' && (
             <div
               style={{
