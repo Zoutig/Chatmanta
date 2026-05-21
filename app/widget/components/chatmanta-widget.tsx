@@ -192,15 +192,18 @@ export function ChatMantaWidget({
       if (!queryLogId) return;
 
       try {
-        const res = await fetch('/api/v0/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            queryLogId,
-            rating,
-            comment: rating === 'down' && comment.trim().length > 0 ? comment.trim() : null,
-          }),
-        });
+        const res = await fetch(
+          `/api/v0/feedback?org=${encodeURIComponent(orgSlug)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              queryLogId,
+              rating,
+              comment: rating === 'down' && comment.trim().length > 0 ? comment.trim() : null,
+            }),
+          },
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         setMessages((prev) => {
           const idx = prev.findIndex((m) => m.id === messageId);
