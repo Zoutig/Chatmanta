@@ -16,11 +16,15 @@ import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getMockWidgetSettings } from '../mock/widget-settings';
 import { getMockChatbotSettings } from '../mock/chatbot-settings';
 import { getMockManualQA } from '../mock/manual-qa';
-import type {
-  ChatbotSettings,
-  ManualQA,
-  WidgetSettings,
+import {
+  TOP_QUESTIONS_DEFAULT,
+  TOP_QUESTIONS_LIMITS,
+  type ChatbotSettings,
+  type ManualQA,
+  type TopQuestionsConfig,
+  type WidgetSettings,
 } from '../types';
+import { AppError } from '@/lib/errors/app-error';
 
 // ---------------------------------------------------------------------------
 // Lazy supabase client (zelfde patroon als lib/v0/server/threads.ts)
@@ -44,8 +48,32 @@ export type OrgSettings = {
   widget: WidgetSettings;
   chatbot: ChatbotSettings;
   qa: ManualQA[];
+  topQuestions: TopQuestionsConfig;
   updatedAt: string | null;
 };
+
+// Defensieve parser: bij corrupte/missende jsonb (handmatige DB-edit, oude
+// row van vóór 0030) val terug op defaults zodat de UI niet breekt.
+function parseTopQuestions(raw: unknown): TopQuestionsConfig {
+  if (!raw || typeof raw !== 'object') return TOP_QUESTIONS_DEFAULT;
+  const obj = raw as Record<string, unknown>;
+  const minCount = typeof obj.minCount === 'number' ? obj.minCount : NaN;
+  const topN = typeof obj.topN === 'number' ? obj.topN : NaN;
+  if (
+    !Number.isFinite(minCount) ||
+    !Number.isFinite(topN) ||
+    minCount < TOP_QUESTIONS_LIMITS.minCountMin ||
+    minCount > TOP_QUESTIONS_LIMITS.minCountMax ||
+    topN < TOP_QUESTIONS_LIMITS.topNMin ||
+    topN > TOP_QUESTIONS_LIMITS.topNMax
+  ) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[parseTopQuestions] invalid value in DB, using defaults', raw);
+    }
+    return TOP_QUESTIONS_DEFAULT;
+  }
+  return { minCount, topN };
+}
 
 // ---------------------------------------------------------------------------
 // Read: merge DB-row met mock-defaults
@@ -61,13 +89,13 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
   try {
     const { data, error } = await sb()
       .from('v0_org_settings')
-      .select('widget, chatbot, qa, updated_at')
+      .select('widget, chatbot, qa, top_questions, updated_at')
       .eq('organization_id', orgId)
       .maybeSingle();
     if (error) throw error;
 
     if (!data) {
-      return { ...defaults, updatedAt: null };
+      return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, updatedAt: null };
     }
 
     // Partial-merge: alleen velden die in jsonb staan overschrijven; rest blijft default.
@@ -82,6 +110,7 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
       },
       // qa heeft geen "merge"-semantiek — als de array bestaat, gebruik 'm; anders default.
       qa: Array.isArray(data.qa) && data.qa.length > 0 ? (data.qa as ManualQA[]) : defaults.qa,
+      topQuestions: parseTopQuestions(data.top_questions),
       updatedAt: data.updated_at as string,
     };
   } catch (err) {
@@ -89,7 +118,7 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[getOrgSettings] DB read failed, using mock defaults', err);
     }
-    return { ...defaults, updatedAt: null };
+    return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, updatedAt: null };
   }
 }
 
@@ -101,12 +130,17 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
 // ---------------------------------------------------------------------------
 async function writeOrgSettings(
   orgId: string,
-  patch: { widget?: WidgetSettings; chatbot?: ChatbotSettings; qa?: ManualQA[] },
+  patch: {
+    widget?: WidgetSettings;
+    chatbot?: ChatbotSettings;
+    qa?: ManualQA[];
+    topQuestions?: TopQuestionsConfig;
+  },
 ): Promise<void> {
   // Lees huidige row om de andere velden te bewaren bij partial-write.
   const { data: current, error: readErr } = await sb()
     .from('v0_org_settings')
-    .select('widget, chatbot, qa')
+    .select('widget, chatbot, qa, top_questions')
     .eq('organization_id', orgId)
     .maybeSingle();
   if (readErr) throw new Error(`writeOrgSettings read: ${readErr.message}`);
@@ -116,6 +150,8 @@ async function writeOrgSettings(
     widget: patch.widget ?? (current?.widget ?? {}),
     chatbot: patch.chatbot ?? (current?.chatbot ?? {}),
     qa: patch.qa ?? (current?.qa ?? []),
+    top_questions:
+      patch.topQuestions ?? (current?.top_questions ?? TOP_QUESTIONS_DEFAULT),
     // updated_at wordt door de DB-trigger geüpdatet
   };
 
@@ -193,5 +229,32 @@ export async function setQAActive(
     x.id === qaId ? { ...x, active, updatedAt: new Date().toISOString() } : x,
   );
   await writeOrgSettings(orgId, { qa: next });
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Save: top-questions config (drempel + lijst-grootte)
+// ---------------------------------------------------------------------------
+export async function saveTopQuestionsConfig(
+  orgSlug: OrgSlug,
+  config: TopQuestionsConfig,
+): Promise<TopQuestionsConfig> {
+  const minCount = Math.floor(config.minCount);
+  const topN = Math.floor(config.topN);
+  if (
+    !Number.isFinite(minCount) ||
+    !Number.isFinite(topN) ||
+    minCount < TOP_QUESTIONS_LIMITS.minCountMin ||
+    minCount > TOP_QUESTIONS_LIMITS.minCountMax ||
+    topN < TOP_QUESTIONS_LIMITS.topNMin ||
+    topN > TOP_QUESTIONS_LIMITS.topNMax
+  ) {
+    throw new AppError('INPUT_INVALID', {
+      message: `top-vragen config buiten range: minCount ∈ [${TOP_QUESTIONS_LIMITS.minCountMin}, ${TOP_QUESTIONS_LIMITS.minCountMax}], topN ∈ [${TOP_QUESTIONS_LIMITS.topNMin}, ${TOP_QUESTIONS_LIMITS.topNMax}]`,
+    });
+  }
+  const next: TopQuestionsConfig = { minCount, topN };
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  await writeOrgSettings(orgId, { topQuestions: next });
   return next;
 }
