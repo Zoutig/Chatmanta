@@ -20,6 +20,7 @@ import { StatusBadge } from '../components/status-badge';
 import { TabsNav } from '../components/tabs';
 import { FilterBar } from './components/filter-bar';
 import { NegativeFeedbackTable } from './components/negative-feedback-table';
+import { ReloadButton } from './components/reload-button';
 import { TopQuestionsTab } from './components/top-questions-tab';
 
 export const dynamic = 'force-dynamic';
@@ -56,11 +57,14 @@ export default async function GesprekkenPage({
     rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
 
   const activeOrg = await getActiveOrgFromCookies();
-  const [items, topQuestions, settings, negativeFeedback, recentNegativeCount] =
+  // Settings eerst — topQuestions config bepaalt de drempel en lijst-grootte
+  // waarop getTopQuestions filtert. Daarna parallel de overige data-fetches
+  // (incl. de negatieve-feedback lijst en banner-counter).
+  const settings = await getOrgSettings(activeOrg.slug);
+  const [items, topQuestions, negativeFeedback, recentNegativeCount] =
     await Promise.all([
       listConversations(activeOrg.slug, filter),
-      getTopQuestions(activeOrg.slug, 20),
-      getOrgSettings(activeOrg.slug),
+      getTopQuestions(activeOrg.slug, settings.topQuestions),
       listNegativeFeedback(activeOrg.slug),
       countRecentNegativeFeedback(activeOrg.slug, 7),
     ]);
@@ -78,6 +82,7 @@ export default async function GesprekkenPage({
       <PageHeader
         title="Gesprekken"
         subtitle="Hier zie je wat bezoekers aan je chatbot vragen — en waar je chatbot nog tekortschiet."
+        action={<ReloadButton />}
       />
 
       <TabsNav
@@ -86,12 +91,17 @@ export default async function GesprekkenPage({
         active={view}
         tabs={[
           { key: 'gesprekken', label: 'Alle gesprekken', count: items.length },
-          { key: 'top-questions', label: 'Meest gestelde vragen', count: topQuestions.length },
+          { key: 'top-questions', label: 'Meest gestelde vragen', count: topQuestions.items.length },
         ]}
       />
 
       {view === 'top-questions' && (
-        <TopQuestionsTab initial={topQuestions} existingQAQuestions={existingQAQuestions} />
+        <TopQuestionsTab
+          initial={topQuestions.items}
+          totalUnique={topQuestions.totalUnique}
+          config={settings.topQuestions}
+          existingQAQuestions={existingQAQuestions}
+        />
       )}
       {view === 'gesprekken' && <FilterBar active={filter} />}
 

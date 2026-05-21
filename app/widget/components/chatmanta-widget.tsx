@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
+import { formatAccentText } from '@/lib/widget/format-accent';
 
 type Message =
   | { role: 'user'; content: string; id: string }
@@ -76,6 +77,14 @@ export type ChatMantaWidgetProps = {
    * de demo zonder klantendashboard-data nog steeds prettig leest.
    */
   welcomeMessage?: string;
+  /**
+   * Tooltip-tekst boven de chat-knop (klantendashboard → widget →
+   * "Tekst op chatknop"). Mag enkele-sterretjes-accenten bevatten:
+   * `Hoi! *Stel je vraag*` → "Hoi! " plain + "Stel je vraag" bold in
+   * accent-kleur. Leeg/undefined → terugval op de oude hardcoded copy
+   * ("Hoi! Heb je een vraag?") zodat de demo zonder klant-data klopt.
+   */
+  launcherText?: string;
 };
 
 export function ChatMantaWidget({
@@ -96,11 +105,16 @@ export function ChatMantaWidget({
   customLogoDataUrl,
   chatbotName,
   welcomeMessage,
+  launcherText,
 }: ChatMantaWidgetProps) {
   // Side-aware positioning voor tooltip. FAB/panel-positie wordt verderop
   // berekend met safe-area-inset + mobile-fullscreen-detectie.
   const tooltipSideStyle = position === 'bottom-left' ? { left: 0 } : { right: 0 };
   const displayTitle = headerTitle?.trim() || companyName;
+  // Tooltip-tekst: klant-input (kan `*woord*`-accenten bevatten) of de
+  // oude default met accent op het laatste deel — zelfde parser zodat de
+  // render-paden niet uit elkaar lopen.
+  const tooltipText = launcherText?.trim() || 'Hoi! *Heb je een vraag?*';
 
   // Granulaire kleur-resolutie met primaryColor als fallback. Eén plek om de
   // semantiek te lezen i.p.v. tien `?? primaryColor` ternaries verspreid in JSX.
@@ -403,7 +417,7 @@ export function ChatMantaWidget({
             fontFamily: 'var(--font-inter), system-ui, sans-serif',
           }}
         >
-          Hoi! <span style={{ color: c.header, fontWeight: 600 }}>Heb je een vraag?</span>
+          {formatAccentText(tooltipText, c.header)}
           <span
             aria-hidden="true"
             style={{

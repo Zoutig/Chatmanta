@@ -1463,3 +1463,38 @@ html[data-style="manta"] .followup-chip {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   Safe-area / iPhone-notch polish (PR4) — Manta-variant
+   Append-only. Bumpt --manta-top-h zodat zowel .manta-topbar als de
+   .manta-sidebar-brand mee-groeien met de iOS notch. Twee selectors voor
+   licht + donker zodat de bestaande dark-specifieke rule (0,2,1) niet wint.
+   ========================================================================== */
+html.dark[data-style="manta"],
+html:not(.dark)[data-style="manta"] {
+  --manta-top-h: calc(56px + var(--safe-top, 0px));
+}
+
+/* Manta-topbar — bestaande: height: var(--manta-top-h); padding: 0 24px.
+   Content schuift onder notch via padding-top; height groeit automatisch
+   doordat --manta-top-h al safe-top bevat. */
+html[data-style="manta"] .manta-topbar {
+  padding-top: var(--safe-top, 0px);
+  padding-left: calc(24px + var(--safe-left, 0px));
+  padding-right: calc(24px + var(--safe-right, 0px));
+}
+
+/* Manta sidebar-brand — bestaande: height: var(--manta-top-h); padding: 0 12px.
+   Idem patroon. */
+html[data-style="manta"] .manta-sidebar-brand {
+  padding-top: var(--safe-top, 0px);
+}
+
+/* Manta composer-wrap heeft eigen klasse op de desktop-shell. Bottom-padding
+   zodat de send-knop niet onder home-indicator klemt. Bestaande padding
+   blijft via shorthand intact, alleen bottom-longhand wint. */
+html[data-style="manta"] .manta-composer-wrap {
+  padding-bottom: calc(22px + var(--safe-bottom, 0px));
+  padding-left: calc(24px + var(--safe-left, 0px));
+  padding-right: calc(24px + var(--safe-right, 0px));
+}

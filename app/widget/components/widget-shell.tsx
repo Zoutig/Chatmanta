@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { ChatMantaWidget } from './chatmanta-widget';
+import { DashboardWidgetSwitch } from '@/app/components/dashboard-widget-switch';
 import { getSkin, ORG_SLUGS_WIDGET, type OrgSkin } from '../org-skins';
 
 export type BotOption = {
@@ -43,6 +44,8 @@ export type WidgetShellProps = {
     chatbotName?: string;
     /** Eerste bot-bubble in de chat (chatbot-instellingen → welcomeMessage). */
     welcomeMessage?: string;
+    /** Tooltip-tekst boven de chat-knop (widget-instellingen → launcherText). */
+    launcherText?: string;
   };
 };
 
@@ -95,6 +98,8 @@ export function WidgetShell({
           border: '1px solid rgba(120,200,230,0.18)',
         }}
       >
+        <DashboardWidgetSwitch current="widget" variant="demo-chrome" />
+        <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.12)' }} />
         <span
           style={{
             fontSize: 10,
@@ -175,6 +180,7 @@ export function WidgetShell({
         customLogoDataUrl={widgetOverrides?.customLogoDataUrl}
         chatbotName={widgetOverrides?.chatbotName}
         welcomeMessage={widgetOverrides?.welcomeMessage}
+        launcherText={widgetOverrides?.launcherText}
       />
     </div>
   );

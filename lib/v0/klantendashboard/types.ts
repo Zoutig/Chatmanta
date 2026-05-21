@@ -260,6 +260,36 @@ export type NegativeFeedbackItem = {
   kind: 'smalltalk' | 'answer' | 'fallback';
 };
 
+// Top-vragen drempel (per-org configureerbaar)
+// ---------------------------------------------------------------------------
+
+/**
+ * Configuratie voor het "Meest gestelde vragen"-scherm.
+ * Default = {minCount: 2, topN: 10} — zie migration 0030.
+ *
+ * Server-side validatie: minCount ∈ [1, 50], topN ∈ [1, 100]. Buiten die
+ * range gooit saveTopQuestionsConfig een AppError; CHECK-constraint in de
+ * DB is de tweede vangnet.
+ */
+export type TopQuestionsConfig = {
+  /** Vraag pas tonen vanaf X keer gesteld. */
+  minCount: number;
+  /** Maximum aantal vragen in de lijst. */
+  topN: number;
+};
+
+export const TOP_QUESTIONS_DEFAULT: TopQuestionsConfig = {
+  minCount: 2,
+  topN: 10,
+};
+
+export const TOP_QUESTIONS_LIMITS = {
+  minCountMin: 1,
+  minCountMax: 50,
+  topNMin: 1,
+  topNMax: 100,
+} as const;
+
 // ---------------------------------------------------------------------------
 // Account
 // ---------------------------------------------------------------------------

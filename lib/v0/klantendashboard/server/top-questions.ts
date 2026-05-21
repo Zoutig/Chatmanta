@@ -13,6 +13,7 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import type { TopQuestionsConfig } from '../types';
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -38,14 +39,26 @@ export type TopQuestion = {
   lastStatus: 'answered' | 'unanswered';
 };
 
-const TOP_N_DEFAULT = 20;
-// Hard cap op SELECT om memory + LLM-vergelijking onder controle te houden.
+/**
+ * Result-shape voor het Klantendashboard "Meest gestelde vragen"-scherm:
+ *   - items: vragen ná filtering op config.minCount, max config.topN groot.
+ *   - totalUnique: aantal unieke vragen vóór filtering. De UI gebruikt
+ *                  dit om onderscheid te maken tussen "echt geen vragen"
+ *                  (=0) en "geen vragen die de drempel halen" (>0 maar
+ *                  items.length=0).
+ */
+export type TopQuestionsResult = {
+  items: TopQuestion[];
+  totalUnique: number;
+};
+
+// Hard cap op SELECT om memory onder controle te houden.
 const MAX_ROWS_SCANNED = 500;
 
 export async function getTopQuestions(
   orgSlug: OrgSlug,
-  limit = TOP_N_DEFAULT,
-): Promise<TopQuestion[]> {
+  config: TopQuestionsConfig,
+): Promise<TopQuestionsResult> {
   const orgId = KNOWN_ORGS[orgSlug].id;
   try {
     const { data, error } = await sb()
@@ -55,7 +68,7 @@ export async function getTopQuestions(
       .in('kind', ['answer', 'fallback'])
       .order('created_at', { ascending: false })
       .limit(MAX_ROWS_SCANNED);
-    if (error || !data) return [];
+    if (error || !data) return { items: [], totalUnique: 0 };
 
     const map = new Map<string, TopQuestion>();
     for (const r of data) {
@@ -83,14 +96,17 @@ export async function getTopQuestions(
       }
     }
 
-    return [...map.values()]
+    const totalUnique = map.size;
+    const items = [...map.values()]
+      .filter((q) => q.count >= config.minCount)
       .sort(
         (a, b) =>
           b.count - a.count ||
           (b.lastAskedAt > a.lastAskedAt ? 1 : a.lastAskedAt > b.lastAskedAt ? -1 : 0),
       )
-      .slice(0, limit);
+      .slice(0, config.topN);
+    return { items, totalUnique };
   } catch {
-    return [];
+    return { items: [], totalUnique: 0 };
   }
 }

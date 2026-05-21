@@ -6,6 +6,13 @@ export type ThemeChoice = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
 const STORAGE_KEY = 'chatmanta-theme';
+// Custom event waarmee useTheme-instances elkaar op de hoogte stellen.
+// Nodig omdat de hook géén Context-store deelt: zonder cross-instance sync
+// blijft een tweede consumer (HubBackground/HubCard/AccentPicker) op zijn
+// eigen lokale state hangen wanneer de AnimatedThemeToggler `set()` aanroept.
+const THEME_CHANGE_EVENT = 'chatmanta:theme-change';
+
+type ThemeChangeDetail = { choice: ThemeChoice; resolved: ResolvedTheme };
 
 function readChoice(): ThemeChoice {
   if (typeof window === 'undefined') return 'light';
@@ -42,12 +49,34 @@ export function useTheme(): {
   const [choice, setChoice] = useState<ThemeChoice>('light');
   const [resolved, setResolved] = useState<ResolvedTheme>('light');
 
-  // Eerste mount: lees opgeslagen voorkeur en resolve.
+  // Eerste mount: lees opgeslagen voorkeur en resolve. Daarna luister
+  // naar cross-instance updates via custom event en cross-tab updates
+  // via storage event, zodat alle useTheme-consumers in sync blijven
+  // zonder Context-provider.
   /* eslint-disable react-hooks/set-state-in-effect -- bewust patroon: SSR-safe defaults via useState, dan op de client localStorage uitlezen. Lazy initializer zou hydration-mismatch geven op aria-checked state in ThemeSwitch. */
   useEffect(() => {
     const stored = readChoice();
     setChoice(stored);
     setResolved(resolveTheme(stored));
+
+    const onCustom = (e: Event) => {
+      const detail = (e as CustomEvent<ThemeChangeDetail>).detail;
+      if (!detail) return;
+      setChoice(detail.choice);
+      setResolved(detail.resolved);
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY) return;
+      const next = readChoice();
+      setChoice(next);
+      setResolved(resolveTheme(next));
+    };
+    window.addEventListener(THEME_CHANGE_EVENT, onCustom);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(THEME_CHANGE_EVENT, onCustom);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -59,6 +88,11 @@ export function useTheme(): {
       const next = resolveTheme('system');
       setResolved(next);
       applyToDom(next);
+      window.dispatchEvent(
+        new CustomEvent<ThemeChangeDetail>(THEME_CHANGE_EVENT, {
+          detail: { choice: 'system', resolved: next },
+        }),
+      );
     };
     mql.addEventListener('change', onChange);
     return () => mql.removeEventListener('change', onChange);
@@ -76,6 +110,15 @@ export function useTheme(): {
     const next = resolveTheme(c);
     setResolved(next);
     applyToDom(next);
+    if (typeof window !== 'undefined') {
+      // Notify andere useTheme-instances binnen dezelfde tab — anders
+      // blijven HubBackground/HubCard/AccentPicker op stale lokale state.
+      window.dispatchEvent(
+        new CustomEvent<ThemeChangeDetail>(THEME_CHANGE_EVENT, {
+          detail: { choice: c, resolved: next },
+        }),
+      );
+    }
   }, []);
 
   return { choice, resolved, set };
