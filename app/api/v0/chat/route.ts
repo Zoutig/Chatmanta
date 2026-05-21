@@ -26,9 +26,30 @@ import {
   buildChatbotOverrides,
   type ChatbotPromptOverrides,
 } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
+import { commitTurn, findRecentThreadByVisitor } from '@/lib/v0/server/threads';
+import {
+  readVisitorId,
+  newVisitorId,
+  serializeVisitorCookie,
+} from '@/lib/v0/server/visitor';
 import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
+
+// Widget-detectie via referer-header. /widget/<slug> is in V0 het enige
+// publieke chat-pad; testtool zit op /klantendashboard/test en doet z'n
+// eigen commitTurnAction client-side. Externe-embed scenario's komen pas
+// met V1 + widget-script en vragen om een explicietere signal (header /
+// origin-check); voor V0 is de referer-sniff voldoende.
+function isWidgetRequest(req: Request): boolean {
+  const referer = req.headers.get('referer');
+  if (!referer) return false;
+  try {
+    return new URL(referer).pathname.startsWith('/widget/');
+  } catch {
+    return false;
+  }
+}
 
 export const runtime = 'nodejs';
 
@@ -69,6 +90,15 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
 
 export async function POST(req: Request) {
   const requestId = newRequestId();
+
+  // Widget-pad? Bepaalt of we visitor-grouping + server-side commitTurn doen.
+  // Testtool-calls krijgen geen visitor-cookie en geen extra thread-write
+  // (zou anders dubbele rijen geven naast de bestaande client-side commit).
+  const isWidget = isWidgetRequest(req);
+  // Lazy-set: lees bestaande cookie of genereer nieuwe; in beide gevallen
+  // sturen we 'm terug zodat browsers zonder cookie hem alsnog krijgen.
+  const visitorId = isWidget ? (readVisitorId(req) ?? newVisitorId()) : null;
+  const visitorCookieHeader = visitorId ? serializeVisitorCookie(visitorId) : null;
 
   // v0.4 security gate #1 — rate limit per IP. Faalt door als bucket overstroomt.
   const ip = getClientIp(req);
@@ -173,14 +203,13 @@ export async function POST(req: Request) {
       totalCostUsd: 0,
     };
     const ndjson = JSON.stringify({ kind: 'fallback', response: blockedResponse }) + '\n';
-    return new Response(ndjson, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/x-ndjson; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'X-Request-Id': requestId,
-      },
+    const blockedHeaders = new Headers({
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Request-Id': requestId,
     });
+    if (visitorCookieHeader) blockedHeaders.append('Set-Cookie', visitorCookieHeader);
+    return new Response(ndjson, { status: 200, headers: blockedHeaders });
   }
 
   const organizationId = getActiveOrgId(req);
@@ -318,16 +347,48 @@ export async function POST(req: Request) {
             );
           }
         });
+
+        // Widget-thread persistentie (Scherm 6: Alle gesprekken). Lopen in een
+        // eigen after() ná logQuery zodat een fout in de threads-laag de query_log
+        // telemetrie niet sloopt. Skip in non-widget paden — testtool committet
+        // zelf via app/actions/threads.ts → commitTurnAction (dubbele rij anders).
+        if (isWidget && visitorId) {
+          const widgetUserContent = question;
+          const widgetResponse = finalResponseForLog;
+          after(async () => {
+            try {
+              const existingThreadId = await findRecentThreadByVisitor(
+                organizationId,
+                visitorId,
+                24,
+              );
+              await commitTurn({
+                threadId: existingThreadId,
+                userContent: widgetUserContent,
+                response: widgetResponse,
+                botVersion: bot.version,
+                organizationId,
+                visitorId,
+              });
+            } catch (err) {
+              console.error(
+                '[commitTurn widget]',
+                requestId,
+                err instanceof Error ? err.message : err,
+              );
+            }
+          });
+        }
       }
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'application/x-ndjson; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Request-Id': requestId,
-    },
+  const streamHeaders = new Headers({
+    'Content-Type': 'application/x-ndjson; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Request-Id': requestId,
   });
+  if (visitorCookieHeader) streamHeaders.append('Set-Cookie', visitorCookieHeader);
+  return new Response(stream, { headers: streamHeaders });
 }

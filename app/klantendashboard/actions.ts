@@ -13,6 +13,7 @@ import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import {
   saveWidgetSettings,
   saveChatbotSettings,
+  saveTopQuestionsConfig,
   upsertQAItem,
   deleteQAItem,
   setQAActive,
@@ -20,6 +21,7 @@ import {
 import type {
   ChatbotSettings,
   ManualQA,
+  TopQuestionsConfig,
   WidgetSettings,
 } from '@/lib/v0/klantendashboard/types';
 
@@ -96,6 +98,22 @@ export async function setQAActiveAction(
     const qa = await setQAActive(activeOrg.slug, id, active);
     revalidatePath('/klantendashboard', 'layout');
     return { qa };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Top-vragen drempel
+// ---------------------------------------------------------------------------
+export async function saveTopQuestionsAction(
+  config: TopQuestionsConfig,
+): Promise<ActionResult<{ topQuestions: TopQuestionsConfig }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const topQuestions = await saveTopQuestionsConfig(activeOrg.slug, config);
+    // Revalidatie van /klantendashboard layout dekt zowel /instellingen
+    // (zelf-refresh na save) als /gesprekken (de drempel-toepassing).
+    revalidatePath('/klantendashboard', 'layout');
+    return { topQuestions };
   });
 }
 

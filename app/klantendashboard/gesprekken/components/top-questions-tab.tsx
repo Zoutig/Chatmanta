@@ -5,6 +5,7 @@ import { MessagesSquare, Plus, Check } from 'lucide-react';
 import { addQAFromTopQuestionAction } from '../../actions';
 import { StatusBadge } from '../../components/status-badge';
 import type { TopQuestion } from '@/lib/v0/klantendashboard/server/top-questions';
+import type { TopQuestionsConfig } from '@/lib/v0/klantendashboard/types';
 
 function formatDate(iso: string): string {
   if (!iso) return '—';
@@ -19,11 +20,18 @@ function formatDate(iso: string): string {
 export function TopQuestionsTab({
   initial,
   existingQAQuestions = [],
+  config,
+  totalUnique,
 }: {
   initial: TopQuestion[];
   /** Vragen die al als actieve Q&A in v0_org_settings.qa staan — initial seed
    * voor de "✓ In Q&A"-badge zodat die na page-reload zichtbaar blijft. */
   existingQAQuestions?: string[];
+  /** Drempel + lijst-grootte uit v0_org_settings.top_questions. */
+  config: TopQuestionsConfig;
+  /** Aantal unieke vragen vóór filtering. Onderscheidt "echt geen vragen"
+   * (=0) van "geen vragen die de drempel halen" (>0 maar initial leeg). */
+  totalUnique: number;
 }) {
   const [items] = useState<TopQuestion[]>(initial);
   const [drafting, setDrafting] = useState<{ question: string; answer: string } | null>(null);
@@ -34,15 +42,21 @@ export function TopQuestionsTab({
   const [pending, startTransition] = useTransition();
 
   if (items.length === 0) {
+    const hasRawQuestions = totalUnique > 0;
     return (
       <div className="klant-empty">
         <div className="klant-empty-icon">
           <MessagesSquare size={26} strokeWidth={1.6} />
         </div>
-        <h3 className="klant-empty-title">Nog geen vragen geteld</h3>
+        <h3 className="klant-empty-title">
+          {hasRawQuestions
+            ? `Nog geen vragen met minimaal ${config.minCount}× herhaling`
+            : 'Nog geen vragen geteld'}
+        </h3>
         <p className="klant-empty-sub">
-          Zodra bezoekers vragen stellen aan je chatbot, verschijnt hier een ranglijst
-          van de vragen die het vaakst terugkomen — handig om je FAQ uit te breiden.
+          {hasRawQuestions
+            ? `Er zijn ${totalUnique} unieke vragen gesteld, maar nog geen die de drempel haalt. Verlaag de drempel in Instellingen of wacht tot bezoekers vaker dezelfde vraag stellen.`
+            : 'Zodra bezoekers vragen stellen aan je chatbot, verschijnt hier een ranglijst van de vragen die het vaakst terugkomen — handig om je FAQ uit te breiden.'}
         </p>
       </div>
     );
@@ -70,12 +84,12 @@ export function TopQuestionsTab({
           className="klant-section-help"
           style={{ margin: 0, maxWidth: 640 }}
         >
-          De vragen die je bezoekers het vaakst stellen — gebaseerd op de laatste 500
+          Vragen die ≥{config.minCount}× zijn gesteld — gebaseerd op de laatste 500
           gesprekken. Klik op &quot;Maak Q&amp;A&quot; om een goed antwoord vast te leggen,
           dan beantwoordt je chatbot deze vraag voortaan direct uit je kennisbank.
         </p>
         <div style={{ fontSize: 12, color: 'var(--klant-fg-dim)' }}>
-          Top {items.length} · vandaag bijgewerkt
+          Top {items.length} van max {config.topN} · vandaag bijgewerkt
         </div>
       </div>
 
