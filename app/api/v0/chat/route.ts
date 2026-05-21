@@ -69,6 +69,11 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
 
 export async function POST(req: Request) {
   const requestId = newRequestId();
+  // Pre-gegenereerde query_log-id zodat de widget hem al kent via het
+  // 'meta'-event vóór de log-insert (die loopt post-stream via after()).
+  // Wordt aan logQuery doorgegeven zodat de uiteindelijke row dezelfde id
+  // krijgt — feedback kan zo betrouwbaar gekoppeld worden.
+  const queryLogId = crypto.randomUUID();
 
   // v0.4 security gate #1 — rate limit per IP. Faalt door als bucket overstroomt.
   const ip = getClientIp(req);
@@ -228,6 +233,16 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      // Eerste event = meta. De widget hangt deze id aan z'n actieve
+      // assistant-message en gebruikt 'm bij /api/v0/feedback POST. Sturen
+      // we vóór de eerste content zodat de feedback-knop direct na de
+      // eerste delta enabled kan worden — race tussen "klik op 👎" en "id
+      // beschikbaar" zou anders een lege body opleveren.
+      controller.enqueue(
+        encoder.encode(
+          JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n',
+        ),
+      );
       let finalResponse: ChatResponse | null = null;
       try {
         for await (const event of generator) {
@@ -309,6 +324,7 @@ export async function POST(req: Request) {
               organizationId,
               hydeMeta,
               requestId,
+              queryLogId,
             );
           } catch (err) {
             console.error(
