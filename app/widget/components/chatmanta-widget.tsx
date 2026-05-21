@@ -329,10 +329,14 @@ export function ChatMantaWidget({
     }
   }, [messages, activeThreadId]);
 
-  const openDrawer = useCallback(() => {
-    const store = storeRef.current;
-    if (store) setThreads(store.list());
-    setDrawerOpen(true);
+  const toggleDrawer = useCallback(() => {
+    setDrawerOpen((prev) => {
+      if (!prev) {
+        const store = storeRef.current;
+        if (store) setThreads(store.list());
+      }
+      return !prev;
+    });
   }, []);
 
   const handleNewThread = useCallback(() => {
@@ -577,8 +581,8 @@ export function ChatMantaWidget({
           >
             <button
               type="button"
-              onClick={openDrawer}
-              aria-label="Open gesprekkenlijst"
+              onClick={toggleDrawer}
+              aria-label={drawerOpen ? 'Sluit gesprekkenlijst' : 'Open gesprekkenlijst'}
               style={{
                 background: 'transparent',
                 border: 'none',

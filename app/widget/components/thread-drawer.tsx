@@ -25,8 +25,14 @@ export function ThreadDrawer({
       role="dialog"
       aria-label="Gesprekkenlijst"
       style={{
+        // Start onder de header (~56px) — laat de header van het paneel
+        // zichtbaar zodat de bezoeker ☰ kan toggelen of de widget kan sluiten
+        // zonder eerst terug te navigeren.
         position: 'absolute',
-        inset: 0,
+        top: 56,
+        left: 0,
+        right: 0,
+        bottom: 0,
         background: '#f7f8fa',
         display: 'flex',
         flexDirection: 'column',
