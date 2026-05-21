@@ -85,7 +85,12 @@ export default async function GesprekkenPage({
       />
 
       {view === 'top-questions' && (
-        <TopQuestionsTab initial={topQuestions.items} existingQAQuestions={existingQAQuestions} />
+        <TopQuestionsTab
+          initial={topQuestions.items}
+          totalUnique={topQuestions.totalUnique}
+          config={settings.topQuestions}
+          existingQAQuestions={existingQAQuestions}
+        />
       )}
       {view === 'gesprekken' && <FilterBar active={filter} />}
 
