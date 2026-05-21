@@ -11,6 +11,7 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   'dev-org': {
     primaryColor: '#4dd6e8',
     position: 'bottom-right',
+    pulseEnabled: true,
     logoStyle: 'brand-mark',
     customLogoDataUrl: null,
     title: 'Hoi! Hoe kan ik je helpen?',
@@ -24,6 +25,7 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   'acme-corp': {
     primaryColor: '#d97706',
     position: 'bottom-right',
+    pulseEnabled: true,
     logoStyle: 'brand-mark',
     customLogoDataUrl: null,
     title: 'Vraag het Dakwerken De Boer',
@@ -37,6 +39,7 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   'globex-inc': {
     primaryColor: '#0891b2',
     position: 'bottom-right',
+    pulseEnabled: true,
     logoStyle: 'brand-mark',
     customLogoDataUrl: null,
     title: 'FysioPlus chat-assistent',
@@ -50,6 +53,7 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
   initech: {
     primaryColor: '#475569',
     position: 'bottom-right',
+    pulseEnabled: true,
     logoStyle: 'brand-mark',
     customLogoDataUrl: null,
     title: 'Bakker & Vermeer · advies',

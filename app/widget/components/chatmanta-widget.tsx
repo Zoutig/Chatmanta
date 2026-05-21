@@ -20,6 +20,9 @@ import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 import { formatAccentText } from '@/lib/widget/format-accent';
+import { LocalStorageThreadStore } from '@/lib/widget/thread-store';
+import type { Thread } from '@/lib/widget/thread-types';
+import { ThreadDrawer } from './thread-drawer';
 
 type Message =
   | { role: 'user'; content: string; id: string }
@@ -59,6 +62,10 @@ export type ChatMantaWidgetProps = {
   logoColor?: string;
   widgetBgColor?: string; // FAB-knop achtergrond (default wit)
   pulseColor?: string;
+  /**
+   * Toggle voor de pulse-animatie. Default `true` — false verbergt de ring.
+   */
+  pulseEnabled?: boolean;
   headerColor?: string; // header + send-button + user-bubble
   /** Welk icoon op de FAB? */
   logoStyle?: 'brand-mark' | 'chat-bubble' | 'custom-logo';
@@ -100,6 +107,7 @@ export function ChatMantaWidget({
   logoColor,
   widgetBgColor,
   pulseColor,
+  pulseEnabled = true,
   headerColor,
   logoStyle = 'brand-mark',
   customLogoDataUrl,
@@ -138,6 +146,15 @@ export function ChatMantaWidget({
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Thread-state. `storeRef` is null tot na hydration zodat SSR niet probeert
+  // localStorage te lezen. `activeThreadId` = null betekent "fresh chat" — pas
+  // bij het eerste user-bericht wordt een thread écht aangemaakt, zodat we geen
+  // lege spook-threads in de drawer-lijst krijgen.
+  const storeRef = useRef<LocalStorageThreadStore | null>(null);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mq = window.matchMedia('(max-width: 639px)');
@@ -146,6 +163,25 @@ export function ChatMantaWidget({
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, []);
+
+  // Init thread-store na hydration. localStorage is alleen client-side
+  // beschikbaar — vandaar de useEffect-guard. Bij eerste mount:
+  //   1. construct store voor (orgSlug, botVersion)
+  //   2. lees alle threads in voor de drawer
+  //   3. lees activeId; als het een bestaande thread is → laad messages
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const store = new LocalStorageThreadStore(orgSlug, botVersion);
+    storeRef.current = store;
+    const all = store.list();
+    setThreads(all);
+    const id = store.getActiveId();
+    const active = id ? store.get(id) : null;
+    if (active) {
+      setActiveThreadId(active.id);
+      setMessages(active.messages.map((m) => ({ ...m, streaming: false })));
+    }
+  }, [orgSlug, botVersion]);
 
   // Auto-scroll naar onderkant bij nieuwe content.
   useEffect(() => {
@@ -341,6 +377,83 @@ export function ChatMantaWidget({
     [messages, orgSlug, botVersion, pending],
   );
 
+  // Persist messages → thread-store. Triggert na elke setMessages-flush,
+  // inclusief streaming-delta's. Dat is goed: bij refresh midden in een
+  // streaming-antwoord blijft de partial content bewaard zodat de bezoeker
+  // niet "leeg" terugkomt. Eerste user-bericht zonder activeThreadId =
+  // signaal om een nieuwe thread aan te maken (geen lege spook-threads).
+  useEffect(() => {
+    const store = storeRef.current;
+    if (!store) return;
+    if (messages.length === 0) return;
+
+    let id = activeThreadId;
+    if (!id) {
+      const t = store.create();
+      id = t.id;
+      setActiveThreadId(id);
+      store.setActiveId(id);
+    }
+
+    const plain = messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+    }));
+    const updated = store.update(id, { messages: plain });
+    if (updated) {
+      setThreads((prev) => {
+        const others = prev.filter((t) => t.id !== updated.id);
+        return [updated, ...others];
+      });
+    }
+  }, [messages, activeThreadId]);
+
+  const toggleDrawer = useCallback(() => {
+    setDrawerOpen((prev) => {
+      if (!prev) {
+        const store = storeRef.current;
+        if (store) setThreads(store.list());
+      }
+      return !prev;
+    });
+  }, []);
+
+  const handleNewThread = useCallback(() => {
+    abortRef.current?.abort();
+    setMessages([]);
+    setActiveThreadId(null);
+    storeRef.current?.setActiveId(null);
+    setDrawerOpen(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
+  const handleSelectThread = useCallback((id: string) => {
+    const store = storeRef.current;
+    if (!store) return;
+    const t = store.get(id);
+    if (!t) return;
+    abortRef.current?.abort();
+    setActiveThreadId(id);
+    store.setActiveId(id);
+    setMessages(t.messages.map((m) => ({ ...m, streaming: false })));
+    setDrawerOpen(false);
+  }, []);
+
+  const handleDeleteThread = useCallback(
+    (id: string) => {
+      const store = storeRef.current;
+      if (!store) return;
+      store.delete(id);
+      setThreads(store.list());
+      if (id === activeThreadId) {
+        setMessages([]);
+        setActiveThreadId(null);
+      }
+    },
+    [activeThreadId],
+  );
+
   const showSuggested = !open ? false : messages.length === 0 && !pending;
 
   const showTooltipNow = (tooltipVisible || tooltipHovered) && !open;
@@ -377,9 +490,10 @@ export function ChatMantaWidget({
         onMouseEnter={() => setTooltipHovered(true)}
         onMouseLeave={() => setTooltipHovered(false)}
       >
-        {/* Pulse-ring achter de FAB — alleen zichtbaar als chat gesloten is.
+        {/* Pulse-ring achter de FAB — alleen zichtbaar als chat gesloten is
+            en de klant pulseEnabled niet expliciet uit heeft gezet.
             Per render gegenereerd met primaryColor zodat hij de org-context volgt. */}
-        {!open && (
+        {!open && pulseEnabled && (
           <span
             aria-hidden="true"
             style={{
@@ -542,10 +656,27 @@ export function ChatMantaWidget({
               padding: '14px 18px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              gap: 10,
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <button
+              type="button"
+              onClick={toggleDrawer}
+              aria-label={drawerOpen ? 'Sluit gesprekkenlijst' : 'Open gesprekkenlijst'}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                padding: 4,
+                opacity: 0.85,
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              <MenuIcon size={16} />
+            </button>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{displayTitle}</span>
               <span style={{ fontSize: 11, opacity: 0.85 }}>
                 {headerSubtitle?.trim() || 'Online · meestal binnen seconden antwoord'}
@@ -749,6 +880,22 @@ export function ChatMantaWidget({
               ChatManta
             </a>
           </div>
+
+          {/* Thread-drawer als overlay binnen het paneel. Hij zit boven de
+              messages-area maar onder de header (zIndex: 2 vs 9998 paneel-zelf).
+              `position: absolute; inset: 0` binnen het paneel zorgt dat de
+              header + footer zichtbaar blijven. */}
+          {drawerOpen && (
+            <ThreadDrawer
+              threads={threads}
+              activeId={activeThreadId}
+              headerColor={c.header}
+              onClose={() => setDrawerOpen(false)}
+              onSelect={handleSelectThread}
+              onNew={handleNewThread}
+              onDelete={handleDeleteThread}
+            />
+          )}
         </div>
       )}
     </>
@@ -1072,6 +1219,16 @@ function CloseIcon({ size = 22 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function MenuIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
     </svg>
   );
 }

@@ -19,6 +19,7 @@ import { BubblePreview, MarkPreview } from '../../components/widget-logo';
 import { saveWidgetSettingsAction } from '../../actions';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 import { formatAccentText } from '@/lib/widget/format-accent';
+import { PresetColorPicker } from './preset-color-picker';
 
 // Max 200KB voor base64-data-URL — anders wordt de jsonb-row te zwaar.
 const MAX_LOGO_BYTES = 200 * 1024;
@@ -213,29 +214,65 @@ export function WidgetForm({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gridTemplateColumns: '1fr',
               gap: 10,
             }}
           >
-            <ColorPicker
+            <PresetColorPicker
               label="Logo-kleur"
               hint="ChatManta-mark of chat-bubble"
               value={resolvedColors.logo}
               onChange={(v) => update('logoColor', v)}
             />
-            <ColorPicker
+            <PresetColorPicker
               label="Achtergrond-knop"
               hint="Rond bolletje rechtsonder"
               value={resolvedColors.bg}
               onChange={(v) => update('widgetBgColor', v)}
             />
-            <ColorPicker
-              label="Pulse-ring"
-              hint="Animatie rond gesloten knop"
-              value={resolvedColors.pulse}
-              onChange={(v) => update('pulseColor', v)}
-            />
-            <ColorPicker
+            <div
+              style={{
+                padding: 10,
+                background: 'var(--klant-surface)',
+                borderRadius: 'var(--klant-r-md)',
+                border: '1px solid var(--klant-border)',
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  marginBottom: 10,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: 'var(--klant-fg)',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>
+                  Pulse-ring{' '}
+                  <span style={{ color: 'var(--klant-fg-dim)', fontWeight: 400 }}>
+                    · Animatie rond gesloten knop
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={w.pulseEnabled !== false}
+                  onChange={(e) => update('pulseEnabled', e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+              </label>
+              <PresetColorPicker
+                label="Kleur"
+                hint="Alleen actief als pulse aanstaat"
+                value={resolvedColors.pulse}
+                onChange={(v) => update('pulseColor', v)}
+                disabled={w.pulseEnabled === false}
+              />
+            </div>
+            <PresetColorPicker
               label="Header + verstuurknop"
               hint="Bovenkant + send-button"
               value={resolvedColors.header}
@@ -378,21 +415,21 @@ export function WidgetForm({
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 type="button"
-                onClick={() => update('position', 'bottom-right')}
-                className="klant-btn"
-                data-variant={w.position === 'bottom-right' ? 'primary' : 'ghost'}
-                style={{ flex: 1 }}
-              >
-                Rechtsonder
-              </button>
-              <button
-                type="button"
                 onClick={() => update('position', 'bottom-left')}
                 className="klant-btn"
                 data-variant={w.position === 'bottom-left' ? 'primary' : 'ghost'}
                 style={{ flex: 1 }}
               >
                 Linksonder
+              </button>
+              <button
+                type="button"
+                onClick={() => update('position', 'bottom-right')}
+                className="klant-btn"
+                data-variant={w.position === 'bottom-right' ? 'primary' : 'ghost'}
+                style={{ flex: 1 }}
+              >
+                Rechtsonder
               </button>
             </div>
           </Field>
@@ -875,62 +912,6 @@ function WidgetMockup({
         )}
       </button>
     </div>
-  );
-}
-
-function ColorPicker({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        padding: 10,
-        background: 'var(--klant-surface)',
-        borderRadius: 'var(--klant-r-md)',
-        border: '1px solid var(--klant-border)',
-      }}
-    >
-      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--klant-fg)' }}>{label}</span>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          style={{
-            width: 34,
-            height: 30,
-            border: '1px solid var(--klant-border)',
-            borderRadius: 'var(--klant-r-sm)',
-            background: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            flexShrink: 0,
-          }}
-        />
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="klant-input"
-          style={{
-            fontFamily: 'var(--font-mono), monospace',
-            fontSize: 12,
-            padding: '6px 8px',
-          }}
-        />
-      </div>
-      <span style={{ fontSize: 11, color: 'var(--klant-fg-dim)' }}>{hint}</span>
-    </label>
   );
 }
 

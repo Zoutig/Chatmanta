@@ -192,6 +192,12 @@ export type WidgetSettings = {
   logoColor?: string; // ChatManta-mark of chat-bubble icoon
   widgetBgColor?: string; // FAB-knop achtergrond
   pulseColor?: string; // pulse-ring achter de FAB
+  /**
+   * Pulse-ring aan/uit. Default `true` (backwards-compat — bestaande rijen
+   * zonder dit veld worden behandeld als aan). Wanneer `false` verbergt de
+   * widget-runtime de pulse-animatie volledig.
+   */
+  pulseEnabled?: boolean;
   headerColor?: string; // header bij geopende widget + verstuurknop
 
   /** Welk icoon wordt op de FAB getoond? */
