@@ -22,6 +22,10 @@ import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import {
+  buildChatbotOverrides,
+  type ChatbotPromptOverrides,
+} from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
 import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
@@ -180,21 +184,31 @@ export async function POST(req: Request) {
   }
 
   const organizationId = getActiveOrgId(req);
-  // Manual Q&A fast-path: probeer de slug af te leiden uit de orgId zodat we
-  // de v0_org_settings.qa-lijst kunnen laden. Lukt dit niet (onbekende
-  // sandbox-org, query-tampering, etc.) dan slaan we Q&A over en draait de
-  // pipeline gewoon als voorheen.
+  // Eén v0_org_settings-read voor zowel manual Q&A fast-path als de
+  // chatbot-prompt-overrides (tone of voice, fallbackMessage, may-mention
+  // toggles, extraInstructions, etc.). Bij DB-fout valt getOrgSettings al
+  // stilzwijgend terug op mock-defaults — pipeline werkt zonder overrides
+  // ook gewoon door.
   const orgSlug = resolveOrgSlugFromId(organizationId);
   let manualQAItems: ManualQA[] = [];
+  let chatbotOverrides: ChatbotPromptOverrides | undefined;
   if (orgSlug) {
     try {
       const settings = await getOrgSettings(orgSlug);
       manualQAItems = settings.qa.filter((q) => q.active);
+      chatbotOverrides = buildChatbotOverrides(settings.chatbot);
     } catch {
-      // getOrgSettings doet zelf al fallback op mock-defaults bij DB-fout;
-      // als hij hier toch gooit slaan we Q&A-fast-path stilzwijgend over.
+      // getOrgSettings throws zelden — alleen als zowel DB als de mock-fallback
+      // falen. Pipeline draait gewoon door zonder overrides en zonder Q&A.
     }
   }
+
+  // Body-tone/length winnen van de saved chatbot-overrides; rag.ts past die
+  // hierarchie zelf toe (input.tone ?? chatbotOverrides?.tone ?? default).
+  // Voor backwards-compat met de admin panel die expliciet tone/length stuurt
+  // geven we de body-waardes alleen mee als de caller ze ook echt zond.
+  const explicitTone = typeof body.tone === 'string' ? tone : undefined;
+  const explicitLength = typeof body.length === 'string' ? length : undefined;
 
   const generator = runRagQueryStreaming({
     question,
@@ -203,11 +217,12 @@ export async function POST(req: Request) {
     enableGeneralKnowledge,
     bot,
     history,
-    tone,
-    length,
+    tone: explicitTone,
+    length: explicitLength,
     organizationId,
     hydeModeOverride: hydeModeRequested,
     manualQAItems,
+    chatbotOverrides,
   });
 
   const encoder = new TextEncoder();

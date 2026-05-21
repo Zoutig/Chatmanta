@@ -16,6 +16,7 @@ import {
 import { resolveBot } from '@/lib/v0/server/bots';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import { buildChatbotOverrides } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
 
 export type TestAnswerResult =
   | { ok: true; response: ChatResponse }
@@ -51,9 +52,12 @@ export async function askTestQuestion(
   try {
     const activeOrg = await getActiveOrgFromCookies();
     const bot = resolveBot(undefined); // gebruikt LATEST_BOT_VERSION
-    // Q&A items voor de fast-path. Bij faal valt getOrgSettings al stilletjes
-    // terug op mock-defaults; geen extra error-handling nodig hier.
+    // Q&A items voor de fast-path + chatbot-overrides (tone, fallbackMessage,
+    // extraInstructions, ...) uit één v0_org_settings-read. Bij faal valt
+    // getOrgSettings al stilletjes terug op mock-defaults; geen extra
+    // error-handling nodig hier.
     const settings = await getOrgSettings(activeOrg.slug);
+    const chatbotOverrides = buildChatbotOverrides(settings.chatbot);
     let final: ChatResponse | null = null;
     let answerStartSources: ChatSource[] = [];
 
@@ -64,7 +68,8 @@ export async function askTestQuestion(
       bot,
       organizationId: activeOrg.id,
       history: sanitizeHistory(history),
-      manualQAItems: settings.qa,
+      manualQAItems: settings.qa.filter((qa) => qa.active),
+      chatbotOverrides,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         final = ev.response;

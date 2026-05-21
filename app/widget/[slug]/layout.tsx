@@ -77,6 +77,13 @@ export default async function OrgLayout({ params, children }: LayoutProps) {
         headerColor: orgSettings.widget.headerColor,
         logoStyle: orgSettings.widget.logoStyle,
         customLogoDataUrl: orgSettings.widget.customLogoDataUrl,
+        // Chatbot-identiteit + welkomstbericht uit /klantendashboard/instellingen.
+        // Voorheen toonde de widget altijd "Hoi! Ik ben de digitale assistent
+        // van {companyName}. Stel je vraag — ik zoek het op in onze content."
+        // — hardcoded en niet wijzigbaar door de klant. Nu wint chatbotName /
+        // welcomeMessage wanneer ingevuld; bij leeg vallen we terug op de copy.
+        chatbotName: orgSettings.chatbot.chatbotName,
+        welcomeMessage: orgSettings.chatbot.welcomeMessage,
       }}
     >
       <FakeSite skin={skin}>{children}</FakeSite>
