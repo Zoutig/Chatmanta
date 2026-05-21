@@ -15,6 +15,7 @@ import { PageHeader } from '../components/page-header';
 import { StatusBadge } from '../components/status-badge';
 import { TabsNav } from '../components/tabs';
 import { FilterBar } from './components/filter-bar';
+import { ReloadButton } from './components/reload-button';
 import { TopQuestionsTab } from './components/top-questions-tab';
 
 export const dynamic = 'force-dynamic';
@@ -72,6 +73,7 @@ export default async function GesprekkenPage({
       <PageHeader
         title="Gesprekken"
         subtitle="Hier zie je wat bezoekers aan je chatbot vragen — en waar je chatbot nog tekortschiet."
+        action={<ReloadButton />}
       />
 
       <TabsNav
