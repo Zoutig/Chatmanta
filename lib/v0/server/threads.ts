@@ -191,6 +191,13 @@ export async function commitTurn(opts: {
   botVersion: string;
   /** v0.4 multi-org: schrijven naar deze org. Default DEV_ORG voor backward compat. */
   organizationId?: string;
+  /**
+   * Anonieme cookie-UUID (zie lib/v0/server/visitor.ts). Wordt alleen gezet
+   * bij nieuwe threads en stelt /api/v0/chat in staat opvolgende widget-turns
+   * binnen 24u via findRecentThreadByVisitor te groeperen. Testtool-paden
+   * laten dit weg → kolom blijft NULL.
+   */
+  visitorId?: string;
 }): Promise<{ summary: ThreadSummary }> {
   const orgId = opts.organizationId ?? DEV_ORG_ID;
   const sb = db();
@@ -215,6 +222,7 @@ export async function commitTurn(opts: {
         organization_id: orgId,
         bot_version: botVersion,
         title,
+        visitor_id: opts.visitorId ?? null,
       })
       .select('id, created_at, updated_at')
       .single();
@@ -314,6 +322,37 @@ export async function commitTurn(opts: {
       messageCount,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// findRecentThreadByVisitor — zoek meest recente thread voor een widget-
+// visitor binnen het idle-venster.
+//
+// /api/v0/chat gebruikt dit om opvolgende widget-turns van dezelfde bezoeker
+// in één thread te groeperen. Geen treffer → caller maakt een nieuwe thread.
+//
+// Het index v0_threads_org_visitor_updated_idx (migration 0030) ondersteunt
+// deze exacte WHERE-clause.
+// ---------------------------------------------------------------------------
+export async function findRecentThreadByVisitor(
+  organizationId: string,
+  visitorId: string,
+  idleHours = 24,
+): Promise<string | null> {
+  const sb = db();
+  const sinceIso = new Date(Date.now() - idleHours * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from('v0_threads')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('visitor_id', visitorId)
+    .is('deleted_at', null)
+    .gte('updated_at', sinceIso)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`findRecentThreadByVisitor: ${error.message}`);
+  return (data?.id as string) ?? null;
 }
 
 // ---------------------------------------------------------------------------
