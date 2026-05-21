@@ -23,7 +23,7 @@ Widget:
 - [ ] Werkt voor zowel `answer` als `fallback` als `smalltalk` kinds (alles wat een bot-bubble is)
 
 Backend:
-- [ ] Nieuwe migration `0030_v0_feedback.sql` met tabel `v0_feedback`, RLS aan, append-only patroon (geen UPDATE/DELETE policy)
+- [ ] Nieuwe migration `0031_v0_feedback.sql` met tabel `v0_feedback`, RLS aan, append-only patroon (geen UPDATE/DELETE policy)
 - [ ] `/api/v0/chat` streamt vóór de eerste content-event een `{ kind: 'meta', queryLogId, requestId }` event zodat de widget de id heeft vóór de gebruiker iets kan klikken
 - [ ] `logQuery` accepteert een vooraf-gegenereerde id zodat de gestreamde id en de uiteindelijk gepersisteerde row dezelfde id hebben
 - [ ] Nieuwe route `POST /api/v0/feedback`: body `{ queryLogId, rating: 'up'|'down', comment?: string }`, valideert dat de query_log-row bestaat in de actieve org, insert in `v0_feedback`
@@ -130,4 +130,4 @@ UI-componenten (gewijzigd):
 
 ## Migration number
 
-Hoogste bestaand: `0029_cc_collapse_v05_v06_into_v0.sql`. Conflict op `0028` (zowel `0028_cc_assistant_threads.sql` als `0028_v0_org_settings.sql`) — niet ons probleem. **Wij claimen `0030`**. Pre-PR check: `gh pr list --state open --search "supabase/migrations"` om te zien of een andere branch ook `0030` claimt.
+Initieel `0030` geclaimd, maar PR #78 (`feat/seb/klant-gesprekken`) had `0030_v0_widget_threads_and_top_questions` al open. Pre-push hook ving het — gehernoemd naar **`0031_v0_feedback`** en `_migrations`-tracking-row mee bijgewerkt.

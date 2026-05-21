@@ -6,9 +6,9 @@
 
 Each task = one logical commit. Run `npm run typecheck` after every backend task; cache-clear (`rm -rf .next`) before manual widget verification.
 
-## Task 1 — DB migration `0030_v0_feedback` + types
+## Task 1 — DB migration `0031_v0_feedback` + types
 
-- **Files:** `supabase/migrations/0030_v0_feedback.sql` (new); `lib/v0/klantendashboard/types.ts` (additive)
+- **Files:** `supabase/migrations/0031_v0_feedback.sql` (new); `lib/v0/klantendashboard/types.ts` (additive)
 - **Approach:** Schrijf migration zoals in spec. Run `npm run migrate` om hem live te zetten. Voeg `NegativeFeedbackItem` type toe aan types.ts voor de dashboard-view (id, queryLogId, threadId|null, rating, comment, createdAt, question, answer, kind).
 - **Tests:** `npm run migrate:status` — laat zien dat 0030 applied is. `psql … "SELECT * FROM v0_feedback LIMIT 1"` via supabase studio of `npm run v0:list` adhoc.
 - **Commit:** `feat(db): 0030 v0_feedback table + RLS`
