@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { Icon } from './svg-icons';
-import { buildStyleSuffix, buildSystemPrompt } from '@/lib/v0/style';
+import { buildStyleSuffix, buildSystemPrompt, type OutputStyleVersion } from '@/lib/v0/style';
 import type { Length, Tone } from '@/lib/v0/style-types';
 import { STYLE_LABELS } from './style-labels';
 
@@ -15,14 +15,16 @@ export function PromptView({
   botSystemPrompt,
   tone,
   length,
+  outputStyleVersion,
 }: {
   botVersion: string;
   botSystemPrompt: string;
   tone: Tone;
   length: Length;
+  outputStyleVersion?: OutputStyleVersion;
 }) {
-  const suffix = buildStyleSuffix({ tone, length });
-  const final = buildSystemPrompt(botSystemPrompt, { tone, length });
+  const suffix = buildStyleSuffix({ tone, length }, outputStyleVersion);
+  const final = buildSystemPrompt(botSystemPrompt, { tone, length }, outputStyleVersion);
 
   return (
     <div>

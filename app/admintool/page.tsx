@@ -65,6 +65,7 @@ export default async function Home({
         generalKnowledgeEnabled: bot.generalKnowledgeEnabled,
       }}
       botSystemPrompt={renderedBotSystemPrompt}
+      botOutputStyleVersion={bot.outputStyleVersion}
       defaultThreshold={bot.similarityThreshold}
       defaultEnableRewrite={bot.enableRewriteByDefault}
       docs={docs}
