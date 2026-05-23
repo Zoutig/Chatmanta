@@ -15,13 +15,42 @@
 
 import type { ReactNode } from 'react';
 
+// Streaming-veilige cleaner. De widget rendert rauwe LLM-deltas; bots met
+// chainOfThought:true streamen eerst <thinking>…</thinking> en pas daarna het
+// <answer>. Tijdens de stream kan de buffer dus een GEOPENDE <thinking> zonder
+// sluit-tag bevatten — de regex voor gesloten blokken pakt die niet, waardoor
+// de rauwe redenering anders zichtbaar wordt in de bubble. Spiegelt
+// parseStreamingV03 uit app/components/messages.tsx, maar teruggebracht tot een
+// string-cleaner voor de lite-renderer. Exported zodat de widget-component met
+// hetzelfde resultaat kan beslissen tussen "typt nog" en "toont antwoord".
+export function cleanWidgetAnswer(text: string): string {
+  let s = text;
+  // Gesloten blokken eruit.
+  s = s.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+  s = s.replace(/<confidence>[\s\S]*?<\/confidence>/gi, '');
+  // Open <thinking> zonder sluit-tag → model is nog aan het redeneren; alles
+  // vanaf de open-tag is interne reasoning en mag niet zichtbaar zijn.
+  const openThink = s.search(/<thinking>/i);
+  if (openThink !== -1 && !/<\/thinking>/i.test(s.slice(openThink))) {
+    s = s.slice(0, openThink);
+  }
+  // Alles ná </answer> is confidence/metadata — nooit antwoord-tekst. Knip het
+  // in één keer weg (spiegelt parseStreamingV03's </answer>-tail-strip), dan de
+  // losse <answer>-open tag. De nog-open <confidence>-staart-strip blijft voor
+  // bots die zónder </answer> afsluiten.
+  s = s.replace(/<\/answer>[\s\S]*$/i, '');
+  s = s.replace(/<answer>/gi, '');
+  s = s.replace(/<confidence>[\s\S]*$/i, '');
+  // [n]-citaties.
+  s = s.replace(/\s*\[\d+\](\[\d+\])*/g, '');
+  // Halve trailing tag aan het buffer-einde ("<", "<a", "<thi"…) afknippen
+  // zodat hij niet als zichtbare tekst flikkert tijdens streaming.
+  s = s.replace(/<[a-z/]*$/i, '');
+  return s.trim();
+}
+
 export function renderMarkdownLite(text: string): ReactNode {
-  let clean = text;
-  clean = clean.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
-  clean = clean.replace(/<\/?answer>/g, '');
-  clean = clean.replace(/<confidence>[\s\S]*?<\/confidence>/g, '');
-  clean = clean.replace(/\s*\[\d+\](\[\d+\])*/g, '');
-  clean = clean.trim();
+  const clean = cleanWidgetAnswer(text);
 
   const lines = clean.split('\n');
   const blocks: ReactNode[] = [];

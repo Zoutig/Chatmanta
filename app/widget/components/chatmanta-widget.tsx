@@ -20,7 +20,7 @@ import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 import { formatAccentText } from '@/lib/widget/format-accent';
-import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
+import { cleanWidgetAnswer, renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { LocalStorageThreadStore } from '@/lib/widget/thread-store';
 import type { Thread } from '@/lib/widget/thread-types';
 import { ThreadDrawer } from './thread-drawer';
@@ -730,19 +730,27 @@ export function ChatMantaWidget({
               </BotBubble>
             )}
 
-            {messages.map((m) =>
-              m.role === 'user' ? (
-                <UserBubble key={m.id} color={c.header}>
-                  {m.content}
-                </UserBubble>
-              ) : (
+            {messages.map((m) => {
+              if (m.role === 'user') {
+                return (
+                  <UserBubble key={m.id} color={c.header}>
+                    {m.content}
+                  </UserBubble>
+                );
+              }
+              // Streaming-veilige weergave. Bots met chainOfThought streamen
+              // eerst <thinking>…</thinking> en pas daarna het antwoord. Tijdens
+              // die denkfase is de zichtbare tekst leeg → toon de typ-indicator
+              // i.p.v. de rauwe redenering (spiegelt het hoofd-chat-pad).
+              const visible = cleanWidgetAnswer(m.content);
+              return (
                 <div
                   key={m.id}
                   style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
                 >
                   <BotBubble color={c.header}>
-                    {m.streaming && !m.content ? <TypingDots /> : renderMarkdownLite(m.content)}
-                    {m.streaming && m.content ? <Caret /> : null}
+                    {m.streaming && !visible ? <TypingDots /> : renderMarkdownLite(m.content)}
+                    {m.streaming && visible ? <Caret /> : null}
                   </BotBubble>
                   {/* Feedback-knoppen: alleen op afgeronde, niet-fouten messages
                       met een queryLogId (= meta-event al binnen). Welkomstbubble
@@ -765,8 +773,8 @@ export function ChatMantaWidget({
                     />
                   )}
                 </div>
-              ),
-            )}
+              );
+            })}
 
             {/* Suggested questions */}
             {showSuggested && suggested.length > 0 && (

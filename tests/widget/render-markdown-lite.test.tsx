@@ -26,6 +26,44 @@ test('strips leaked <thinking> tags', () => {
   assert.match(out, /Antwoord/);
 });
 
+test('hides an OPEN <thinking> with no closing tag (mid-stream)', () => {
+  // Tijdens het streamen heeft het model wel <thinking> geopend maar nog niet
+  // gesloten. De rauwe redenering mag niet zichtbaar zijn.
+  const out = html('<thinking>ik denk na over welke chunk relevant is');
+  assert.doesNotMatch(out, /thinking/i);
+  assert.doesNotMatch(out, /ik denk na/);
+});
+
+test('open <thinking> gevolgd door beginnend antwoord toont alleen het antwoord', () => {
+  const out = html('<thinking>redenering</thinking>\n<answer>Het antwoord begint');
+  assert.doesNotMatch(out, /redenering/);
+  assert.doesNotMatch(out, /answer/i);
+  assert.match(out, /Het antwoord begint/);
+});
+
+test('knipt een halve trailing tag af tijdens streaming', () => {
+  // Buffer eindigt midden in een tag ("<a" voor <answer>) — mag niet als
+  // zichtbare tekst flikkeren.
+  const out = html('Wij zijn open van 9-17 uur <a');
+  assert.doesNotMatch(out, /&lt;a/);
+  assert.match(out, /9-17 uur/);
+});
+
+test('strips een nog-open <confidence>-staart', () => {
+  const out = html('Het kost €50 per maand. <confidence>0.82');
+  assert.match(out, /€50 per maand\./);
+  assert.doesNotMatch(out, /confidence/i);
+  assert.doesNotMatch(out, /0\.82/);
+});
+
+test('knipt alle metadata na </answer> weg, ook zonder <confidence>-tag', () => {
+  // Spiegelt parseStreamingV03: alles na </answer> is metadata, geen antwoord.
+  const out = html('<answer>Het kost €50 per maand.</answer>\nconfidence: 0.92');
+  assert.match(out, /€50 per maand\./);
+  assert.doesNotMatch(out, /confidence/i);
+  assert.doesNotMatch(out, /0\.92/);
+});
+
 test('strips [n] citations', () => {
   const out = html('Het kost €50 [1] per maand [2][3].');
   assert.doesNotMatch(out, /\[1\]/);
