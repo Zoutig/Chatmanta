@@ -849,6 +849,48 @@ const V0_6: BotConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// v0.7 — output-clarity: scherpere lengtes + BLUF + anti-preamble + bullets in
+// de widget. Spec: docs/superpowers/specs/2026-05-23-v0.7-output-clarity-design.md
+// Append-only: V0_1..V0_6 ongewijzigd. v0.7 zet outputStyleVersion='v2' zodat
+// lib/v0/style.ts de nieuwe LENGTH_INSTRUCTION_V2 strings prepend, en voegt
+// een output-discipline blok toe aan de systemPrompt.
+// ---------------------------------------------------------------------------
+const V0_7_OUTPUT_RULES_BLOCK = `
+
+OUTPUT-DISCIPLINE:
+
+LEAD MET HET ANTWOORD (BLUF):
+- Eerste zin = direct antwoord op de vraag. Geen aanloop, geen herhaling van de vraag.
+- Ja/nee-vragen: woord 1 is "Ja" of "Nee". Dan pas toelichting.
+
+GEEN PREAMBLE:
+- VERBODEN openings-formuleringen: "Bedankt voor je vraag", "Goeie vraag", "Leuk dat je het vraagt", "Zoals je vroeg", "Wat betreft je vraag", "Op basis van de beschikbare informatie".
+- VERBODEN als slot: een conclusie-zin die alles herhaalt ("Kortom:...", "Samenvattend:..."). Stop zodra de vraag is beantwoord.
+
+GEEN OPGEBLAZEN ZINNEN:
+- Verzin geen bufferinformatie ("we proberen binnen 24u te reageren" — alleen als dat letterlijk in de bronnen staat).
+- Geen herhaling van wat de gebruiker net zei.
+- Geen meta-talk over wat je gaat doen ("Ik zal je uitleggen dat..."). Doe het gewoon.
+
+`;
+
+// ---------------------------------------------------------------------------
+// v0.7 — extends V0_6 met:
+//   - outputStyleVersion='v2' (nieuwe LENGTH_INSTRUCTION strings)
+//   - OUTPUT-DISCIPLINE blok in systemPrompt (BLUF + anti-preamble + anti-vulling)
+// Geen pipeline-wijzigingen — pure prompt + output-style change.
+// ---------------------------------------------------------------------------
+const V0_7: BotConfig = {
+  ...V0_6,
+  version: 'v0.7',
+  label: 'v0.7 — output-clarity',
+  description:
+    'v0.6 plus scherpere lengte-prompts (kort=1-2 zinnen, normaal=adaptief, lang=gestructureerd), BLUF-lead, anti-preamble, en bullets/witregels renderen nu in de widget.',
+  outputStyleVersion: 'v2',
+  systemPrompt: V0_6.systemPrompt + V0_7_OUTPUT_RULES_BLOCK,
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 export const BOTS: Record<string, BotConfig> = {
@@ -858,10 +900,11 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
   [V0_6.version]: V0_6,
+  [V0_7.version]: V0_7,
 };
 
 /** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_6.version;
+export const LATEST_BOT_VERSION = V0_7.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -871,6 +914,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_4.version,
   V0_5.version,
   V0_6.version,
+  V0_7.version,
 ];
 
 /**
