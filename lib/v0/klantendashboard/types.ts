@@ -227,7 +227,12 @@ export type ConversationStatus = 'answered' | 'unanswered' | 'feedback';
 
 export type ConversationListItem = {
   id: string;
-  startedAt: string;
+  // Laatste activiteit (updated_at) — wint van created_at omdat widget-turns
+  // binnen 24u groeperen via findRecentThreadByVisitor: een nieuwe vraag bumpt
+  // de bestaande thread i.p.v. een nieuwe rij te maken. Sorteren én tonen op
+  // updated_at zorgt dat zo'n thread visueel bovenaan staat met de actuele
+  // datum, in plaats van "gevangen" op de aanmaakdatum van het eerste turn.
+  lastActivityAt: string;
   firstQuestion: string;
   messageCount: number;
   status: ConversationStatus;

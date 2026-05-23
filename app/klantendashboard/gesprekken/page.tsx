@@ -176,7 +176,7 @@ export default async function GesprekkenPage({
                   <th>Eerste vraag</th>
                   <th>Berichten</th>
                   <th>Status</th>
-                  <th>Datum</th>
+                  <th>Laatste activiteit</th>
                   <th style={{ textAlign: 'right' }}>Actie</th>
                 </tr>
               </thead>
@@ -205,7 +205,7 @@ export default async function GesprekkenPage({
                     <td>
                       <StatusBadge status={c.status} kind="conversation" />
                     </td>
-                    <td style={{ color: 'var(--klant-fg-muted)' }}>{formatDateTime(c.startedAt)}</td>
+                    <td style={{ color: 'var(--klant-fg-muted)' }}>{formatDateTime(c.lastActivityAt)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <Link
                         href={`/klantendashboard/gesprekken/${c.id}`}
