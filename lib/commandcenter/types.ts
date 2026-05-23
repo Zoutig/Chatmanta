@@ -216,6 +216,26 @@ export function isMilestoneEffectivelyDone(m: Milestone, tasks: Task[]): boolean
   );
 }
 
+export type MilestoneTaskProgress = {
+  done: number;
+  total: number;
+  ratio: number;
+};
+
+/** Taak-voortgang van één milestone: hoeveel van de gekoppelde taken op
+ *  status='Klaar' staan. `total` rekent op daadwerkelijk gevonden taken (niet
+ *  op linkedTaskIds.length) zodat verwijderde taak-id's de teller niet vervuilen.
+ *  total=0 → "vrije invulling" (milestone zonder taken). */
+export function computeMilestoneTaskProgress(
+  m: Milestone,
+  tasks: Task[],
+): MilestoneTaskProgress {
+  const linked = tasks.filter((t) => m.linkedTaskIds.includes(t.id));
+  const total = linked.length;
+  const done = linked.filter((t) => t.status === 'Klaar').length;
+  return { done, total, ratio: total > 0 ? done / total : 0 };
+}
+
 export type PhaseProgress = {
   done: number;
   total: number;

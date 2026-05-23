@@ -6,7 +6,7 @@ type IconName =
   | 'docs' | 'embed' | 'panel-right' | 'copy' | 'thumb-up' | 'thumb-down'
   | 'refresh' | 'check' | 'upload' | 'x' | 'caret' | 'globe' | 'sun' | 'moon'
   | 'monitor' | 'log-out' | 'command' | 'list' | 'trash' | 'edit' | 'alert'
-  | 'folder' | 'menu';
+  | 'folder' | 'menu' | 'flag';
 
 export function Icon({
   name,
@@ -90,6 +90,8 @@ export function Icon({
       return (<svg {...props}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>);
     case 'menu':
       return (<svg {...props}><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>);
+    case 'flag':
+      return (<svg {...props}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><path d="M4 22v-7" /></svg>);
     default:
       return null;
   }
