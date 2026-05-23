@@ -16,6 +16,7 @@ import {
   type TaskStatus,
 } from '@/lib/commandcenter/types';
 import { Icon } from '@/app/components/svg-icons';
+import { setStatusAction } from '@/app/actions/commandcenter';
 import { TaskModal } from './task-modal';
 import { LabelChip, OwnerBadge, OverdueBadge, PriorityBadge, StatusBadge } from './badges';
 
@@ -74,6 +75,9 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [groupByOwner, setGroupByOwner] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [mode, setMode] = useState<'closed' | 'create' | 'edit'>('closed');
+  // Id van de taak die nu via de quick-Done-knop op 'Klaar' wordt gezet (voor
+  // per-rij pending-state + dubbelklik-bescherming).
+  const [doningId, setDoningId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const filter = QUICK_FILTERS.find((q) => q.id === filterId)?.filter ?? { kind: 'all' };
@@ -91,6 +95,24 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   function close() {
     setMode('closed');
     setEditing(null);
+  }
+
+  // Quick-complete: zet een taak in één klik op 'Klaar' zonder de modal te
+  // openen. Hergebruikt de bestaande setStatusAction; de trigger in de DB vult
+  // completed_at. router.refresh() haalt de bijgewerkte lijst opnieuw op.
+  async function markDone(id: string) {
+    if (doningId) return; // al een Done-call bezig
+    setDoningId(id);
+    try {
+      const res = await setStatusAction(id, 'Klaar');
+      if (!res.ok) {
+        alert(`Kon taak niet op Klaar zetten: ${res.error}`);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDoningId(null);
+    }
   }
 
   return (
@@ -260,13 +282,19 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                     {list.length} {list.length === 1 ? 'taak' : 'taken'}
                   </span>
                 </header>
-                <TaskTable rows={list} onClick={openEdit} hideOwner />
+                <TaskTable
+                  rows={list}
+                  onClick={openEdit}
+                  hideOwner
+                  onDone={markDone}
+                  doningId={doningId}
+                />
               </section>
             );
           })}
         </div>
       ) : (
-        <TaskTable rows={visible} onClick={openEdit} />
+        <TaskTable rows={visible} onClick={openEdit} onDone={markDone} doningId={doningId} />
       )}
 
       <TaskModal
@@ -296,10 +324,14 @@ function TaskTable({
   rows,
   onClick,
   hideOwner,
+  onDone,
+  doningId,
 }: {
   rows: Task[];
   onClick: (t: Task) => void;
   hideOwner?: boolean;
+  onDone: (id: string) => void;
+  doningId: string | null;
 }) {
   return (
     <div
@@ -330,6 +362,7 @@ function TaskTable({
             <Th>Prio</Th>
             <Th>Deadline</Th>
             <Th>Projectgebied</Th>
+            <Th> </Th>
           </tr>
         </thead>
         <tbody>
@@ -405,6 +438,18 @@ function TaskTable({
                   {t.projectArea}
                 </span>
               </Td>
+              <Td>
+                {t.status !== 'Klaar' && (
+                  <DoneButton
+                    pending={doningId === t.id}
+                    disabled={doningId !== null && doningId !== t.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDone(t.id);
+                    }}
+                  />
+                )}
+              </Td>
             </tr>
           ))}
         </tbody>
@@ -442,5 +487,58 @@ function Td({ children }: { children: React.ReactNode }) {
     >
       {children}
     </td>
+  );
+}
+
+// Compacte quick-complete-knop in de actiekolom. stopPropagation gebeurt in de
+// caller zodat de rij-onClick (modal openen) niet óók afgaat.
+function DoneButton({
+  pending,
+  disabled,
+  onClick,
+}: {
+  pending: boolean;
+  disabled: boolean;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending || disabled}
+      title="Markeer als klaar"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        whiteSpace: 'nowrap',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border-strong)',
+        color: 'var(--fg-muted)',
+        padding: '5px 10px',
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 500,
+        cursor: pending || disabled ? 'default' : 'pointer',
+        opacity: disabled && !pending ? 0.45 : 1,
+        transition: 'border-color 140ms ease, color 140ms ease, background 140ms ease',
+      }}
+      onMouseEnter={(e) => {
+        if (pending || disabled) return;
+        e.currentTarget.style.borderColor =
+          'color-mix(in oklab, var(--manta-accent) 45%, transparent)';
+        e.currentTarget.style.color = 'var(--manta-accent, var(--accent))';
+        e.currentTarget.style.background =
+          'color-mix(in oklab, var(--manta-accent) 12%, transparent)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border-strong)';
+        e.currentTarget.style.color = 'var(--fg-muted)';
+        e.currentTarget.style.background = 'var(--surface-2)';
+      }}
+    >
+      <Icon name="check" size={13} />
+      {pending ? 'Bezig…' : 'Klaar'}
+    </button>
   );
 }
