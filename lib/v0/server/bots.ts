@@ -259,6 +259,14 @@ export type BotConfig = {
    */
   hardFactNumericFallback?: boolean;
   /**
+   * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
+   * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
+   * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
+   * lang=gestructureerd). Per-versie zodat oudere eval-runs reproduceerbaar
+   * blijven.
+   */
+  outputStyleVersion?: 'v1' | 'v2';
+  /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
    * omdat v0.4 met cascade nooit dezelfde latency haalt als v0.1.
