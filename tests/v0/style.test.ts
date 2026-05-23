@@ -121,3 +121,36 @@ test('describeStyle returns the same instruction strings used in the prompt', ()
   assert.ok(full.includes(desc.tone));
   assert.ok(full.includes(desc.length));
 });
+
+test('buildSystemPrompt outputStyleVersion v1 returns existing strings', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'short' }, 'v1');
+  assert.ok(out.includes('maximaal 2 zinnen'));
+});
+
+test('buildSystemPrompt outputStyleVersion v2 returns new short instruction', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'short' }, 'v2');
+  assert.ok(out.includes('ULTRA-kort'));
+  assert.ok(!out.includes('maximaal 2 zinnen'));
+});
+
+test('buildSystemPrompt outputStyleVersion v2 returns new medium instruction', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'medium' }, 'v2');
+  assert.ok(out.includes('minimum dat compleet is'));
+  assert.ok(!out.includes('één korte alinea'));
+});
+
+test('buildSystemPrompt outputStyleVersion v2 returns new detailed instruction', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'detailed' }, 'v2');
+  assert.ok(out.includes('Meer structuur'));
+  assert.ok(!out.includes('uitgebreid antwoord van meerdere alineas'));
+});
+
+test('buildSystemPrompt defaults to v1 when version param omitted', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'short' });
+  assert.ok(out.includes('maximaal 2 zinnen'));
+});
+
+test('buildStyleSuffix accepts outputStyleVersion v2', () => {
+  const suffix = buildStyleSuffix({ tone: 'neutral', length: 'detailed' }, 'v2');
+  assert.ok(suffix.includes('Meer structuur'));
+});
