@@ -1177,6 +1177,7 @@ export async function runRagQuery({
   const styledSystemPrompt = buildSystemPrompt(
     renderPersonaTemplate(bot.systemPrompt, evalPersona),
     { tone, length },
+    bot.outputStyleVersion,
   );
 
   // 1. Optional pre-processor — classifies smalltalk vs search and rewrites
@@ -1499,6 +1500,7 @@ export async function* runRagQueryStreaming(input: {
   const styledSystemPrompt = buildSystemPrompt(
     extras.length > 0 ? `${baseSystemPrompt}\n\n${extras}` : baseSystemPrompt,
     { tone, length },
+    bot.outputStyleVersion,
   );
 
   // 0. Manual Q&A fast-path — vóór preprocess/cache/embed.

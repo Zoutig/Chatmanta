@@ -26,6 +26,7 @@ import { EmptyState } from './empty-state';
 import { AssistantMessage, UserMessage, ErrorMessage } from './messages';
 import { RightPanel, type RightTab } from './right-panel';
 import type { BotMeta } from './bot-dropdown';
+import type { OutputStyleVersion } from '@/lib/v0/style';
 import { useStyle } from './use-style';
 import { useHydeMode } from './use-hyde-mode';
 import { useStyleMode } from '@/lib/v0/hooks/use-style-mode';
@@ -76,6 +77,7 @@ export function ChatShell({
   bots,
   botFlags,
   botSystemPrompt,
+  botOutputStyleVersion,
   defaultThreshold,
   defaultEnableRewrite,
   docs,
@@ -91,6 +93,7 @@ export function ChatShell({
   bots: BotMeta[];
   botFlags: BotFlags;
   botSystemPrompt: string;
+  botOutputStyleVersion?: OutputStyleVersion;
   defaultThreshold: number;
   defaultEnableRewrite: boolean;
   docs: DocSummary[];
@@ -654,6 +657,7 @@ export function ChatShell({
           onToggleGeneralKnowledge={() => setGeneralKnowledgeOn((v) => !v)}
           botVersion={botVersion}
           botSystemPrompt={botSystemPrompt}
+          botOutputStyleVersion={botOutputStyleVersion}
           bots={bots}
           botFlags={botFlags}
           activeCite={activeCite}
@@ -749,6 +753,7 @@ export function ChatShell({
           onToggleGeneralKnowledge={() => setGeneralKnowledgeOn((v) => !v)}
           botVersion={botVersion}
           botSystemPrompt={botSystemPrompt}
+          botOutputStyleVersion={botOutputStyleVersion}
           bots={bots}
           botFlags={botFlags}
           activeCite={activeCite}

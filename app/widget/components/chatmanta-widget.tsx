@@ -20,6 +20,7 @@ import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
 import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 import { formatAccentText } from '@/lib/widget/format-accent';
+import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { LocalStorageThreadStore } from '@/lib/widget/thread-store';
 import type { Thread } from '@/lib/widget/thread-types';
 import { ThreadDrawer } from './thread-drawer';
@@ -1185,29 +1186,6 @@ function Caret() {
       }}
     />
   );
-}
-
-// ---------------------------------------------------------------------------
-// Markdown-lite: alleen **bold** segmenten — past bij de v0.5+ system-prompt
-// die de bot instrueert om kernwoorden vet te zetten. Geen volledige md-parser.
-// ---------------------------------------------------------------------------
-function renderMarkdownLite(text: string): React.ReactNode {
-  // Verwijder eventueel weggelekte <thinking>/<answer>-tags (v0.3+ output-format).
-  let clean = text;
-  clean = clean.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
-  clean = clean.replace(/<\/?answer>/g, '');
-  clean = clean.replace(/<confidence>[\s\S]*?<\/confidence>/g, '');
-  // Verwijder [n]-citaties — de widget heeft geen sources-view.
-  clean = clean.replace(/\s*\[\d+\](\[\d+\])*/g, '');
-  clean = clean.trim();
-
-  const parts = clean.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((p, i) => {
-    if (p.startsWith('**') && p.endsWith('**')) {
-      return <strong key={i}>{p.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{p}</span>;
-  });
 }
 
 // ---------------------------------------------------------------------------

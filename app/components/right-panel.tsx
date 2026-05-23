@@ -15,6 +15,7 @@ import { PromptView } from './prompt-view';
 import { ClaimsView } from './claims-view';
 import type { BotMeta } from './bot-dropdown';
 import type { Length, Tone } from '@/lib/v0/style-types';
+import type { OutputStyleVersion } from '@/lib/v0/style';
 import type { HydeMode } from './use-hyde-mode';
 
 export type RightTab =
@@ -48,6 +49,7 @@ export function RightPanel({
   onToggleGeneralKnowledge,
   botVersion,
   botSystemPrompt,
+  botOutputStyleVersion,
   bots,
   botFlags,
   activeCite,
@@ -72,6 +74,7 @@ export function RightPanel({
   onToggleGeneralKnowledge: () => void;
   botVersion: string;
   botSystemPrompt: string;
+  botOutputStyleVersion?: OutputStyleVersion;
   bots: BotMeta[];
   botFlags: {
     cacheEnabled: boolean;
@@ -204,6 +207,7 @@ export function RightPanel({
             botSystemPrompt={botSystemPrompt}
             tone={tone}
             length={length}
+            outputStyleVersion={botOutputStyleVersion}
           />
         ) : null}
         {tab === 'embed' ? <EmbedView botVersion={botVersion} /> : null}
