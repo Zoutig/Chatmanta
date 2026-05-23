@@ -34,8 +34,12 @@ export function cleanWidgetAnswer(text: string): string {
   if (openThink !== -1 && !/<\/thinking>/i.test(s.slice(openThink))) {
     s = s.slice(0, openThink);
   }
-  // <answer>-wrappers + een (mogelijk nog open) <confidence>-staart.
-  s = s.replace(/<\/?answer>/gi, '');
+  // Alles ná </answer> is confidence/metadata — nooit antwoord-tekst. Knip het
+  // in één keer weg (spiegelt parseStreamingV03's </answer>-tail-strip), dan de
+  // losse <answer>-open tag. De nog-open <confidence>-staart-strip blijft voor
+  // bots die zónder </answer> afsluiten.
+  s = s.replace(/<\/answer>[\s\S]*$/i, '');
+  s = s.replace(/<answer>/gi, '');
   s = s.replace(/<confidence>[\s\S]*$/i, '');
   // [n]-citaties.
   s = s.replace(/\s*\[\d+\](\[\d+\])*/g, '');

@@ -56,6 +56,14 @@ test('strips een nog-open <confidence>-staart', () => {
   assert.doesNotMatch(out, /0\.82/);
 });
 
+test('knipt alle metadata na </answer> weg, ook zonder <confidence>-tag', () => {
+  // Spiegelt parseStreamingV03: alles na </answer> is metadata, geen antwoord.
+  const out = html('<answer>Het kost €50 per maand.</answer>\nconfidence: 0.92');
+  assert.match(out, /€50 per maand\./);
+  assert.doesNotMatch(out, /confidence/i);
+  assert.doesNotMatch(out, /0\.92/);
+});
+
 test('strips [n] citations', () => {
   const out = html('Het kost €50 [1] per maand [2][3].');
   assert.doesNotMatch(out, /\[1\]/);
