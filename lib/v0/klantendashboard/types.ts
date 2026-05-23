@@ -129,7 +129,6 @@ export type SourceStrictness = 'strict' | 'normal' | 'flexible';
 export type ChatbotSettings = {
   // Basis
   chatbotName: string;
-  companyName: string;
   companyDescription: string;
   welcomeMessage: string;
   starterQuestions: string[];
@@ -137,7 +136,6 @@ export type ChatbotSettings = {
   // Taal
   primaryLanguage: Language;
   autoDetectLanguage: boolean;
-  extraLanguages: Language[];
 
   // Tone of voice
   toneOfVoice: ToneOfVoice;

@@ -4,7 +4,8 @@
 // toneOfVoice ∈ {professional, friendly, concise, enthusiastic, informal},
 // answerLength ∈ {short, normal, long}, plus extraInstructions, fallbackMessage,
 // sourceStrictness, mayMentionPrices, mayShareContact, honestAboutUnknown,
-// companyDescription, chatbotName, contact-velden.
+// companyDescription, chatbotName, primaryLanguage, autoDetectLanguage,
+// contact-velden.
 //
 // De RAG-pipeline (lib/v0/server/rag.ts) werkt met een veel kleinere set:
 // Tone ∈ {formal, neutral, casual}, Length ∈ {short, medium, detailed}, plus
@@ -15,8 +16,16 @@
 // Bewust géén 'server-only' import: types-only consumers (eval-runner, tests)
 // mogen hem ook draaien. Geen I/O hier — pure transformatie.
 
-import type { ChatbotSettings } from '../types';
+import type { ChatbotSettings, Language } from '../types';
 import type { Length, Tone } from '../../style-types';
+
+const LANG_LABEL_NL: Record<Language, string> = {
+  nl: 'Nederlands',
+  en: 'Engels',
+  de: 'Duits',
+  fr: 'Frans',
+  es: 'Spaans',
+};
 
 // ---------------------------------------------------------------------------
 // Mapping ToneOfVoice (5) → Tone (3)
@@ -81,10 +90,9 @@ export function buildChatbotOverrides(
 
   // Chatbot-identiteit. Persona.ts levert de bedrijfsnaam-velden (COMPANY,
   // COMPANY_SUFFIX) — chatbotName is een aparte laag: hoe noemt de bot zich
-  // intern. Alleen toevoegen als de klant een betekenisvolle naam koos (niet
-  // de default leeg-string of bedrijfsnaam-herhaling).
+  // intern. Alleen toevoegen als de klant een betekenisvolle naam koos.
   const chatbotName = settings.chatbotName.trim();
-  if (chatbotName && chatbotName !== settings.companyName.trim()) {
+  if (chatbotName) {
     lines.push(`Je heet "${chatbotName}". Stel je zo voor als de gebruiker daar expliciet naar vraagt — niet ongevraagd.`);
   }
 
@@ -94,6 +102,21 @@ export function buildChatbotOverrides(
   const companyDescription = settings.companyDescription.trim();
   if (companyDescription) {
     lines.push(`OVER HET BEDRIJF: ${companyDescription}`);
+  }
+
+  // Taal-instructie. Zonder deze regel detecteert de LLM de taal puur uit de
+  // vraag en kiest zelf. Met autoDetectLanguage=true sturen we dat gedrag
+  // expliciet aan (bot volgt de bezoeker); met false dwingen we de primaryLanguage
+  // ook als de bezoeker iets anders schrijft (bv. NL-klant die alleen NL wil).
+  const lang = LANG_LABEL_NL[settings.primaryLanguage];
+  if (settings.autoDetectLanguage) {
+    lines.push(
+      `TAAL: Antwoord standaard in het ${lang}. Als de bezoeker een vraag in een andere taal stelt, antwoord dan in die taal.`,
+    );
+  } else {
+    lines.push(
+      `TAAL: Antwoord ALTIJD in het ${lang}, ook als de bezoeker in een andere taal schrijft.`,
+    );
   }
 
   // Source-strictness — hoe ver mag de bot van de retrieved chunks afwijken?
@@ -114,7 +137,8 @@ export function buildChatbotOverrides(
   if (!settings.mayMentionPrices) {
     const url = settings.contactPageUrl.trim();
     const phone = settings.contactPhone.trim();
-    const refers = [url, phone].filter((x) => x.length > 0).join(' of ');
+    const email = settings.contactEmail.trim();
+    const refers = [url, phone, email].filter((x) => x.length > 0).join(' of ');
     const suffix = refers ? ` Verwijs voor prijzen naar ${refers}.` : '';
     lines.push(`GEEN PRIJZEN: Noem geen tarieven of bedragen, ook niet uit de bronnen.${suffix}`);
   }
