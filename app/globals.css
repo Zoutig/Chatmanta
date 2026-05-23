@@ -2126,6 +2126,38 @@ body.body-fixed { overflow: hidden; }
 .bot-dropdown-model { font-family: var(--font-mono); font-size: 10px; color: var(--fg-dim); }
 .bot-dropdown-item.active .bot-dropdown-model { color: var(--accent); }
 .bot-dropdown-desc { font-size: 11.5px; color: var(--fg-muted); line-height: 1.45; }
+.bot-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 4px;
+}
+.bot-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.bot-dropdown-toggle:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+.bot-dropdown-toggle:focus { outline: none; }
+.bot-dropdown-toggle:focus-visible {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+.bot-dropdown-toggle .caret-icon { transition: transform 0.18s ease; display: inline-flex; }
+.bot-dropdown-toggle[data-expanded="true"] .caret-icon { transform: rotate(180deg); }
 
 /* Docs panel */
 .docs-actions { margin-bottom: 14px; display: flex; gap: 8px; }
