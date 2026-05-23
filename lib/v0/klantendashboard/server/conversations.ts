@@ -111,7 +111,12 @@ export async function listConversations(
         resp?.kind === 'fallback' ? 'unanswered' : 'answered';
       return {
         id: tid,
-        startedAt: String(t.created_at ?? ''),
+        // Toon updated_at, niet created_at: widget-turns binnen 24u worden door
+        // findRecentThreadByVisitor aan een bestaande thread geappend i.p.v.
+        // een nieuwe rij te maken. Met created_at zou een net-bijgewerkte
+        // thread visueel "vast" lijken op haar startdatum; updated_at maakt de
+        // bumped-naar-boven-positie consistent met de getoonde datum.
+        lastActivityAt: String(t.updated_at ?? t.created_at ?? ''),
         firstQuestion: firstQ,
         messageCount: countByThread.get(tid) ?? 0,
         status,
