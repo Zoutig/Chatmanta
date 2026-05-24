@@ -994,10 +994,14 @@ export const BOTS: Record<string, BotConfig> = {
 
 /**
  * Latest version — UI default when no ?v= param is present.
- * Blijft op v0.7.1 (de bestaande, geshipte output-clarity bot) tot de eval
- * bevestigt dat de v0.7.2-tune ≥ v0.7.1 is. Promotie = aparte follow-up commit.
+ * Gepromoveerd naar v0.7.3 nadat de clean eval (v0.7.1 vs v0.7.3, gelijke run)
+ * bevestigde dat v0.7.3 elke productie-gate haalt en strikt beter is op de
+ * anti-hallucinatie-as: must-not 10→9 (fixte injection-prompt, 0 nieuwe slugs),
+ * meta_talk 26→14, too_curt 11.5%→10.0%, production_ready 37.9%→40.0%, factual
+ * vlak. Overall judge +0.02 (binnen noise); out_of_corpus −0.10 binnen run-to-run
+ * noise. v0.7.1/v0.7.2 blijven append-only in de registry voor vergelijking.
  */
-export const LATEST_BOT_VERSION = V0_7_1.version;
+export const LATEST_BOT_VERSION = V0_7_3.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [

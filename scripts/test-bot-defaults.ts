@@ -154,7 +154,7 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.7.1', 'LATEST_BOT_VERSION moet v0.7.1 zijn (v0.7.2/v0.7.3 niet gepromoveerd tot eval bevestigt)');
+assert.equal(LATEST_BOT_VERSION, 'v0.7.3', 'LATEST_BOT_VERSION moet v0.7.3 zijn (gepromoveerd na clean eval: gate-schoon + must-not 10→9)');
 assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3']);
 
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
@@ -168,4 +168,4 @@ console.log(`✓ v0.6.1/v0.6.2/v0.6.3 staging-versies bestaan niet meer in BOTS`
 console.log(`✓ v0.7.1 = output-clarity (outputStyleVersion=v2, was 'v0.7')`);
 console.log(`✓ v0.7.2 = output-clarity tune (outputStyleVersion=v3, rebuild vanaf v0.6, geen v0.7.1-stacking)`);
 console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.7.2-blok, rebuild vanaf v0.6)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.7.1 (v0.7.2/v0.7.3 nog niet gepromoveerd), BOT_VERSIONS_ORDERED = [v0.1..v0.7.3]`);
+console.log(`✓ LATEST_BOT_VERSION = v0.7.3 (gepromoveerd na clean eval), BOT_VERSIONS_ORDERED = [v0.1..v0.7.3]`);
