@@ -18,7 +18,7 @@ import {
   type Tone,
 } from './style-types';
 
-export type OutputStyleVersion = 'v1' | 'v2';
+export type OutputStyleVersion = 'v1' | 'v2' | 'v3';
 
 const TONE_INSTRUCTION: Record<Tone, string> = {
   formal:
@@ -45,8 +45,23 @@ const LENGTH_INSTRUCTION_V2: Record<Length, string> = {
     'Geef het volledige antwoord met structuur: paragrafen met witregels (lege regel tussen blokken), opsommingen waar er 3+ parallelle items zijn (regels die beginnen met "- "), en gebruik **vetgedrukte koppen** voor sub-onderwerpen (bv. "**Openingstijden**" gevolgd door details). Meer structuur, niet meer woorden — voeg geen vulling toe voor de schijn van diepgang.',
 };
 
+// V3 (v0.7.2): tune van V2. De eval draait altijd op length='medium'
+// (DEFAULT_LENGTH) — daar zat de too_curt-regressie van v0.7.1: "het minimum dat
+// compleet is" + BLUF deden de bot nodige context, wedervragen en contact-CTA's
+// droppen. V3 behoudt de beknoptheid maar geeft die assen expliciet terug.
+const LENGTH_INSTRUCTION_V3: Record<Length, string> = {
+  short:
+    'Houd het kort en direct: meestal 1-3 zinnen. Geen aanloop of herhaling. Maar laat geen cruciale nuance, correctie of vervolgstap weg om kort te zijn.',
+  medium:
+    'Geef het minimum dat compleet én bruikbaar is — zo kort als de vraag toelaat, zo lang als nodig. Bij een simpel feit: 1-2 zinnen. Bij meerdere onderdelen of een vergelijking: een paragraafje. Laat nooit context weg die de klant nodig heeft om het antwoord te kunnen gebruiken. Bij een vage of onderspecificeerde vraag: stel eerst één gerichte wedervraag in plaats van te gokken. Geen vulling, maar beknoptheid gaat nooit ten koste van een nodige nuance, correctie of vervolgstap.',
+  detailed:
+    'Geef het volledige antwoord met structuur: paragrafen met witregels (lege regel tussen blokken), opsommingen waar er 3+ parallelle items zijn (regels die beginnen met "- "), en gebruik **vetgedrukte koppen** voor sub-onderwerpen (bv. "**Openingstijden**" gevolgd door details). Meer structuur, niet meer woorden — voeg geen vulling toe voor de schijn van diepgang.',
+};
+
 function pickLengthMap(version: OutputStyleVersion): Record<Length, string> {
-  return version === 'v2' ? LENGTH_INSTRUCTION_V2 : LENGTH_INSTRUCTION_V1;
+  if (version === 'v3') return LENGTH_INSTRUCTION_V3;
+  if (version === 'v2') return LENGTH_INSTRUCTION_V2;
+  return LENGTH_INSTRUCTION_V1;
 }
 
 export function normalizeStyle(input: {

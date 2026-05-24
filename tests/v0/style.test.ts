@@ -87,7 +87,7 @@ test('buildSystemPrompt covers all 9 tone × length combinations', () => {
       // Tone-zin moet aanwezig zijn
       const toneSnippet = {
         formal: 'formele, zakelijke toon',
-        neutral: 'neutrale, professioneel-vriendelijke toon',
+        neutral: 'warme, vriendelijke toon',
         casual: 'losse, informele toon',
       }[tone];
       assert.ok(
@@ -153,4 +153,26 @@ test('buildSystemPrompt defaults to v1 when version param omitted', () => {
 test('buildStyleSuffix accepts outputStyleVersion v2', () => {
   const suffix = buildStyleSuffix({ tone: 'neutral', length: 'detailed' }, 'v2');
   assert.ok(suffix.includes('Meer structuur'));
+});
+
+test('buildSystemPrompt outputStyleVersion v3 softens the short instruction', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'short' }, 'v3');
+  assert.ok(out.includes('meestal 1-3 zinnen'));
+  assert.ok(!out.includes('ULTRA-kort'), 'v3 short mag niet langer ULTRA-kort zijn');
+});
+
+test('buildSystemPrompt outputStyleVersion v3 medium preserves needed context', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'medium' }, 'v3');
+  assert.ok(out.includes('compleet én bruikbaar'));
+  assert.ok(out.includes('stel eerst één gerichte wedervraag'));
+});
+
+test('buildSystemPrompt outputStyleVersion v3 detailed equals v2 detailed', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'neutral', length: 'detailed' }, 'v3');
+  assert.ok(out.includes('Meer structuur'));
+});
+
+test('buildStyleSuffix accepts outputStyleVersion v3', () => {
+  const suffix = buildStyleSuffix({ tone: 'neutral', length: 'medium' }, 'v3');
+  assert.ok(suffix.includes('stel eerst één gerichte wedervraag'));
 });
