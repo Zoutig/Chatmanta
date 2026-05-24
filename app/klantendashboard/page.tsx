@@ -16,7 +16,7 @@ import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions'
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from './components/ui/page-head';
 import { Btn } from './components/ui/btn';
-import { Icon } from './components/ui/icon';
+import { Icon } from './components/ui/icons';
 import { SetupChecklist } from './components/setup-checklist';
 import { DismissibleBanner } from './components/dismissible-banner';
 import { TriagePanel } from './components/overview/triage-panel';

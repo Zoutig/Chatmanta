@@ -11,7 +11,7 @@ import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getConversationDetail } from '@/lib/v0/klantendashboard/server/conversations';
 import { PageHead } from '../../components/ui/page-head';
 import { StatusBadge } from '../../components/status-badge';
-import { Icon } from '../../components/ui/icon';
+import { Icon } from '../../components/ui/icons';
 import { ConversationActions } from './components/conversation-actions';
 
 export const dynamic = 'force-dynamic';

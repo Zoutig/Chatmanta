@@ -17,7 +17,7 @@ import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from '../components/ui/page-head';
 import { StatusBadge } from '../components/status-badge';
-import { Icon } from '../components/ui/icon';
+import { Icon } from '../components/ui/icons';
 import { TabsNav } from '../components/tabs';
 import { FilterBar } from './components/filter-bar';
 import { NegativeFeedbackTable } from './components/negative-feedback-table';

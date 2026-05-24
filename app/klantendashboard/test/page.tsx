@@ -16,7 +16,7 @@ import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import { PageHead } from '../components/ui/page-head';
 import { Btn } from '../components/ui/btn';
-import { Icon } from '../components/ui/icon';
+import { Icon } from '../components/ui/icons';
 import { ChatPreview } from './components/chat-preview';
 
 export const dynamic = 'force-dynamic';

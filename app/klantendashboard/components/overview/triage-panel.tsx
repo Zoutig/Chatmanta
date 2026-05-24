@@ -7,7 +7,7 @@
 // stuurt naar de kennisbank waar je een Q&A toevoegt.
 
 import { Btn } from '../ui/btn';
-import { Icon } from '../ui/icon';
+import { Icon } from '../ui/icons';
 import type { UnansweredQuestion } from '@/lib/v0/klantendashboard/types';
 
 const UNANSWERED_HREF = '/klantendashboard/gesprekken?filter=unanswered';
