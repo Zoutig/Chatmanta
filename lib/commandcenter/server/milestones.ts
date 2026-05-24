@@ -145,9 +145,12 @@ export async function deleteMilestone(id: string): Promise<void> {
 }
 
 // Module-level cache: skip de COUNT(*) RTT zodra we weten dat seed gedaan is.
+// Auto-seed is opt-in (CC_ENABLE_SEED=true) — zie ensureSeeded() in storage.ts:
+// anders her-injecteert een cold-start de demo-milestones na de "schone lei".
 let _milestonesSeeded = false;
 
 export async function ensureMilestonesSeeded(): Promise<{ seeded: boolean; count: number }> {
+  if (process.env.CC_ENABLE_SEED !== 'true') return { seeded: false, count: -1 };
   if (_milestonesSeeded) return { seeded: false, count: -1 };
 
   const { count, error } = await sb()

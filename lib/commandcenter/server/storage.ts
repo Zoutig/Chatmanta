@@ -180,10 +180,17 @@ export async function deleteTask(id: string): Promise<void> {
 
 /** Idempotent: alleen seeden als de tabel leeg is.
  *  Module-level cache zodat we niet bij elke request een COUNT(*) RTT doen
- *  zodra we weten dat de tabel al gevuld is. */
+ *  zodra we weten dat de tabel al gevuld is.
+ *
+ *  Auto-seed is opt-in (CC_ENABLE_SEED=true). Reden: deze functie draait op elke
+ *  command-center page-load en her-injecteerde de demo-seed zodra de tabel leeg
+ *  was. Dat ondermijnt de "schone lei"-actie — na het wissen van open taken zou
+ *  een Vercel cold-start (in-memory cache reset) de seed terugzetten. Standaard
+ *  dus niet seeden; zet de env-var alleen om een verse DB initieel te vullen. */
 let _tasksSeeded = false;
 
 export async function ensureSeeded(): Promise<{ seeded: boolean; count: number }> {
+  if (process.env.CC_ENABLE_SEED !== 'true') return { seeded: false, count: -1 };
   if (_tasksSeeded) return { seeded: false, count: -1 };
 
   const { count, error } = await sb()
