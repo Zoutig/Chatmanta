@@ -135,8 +135,27 @@ assert.equal(v072.generalKnowledgeEnabled, true, 'v0.7.2 erft generalKnowledgeEn
 // Append-only: v0.7.1 niet gemuteerd door de v0.7.2-toevoeging
 assert.equal(v071.outputStyleVersion, 'v2', 'append-only: v0.7.1 blijft outputStyleVersion=v2');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.7.1', 'LATEST_BOT_VERSION moet v0.7.1 zijn (v0.7.2 niet gepromoveerd tot eval bevestigt)');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2']);
+// V0.7.3 — output-clarity CARVE-OUT. Behoudt het hele v0.7.2-blok (incl.
+// WAT BONDIGHEID NIET MAG WEGLATEN) maar voegt een weiger-carve-out toe die de
+// volledigheids-/CTA-regels beperkt tot beantwoordbare vragen. Rebuild vanaf v0.6.
+const v073 = BOTS['v0.7.3'];
+assert.ok(v073, 'v0.7.3 ontbreekt uit BOTS-registry');
+assert.equal(v073.version, 'v0.7.3', 'v0.7.3 version-veld moet v0.7.3 zijn');
+assert.equal(v073.outputStyleVersion, 'v3', 'v0.7.3 erft outputStyleVersion=v3 van v0.7.2');
+assert.match(v073.systemPrompt, /WEIGER KORT EN SCHOON/, 'v0.7.3 systemPrompt moet de weiger-carve-out bevatten');
+assert.match(v073.systemPrompt, /WAT BONDIGHEID NIET MAG WEGLATEN/, 'v0.7.3 behoudt het v0.7.2-tune-blok');
+assert.match(v073.systemPrompt, /LEAD MET HET ANTWOORD/, 'v0.7.3 behoudt BLUF-lead');
+assert.match(v073.systemPrompt, /ALGEMENE BASISKENNIS ALS BRUG/, 'v0.7.3 erft het v0.6 bridging-blok (rebuild vanaf v0.6)');
+assert.doesNotMatch(v073.systemPrompt, /VERBODEN als slot/, 'v0.7.3 mag het oude v0.7.1-slot-verbod NIET stapelen');
+assert.equal(v073.adaptiveRag, true, 'v0.7.3 erft adaptiveRag=true');
+assert.equal(v073.matchedSpanContext, true, 'v0.7.3 erft matchedSpanContext=true');
+assert.equal(v073.compositeQueryPath, 'standard', 'v0.7.3 erft compositeQueryPath=standard');
+assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEnabled=true');
+// Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
+assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
+
+assert.equal(LATEST_BOT_VERSION, 'v0.7.1', 'LATEST_BOT_VERSION moet v0.7.1 zijn (v0.7.2/v0.7.3 niet gepromoveerd tot eval bevestigt)');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3']);
 
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
@@ -148,4 +167,5 @@ console.log(`✓ v0.6 compositeQueryPath=standard (composite-query naar standard
 console.log(`✓ v0.6.1/v0.6.2/v0.6.3 staging-versies bestaan niet meer in BOTS`);
 console.log(`✓ v0.7.1 = output-clarity (outputStyleVersion=v2, was 'v0.7')`);
 console.log(`✓ v0.7.2 = output-clarity tune (outputStyleVersion=v3, rebuild vanaf v0.6, geen v0.7.1-stacking)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.7.1 (v0.7.2 nog niet gepromoveerd), BOT_VERSIONS_ORDERED = [v0.1..v0.7.2]`);
+console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.7.2-blok, rebuild vanaf v0.6)`);
+console.log(`✓ LATEST_BOT_VERSION = v0.7.1 (v0.7.2/v0.7.3 nog niet gepromoveerd), BOT_VERSIONS_ORDERED = [v0.1..v0.7.3]`);
