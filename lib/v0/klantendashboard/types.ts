@@ -32,6 +32,9 @@ export type OverviewMetrics = {
     messages: number;
   };
   unansweredCount: number;
+  /** Updated_at van de meest recente onbeantwoorde thread (laatste 30 dagen),
+   *  of null. Voedt de dismiss-signature van de Overzicht-banner. */
+  latestUnansweredAt: string | null;
 };
 
 export type UnansweredQuestion = {
