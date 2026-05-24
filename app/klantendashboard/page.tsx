@@ -25,7 +25,7 @@ import { PageHeader } from './components/page-header';
 import { MetricCard } from './components/metric-card';
 import { StatusBadge } from './components/status-badge';
 import { SetupChecklist } from './components/setup-checklist';
-import { WarningBanner } from './components/warning-banner';
+import { DismissibleBanner } from './components/dismissible-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,10 +53,13 @@ export default async function OverviewPage() {
         subtitle="Beheer je chatbot, bronnen en widget vanaf één plek."
       />
 
-      {/* Warnings — gestapeld */}
+      {/* Warnings — gestapeld. Elk wegklikbaar; de onbeantwoord-banner komt
+          terug zodra count of latestUnansweredAt verandert (nieuwe gap). */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
         {!hasAnySource && (
-          <WarningBanner
+          <DismissibleBanner
+            dismissId="no-sources"
+            signature="active"
             variant="warning"
             title="Je hebt nog geen bronnen toegevoegd"
             message="Voeg websitepagina's, documenten of Q&A toe zodat je chatbot vragen kan beantwoorden."
@@ -64,7 +67,9 @@ export default async function OverviewPage() {
           />
         )}
         {metrics.widgetStatus === 'not_installed' && hasAnySource && (
-          <WarningBanner
+          <DismissibleBanner
+            dismissId="widget-not-installed"
+            signature="active"
             variant="info"
             title="Je widget is nog niet geplaatst"
             message="Plaats de embed-code op je website om je chatbot zichtbaar te maken voor bezoekers."
@@ -72,10 +77,16 @@ export default async function OverviewPage() {
           />
         )}
         {metrics.unansweredCount > 0 && (
-          <WarningBanner
+          <DismissibleBanner
+            dismissId="unanswered"
+            signature={`${metrics.unansweredCount}:${metrics.latestUnansweredAt ?? ''}`}
             variant="info"
-            title={`Er zijn ${metrics.unansweredCount} onbeantwoorde vragen`}
-            message="Voeg extra kennis toe om je chatbot beter te maken op onderwerpen die hij nog niet kent."
+            title={
+              metrics.unansweredCount === 1
+                ? 'Er is 1 onbeantwoorde vraag'
+                : `Er zijn ${metrics.unansweredCount} onbeantwoorde vragen`
+            }
+            message="Dit zijn gesprekken van de laatste 30 dagen waar je chatbot geen goed antwoord op had. Voeg kennis toe om ze te verhelpen."
             cta={{ label: 'Bekijken', href: '/klantendashboard/gesprekken?filter=unanswered' }}
           />
         )}
@@ -135,11 +146,11 @@ export default async function OverviewPage() {
             secondary={
               metrics.unansweredCount === 0
                 ? 'Alle vragen tot nu toe beantwoord.'
-                : 'Vragen waar je chatbot geen goed antwoord op had.'
+                : 'Gesprekken (laatste 30 dagen) zonder goed antwoord.'
             }
             icon={HelpCircle}
-            href="/klantendashboard/kennisbank"
-            cta="Verbeter kennisbank"
+            href="/klantendashboard/gesprekken?filter=unanswered"
+            cta="Bekijk gesprekken"
             tone={metrics.unansweredCount > 0 ? 'warning' : 'neutral'}
           />
         </div>
