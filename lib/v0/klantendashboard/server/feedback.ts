@@ -9,7 +9,7 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
-import type { NegativeFeedbackItem } from '../types';
+import type { HelpfulnessRate, NegativeFeedbackItem } from '../types';
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -96,5 +96,42 @@ export async function countRecentNegativeFeedback(
     return count;
   } catch {
     return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getHelpfulnessRate — % duimpjes-omhoog over (up + down) in het venster.
+// Voedt de "Behulpzaam"-metric op Overzicht. `rate` is null bij 0 stemmen,
+// zodat de UI een eerlijke "nog geen feedback"-staat kan tonen i.p.v. "0%".
+// ---------------------------------------------------------------------------
+export async function getHelpfulnessRate(
+  orgSlug: OrgSlug,
+  windowDays = 30,
+): Promise<HelpfulnessRate> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - windowDays);
+    const sinceIso = since.toISOString();
+    const [upRes, downRes] = await Promise.all([
+      sb()
+        .from('v0_feedback')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('rating', 'up')
+        .gte('created_at', sinceIso),
+      sb()
+        .from('v0_feedback')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('rating', 'down')
+        .gte('created_at', sinceIso),
+    ]);
+    const up = upRes.count ?? 0;
+    const down = downRes.count ?? 0;
+    const total = up + down;
+    return { rate: total === 0 ? null : Math.round((up / total) * 100), up, down, total };
+  } catch {
+    return { rate: null, up: 0, down: 0, total: 0 };
   }
 }
