@@ -8,7 +8,7 @@
 import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { DashboardWidgetSwitch } from '@/app/components/dashboard-widget-switch';
-import { PageHeader } from '../components/page-header';
+import { PageHead } from '../components/ui/page-head';
 import { WidgetForm } from './components/widget-form';
 
 export const dynamic = 'force-dynamic';
@@ -21,10 +21,11 @@ export default async function WidgetPage() {
 
   return (
     <>
-      <PageHeader
-        title="Widget"
-        subtitle="Plaats de chatbot op je website en bepaal hoe hij eruitziet."
-        action={<DashboardWidgetSwitch current="dashboard" variant="dashboard" />}
+      <PageHead
+        eyebrow="Widget"
+        title="Plaats je chatbot op je website"
+        subtitle="Een paar regels code, jouw kleuren, jouw positie — bezoekers zien meteen dat het bij je site hoort."
+        actions={<DashboardWidgetSwitch current="dashboard" variant="dashboard" />}
       />
 
       <WidgetForm
