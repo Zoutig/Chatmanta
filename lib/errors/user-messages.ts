@@ -65,6 +65,12 @@ export function userView(
         title: 'We konden het bestand niet lezen',
         body: 'Het bestand lijkt beschadigd of niet leesbaar als tekst. Probeer een ander bestand of plak de inhoud.',
       };
+    case 'CRAWL_FAILED':
+      return {
+        title: 'We konden de website niet crawlen',
+        body: 'Controleer of de URL klopt en publiek bereikbaar is, en probeer het opnieuw.',
+        action: 'Opnieuw proberen',
+      };
     case 'AUTH_REQUIRED':
       return {
         title: 'Inloggen vereist',

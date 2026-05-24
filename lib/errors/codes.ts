@@ -14,6 +14,7 @@ export const APP_ERROR_CODES = [
   'INGEST_TOO_LARGE',    // upload > 200 KB
   'INGEST_TYPE',         // verkeerde extensie
   'INGEST_READ_FAILED',  // file.text() of parser faalt
+  'CRAWL_FAILED',        // website-crawl: ongeldige/geblokkeerde URL of Firecrawl-fout (reden in message)
   'AUTH_REQUIRED',       // V0-cookie ontbreekt/ongeldig, of wachtwoord fout
   'AUTH_FORBIDDEN',      // org-mismatch / role-check faalt (V1 hook)
   'NOT_FOUND',           // thread / doc / org bestaat niet

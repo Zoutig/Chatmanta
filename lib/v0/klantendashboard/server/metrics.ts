@@ -1,15 +1,15 @@
 // V0 Klantendashboard — overview metrics aggregator.
 //
-// Combineert echte data uit query_log/v0_threads/documents (waar beschikbaar)
-// met mock-data voor entiteiten die in V0 nog geen DB-tabel hebben
-// (website_pages, manual_qa_items, widget_settings).
+// Combineert echte data uit query_log/v0_threads/documents/website_pages (waar
+// beschikbaar) met mock-data voor entiteiten die in V0 nog geen DB-tabel hebben
+// (manual_qa_items, widget_settings).
 
 import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
-import { getMockWebsitePages } from '../mock/website-pages';
+import { getWebsiteState } from '@/lib/v0/server/crawler';
 import { getOrgSettings } from './settings';
 import { countUnansweredThreads } from './conversations';
 import { getHelpfulnessRate } from './feedback';
@@ -70,7 +70,7 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
       listDocs(orgId).catch(() => []),
       countUnansweredThreads(orgSlug),
       countConversationsThisMonth(orgId),
-      Promise.resolve(getMockWebsitePages(orgSlug)),
+      getWebsiteState(orgId).then((s) => s.pages).catch(() => []),
       getOrgSettings(orgSlug),
       getHelpfulnessRate(orgSlug),
       getConversationsWeekDelta(orgId),

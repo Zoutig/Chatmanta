@@ -57,6 +57,7 @@ export function httpStatusFor(code: AppErrorCode): number {
       return 504;
     case 'LLM_UNAVAILABLE':
     case 'EMBED_FAILED':
+    case 'CRAWL_FAILED':
       return 502;
     case 'INTERNAL':
       return 500;

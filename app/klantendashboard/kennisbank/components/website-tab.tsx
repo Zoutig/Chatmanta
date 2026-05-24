@@ -1,9 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Globe, RefreshCw, Power, Trash2, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useTransition } from 'react';
+import { Globe, RefreshCw, Trash2, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
 import { StatusBadge } from '../../components/status-badge';
-import type { WebsitePage } from '@/lib/v0/klantendashboard/types';
+import {
+  startWebsiteCrawlAction,
+  deleteWebsiteSourceAction,
+  refreshWebsiteState,
+} from '@/app/actions/crawl';
+import type { WebsiteState } from '@/lib/v0/server/crawler';
 
 function formatDate(iso: string): string {
   if (!iso) return '—';
@@ -17,71 +22,82 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
 }
 
-export function WebsiteTab({ initialPages }: { initialPages: WebsitePage[] }) {
-  const [pages, setPages] = useState<WebsitePage[]>(initialPages);
+export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
+  const [state, setState] = useState<WebsiteState>(initialState);
   const [url, setUrl] = useState('');
-  const [crawling, setCrawling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
-  function addUrl() {
-    if (!url.trim() || crawling) return;
-    setCrawling(true);
-    // Mock crawl — in V0 simuleren we een "verwerking" en voegen na 1.2s een
-    // page toe met status processing → active.
-    const newPage: WebsitePage = {
-      id: `mock-${Date.now()}`,
-      title: new URL(url, 'https://invalid').hostname.replace(/^www\./, '') + ' — toegevoegd',
-      url: url.startsWith('http') ? url : `https://${url}`,
-      status: 'processing',
-      lastProcessedAt: new Date().toISOString(),
-    };
-    setPages((p) => [newPage, ...p]);
-    setTimeout(() => {
-      setPages((p) =>
-        p.map((x) =>
-          x.id === newPage.id
-            ? { ...x, status: 'active' as const, lastProcessedAt: new Date().toISOString() }
-            : x,
-        ),
-      );
-      setCrawling(false);
+  const { source, job, pages } = state;
+  const isCrawling = job?.status === 'pending' || job?.status === 'processing';
+  const jobFailed = job?.status === 'failed';
+
+  // Pollt de state terwijl een crawl loopt; de cron-route ingest op de achtergrond.
+  useEffect(() => {
+    if (!isCrawling) return;
+    const timer = setInterval(async () => {
+      try {
+        setState(await refreshWebsiteState());
+      } catch {
+        /* netwerk-hapering — volgende tick probeert opnieuw */
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isCrawling]);
+
+  function submitCrawl(target: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await startWebsiteCrawlAction(target);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
       setUrl('');
-    }, 1200);
+      try {
+        setState(await refreshWebsiteState());
+      } catch {
+        /* polling pikt het op */
+      }
+    });
   }
 
-  function togglePage(id: string) {
-    setPages((p) =>
-      p.map((x) =>
-        x.id === id ? { ...x, status: x.status === 'active' ? 'disabled' : 'active' } : x,
-      ),
-    );
+  function onAdd() {
+    if (!url.trim() || pending) return;
+    submitCrawl(url);
   }
 
-  function reprocess(id: string) {
-    setPages((p) => p.map((x) => (x.id === id ? { ...x, status: 'processing' as const } : x)));
-    setTimeout(() => {
-      setPages((p) =>
-        p.map((x) =>
-          x.id === id
-            ? { ...x, status: 'active' as const, lastProcessedAt: new Date().toISOString() }
-            : x,
-        ),
-      );
-    }, 1000);
+  function onRecrawl() {
+    if (!source?.rootUrl || pending) return;
+    if (!confirm('Website opnieuw crawlen? De bestaande pagina’s worden vervangen.')) return;
+    submitCrawl(source.rootUrl);
   }
 
-  function removePage(id: string) {
-    if (!confirm('Pagina verwijderen uit kennisbank?')) return;
-    setPages((p) => p.filter((x) => x.id !== id));
+  function onDelete() {
+    if (!source || pending) return;
+    if (!confirm('Website-bron verwijderen? Alle gecrawlde pagina’s gaan uit de kennisbank.')) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteWebsiteSourceAction(source.id);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setState({ source: null, job: null, pages: [] });
+    });
   }
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Invoer */}
       <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <h3 className="klant-section-title">Voeg website-pagina&apos;s toe</h3>
+          <h3 className="klant-section-title">
+            {source ? 'Website van je chatbot' : 'Voeg je website toe'}
+          </h3>
           <p className="klant-section-help">
-            Voeg pagina&apos;s toe die je chatbot mag gebruiken om vragen te beantwoorden.
-            Je chatbot leest de content en haalt daar antwoorden uit.
+            Geef de URL van je website op. Wij crawlen de pagina&apos;s (max 50) en je chatbot
+            haalt daar antwoorden uit. Dit kan een paar minuten duren.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -91,19 +107,19 @@ export function WebsiteTab({ initialPages }: { initialPages: WebsitePage[] }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') addUrl();
+              if (e.key === 'Enter') onAdd();
             }}
             className="klant-input"
-            disabled={crawling}
+            disabled={pending || isCrawling}
           />
           <button
             type="button"
-            onClick={addUrl}
+            onClick={onAdd}
             className="klant-btn"
             data-variant="primary"
-            disabled={crawling || !url.trim()}
+            disabled={pending || isCrawling || !url.trim()}
           >
-            {crawling ? 'Bezig…' : 'Toevoegen'}
+            {isCrawling ? 'Bezig…' : pending ? 'Starten…' : 'Crawl starten'}
           </button>
         </div>
         <div
@@ -115,20 +131,79 @@ export function WebsiteTab({ initialPages }: { initialPages: WebsitePage[] }) {
             alignItems: 'center',
           }}
         >
-          <Globe size={12} /> We verwerken in v0 alleen de pagina-content (geen formulieren of
+          <Globe size={12} /> We verwerken alleen de pagina-content (geen formulieren of
           interactieve elementen).
         </div>
       </div>
 
+      {/* Fout-melding */}
+      {error && (
+        <div className="klant-card" data-tone="danger" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <AlertTriangle size={16} style={{ color: 'var(--klant-danger, #dc2626)' }} />
+          <span style={{ fontSize: 13 }}>{error}</span>
+        </div>
+      )}
+
+      {/* Bron-status + acties */}
+      {source && (
+        <div
+          className="klant-card"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--klant-fg)', fontWeight: 500 }}>{source.rootUrl}</span>
+              {isCrawling && (
+                <span
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--klant-fg-dim)' }}
+                >
+                  <Loader2 size={13} style={{ animation: 'org-spin 0.9s linear infinite' }} /> Bezig met crawlen…
+                </span>
+              )}
+            </div>
+            {jobFailed && (
+              <span style={{ fontSize: 12, color: 'var(--klant-danger, #dc2626)' }}>
+                Laatste crawl mislukte{job?.error ? `: ${job.error}` : '.'}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'inline-flex', gap: 6, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={onRecrawl}
+              className="klant-btn"
+              data-variant="ghost"
+              disabled={pending || isCrawling}
+              title="Opnieuw crawlen"
+            >
+              <RefreshCw size={14} strokeWidth={1.7} /> Opnieuw crawlen
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="klant-btn"
+              data-variant="danger"
+              disabled={pending || isCrawling}
+              title="Bron verwijderen"
+              style={{ padding: 6 }}
+            >
+              <Trash2 size={14} strokeWidth={1.7} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pagina-lijst */}
       {pages.length === 0 ? (
         <div className="klant-empty">
           <div className="klant-empty-icon">
             <Globe size={26} strokeWidth={1.6} />
           </div>
-          <h3 className="klant-empty-title">Nog geen pagina&apos;s</h3>
+          <h3 className="klant-empty-title">{isCrawling ? 'Crawlen…' : 'Nog geen pagina’s'}</h3>
           <p className="klant-empty-sub">
-            Voeg je eerste website-URL toe via het veld hierboven. Wij verwerken de content
-            zodat je chatbot vragen kan beantwoorden.
+            {isCrawling
+              ? 'We zijn je website aan het verwerken. Zodra de pagina’s klaar zijn verschijnen ze hier.'
+              : 'Voeg je website-URL toe via het veld hierboven. Wij crawlen de content zodat je chatbot vragen kan beantwoorden.'}
           </p>
         </div>
       ) : (
@@ -139,7 +214,6 @@ export function WebsiteTab({ initialPages }: { initialPages: WebsitePage[] }) {
                 <th>Pagina</th>
                 <th>Status</th>
                 <th>Laatst verwerkt</th>
-                <th style={{ textAlign: 'right' }}>Acties</th>
               </tr>
             </thead>
             <tbody>
@@ -170,40 +244,6 @@ export function WebsiteTab({ initialPages }: { initialPages: WebsitePage[] }) {
                     <StatusBadge status={p.status} kind="webpage" />
                   </td>
                   <td style={{ color: 'var(--klant-fg-muted)' }}>{formatDate(p.lastProcessedAt)}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 4 }}>
-                      <button
-                        type="button"
-                        onClick={() => togglePage(p.id)}
-                        className="klant-btn"
-                        data-variant="ghost"
-                        title={p.status === 'active' ? 'Uitschakelen' : 'Inschakelen'}
-                        style={{ padding: 6 }}
-                      >
-                        <Power size={14} strokeWidth={1.7} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => reprocess(p.id)}
-                        className="klant-btn"
-                        data-variant="ghost"
-                        title="Opnieuw verwerken"
-                        style={{ padding: 6 }}
-                      >
-                        <RefreshCw size={14} strokeWidth={1.7} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removePage(p.id)}
-                        className="klant-btn"
-                        data-variant="danger"
-                        title="Verwijderen"
-                        style={{ padding: 6 }}
-                      >
-                        <Trash2 size={14} strokeWidth={1.7} />
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
