@@ -72,6 +72,28 @@ const themeBootScript = `
     document.documentElement.style.setProperty('--manta-accent', a);
   } catch (e) {}
 })();
+(function() {
+  try {
+    // Klantendashboard-tweak: accent-familie (los van de globale --manta-accent
+    // van marketingsite/admintool). Gezet op <html> zodat klant.css-selectors
+    // html[data-klant-accent=X] [data-klant-scope] vóór paint matchen → geen FOUC.
+    var k = 'chatmanta-klant-accent';
+    var a = localStorage.getItem(k);
+    var valid = { manta: 1, indigo: 1, terra: 1, slate: 1 };
+    if (!a || !valid[a]) a = 'manta';
+    document.documentElement.setAttribute('data-klant-accent', a);
+  } catch (e) {}
+})();
+(function() {
+  try {
+    // Klantendashboard-tweak: dichtheid (spacing). Default = regular.
+    var k = 'chatmanta-klant-density';
+    var d = localStorage.getItem(k);
+    var valid = { compact: 1, regular: 1, comfy: 1 };
+    if (!d || !valid[d]) d = 'regular';
+    document.documentElement.setAttribute('data-klant-density', d);
+  } catch (e) {}
+})();
 `;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

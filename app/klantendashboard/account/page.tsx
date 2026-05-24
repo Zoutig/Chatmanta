@@ -9,7 +9,7 @@ import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org'
 import { getOverviewMetrics } from '@/lib/v0/klantendashboard/server/metrics';
 import { getMockAccountInfo } from '@/lib/v0/klantendashboard/mock/account';
 import type { AccountPlan } from '@/lib/v0/klantendashboard/types';
-import { PageHeader } from '../components/page-header';
+import { PageHead } from '../components/ui/page-head';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,11 @@ export default async function AccountPage() {
 
   return (
     <>
-      <PageHeader title="Account" subtitle="Basisgegevens van je workspace en gebruik." />
+      <PageHead
+        eyebrow="Account"
+        title="Jouw account en workspace"
+        subtitle="Basisgegevens van je workspace, je abonnement en je gebruik."
+      />
 
       <div
         style={{

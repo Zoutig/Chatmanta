@@ -12,12 +12,15 @@ import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getMockWebsitePages } from '../mock/website-pages';
 import { getOrgSettings } from './settings';
 import { countUnansweredThreads } from './conversations';
+import { getHelpfulnessRate } from './feedback';
 import type {
   OverviewMetrics,
   UnansweredQuestion,
   SetupStep,
   ChatbotStatus,
   WidgetStatus,
+  ConversationsWeekDelta,
+  WeeklyAnswerSplit,
 } from '../types';
 
 let _sb: SupabaseClient | null = null;
@@ -39,6 +42,19 @@ function startOfMonthIso(): string {
   return d.toISOString();
 }
 
+// Maandag-gebaseerde week-start, `weeksAgo` weken terug.
+function startOfWeekIso(weeksAgo = 0): string {
+  const d = new Date();
+  const isoDow = (d.getDay() + 6) % 7; // 0 = maandag
+  d.setDate(d.getDate() - isoDow - weeksAgo * 7);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+// Max rijen om te scannen voor in-JS aggregatie (zoals top-questions). V0-
+// volumes zijn klein; bij V1 wordt dit een SQL-aggregatie/materialized view.
+const MAX_ROWS_SCANNED = 5000;
+
 // ---------------------------------------------------------------------------
 // getOverviewMetrics — main aggregator voor scherm 1.
 // ---------------------------------------------------------------------------
@@ -49,13 +65,18 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
   // counts uit getOrgSettings zodat overzicht klopt met wat de klant zojuist
   // in /instellingen of /kennisbank heeft opgeslagen (getOrgSettings merget
   // de DB-rij met de mock-defaults, dus geen breekend gedrag voor lege orgs).
-  const [docs, unanswered, monthlyStats, websitePages, settings] = await Promise.all([
-    listDocs(orgId).catch(() => []),
-    countUnansweredThreads(orgSlug),
-    countConversationsThisMonth(orgId),
-    Promise.resolve(getMockWebsitePages(orgSlug)),
-    getOrgSettings(orgSlug),
-  ]);
+  const [docs, unanswered, monthlyStats, websitePages, settings, helpfulness, weekDelta, trend, weeklyAnswerSplit] =
+    await Promise.all([
+      listDocs(orgId).catch(() => []),
+      countUnansweredThreads(orgSlug),
+      countConversationsThisMonth(orgId),
+      Promise.resolve(getMockWebsitePages(orgSlug)),
+      getOrgSettings(orgSlug),
+      getHelpfulnessRate(orgSlug),
+      getConversationsWeekDelta(orgId),
+      getConversationsTrend(orgId),
+      getWeeklyAnswerSplit(orgId),
+    ]);
   const qaItems = settings.qa;
   const widget = settings.widget;
 
@@ -85,6 +106,10 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
     conversationsThisMonth: monthlyStats,
     unansweredCount: unanswered.count,
     latestUnansweredAt: unanswered.latestUnansweredAt,
+    helpfulness,
+    conversationsTrend: trend,
+    conversationsWeekDelta: weekDelta,
+    weeklyAnswerSplit,
   };
 }
 
@@ -135,6 +160,102 @@ async function countConversationsThisMonth(
 }
 
 // ---------------------------------------------------------------------------
+// getConversationsWeekDelta — gesprekken deze week vs vorige week (head-counts
+// op v0_threads). deltaPct = null wanneer vorige week 0 was (geen deling-door-0
+// en de UI toont dan "nieuw" i.p.v. een misleidende +100%).
+// ---------------------------------------------------------------------------
+export async function getConversationsWeekDelta(orgId: string): Promise<ConversationsWeekDelta> {
+  try {
+    const thisWeekStart = startOfWeekIso(0);
+    const lastWeekStart = startOfWeekIso(1);
+    const [twRes, lwRes] = await Promise.all([
+      sb()
+        .from('v0_threads')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .is('deleted_at', null)
+        .gte('created_at', thisWeekStart),
+      sb()
+        .from('v0_threads')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .is('deleted_at', null)
+        .gte('created_at', lastWeekStart)
+        .lt('created_at', thisWeekStart),
+    ]);
+    const thisWeek = twRes.count ?? 0;
+    const lastWeek = lwRes.count ?? 0;
+    const deltaPct = lastWeek === 0 ? null : Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
+    return { thisWeek, lastWeek, deltaPct };
+  } catch {
+    return { thisWeek: 0, lastWeek: 0, deltaPct: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getConversationsTrend — dagelijkse berichten-counts over de laatste N dagen
+// voor de sparkline. Eén capped select op query_log.created_at, in-JS bucketing
+// (zelfde stijl als getUnansweredQuestions). Lege org → array van nullen.
+// ---------------------------------------------------------------------------
+export async function getConversationsTrend(orgId: string, days = 14): Promise<number[]> {
+  const buckets = new Array(days).fill(0) as number[];
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - (days - 1));
+    since.setHours(0, 0, 0, 0);
+    const { data, error } = await sb()
+      .from('query_log')
+      .select('created_at')
+      .eq('organization_id', orgId)
+      .gte('created_at', since.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(MAX_ROWS_SCANNED);
+    if (error || !data) return buckets;
+    const startMs = since.getTime();
+    const dayMs = 86_400_000;
+    for (const row of data) {
+      const t = new Date(String(row.created_at)).getTime();
+      if (Number.isNaN(t)) continue;
+      const idx = Math.floor((t - startMs) / dayMs);
+      if (idx >= 0 && idx < days) buckets[idx] += 1;
+    }
+    return buckets;
+  } catch {
+    return buckets;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getWeeklyAnswerSplit — deze week: zelf beantwoord (answer/smalltalk) vs
+// wachtend (fallback). Voedt de gepersonaliseerde greeting op Overzicht.
+// 'blocked' telt voor geen van beide.
+// ---------------------------------------------------------------------------
+export async function getWeeklyAnswerSplit(orgId: string): Promise<WeeklyAnswerSplit> {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 6);
+    since.setHours(0, 0, 0, 0);
+    const { data, error } = await sb()
+      .from('query_log')
+      .select('kind')
+      .eq('organization_id', orgId)
+      .gte('created_at', since.toISOString())
+      .limit(MAX_ROWS_SCANNED);
+    if (error || !data) return { answered: 0, waiting: 0 };
+    let answered = 0;
+    let waiting = 0;
+    for (const row of data) {
+      const k = String(row.kind);
+      if (k === 'fallback') waiting += 1;
+      else if (k === 'answer' || k === 'smalltalk') answered += 1;
+    }
+    return { answered, waiting };
+  } catch {
+    return { answered: 0, waiting: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // getUnansweredQuestions — top-N fallback-vragen voor Overzicht + Gesprekken.
 // Groepeert op vraag-text (lowercase) en sorteert op recentste eerst.
 // ---------------------------------------------------------------------------
@@ -150,7 +271,7 @@ export async function getUnansweredQuestions(
     since.setHours(0, 0, 0, 0);
     const { data, error } = await sb()
       .from('query_log')
-      .select('question, created_at')
+      .select('id, question, created_at')
       .eq('organization_id', orgId)
       .eq('kind', 'fallback')
       .gte('created_at', since.toISOString())
@@ -158,7 +279,9 @@ export async function getUnansweredQuestions(
       .limit(200);
     if (error || !data) return [];
 
-    const groups = new Map<string, { question: string; occurrences: number; lastSeenAt: string }>();
+    // Rijen komen nieuwste-eerst binnen, dus de eerste keer dat we een vraag
+    // zien is meteen de meest recente → queryLogId blijft de laatste fallback.
+    const groups = new Map<string, UnansweredQuestion>();
     for (const row of data) {
       const q = String(row.question ?? '').trim();
       if (!q) continue;
@@ -171,6 +294,7 @@ export async function getUnansweredQuestions(
           question: q,
           occurrences: 1,
           lastSeenAt: String(row.created_at ?? ''),
+          queryLogId: row.id == null ? undefined : String(row.id),
         });
       }
     }
