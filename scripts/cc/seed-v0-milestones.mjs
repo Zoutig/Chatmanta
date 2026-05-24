@@ -203,6 +203,21 @@ const MILESTONES = [
       'Verbeterpunten uit de test kunnen worden teruggekoppeld naar kennisbank, prompt of product.',
     ],
   },
+  {
+    title: 'Publieke widget is beschermd tegen misbruik en kostenexplosie',
+    owner: 'Sebastiaan',
+    description:
+      'De widget is een openbaar endpoint dat iedereen kan aanroepen. Voor livegang is hij beschermd tegen kosten-misbruik, ongeoorloofd hergebruik op vreemde domeinen en pogingen om de bot iets schadelijks te laten zeggen op de site van de klant.',
+    acceptanceCriteria: [
+      'Er geldt een rate-limit op het publieke widget-endpoint (per IP/origin).',
+      'Er is een per-klant kosten- of gebruikslimiet zodat een klant of aanvaller de AI-rekening niet kan laten exploderen.',
+      'De widget werkt alleen vanaf de toegestane domeinen van de klant (domain-allowlist / CORS).',
+      'De bot blijft binnen zijn rol bij pogingen tot prompt-injection of jailbreak.',
+      'Bij het bereiken van een limiet krijgt de bezoeker een nette melding in plaats van een crash.',
+      'Verdacht of extreem gebruik is zichtbaar of herkenbaar voor Sebas.',
+      'Sebas durft het publieke endpoint live te zetten zonder vrees voor een verrassingsrekening.',
+    ],
+  },
 
   // --- NIELS — Customer & Launch ---
   {
@@ -406,6 +421,22 @@ const MILESTONES = [
       'Na 30 dagen wordt besproken of klant doorgaat tegen vriendenprijs.',
       'Positieve klanten kunnen worden gevraagd om testimonial of referral.',
       'V1.1-prioriteiten worden na de eerste feedbackronde bepaald.',
+    ],
+  },
+  {
+    title: 'Juridische en privacy-basis is geregeld voor livegang',
+    owner: 'Samen',
+    description:
+      'Voordat de widget op echte publieke websites draait, zijn de AVG-verplichtingen rond het verwerken van bezoekersgegevens geregeld: een verwerkersovereenkomst per klant, transparante privacy-info voor bezoekers en duidelijke afspraken over opslag en verwijdering van gesprekdata.',
+    acceptanceCriteria: [
+      'Per testklant is een verwerkersovereenkomst afgesloten (klant = verwerkingsverantwoordelijke, ChatManta = verwerker).',
+      'Sub-verwerkers (OpenAI, Supabase, Vercel) zijn benoemd, inclusief doorgifte van data naar buiten de EU.',
+      'Er is een privacyverklaring of privacy-melding die de widgetbezoeker kan inzien.',
+      'Vastgelegd is welke gesprekdata wordt opgeslagen en hoe lang (retentietermijn).',
+      'Een verzoek tot inzage of verwijdering van persoonsgegevens kan worden afgehandeld.',
+      'Vastgelegd is wat er met chatlogs gebeurt wanneer een testklant stopt.',
+      'Een eventueel datalek heeft een duidelijk meld- en escalatiepad.',
+      'Sebas en Niels durven juridisch gezien 3 klanten live te zetten.',
     ],
   },
 ];
