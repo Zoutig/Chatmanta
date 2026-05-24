@@ -1,14 +1,17 @@
 'use client';
 
-// MilestonesClient — lijst van alle milestones met filter per fase + CRUD via
-// MilestoneModal. Klikken op een milestone-rij opent edit-mode.
+// MilestonesClient — lijst van alle milestones met filter per fase + per
+// persoon + CRUD via MilestoneModal. Klikken op een milestone-rij opent
+// edit-mode. Fase- en persoon-filter combineren met AND.
 
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
   compareMilestones,
+  OWNERS,
   ROADMAP_PHASES,
   type Milestone,
+  type Owner,
   type RoadmapPhase,
   type Task,
 } from '@/lib/commandcenter/types';
@@ -18,11 +21,12 @@ import { MilestoneModal } from './milestone-modal';
 
 type Props = { milestones: Milestone[]; tasks: Task[] };
 
-type FilterState = { phase: RoadmapPhase | 'all' };
+type FilterState = { phase: RoadmapPhase | 'all'; owner: Owner | 'all' };
 
 function applyFilter(ms: Milestone[], f: FilterState): Milestone[] {
   let res = ms;
   if (f.phase !== 'all') res = res.filter((m) => m.roadmapPhase === f.phase);
+  if (f.owner !== 'all') res = res.filter((m) => m.owner === f.owner);
   return res.slice().sort(compareMilestones);
 }
 
@@ -33,7 +37,7 @@ function formatDeadline(d: string | null): string {
 
 export function MilestonesClient({ milestones, tasks }: Props) {
   const router = useRouter();
-  const [filter, setFilter] = useState<FilterState>({ phase: 'all' });
+  const [filter, setFilter] = useState<FilterState>({ phase: 'all', owner: 'all' });
   const [editing, setEditing] = useState<Milestone | null>(null);
   const [mode, setMode] = useState<'closed' | 'create' | 'edit'>('closed');
 
@@ -113,7 +117,7 @@ export function MilestonesClient({ milestones, tasks }: Props) {
         <FilterChip
           label="Alle fases"
           active={filter.phase === 'all'}
-          onClick={() => setFilter({ phase: 'all' })}
+          onClick={() => setFilter((f) => ({ ...f, phase: 'all' }))}
         />
         {ROADMAP_PHASES.map((p) => {
           const count = milestones.filter((m) => m.roadmapPhase === p).length;
@@ -123,7 +127,28 @@ export function MilestonesClient({ milestones, tasks }: Props) {
               key={p}
               label={`${p} (${count})`}
               active={filter.phase === p}
-              onClick={() => setFilter({ phase: p })}
+              onClick={() => setFilter((f) => ({ ...f, phase: p }))}
+            />
+          );
+        })}
+      </div>
+
+      {/* Filter chips per persoon */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <FilterChip
+          label="Alle personen"
+          active={filter.owner === 'all'}
+          onClick={() => setFilter((f) => ({ ...f, owner: 'all' }))}
+        />
+        {OWNERS.map((o) => {
+          const count = milestones.filter((m) => m.owner === o).length;
+          if (count === 0) return null;
+          return (
+            <FilterChip
+              key={o}
+              label={`${o} (${count})`}
+              active={filter.owner === o}
+              onClick={() => setFilter((f) => ({ ...f, owner: o }))}
             />
           );
         })}
@@ -142,7 +167,9 @@ export function MilestonesClient({ milestones, tasks }: Props) {
             borderRadius: 14,
           }}
         >
-          Nog geen milestones in deze fase.
+          {filter.phase !== 'all' || filter.owner !== 'all'
+            ? 'Geen milestones voor deze filter.'
+            : 'Nog geen milestones aangemaakt.'}
         </p>
       ) : (
         <div
