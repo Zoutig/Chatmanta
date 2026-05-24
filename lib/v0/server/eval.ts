@@ -52,7 +52,12 @@ function openai(): OpenAI {
   if (_openai) return _openai;
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('OPENAI_API_KEY missing');
-  _openai = new OpenAI({ apiKey: key });
+  // maxRetries/timeout: de judge draait op gpt-4o (lage 30k TPM-tier). Zonder
+  // retries werd elke 429 direct een judge_parse_error met null-scores (35-54%
+  // van de cellen in een eerdere run). De SDK doet exponential backoff met
+  // Retry-After op 429/5xx, zodat bursts worden afgevangen i.p.v. dataverlies.
+  // Dekt zowel runJudge als runPairwiseJudge (gedeelde client).
+  _openai = new OpenAI({ apiKey: key, maxRetries: 6, timeout: 60_000 });
   return _openai;
 }
 

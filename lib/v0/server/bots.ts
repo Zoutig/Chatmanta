@@ -262,10 +262,11 @@ export type BotConfig = {
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
-   * lang=gestructureerd). Per-versie zodat oudere eval-runs reproduceerbaar
-   * blijven.
+   * lang=gestructureerd); 'v3' (v0.7.2) = tune van v2 die context/wedervraag/
+   * CTA teruggeeft (too_curt-fix). Per-versie zodat oudere eval-runs
+   * reproduceerbaar blijven.
    */
-  outputStyleVersion?: 'v1' | 'v2';
+  outputStyleVersion?: 'v1' | 'v2' | 'v3';
   /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
@@ -875,19 +876,69 @@ GEEN OPGEBLAZEN ZINNEN:
 `;
 
 // ---------------------------------------------------------------------------
-// v0.7 — extends V0_6 met:
+// v0.7.1 — extends V0_6 met:
 //   - outputStyleVersion='v2' (nieuwe LENGTH_INSTRUCTION strings)
 //   - OUTPUT-DISCIPLINE blok in systemPrompt (BLUF + anti-preamble + anti-vulling)
 // Geen pipeline-wijzigingen — pure prompt + output-style change.
+// (Was 'v0.7'; hernoemd naar 'v0.7.1' toen v0.7.2 als point-tune landde. De
+//  bot zelf is ongewijzigd — alleen het versie-label.)
 // ---------------------------------------------------------------------------
-const V0_7: BotConfig = {
+const V0_7_1: BotConfig = {
   ...V0_6,
-  version: 'v0.7',
-  label: 'v0.7 — output-clarity',
+  version: 'v0.7.1',
+  label: 'v0.7.1 — output-clarity',
   description:
     'v0.6 plus scherpere lengte-prompts (kort=1-2 zinnen, normaal=adaptief, lang=gestructureerd), BLUF-lead, anti-preamble, en bullets/witregels renderen nu in de widget.',
   outputStyleVersion: 'v2',
   systemPrompt: V0_6.systemPrompt + V0_7_OUTPUT_RULES_BLOCK,
+};
+
+// ---------------------------------------------------------------------------
+// v0.7.2 — output-clarity TUNE. Diagnose uit de v0.6-vs-v0.7.1 eval: v0.7.1 was
+// gepaard ≈ neutraal vs v0.6 maar too_curt steeg 7.7%→12.8%, met regressies in
+// ambiguous / false-premise / multi-turn-followup / contact-CTA-verlies. De eval
+// draait altijd op length='medium', dus de oorzaak is de medium-string ("minimum
+// dat compleet is") + het BLUF-blok ("Stop zodra de vraag is beantwoord" /
+// "VERBODEN als slot"), die nodige context, wedervragen en CTA's lieten vallen.
+// v0.7.2 zet outputStyleVersion='v3' (context-behoudende medium) en herschrijft
+// het output-blok: BLUF + anti-preamble blijven, maar bondigheid mag geen
+// wedervraag, premise-correctie of persona-CTA wegsnijden.
+// Rebuild vanaf V0_6.systemPrompt (NIET v0.7.1's) zodat het oude, contradicerende
+// V0_7_OUTPUT_RULES_BLOCK niet stapelt.
+// ---------------------------------------------------------------------------
+const V0_7_2_OUTPUT_RULES_BLOCK = `
+
+OUTPUT-DISCIPLINE:
+
+LEAD MET HET ANTWOORD (BLUF):
+- Eerste zin = direct antwoord op de vraag. Geen aanloop, geen herhaling van de vraag.
+- Ja/nee-vragen: woord 1 is "Ja" of "Nee". Dan pas toelichting.
+
+GEEN PREAMBLE:
+- VERBODEN openings-formuleringen: "Bedankt voor je vraag", "Goeie vraag", "Leuk dat je het vraagt", "Zoals je vroeg", "Wat betreft je vraag", "Op basis van de beschikbare informatie".
+- Geen samenvattende herhaling aan het slot ("Kortom:...", "Samenvattend:...") die het antwoord nog eens overdoet.
+
+GEEN OPGEBLAZEN ZINNEN:
+- Verzin geen bufferinformatie ("we proberen binnen 24u te reageren" — alleen als dat letterlijk in de bronnen staat).
+- Geen herhaling van wat de gebruiker net zei.
+- Geen meta-talk over wat je gaat doen ("Ik zal je uitleggen dat..."). Doe het gewoon.
+
+WAT BONDIGHEID NIET MAG WEGLATEN:
+- Bij een vage of onderspecificeerde vraag: stel eerst één gerichte wedervraag. Een wedervraag is geen preamble en geen vulling.
+- Bij een onjuiste aanname van de gebruiker: benoem kort waaróm het niet klopt, niet alleen dát het niet klopt.
+- Een concrete vervolgstap of contact-uitnodiging die in de persona of de bronnen staat (bv. "bel ... voor een offerte") hoort bij het antwoord — laat die niet weg als "slot".
+- "Stop zodra de vraag beantwoord is" betekent: geen samenvattende herhaling — niet: laat nuttige context of een nodige vervolgstap weg.
+
+`;
+
+const V0_7_2: BotConfig = {
+  ...V0_7_1,
+  version: 'v0.7.2',
+  label: 'v0.7.2 — output-clarity tune',
+  description:
+    'v0.7.1-tune die de too_curt-regressie aanpakt: context-behoudende medium-length (outputStyleVersion=v3) + herschreven output-blok dat wedervragen, premise-correcties en persona-CTA\'s expliciet behoudt. BLUF + anti-preamble blijven. Geen pipeline-wijziging.',
+  outputStyleVersion: 'v3',
+  systemPrompt: V0_6.systemPrompt + V0_7_2_OUTPUT_RULES_BLOCK,
 };
 
 // ---------------------------------------------------------------------------
@@ -900,11 +951,16 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_4.version]: V0_4,
   [V0_5.version]: V0_5,
   [V0_6.version]: V0_6,
-  [V0_7.version]: V0_7,
+  [V0_7_1.version]: V0_7_1,
+  [V0_7_2.version]: V0_7_2,
 };
 
-/** Latest version — UI default when no ?v= param is present. */
-export const LATEST_BOT_VERSION = V0_7.version;
+/**
+ * Latest version — UI default when no ?v= param is present.
+ * Blijft op v0.7.1 (de bestaande, geshipte output-clarity bot) tot de eval
+ * bevestigt dat de v0.7.2-tune ≥ v0.7.1 is. Promotie = aparte follow-up commit.
+ */
+export const LATEST_BOT_VERSION = V0_7_1.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -914,7 +970,8 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_4.version,
   V0_5.version,
   V0_6.version,
-  V0_7.version,
+  V0_7_1.version,
+  V0_7_2.version,
 ];
 
 /**
