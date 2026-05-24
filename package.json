@@ -35,6 +35,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
     "@ark-ui/react": "^5.36.2",
+    "@mendable/firecrawl-js": "^4.25.0",
     "@paper-design/shaders-react": "^0.0.76",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",
