@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter } from 'lucide-react';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
 
 const OPTIONS: { key: ConversationFilter; label: string }[] = [
@@ -29,37 +28,33 @@ export function FilterBar({ active }: { active: ConversationFilter }) {
         gap: 6,
         alignItems: 'center',
         flexWrap: 'wrap',
-        marginBottom: 20,
-        padding: '10px 12px',
-        background: 'var(--klant-surface)',
-        borderRadius: 'var(--klant-r-md)',
-        border: '1px solid var(--klant-border)',
+        marginBottom: 18,
       }}
     >
-      <span
-        style={{
-          display: 'inline-flex',
-          gap: 6,
-          alignItems: 'center',
-          fontSize: 12,
-          color: 'var(--klant-fg-muted)',
-          marginRight: 4,
-        }}
-      >
-        <Filter size={13} /> Filter
-      </span>
-      {OPTIONS.map((opt) => (
-        <button
-          key={opt.key}
-          type="button"
-          onClick={() => setFilter(opt.key)}
-          className="klant-btn"
-          data-variant={active === opt.key ? 'primary' : 'ghost'}
-          style={{ fontSize: 12, padding: '5px 11px' }}
-        >
-          {opt.label}
-        </button>
-      ))}
+      {OPTIONS.map((opt) => {
+        const isActive = active === opt.key;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setFilter(opt.key)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 999,
+              border: `1px solid ${isActive ? 'var(--klant-accent-border)' : 'var(--klant-border)'}`,
+              background: isActive ? 'var(--klant-accent-soft)' : 'transparent',
+              color: isActive ? 'var(--klant-accent)' : 'var(--klant-muted)',
+              fontFamily: 'var(--klant-font-body)',
+              fontSize: 13,
+              fontWeight: isActive ? 500 : 400,
+              cursor: 'pointer',
+              transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease',
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

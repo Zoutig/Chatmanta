@@ -58,6 +58,11 @@ graphify-out/
 /playwright-report/
 /playwright/.cache/
 tests/.auth-state.json
+.playwright-mcp/
+
+# lokale QA-artefacten (screenshots + dev-server logs, regenereerbaar)
+qa-*.png
+dev-server.log
 
 # ad-hoc debug scripts (browser automation, one-off diagnostics)
 /tmp/

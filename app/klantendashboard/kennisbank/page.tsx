@@ -9,7 +9,7 @@ import { listDocs } from '@/lib/v0/server/rag';
 import { getWebsiteState } from '@/lib/v0/server/crawler';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { DocumentSummary } from '@/lib/v0/klantendashboard/types';
-import { PageHeader } from '../components/page-header';
+import { PageHead } from '../components/ui/page-head';
 import { TabsNav } from '../components/tabs';
 import { DocumentsTab } from './components/documents-tab';
 import { WebsiteTab } from './components/website-tab';
@@ -62,9 +62,10 @@ export default async function KennisbankPage({
 
   return (
     <>
-      <PageHeader
-        title="Kennisbank"
-        subtitle="Dit zijn de informatiebronnen van je chatbot. Hoe completer ze zijn, hoe beter de antwoorden."
+      <PageHead
+        eyebrow="Kennisbank"
+        title="De bronnen waaruit je chatbot put"
+        subtitle="Documenten, website en Q&A worden geïndexeerd en hergebruikt in elk antwoord. Een goede kennisbank is het verschil tussen 60% en 95% behulpzaamheid."
       />
 
       <TabsNav

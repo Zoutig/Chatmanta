@@ -19,6 +19,27 @@ export type ChatbotStatus = 'concept' | 'testing' | 'live' | 'paused';
 
 export type WidgetStatus = 'not_installed' | 'detected' | 'active';
 
+/** Behulpzaamheid: up/down-ratio uit v0_feedback. `rate` null bij 0 stemmen. */
+export type HelpfulnessRate = {
+  rate: number | null;
+  up: number;
+  down: number;
+  total: number;
+};
+
+/** Week-over-week gesprekken-delta. `deltaPct` null als vorige week 0 was. */
+export type ConversationsWeekDelta = {
+  thisWeek: number;
+  lastWeek: number;
+  deltaPct: number | null;
+};
+
+/** Deze week: zelf beantwoord vs wachtend op input (uit query_log.kind). */
+export type WeeklyAnswerSplit = {
+  answered: number;
+  waiting: number;
+};
+
 export type OverviewMetrics = {
   chatbotStatus: ChatbotStatus;
   widgetStatus: WidgetStatus;
@@ -35,12 +56,24 @@ export type OverviewMetrics = {
   /** Updated_at van de meest recente onbeantwoorde thread (laatste 30 dagen),
    *  of null. Voedt de dismiss-signature van de Overzicht-banner. */
   latestUnansweredAt: string | null;
+  /** Behulpzaamheid (laatste 30 dagen) — voor de metric-strip. */
+  helpfulness: HelpfulnessRate;
+  /** Dagelijkse berichten-trend (14 dagen) — voor de sparkline. */
+  conversationsTrend: number[];
+  /** Week-over-week gesprekken-delta — voor de metric-strip. */
+  conversationsWeekDelta: ConversationsWeekDelta;
+  /** Deze week beantwoord/wachtend — voor de greeting. */
+  weeklyAnswerSplit: WeeklyAnswerSplit;
 };
 
 export type UnansweredQuestion = {
   question: string;
   occurrences: number;
   lastSeenAt: string;
+  /** Meest recente fallback-row voor deze vraag (context voor add-to-QA).
+   *  query_log heeft geen thread_id, dus de "Bekijk gesprek"-actie linkt naar
+   *  de gefilterde gesprekkenlijst i.p.v. een specifieke thread. */
+  queryLogId?: string;
 };
 
 export type SetupStep = {
