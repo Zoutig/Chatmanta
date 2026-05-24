@@ -19,6 +19,9 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Run on every path EXCEPT /login, Next.js internals, and static assets.
-  matcher: ['/((?!login|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)'],
+  // Run on every path EXCEPT /login, Next.js internals, static assets, en de
+  // Vercel-cron-route. Die laatste heeft geen login-cookie (Vercel roept 'm
+  // server-side aan) en beveiligt zichzelf via CRON_SECRET in de route-handler —
+  // zou anders naar /login omgeleid worden en nooit draaien.
+  matcher: ['/((?!login|api/v0/cron|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)'],
 };
