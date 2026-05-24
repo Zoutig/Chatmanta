@@ -13,6 +13,7 @@ import { getMockWidgetSettings } from '@/lib/v0/klantendashboard/mock/widget-set
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { Sidebar } from './components/sidebar';
 import { Topbar } from './components/topbar';
+import { TweaksPanel } from './components/tweaks/tweaks-panel';
 
 export const metadata: Metadata = {
   title: 'ChatManta · Klantendashboard',
@@ -59,6 +60,7 @@ export default async function KlantendashboardLayout({
       <Sidebar activeOrg={activeOrg} orgs={orgs} />
       <Topbar orgName={activeOrg.name} chatbotStatus={chatbotStatus} />
       <main className="klant-main">{children}</main>
+      <TweaksPanel />
     </div>
   );
 }

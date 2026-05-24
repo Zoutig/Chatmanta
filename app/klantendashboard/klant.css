@@ -9,31 +9,79 @@
  * Theme-switching gebeurt via het bestaande [data-theme="light"|"dark"]
  * attribuut op <html>, gezet door lib/v0/hooks/use-theme.ts. */
 
-[data-klant-scope] {
-  /* Defaults = dark abyss, blijft consistent met de rest van ChatManta. */
-  --klant-bg: #050b14;
-  --klant-bg-elev: #0a131f;
-  --klant-bg-elev-2: #0f1c2c;
-  --klant-surface: rgba(255, 255, 255, 0.04);
-  --klant-surface-hover: rgba(255, 255, 255, 0.07);
-  --klant-border: rgba(120, 200, 230, 0.14);
-  --klant-border-strong: rgba(120, 200, 230, 0.28);
-  --klant-fg: #e6f1f7;
-  --klant-fg-muted: #8aa3b3;
-  --klant-fg-dim: #5a7384;
-  --klant-accent: var(--manta-accent, #4dd6e8);
-  --klant-accent-soft: color-mix(in oklab, var(--manta-accent, #4dd6e8) 14%, transparent);
-  --klant-accent-strong: color-mix(in oklab, var(--manta-accent, #4dd6e8) 60%, transparent);
+/* ─────────────────────────────────────────────────────────────────────────
+ * Design-systeem "Quiet Light / Aurora" (rebuild mei 2026).
+ *
+ * Drie orthogonale assen, alle als CSS-vars zodat SERVER-components met
+ * `var(--klant-*)` renderen ongeacht de client-tweak — geschakeld door
+ * data-attributes op <html> (gezet door het FOUC-bootscript + de hooks):
+ *   - thema     : `.dark` / `[data-theme='dark']`  (useTheme)
+ *   - accent    : `[data-klant-accent='manta|indigo|terra|slate']`  (useTweaks)
+ *   - dichtheid : `[data-klant-density='compact|regular|comfy']`     (useTweaks)
+ *
+ * Type-sizes staan NIET in de density-as (hiërarchie leest identiek). Accent-
+ * soft/-border worden gederived via color-mix zodat een accent-familie wisselt
+ * met 1 hex i.p.v. 5 handgeschreven rgba's (patroon was er al voor manta).
+ *
+ * Oude tokennamen (--klant-fg, --klant-bg-elev, --klant-warning, …) blijven
+ * gedefinieerd als brug zodat nog-niet-herbouwde schermen leesbaar blijven
+ * tijdens de scherm-voor-scherm-migratie. Fase 6 ruimt ze op.
+ * ───────────────────────────────────────────────────────────────────────── */
 
-  /* Semantic colors */
-  --klant-success: #34d399;
-  --klant-success-soft: rgba(52, 211, 153, 0.14);
-  --klant-warning: #fbbf24;
-  --klant-warning-soft: rgba(251, 191, 36, 0.14);
-  --klant-danger: #f87171;
-  --klant-danger-soft: rgba(248, 113, 113, 0.14);
-  --klant-info: #60a5fa;
-  --klant-info-soft: rgba(96, 165, 250, 0.14);
+/* Base = LIGHT (Quiet Light). Papier, witte surfaces, haarlijntjes, plat. */
+[data-klant-scope] {
+  --klant-bg: #fafaf7;
+  --klant-bg-grad: #fafaf7; /* light = vlak papier */
+  --klant-surface: #ffffff;
+  --klant-surface-muted: #f4f3ee;
+  --klant-surface-deep: #edebe3;
+  --klant-border: rgba(15, 17, 21, 0.08);
+  --klant-border-strong: rgba(15, 17, 21, 0.14);
+  --klant-shadow: 0 1px 2px rgba(15, 17, 21, 0.04), 0 1px 0 rgba(15, 17, 21, 0.02);
+  --klant-highlight: rgba(255, 255, 255, 0); /* geen inset-glow in light */
+
+  --klant-ink: #0f1115;
+  --klant-ink-soft: #2b2f36;
+  --klant-muted: #5a6170;
+  --klant-dim: #8a93a3;
+  --klant-faint: #b7bcc7;
+
+  --klant-success: #1f8757;
+  --klant-success-soft: rgba(31, 135, 87, 0.10);
+  --klant-success-border: rgba(31, 135, 87, 0.22);
+  --klant-warn: #a86600;
+  --klant-warn-soft: rgba(168, 102, 0, 0.10);
+  --klant-warn-border: rgba(168, 102, 0, 0.22);
+  --klant-danger: #b91c1c;
+  --klant-danger-soft: rgba(185, 28, 28, 0.08);
+  --klant-danger-border: rgba(185, 28, 28, 0.20);
+  --klant-info: #1659c5;
+  --klant-info-soft: rgba(22, 89, 197, 0.08);
+  --klant-info-border: rgba(22, 89, 197, 0.20);
+
+  /* Accent (default = manta light). Wordt per data-klant-accent overschreven. */
+  --klant-accent: #0e8e78;
+  --klant-accent-deep: #0e8e78;
+  --klant-accent-ink: #ffffff; /* tekst op accent in light = wit */
+  --klant-on-accent: #ffffff;
+  --klant-accent-soft: color-mix(in oklab, var(--klant-accent) 10%, transparent);
+  --klant-accent-border: color-mix(in oklab, var(--klant-accent) 24%, transparent);
+
+  /* Chrome (sidebar/topbar) */
+  --klant-chrome-bg: #fafaf7;
+  --klant-chrome-border: rgba(15, 17, 21, 0.08);
+
+  /* Dichtheid (default = regular). Wordt per data-klant-density overschreven. */
+  --klant-pad-x: 18px;
+  --klant-pad-y: 16px;
+  --klant-gap: 14px;
+  --klant-nav-y: 8px;
+  --klant-row-y: 12px;
+
+  /* Fonts */
+  --klant-font-body: var(--font-inter), system-ui, sans-serif;
+  --klant-font-display: var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+  --klant-font-mono: var(--font-jetbrains), ui-monospace, 'SF Mono', monospace;
 
   /* Radii */
   --klant-r-sm: 6px;
@@ -44,29 +92,130 @@
 
   --klant-sidebar-w: 248px;
   --klant-topbar-h: 60px;
+
+  /* ── Back-compat-aliassen (oude tokennamen → nieuwe waarden) ───────────── */
+  --klant-bg-elev: var(--klant-surface);
+  --klant-bg-elev-2: var(--klant-surface-deep);
+  --klant-surface-hover: var(--klant-surface-muted);
+  --klant-fg: var(--klant-ink);
+  --klant-fg-muted: var(--klant-muted);
+  --klant-fg-dim: var(--klant-dim);
+  --klant-accent-strong: var(--klant-accent-border);
+  --klant-warning: var(--klant-warn);
+  --klant-warning-soft: var(--klant-warn-soft);
 }
 
-/* Light-mode tokens — best-effort scope-beperkt tot het klantendashboard.
- * Per memory tailwind_v4_postcss_quirk: blijf bij CSS-vars + inline styles
- * waar Tailwind class-based selectors silent gedropt zouden kunnen worden. */
-[data-theme='light'] [data-klant-scope] {
-  --klant-bg: #f8fafc;
-  --klant-bg-elev: #ffffff;
-  --klant-bg-elev-2: #f1f5f9;
-  --klant-surface: rgba(15, 23, 42, 0.03);
-  --klant-surface-hover: rgba(15, 23, 42, 0.06);
-  --klant-border: rgba(15, 23, 42, 0.10);
-  --klant-border-strong: rgba(15, 23, 42, 0.20);
-  --klant-fg: #0f172a;
-  --klant-fg-muted: #475569;
-  --klant-fg-dim: #94a3b8;
-  --klant-accent-soft: color-mix(in oklab, var(--manta-accent, #0ea5b8) 10%, transparent);
-  --klant-accent-strong: color-mix(in oklab, var(--manta-accent, #0ea5b8) 50%, transparent);
+/* Dark = AURORA. Deep-ink met subtiele radial gradients + mint-glow. */
+.dark [data-klant-scope],
+[data-theme='dark'] [data-klant-scope] {
+  --klant-bg: #0e1722;
+  --klant-bg-grad: radial-gradient(140% 80% at 0% 0%, rgba(111, 227, 194, 0.06), transparent 50%),
+    radial-gradient(80% 60% at 100% 100%, rgba(240, 207, 161, 0.04), transparent 55%), #0e1722;
+  --klant-surface: #13202f;
+  --klant-surface-muted: #172738;
+  --klant-surface-deep: #1c2e43;
+  --klant-border: rgba(180, 210, 230, 0.10);
+  --klant-border-strong: rgba(180, 210, 230, 0.20);
+  --klant-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.45);
+  --klant-highlight: rgba(255, 255, 255, 0.04);
 
-  --klant-success-soft: rgba(5, 150, 105, 0.10);
-  --klant-warning-soft: rgba(202, 138, 4, 0.10);
-  --klant-danger-soft: rgba(220, 38, 38, 0.10);
-  --klant-info-soft: rgba(37, 99, 235, 0.10);
+  --klant-ink: #e9eef3;
+  --klant-ink-soft: #c1ccd7;
+  --klant-muted: #92a1b2;
+  --klant-dim: #5e708a;
+  --klant-faint: #3f4f66;
+
+  --klant-success: #6fe3c2;
+  --klant-success-soft: rgba(111, 227, 194, 0.12);
+  --klant-success-border: rgba(111, 227, 194, 0.30);
+  --klant-warn: #f0cfa1;
+  --klant-warn-soft: rgba(240, 207, 161, 0.12);
+  --klant-warn-border: rgba(240, 207, 161, 0.28);
+  --klant-danger: #f2867a;
+  --klant-danger-soft: rgba(242, 134, 122, 0.12);
+  --klant-danger-border: rgba(242, 134, 122, 0.28);
+  --klant-info: #7ab8ff;
+  --klant-info-soft: rgba(122, 184, 255, 0.10);
+  --klant-info-border: rgba(122, 184, 255, 0.22);
+
+  /* Accent default = manta dark */
+  --klant-accent: #6fe3c2;
+  --klant-accent-deep: #3dab8a;
+  --klant-accent-ink: #06281f; /* donkere tekst op heldere mint */
+  --klant-on-accent: #06281f;
+  --klant-accent-soft: color-mix(in oklab, var(--klant-accent) 14%, transparent);
+  --klant-accent-border: color-mix(in oklab, var(--klant-accent) 32%, transparent);
+
+  --klant-chrome-bg: rgba(11, 18, 28, 0.6);
+  --klant-chrome-border: rgba(180, 210, 230, 0.10);
+}
+
+/* ── Accent-families (per thema gekwalificeerd, onderling exclusief) ─────────
+ * Light: html:not(.dark)[data-klant-accent=X]  → (0,3,1)
+ * Dark : html.dark[data-klant-accent=X]         → (0,3,1)
+ * Beide verslaan de thema-basis-blokken; alleen accent-vars worden gezet. */
+html:not(.dark)[data-klant-accent='manta'] [data-klant-scope] {
+  --klant-accent: #0e8e78;
+  --klant-accent-deep: #0e8e78;
+}
+html:not(.dark)[data-klant-accent='indigo'] [data-klant-scope] {
+  --klant-accent: #4f46e5;
+  --klant-accent-deep: #4f46e5;
+}
+html:not(.dark)[data-klant-accent='terra'] [data-klant-scope] {
+  --klant-accent: #b94b26;
+  --klant-accent-deep: #b94b26;
+}
+html:not(.dark)[data-klant-accent='slate'] [data-klant-scope] {
+  --klant-accent: #3a4656;
+  --klant-accent-deep: #3a4656;
+}
+html.dark[data-klant-accent='manta'] [data-klant-scope] {
+  --klant-accent: #6fe3c2;
+  --klant-accent-deep: #3dab8a;
+  --klant-accent-ink: #06281f;
+  --klant-on-accent: #06281f;
+}
+html.dark[data-klant-accent='indigo'] [data-klant-scope] {
+  --klant-accent: #8b92ff;
+  --klant-accent-deep: #5c61d8;
+  --klant-accent-ink: #0b0e33;
+  --klant-on-accent: #0b0e33;
+}
+html.dark[data-klant-accent='terra'] [data-klant-scope] {
+  --klant-accent: #f2867a;
+  --klant-accent-deep: #c25949;
+  --klant-accent-ink: #3b1308;
+  --klant-on-accent: #3b1308;
+}
+html.dark[data-klant-accent='slate'] [data-klant-scope] {
+  --klant-accent: #a6b2c2;
+  --klant-accent-deep: #74819a;
+  --klant-accent-ink: #0f1218;
+  --klant-on-accent: #0f1218;
+}
+
+/* ── Dichtheid (thema-onafhankelijk; alleen spacing, geen type-sizes) ─────── */
+[data-klant-density='compact'] [data-klant-scope] {
+  --klant-pad-x: 14px;
+  --klant-pad-y: 12px;
+  --klant-gap: 10px;
+  --klant-nav-y: 6px;
+  --klant-row-y: 9px;
+}
+[data-klant-density='regular'] [data-klant-scope] {
+  --klant-pad-x: 18px;
+  --klant-pad-y: 16px;
+  --klant-gap: 14px;
+  --klant-nav-y: 8px;
+  --klant-row-y: 12px;
+}
+[data-klant-density='comfy'] [data-klant-scope] {
+  --klant-pad-x: 22px;
+  --klant-pad-y: 20px;
+  --klant-gap: 18px;
+  --klant-nav-y: 10px;
+  --klant-row-y: 14px;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -78,9 +227,9 @@
   grid-template-columns: var(--klant-sidebar-w) 1fr;
   grid-template-rows: var(--klant-topbar-h) 1fr;
   min-height: 100vh;
-  background: var(--klant-bg);
-  color: var(--klant-fg);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  background: var(--klant-bg-grad, var(--klant-bg));
+  color: var(--klant-ink);
+  font-family: var(--klant-font-body);
 }
 
 .klant-sidebar {
@@ -463,6 +612,110 @@
 .klant-tab[data-active='true'] {
   color: var(--klant-accent);
   border-bottom-color: var(--klant-accent);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * UI-primitives (Quiet-Light/Aurora). Hover/focus kan inline niet — daarom
+ * als classes; de component zet data-variant / data-size. Zie components/ui/.
+ * ───────────────────────────────────────────────────────────────────────── */
+.klant-ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-family: var(--klant-font-body);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+.klant-ui-btn[data-size='sm'] {
+  padding: 5px 10px;
+  font-size: 12px;
+  gap: 6px;
+}
+.klant-ui-btn[data-size='md'] {
+  padding: 7px 13px;
+  font-size: 13px;
+}
+.klant-ui-btn[data-size='lg'] {
+  padding: 9px 16px;
+  font-size: 14px;
+  gap: 8px;
+}
+.klant-ui-btn[data-variant='primary'] {
+  background: var(--klant-accent);
+  color: var(--klant-accent-ink);
+  border-color: var(--klant-accent);
+  font-weight: 600;
+}
+.klant-ui-btn[data-variant='primary']:hover {
+  background: color-mix(in oklab, var(--klant-accent) 88%, black);
+}
+.klant-ui-btn[data-variant='secondary'] {
+  background: var(--klant-surface);
+  color: var(--klant-ink);
+  border-color: var(--klant-border-strong);
+}
+.klant-ui-btn[data-variant='secondary']:hover {
+  background: var(--klant-surface-muted);
+}
+.klant-ui-btn[data-variant='ghost'] {
+  background: transparent;
+  color: var(--klant-ink);
+}
+.klant-ui-btn[data-variant='ghost']:hover {
+  background: var(--klant-surface-muted);
+}
+.klant-ui-btn[data-variant='soft'] {
+  background: var(--klant-accent-soft);
+  color: var(--klant-accent);
+  border-color: var(--klant-accent-border);
+}
+.klant-ui-btn[data-variant='soft']:hover {
+  background: color-mix(in oklab, var(--klant-accent) 18%, transparent);
+}
+.klant-ui-btn[data-variant='danger'] {
+  background: transparent;
+  color: var(--klant-danger);
+  border-color: var(--klant-danger-border);
+}
+.klant-ui-btn[data-variant='danger']:hover {
+  background: var(--klant-danger-soft);
+}
+.klant-ui-btn[data-variant='inverse'] {
+  background: var(--klant-ink);
+  color: var(--klant-bg);
+  border-color: var(--klant-ink);
+}
+.klant-ui-btn[data-variant='inverse']:hover {
+  opacity: 0.9;
+}
+.klant-ui-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.klant-ui-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--klant-border);
+  background: var(--klant-surface);
+  color: var(--klant-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.klant-ui-iconbtn:hover {
+  background: var(--klant-surface-muted);
+  color: var(--klant-ink);
+  border-color: var(--klant-border-strong);
 }
 
 /* Mobile */
