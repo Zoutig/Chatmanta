@@ -6,7 +6,7 @@
 
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
-import { PageHeader } from '../components/page-header';
+import { PageHead } from '../components/ui/page-head';
 import { SettingsForm } from './components/settings-form';
 import { TopQuestionsConfigCard } from './components/top-questions-config-card';
 
@@ -18,9 +18,10 @@ export default async function InstellingenPage() {
 
   return (
     <>
-      <PageHeader
-        title="Instellingen"
-        subtitle="Hier bepaal je hoe je chatbot zich gedraagt — naam, taal, toon, en wat hij doet als hij een antwoord niet weet."
+      <PageHead
+        eyebrow="Instellingen"
+        title="Hoe je chatbot praat en denkt"
+        subtitle="Naam, taal, toon en gedrag — en wat je chatbot doet als hij een antwoord niet weet. Wijzigingen gelden zodra je opslaat."
       />
 
       <SettingsForm key={activeOrg.slug} initial={settings.chatbot} />

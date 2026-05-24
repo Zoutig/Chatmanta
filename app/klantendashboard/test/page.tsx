@@ -14,7 +14,9 @@
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
-import { PageHeader } from '../components/page-header';
+import { PageHead } from '../components/ui/page-head';
+import { Btn } from '../components/ui/btn';
+import { Icon } from '../components/ui/icon';
 import { ChatPreview } from './components/chat-preview';
 
 export const dynamic = 'force-dynamic';
@@ -25,9 +27,15 @@ export default async function TestPage() {
 
   return (
     <>
-      <PageHeader
-        title="Test je chatbot"
-        subtitle="Stel testvragen om te zien hoe je chatbot antwoordt op basis van je bronnen — voordat je hem live zet."
+      <PageHead
+        eyebrow="Test chatbot"
+        title="Praat met je chatbot zoals een bezoeker"
+        subtitle="Probeer vragen die je vaak hoort. Onder elk antwoord zie je welke bronnen zijn gebruikt — handig om je kennis te tunen, vóór je live gaat."
+        actions={
+          <Btn href="/widget" variant="secondary" leadingIcon={<Icon name="arrow-up-right" size={13} />}>
+            Open in widget
+          </Btn>
+        }
       />
 
       <ChatPreview
