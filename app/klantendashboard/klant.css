@@ -755,6 +755,11 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
   filter: brightness(1.08);
 }
 
+/* Gesprekken-lijst rij-hover. */
+.klant-convo-row:hover {
+  background: var(--klant-surface-muted);
+}
+
 /* Mobile */
 @media (max-width: 900px) {
   .klant-shell {

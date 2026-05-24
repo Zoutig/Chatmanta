@@ -9,8 +9,9 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getConversationDetail } from '@/lib/v0/klantendashboard/server/conversations';
-import { PageHeader } from '../../components/page-header';
+import { PageHead } from '../../components/ui/page-head';
 import { StatusBadge } from '../../components/status-badge';
+import { Icon } from '../../components/ui/icon';
 import { ConversationActions } from './components/conversation-actions';
 
 export const dynamic = 'force-dynamic';
@@ -67,10 +68,11 @@ export default async function GesprekDetailPage({
         <ArrowLeft size={13} strokeWidth={1.7} /> Terug naar gesprekken
       </Link>
 
-      <PageHeader
+      <PageHead
+        eyebrow="Gesprek"
         title="Gesprek bekijken"
         subtitle={`Gestart op ${formatDateTime(detail.thread.createdAt)}`}
-        action={<StatusBadge status={isUnanswered ? 'unanswered' : 'answered'} kind="conversation" />}
+        actions={<StatusBadge status={isUnanswered ? 'unanswered' : 'answered'} kind="conversation" />}
       />
 
       <section
@@ -80,51 +82,114 @@ export default async function GesprekDetailPage({
           gap: 20,
         }}
       >
-        {/* Linkerkolom: conversatie */}
-        <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h3 className="klant-section-title">Conversatie</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {detail.messages.map((m) => (
-              <article
-                key={m.id}
+        {/* Linkerkolom: conversatie als chat-bubbles */}
+        <div
+          style={{
+            background: 'var(--klant-surface)',
+            border: '1px solid var(--klant-border)',
+            borderRadius: 'var(--klant-r-lg)',
+            boxShadow: 'var(--klant-shadow)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {isUnanswered && (
+            <div
+              style={{
+                margin: '16px 18px 0',
+                padding: '12px 14px',
+                borderRadius: 'var(--klant-r-md)',
+                background: 'var(--klant-warn-soft)',
+                border: '1px solid var(--klant-warn-border)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                  padding: '10px 12px',
-                  borderRadius: 'var(--klant-r-md)',
-                  background:
-                    m.role === 'user' ? 'var(--klant-surface)' : 'var(--klant-accent-soft)',
-                  border:
-                    '1px solid ' +
-                    (m.role === 'user' ? 'var(--klant-border)' : 'var(--klant-border-strong)'),
-                  alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                  maxWidth: '92%',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: 'var(--klant-warn-soft)',
+                  color: 'var(--klant-warn)',
+                  border: '1px solid var(--klant-warn-border)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
                 }}
               >
+                <Icon name="alert" size={15} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--klant-ink)' }}>
+                  Je chatbot kon deze vraag niet beantwoorden
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--klant-muted)', marginTop: 2 }}>
+                  Voeg een Q&amp;A of pagina toe — vergelijkbare vragen worden meteen meegenomen.
+                </div>
+              </div>
+            </div>
+          )}
+          <div
+            style={{
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            {detail.messages.map((m) => {
+              const isUser = m.role === 'user';
+              const flagged = m.role === 'assistant' && m.response.kind === 'fallback';
+              return (
                 <div
+                  key={m.id}
                   style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: m.role === 'user' ? 'var(--klant-fg-muted)' : 'var(--klant-accent)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: isUser ? 'flex-end' : 'flex-start',
+                    gap: 4,
+                    maxWidth: '82%',
+                    alignSelf: isUser ? 'flex-end' : 'flex-start',
                   }}
                 >
-                  {m.role === 'user' ? 'Bezoeker' : 'Chatbot'}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--klant-dim)',
+                      fontFamily: 'var(--klant-font-mono)',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {isUser ? 'BEZOEKER' : 'CHATMANTA'}
+                  </span>
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      borderTopLeftRadius: isUser ? 14 : 4,
+                      borderTopRightRadius: isUser ? 4 : 14,
+                      background: isUser ? 'var(--klant-accent-soft)' : 'var(--klant-surface-muted)',
+                      border: `1px solid ${
+                        flagged
+                          ? 'var(--klant-warn-border)'
+                          : isUser
+                            ? 'var(--klant-accent-border)'
+                            : 'var(--klant-border)'
+                      }`,
+                      color: 'var(--klant-ink)',
+                      fontSize: 13.5,
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {m.content}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 14,
-                    color: 'var(--klant-fg)',
-                    lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {m.content}
-                </div>
-              </article>
-            ))}
+              );
+            })}
           </div>
         </div>
 

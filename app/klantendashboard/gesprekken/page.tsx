@@ -5,7 +5,7 @@
 // laatste assistant-message.response.kind.
 
 import Link from 'next/link';
-import { ArrowRight, MessagesSquare } from 'lucide-react';
+import { MessagesSquare } from 'lucide-react';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { listConversations } from '@/lib/v0/klantendashboard/server/conversations';
 import {
@@ -15,8 +15,9 @@ import {
 import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
-import { PageHeader } from '../components/page-header';
+import { PageHead } from '../components/ui/page-head';
 import { StatusBadge } from '../components/status-badge';
+import { Icon } from '../components/ui/icon';
 import { TabsNav } from '../components/tabs';
 import { FilterBar } from './components/filter-bar';
 import { NegativeFeedbackTable } from './components/negative-feedback-table';
@@ -79,10 +80,11 @@ export default async function GesprekkenPage({
 
   return (
     <>
-      <PageHeader
-        title="Gesprekken"
-        subtitle="Hier zie je wat bezoekers aan je chatbot vragen — en waar je chatbot nog tekortschiet."
-        action={<ReloadButton />}
+      <PageHead
+        eyebrow="Gesprekken"
+        title="Alle conversaties op één plek"
+        subtitle="Filter op onbeantwoord om snel te zien waar je chatbot vastloopt — en los het direct op door kennis toe te voegen."
+        actions={<ReloadButton />}
       />
 
       <TabsNav
@@ -128,11 +130,11 @@ export default async function GesprekkenPage({
               style={{
                 marginBottom: 12,
                 padding: '10px 14px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.28)',
+                background: 'var(--klant-danger-soft)',
+                border: '1px solid var(--klant-danger-border)',
                 borderRadius: 'var(--klant-r-md)',
                 fontSize: 13,
-                color: 'var(--klant-fg)',
+                color: 'var(--klant-ink)',
               }}
             >
               <strong>{recentNegativeCount}</strong>{' '}
@@ -151,15 +153,16 @@ export default async function GesprekkenPage({
               style={{
                 marginBottom: 16,
                 padding: '10px 14px',
-                background: 'var(--klant-warning-soft)',
-                border: '1px solid rgba(251, 191, 36, 0.32)',
+                background: 'var(--klant-warn-soft)',
+                border: '1px solid var(--klant-warn-border)',
                 borderRadius: 'var(--klant-r-md)',
                 fontSize: 13,
-                color: 'var(--klant-fg)',
+                color: 'var(--klant-ink)',
               }}
             >
-              <strong>{unansweredCount}</strong> {unansweredCount === 1 ? 'gesprek heeft' : 'gesprekken hebben'} een
-              onbeantwoorde vraag.{' '}
+              <strong>{unansweredCount}</strong>{' '}
+              {unansweredCount === 1 ? 'gesprek heeft' : 'gesprekken hebben'} een onbeantwoorde
+              vraag.{' '}
               <Link
                 href="/klantendashboard/gesprekken?filter=unanswered"
                 style={{ color: 'var(--klant-accent)' }}
@@ -168,59 +171,89 @@ export default async function GesprekkenPage({
               </Link>
             </div>
           )}
-          <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div className="table-scroll">
-            <table className="klant-table">
-              <thead>
-                <tr>
-                  <th>Eerste vraag</th>
-                  <th>Berichten</th>
-                  <th>Status</th>
-                  <th>Laatste activiteit</th>
-                  <th style={{ textAlign: 'right' }}>Actie</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <Link
-                        href={`/klantendashboard/gesprekken/${c.id}`}
+          <div
+            style={{
+              background: 'var(--klant-surface)',
+              border: '1px solid var(--klant-border)',
+              borderRadius: 'var(--klant-r-lg)',
+              boxShadow: 'var(--klant-shadow)',
+              overflow: 'hidden',
+            }}
+          >
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {items.map((c, i) => (
+                <li key={c.id} style={{ borderTop: i ? '1px solid var(--klant-border)' : 'none' }}>
+                  <Link
+                    href={`/klantendashboard/gesprekken/${c.id}`}
+                    className="klant-convo-row"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      padding: '13px 18px',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
                         style={{
-                          color: 'var(--klant-fg)',
-                          textDecoration: 'none',
-                          fontWeight: 500,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          background: 'var(--klant-surface-muted)',
+                          color: 'var(--klant-muted)',
+                          border: '1px solid var(--klant-border)',
+                          display: 'inline-grid',
+                          placeItems: 'center',
+                          flexShrink: 0,
                         }}
                       >
-                        {c.firstQuestion}
-                      </Link>
-                    </td>
-                    <td style={{ color: 'var(--klant-fg-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                      {c.messageCount}
-                    </td>
-                    <td>
-                      <StatusBadge status={c.status} kind="conversation" />
-                    </td>
-                    <td style={{ color: 'var(--klant-fg-muted)' }}>{formatDateTime(c.lastActivityAt)}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Link
-                        href={`/klantendashboard/gesprekken/${c.id}`}
-                        className="klant-btn"
-                        data-variant="ghost"
-                        style={{ textDecoration: 'none' }}
+                        <Icon name="globe" size={11} />
+                      </span>
+                      <span style={{ fontSize: 12.5, color: 'var(--klant-ink)', fontWeight: 500 }}>
+                        {c.visitorLabel || 'Bezoeker'}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: 11,
+                          color: 'var(--klant-dim)',
+                          fontFamily: 'var(--klant-font-mono)',
+                        }}
                       >
-                        Bekijken <ArrowRight size={13} strokeWidth={1.7} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+                        {formatDateTime(c.lastActivityAt)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        color: 'var(--klant-ink)',
+                        lineHeight: 1.35,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {c.firstQuestion}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <StatusBadge status={c.status} kind="conversation" />
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: 11,
+                          color: 'var(--klant-dim)',
+                          fontFamily: 'var(--klant-font-mono)',
+                        }}
+                      >
+                        {c.messageCount} berichten
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </>
       ) : null}
