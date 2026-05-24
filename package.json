@@ -26,6 +26,7 @@
     "eval:run-all": "npm run eval:seed && npm run eval:run && npm run eval:report",
     "cc:backfill-prs": "node scripts/cc/backfill-prs.mjs",
     "cc:clean-slate": "node scripts/cc/clean-slate.mjs",
+    "cc:seed-v0-milestones": "node scripts/cc/seed-v0-milestones.mjs",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "migrate:status": "node --env-file=.env.local scripts/migrate.mjs status",
     "migrate:bootstrap": "node --env-file=.env.local scripts/migrate.mjs bootstrap",
