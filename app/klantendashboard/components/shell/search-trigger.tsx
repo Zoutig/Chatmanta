@@ -24,11 +24,23 @@ export function SearchTrigger() {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Reset + open in één handler i.p.v. setState in een effect (vermijdt
+  // cascading-render lint-error; matcht de codebase-conventie).
+  const openPalette = () => {
+    setQuery('');
+    setActive(0);
+    setOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setOpen((v) => !v);
+        setOpen((v) => {
+          if (!v) requestAnimationFrame(() => inputRef.current?.focus());
+          return !v;
+        });
       } else if (e.key === 'Escape') {
         setOpen(false);
       }
@@ -36,15 +48,6 @@ export function SearchTrigger() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  useEffect(() => {
-    if (open) {
-      setQuery('');
-      setActive(0);
-      // focus na render
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  }, [open]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -63,7 +66,7 @@ export function SearchTrigger() {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openPalette}
         style={{
           display: 'flex',
           alignItems: 'center',

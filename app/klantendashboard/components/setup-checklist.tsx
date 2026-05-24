@@ -8,7 +8,18 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
   const pct = Math.round((doneCount / total) * 100);
 
   return (
-    <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <section
+      style={{
+        background: 'var(--klant-surface)',
+        border: '1px solid var(--klant-border)',
+        borderRadius: 'var(--klant-r-lg)',
+        boxShadow: 'var(--klant-shadow)',
+        padding: '16px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+      }}
+    >
       <div
         style={{
           display: 'flex',
@@ -19,21 +30,34 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
         }}
       >
         <div>
-          <h3 className="klant-section-title">Aan de slag</h3>
-          <p className="klant-section-help">
+          <h3
+            style={{
+              fontFamily: 'var(--klant-font-display)',
+              fontSize: 14,
+              fontWeight: 500,
+              letterSpacing: '-0.01em',
+              color: 'var(--klant-ink)',
+              margin: '0 0 3px',
+            }}
+          >
+            Aan de slag
+          </h3>
+          <p style={{ fontSize: 12, color: 'var(--klant-muted)', margin: 0 }}>
             {doneCount === total
               ? 'Alle stappen voltooid! Je chatbot staat klaar.'
               : `${doneCount} van ${total} stappen voltooid — klik door om de rest te doen.`}
           </p>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--klant-fg-muted)' }}>{pct}%</div>
+        <div style={{ fontFamily: 'var(--klant-font-mono)', fontSize: 12, color: 'var(--klant-muted)' }}>
+          {doneCount}/{total}
+        </div>
       </div>
 
       {/* Progress bar */}
       <div
         style={{
           height: 4,
-          background: 'var(--klant-surface)',
+          background: 'var(--klant-surface-muted)',
           borderRadius: 999,
           overflow: 'hidden',
         }}

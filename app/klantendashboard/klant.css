@@ -727,6 +727,34 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
   border-color: var(--klant-border-strong);
 }
 
+/* Triage-hero (Overzicht). Light = vlakke surface; dark = Aurora-gradient
+ * met mint-glow rechtsboven. */
+.klant-triage {
+  position: relative;
+  background: var(--klant-surface);
+  border: 1px solid var(--klant-border-strong);
+  border-radius: 16px;
+  box-shadow: var(--klant-shadow);
+  overflow: hidden;
+}
+.dark .klant-triage,
+[data-theme='dark'] .klant-triage {
+  background: linear-gradient(135deg, var(--klant-surface-muted) 0%, var(--klant-surface) 70%);
+}
+.dark .klant-triage::before,
+[data-theme='dark'] .klant-triage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 90% at 100% 0%, var(--klant-accent-soft), transparent 60%);
+}
+
+/* Metric-strip bar (top-questions) hover-affordance op de rij-link. */
+.klant-bar-row:hover .klant-bar-fill {
+  filter: brightness(1.08);
+}
+
 /* Mobile */
 @media (max-width: 900px) {
   .klant-shell {
