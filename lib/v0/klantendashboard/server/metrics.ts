@@ -11,6 +11,7 @@ import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getMockWebsitePages } from '../mock/website-pages';
 import { getOrgSettings } from './settings';
+import { countUnansweredThreads } from './conversations';
 import type {
   OverviewMetrics,
   UnansweredQuestion,
@@ -48,9 +49,9 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
   // counts uit getOrgSettings zodat overzicht klopt met wat de klant zojuist
   // in /instellingen of /kennisbank heeft opgeslagen (getOrgSettings merget
   // de DB-rij met de mock-defaults, dus geen breekend gedrag voor lege orgs).
-  const [docs, fallbackCount, monthlyStats, websitePages, settings] = await Promise.all([
+  const [docs, unanswered, monthlyStats, websitePages, settings] = await Promise.all([
     listDocs(orgId).catch(() => []),
-    countFallbacksAllTime(orgId),
+    countUnansweredThreads(orgSlug),
     countConversationsThisMonth(orgId),
     Promise.resolve(getMockWebsitePages(orgSlug)),
     getOrgSettings(orgSlug),
@@ -82,25 +83,9 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
       qaItems: qaItems.filter((q) => q.active).length,
     },
     conversationsThisMonth: monthlyStats,
-    unansweredCount: fallbackCount,
+    unansweredCount: unanswered.count,
+    latestUnansweredAt: unanswered.latestUnansweredAt,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Internal: tellers via query_log + v0_threads.
-// ---------------------------------------------------------------------------
-async function countFallbacksAllTime(orgId: string): Promise<number> {
-  try {
-    const { count, error } = await sb()
-      .from('query_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('kind', 'fallback');
-    if (error) return 0;
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
 }
 
 /**
@@ -156,14 +141,19 @@ async function countConversationsThisMonth(
 export async function getUnansweredQuestions(
   orgSlug: OrgSlug,
   limit = 10,
+  sinceDays = 30,
 ): Promise<UnansweredQuestion[]> {
   const orgId = KNOWN_ORGS[orgSlug].id;
   try {
+    const since = new Date();
+    since.setDate(since.getDate() - (sinceDays - 1));
+    since.setHours(0, 0, 0, 0);
     const { data, error } = await sb()
       .from('query_log')
       .select('question, created_at')
       .eq('organization_id', orgId)
       .eq('kind', 'fallback')
+      .gte('created_at', since.toISOString())
       .order('created_at', { ascending: false })
       .limit(200);
     if (error || !data) return [];

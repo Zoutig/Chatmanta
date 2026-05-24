@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, X } from 'lucide-react';
 
 type Variant = 'warning' | 'info' | 'success';
 
@@ -8,11 +8,15 @@ export function WarningBanner({
   title,
   message,
   cta,
+  onDismiss,
 }: {
   variant?: Variant;
   title: string;
   message: string;
   cta?: { label: string; href: string };
+  /** Wanneer aanwezig: render een ✕-knop rechtsboven. Vereist client-context
+   *  (de banner wordt dan gerenderd binnen DismissibleBanner). */
+  onDismiss?: () => void;
 }) {
   const cfg = {
     warning: {
@@ -76,6 +80,29 @@ export function WarningBanner({
         >
           {cta.label}
         </Link>
+      )}
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Melding sluiten"
+          style={{
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 4,
+            marginTop: -2,
+            marginRight: -4,
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 'var(--klant-r-sm)',
+            cursor: 'pointer',
+            color: 'var(--klant-fg-muted)',
+          }}
+        >
+          <X size={16} strokeWidth={1.8} />
+        </button>
       )}
     </div>
   );

@@ -36,7 +36,9 @@ function sinceFilter(filter: ConversationFilter): string | null {
     d.setDate(d.getDate() - 6);
     return d.toISOString();
   }
-  if (filter === 'last_30_days') {
+  // 'unanswered' deelt het 30-dagen-venster van 'last_30_days' zodat het
+  // Overzicht-bannergetal exact gelijk is aan wat deze gefilterde lijst toont.
+  if (filter === 'last_30_days' || filter === 'unanswered') {
     d.setDate(d.getDate() - 29);
     return d.toISOString();
   }
@@ -145,4 +147,22 @@ export async function listConversations(
 export async function getConversationDetail(orgSlug: OrgSlug, threadId: string) {
   const orgId = KNOWN_ORGS[orgSlug].id;
   return getThread(threadId, orgId);
+}
+
+// ---------------------------------------------------------------------------
+// countUnansweredThreads — DE bron van waarheid voor het Overzicht-scherm.
+// Hergebruikt listConversations('unanswered') zodat het getal per definitie
+// gelijk is aan de rijen op /klantendashboard/gesprekken?filter=unanswered.
+// latestUnansweredAt voedt de dismiss-signature van de banner: verandert dit
+// (nieuwe onbeantwoorde vraag), dan komt een weggeklikte banner weer terug.
+// ---------------------------------------------------------------------------
+export async function countUnansweredThreads(
+  orgSlug: OrgSlug,
+): Promise<{ count: number; latestUnansweredAt: string | null }> {
+  const items = await listConversations(orgSlug, 'unanswered');
+  // items zijn al gesorteerd op updated_at desc; [0] is dus de meest recente.
+  return {
+    count: items.length,
+    latestUnansweredAt: items[0]?.lastActivityAt ?? null,
+  };
 }
