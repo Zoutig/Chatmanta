@@ -10,6 +10,8 @@ import type { Metadata } from 'next';
 import { getActiveOrgFromCookies, listKnownOrgs, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { getMockChatbotSettings } from '@/lib/v0/klantendashboard/mock/chatbot-settings';
 import { getMockWidgetSettings } from '@/lib/v0/klantendashboard/mock/widget-settings';
+import { countUnansweredThreads } from '@/lib/v0/klantendashboard/server/conversations';
+import { countRecentNegativeFeedback } from '@/lib/v0/klantendashboard/server/feedback';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { Sidebar } from './components/sidebar';
 import { Topbar } from './components/topbar';
@@ -48,6 +50,10 @@ export default async function KlantendashboardLayout({
   const orgs = listKnownOrgs();
   const widget = getMockWidgetSettings(activeOrg.slug);
   const settings = getMockChatbotSettings(activeOrg.slug);
+  const [unanswered, negativeFeedbackCount] = await Promise.all([
+    countUnansweredThreads(activeOrg.slug),
+    countRecentNegativeFeedback(activeOrg.slug),
+  ]);
 
   // Approximation: heeft de org chatbot-name + welcome → mag in "testing".
   // Voor de demo-orgs (acme, globex, initech) zien we hierdoor 'testing' of
@@ -57,8 +63,13 @@ export default async function KlantendashboardLayout({
 
   return (
     <div data-klant-scope className="klant-shell">
-      <Sidebar activeOrg={activeOrg} orgs={orgs} />
-      <Topbar orgName={activeOrg.name} chatbotStatus={chatbotStatus} />
+      <Sidebar activeOrg={activeOrg} orgs={orgs} unansweredCount={unanswered.count} />
+      <Topbar
+        orgName={activeOrg.name}
+        chatbotStatus={chatbotStatus}
+        unansweredCount={unanswered.count}
+        negativeFeedbackCount={negativeFeedbackCount}
+      />
       <main className="klant-main">{children}</main>
       <TweaksPanel />
     </div>

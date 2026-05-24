@@ -235,8 +235,8 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
 .klant-sidebar {
   grid-row: 1 / span 2;
   grid-column: 1;
-  background: var(--klant-bg-elev);
-  border-right: 1px solid var(--klant-border);
+  background: var(--klant-chrome-bg);
+  border-right: 1px solid var(--klant-chrome-border);
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
@@ -250,8 +250,8 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
 .klant-topbar {
   grid-row: 1;
   grid-column: 2;
-  background: var(--klant-bg-elev);
-  border-bottom: 1px solid var(--klant-border);
+  background: var(--klant-chrome-bg);
+  border-bottom: 1px solid var(--klant-chrome-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -259,6 +259,15 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+/* Aurora-dark: chrome is semi-transparant → blur erachter voor diepte. */
+.dark .klant-sidebar,
+[data-theme='dark'] .klant-sidebar,
+.dark .klant-topbar,
+[data-theme='dark'] .klant-topbar {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .klant-main {
