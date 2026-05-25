@@ -129,7 +129,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
   // (lege omschrijving → status 'concept'), wat klopt voor een verse org.
   'demo-nieuw': {
     chatbotName: 'Mijn assistent',
-    companyName: 'Demo Nieuw',
     companyDescription: '',
     welcomeMessage: 'Hoi! Hoe kan ik je helpen?',
     starterQuestions: [
@@ -139,7 +138,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: true,
-    extraLanguages: [],
     toneOfVoice: 'friendly',
     extraInstructions: '',
     answerLength: 'normal',
