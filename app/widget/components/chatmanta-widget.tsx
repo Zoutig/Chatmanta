@@ -93,6 +93,12 @@ export type ChatMantaWidgetProps = {
    * ("Hoi! Heb je een vraag?") zodat de demo zonder klant-data klopt.
    */
   launcherText?: string;
+  /** Embedded in een iframe-loader → stuur resize-postMessage naar de parent. */
+  embedded?: boolean;
+  /** Origin van de parent-loader (voor de postMessage-target). Default '*'. */
+  parentOrigin?: string;
+  /** Kortlevend embed-token; meegestuurd als x-chatmanta-embed op chat-fetches. */
+  embedToken?: string;
 };
 
 export function ChatMantaWidget({
@@ -115,6 +121,9 @@ export function ChatMantaWidget({
   chatbotName,
   welcomeMessage,
   launcherText,
+  embedded = false,
+  parentOrigin = '*',
+  embedToken,
 }: ChatMantaWidgetProps) {
   // Side-aware positioning voor tooltip. FAB/panel-positie wordt verderop
   // berekend met safe-area-inset + mobile-fullscreen-detectie.
@@ -216,6 +225,16 @@ export function ChatMantaWidget({
     };
   }, [open]);
 
+  // Embedded-modus: vertel de iframe-loader of we collapsed of open zijn,
+  // zodat hij de iframe kan resizen. Side meegestuurd voor de hoek-positie.
+  useEffect(() => {
+    if (!embedded || typeof window === 'undefined' || window.parent === window) return;
+    window.parent.postMessage(
+      { type: 'chatmanta:resize', state: open ? 'open' : 'collapsed', side: position },
+      parentOrigin,
+    );
+  }, [embedded, open, position, parentOrigin]);
+
   // Submit-handler voor de duim-knoppen onder een bot-bubble. Werkt voor
   // beide ratings; bij 'up' is de comment altijd null (geen disclosure-flow),
   // bij 'down' kan de bezoeker een toelichting hebben getypt of "Sla over"
@@ -316,7 +335,10 @@ export function ChatMantaWidget({
       try {
         const res = await fetch(`/api/v0/chat?org=${encodeURIComponent(orgSlug)}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(embedToken ? { 'x-chatmanta-embed': embedToken } : {}),
+          },
           body: JSON.stringify({
             question: trimmed,
             version: botVersion,
@@ -375,7 +397,7 @@ export function ChatMantaWidget({
         abortRef.current = null;
       }
     },
-    [messages, orgSlug, botVersion, pending],
+    [messages, orgSlug, botVersion, pending, embedToken],
   );
 
   // Persist messages → thread-store. Triggert na elke setMessages-flush,
