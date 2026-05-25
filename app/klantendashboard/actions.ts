@@ -12,6 +12,7 @@ import { actionTry, type ActionResult } from '@/lib/errors/action';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import {
   saveWidgetSettings,
+  getOrgSettings,
   saveChatbotSettings,
   saveTopQuestionsConfig,
   upsertQAItem,
@@ -41,6 +42,39 @@ export async function saveWidgetSettingsAction(
     // zichtbaar na een rebuild of cache-TTL.
     revalidatePath('/widget', 'layout');
     return { widget };
+  });
+}
+
+// Installatie-detectie: leest de echte heartbeat-status (lastSeenAt) i.p.v. een
+// mock-toggle. installed = ping gezien binnen het freshness-venster. Persisteert
+// de herberekende isInstalled + lastCheckedAt zodat de status niet eeuwig "Ja"
+// blijft als de widget weken niet is gezien.
+const WIDGET_INSTALL_FRESHNESS_SEC = Number(process.env.WIDGET_INSTALL_FRESHNESS_SEC) || 604800;
+
+export async function checkWidgetInstallationAction(): Promise<
+  ActionResult<{
+    isInstalled: boolean;
+    lastSeenAt: string | null;
+    installOrigin: string | null;
+    lastCheckedAt: string;
+  }>
+> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const settings = await getOrgSettings(activeOrg.slug);
+    const w = settings.widget;
+    const seenMs = w.lastSeenAt ? Date.parse(w.lastSeenAt) : NaN;
+    const installed =
+      Number.isFinite(seenMs) && Date.now() - seenMs < WIDGET_INSTALL_FRESHNESS_SEC * 1000;
+    const lastCheckedAt = new Date().toISOString();
+    await saveWidgetSettings(activeOrg.slug, { isInstalled: installed, lastCheckedAt });
+    revalidatePath('/klantendashboard/widget', 'page');
+    return {
+      isInstalled: installed,
+      lastSeenAt: w.lastSeenAt,
+      installOrigin: w.installOrigin,
+      lastCheckedAt,
+    };
   });
 }
 

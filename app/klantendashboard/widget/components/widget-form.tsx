@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '../../components/status-badge';
 import { BubblePreview, MarkPreview } from '../../components/widget-logo';
-import { saveWidgetSettingsAction } from '../../actions';
+import { saveWidgetSettingsAction, checkWidgetInstallationAction } from '../../actions';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { PresetColorPicker } from './preset-color-picker';
@@ -31,12 +31,12 @@ export function WidgetForm({
   initial,
   chatbotName,
   welcomeMessage,
-  workspaceId,
+  orgSlug,
 }: {
   initial: WidgetSettings;
   chatbotName: string;
   welcomeMessage: string;
-  workspaceId: string;
+  orgSlug: string;
 }) {
   const [w, setW] = useState<WidgetSettings>(initial);
   const [openSection, setOpenSection] = useState<Section>('install');
@@ -55,7 +55,9 @@ export function WidgetForm({
     header: w.headerColor || w.primaryColor,
   };
 
-  const embedCode = `<script src="https://cdn.chatmanta.nl/widget.js" data-chatbot-id="${workspaceId}"></script>`;
+  // origin via window zodat de snippet op localhost én prod het juiste host toont.
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.chatmanta.nl';
+  const embedCode = `<script src="${origin}/widget.js" data-org="${orgSlug}" defer></script>`;
 
   function copy() {
     navigator.clipboard.writeText(embedCode);
@@ -589,6 +591,9 @@ export function WidgetForm({
             value={w.lastCheckedAt ? new Date(w.lastCheckedAt).toLocaleString('nl-NL') : '—'}
             tone="neutral"
           />
+          {w.installOrigin && (
+            <StatusCell label="Gezien op" value={w.installOrigin} tone="neutral" />
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
@@ -615,9 +620,19 @@ export function WidgetForm({
           <button
             type="button"
             onClick={() =>
-              persist({
-                lastCheckedAt: new Date().toISOString(),
-                isInstalled: true,
+              startTransition(async () => {
+                const res = await checkWidgetInstallationAction();
+                if (res.ok) {
+                  setW((prev) => ({
+                    ...prev,
+                    isInstalled: res.isInstalled,
+                    lastSeenAt: res.lastSeenAt,
+                    installOrigin: res.installOrigin,
+                    lastCheckedAt: res.lastCheckedAt,
+                  }));
+                } else {
+                  setError(res.error);
+                }
               })
             }
             className="klant-btn"
