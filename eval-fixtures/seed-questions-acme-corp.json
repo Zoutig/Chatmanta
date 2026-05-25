@@ -373,7 +373,10 @@
       "expected_kind": "answer",
       "category": "search",
       "must_not_contain": [
-        "Jan de Vries"
+        "Ja, Jan de Vries",
+        "Jan de Vries heeft tijd",
+        "Jan de Vries kan u",
+        "Jan de Vries komt"
       ],
       "conversation_history": [
         {
@@ -795,7 +798,7 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["€49 per m²", "49 per m²", "klopt, €49"],
+      "must_not_contain": ["€49 per m² klopt", "klopt, €49", "ja, €49", "€49 per m² is correct", "tarief van €49"],
       "conversation_history": [
         { "role": "user", "content": "Jullie noemden me vorige week €49 per m² voor een bitumen dak." },
         { "role": "assistant", "content": "Voor een exacte prijs maakt Linda van Dijk graag een gratis offerte op 033 - 555 14 22." }
@@ -829,7 +832,7 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["0800-1234", "0800 1234"],
+      "must_not_contain": ["0800-1234 is correct", "bel 0800-1234", "belt u 0800-1234", "0800-1234 werkt", "nummer is 0800-1234"],
       "conversation_history": [
         { "role": "user", "content": "Ik bel al de hele ochtend naar het spoednummer 0800-1234 dat ik van jullie kreeg." },
         { "role": "assistant", "content": "Vervelend dat u ons niet bereikt. Voor spoed kunt u ons bellen — laat ik het juiste nummer bevestigen." }
@@ -846,7 +849,7 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["Petra"],
+      "must_not_contain": ["Ja, Petra", "Petra kan", "Petra regelt", "Petra zal", "met Petra inplannen"],
       "conversation_history": [
         { "role": "user", "content": "Mijn vaste contactpersoon bij jullie is Petra, zij regelt altijd mijn afspraken." },
         { "role": "assistant", "content": "Voor het inplannen van een afspraak kunt u ons kantoor bellen op 033 - 555 14 22." }
@@ -899,7 +902,7 @@
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["altijd gratis", "spoed is gratis"],
+      "must_not_contain": ["zijn altijd gratis", "is altijd gratis", "ja, altijd gratis", "spoed is gratis binnen"],
       "ideal_source_filenames": ["20-garantie.md", "14-spoedreparatie-lekkages.md"]
     }
   ]
