@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "purpose": "Gerichte ideal_source_filenames-correcties voor eval_questions die WEL in de live DB staan en geëvalueerd worden, maar NIET (meer) in een seed-fixture voorkomen — 'orphans'. Die worden door `npm run eval:seed` niet geraakt (upsert matcht op org+slug), dus corrigeren we ze direct via `npm run eval:relabel`.",
+    "context": "Deze dev-org orphans dateren van vóór de V0.7 slim-down (69→17): de fixture is geslankt maar de oude rijen leven nog in eval_questions en worden nog steeds gerund. Hun ideal_source_filenames wezen naar het verouderde 'v0-sample.md'; het live DEV_ORG-corpus is de echte ChatManta self-docs, met Concept_Blueprint_ChatManta.md als canonieke spec.",
+    "in_fixture_corrections": "Correcties voor vragen die WÉL in een fixture staan (7 dev-org + acme-249) zijn in de fixture-JSONs zelf gedaan en landen via `npm run eval:seed`. Dit bestand bevat alleen de orphans.",
+    "format": "{ \"<organization_id>\": { \"<slug>\": [\"file.md\", ...] } }",
+    "applied_by": "scripts/v0-eval-relabel.ts (idempotent, $0, raakt alleen eval_questions.ideal_source_filenames)"
+  },
+  "00000000-0000-0000-0000-0000000000d0": {
+    "kernprincipes": ["Concept_Blueprint_ChatManta.md"],
+    "doelgroep-jorion": ["Concept_Blueprint_ChatManta.md"],
+    "oprichter-jorion": ["Concept_Blueprint_ChatManta.md"],
+    "stack-overzicht": ["Concept_Blueprint_ChatManta.md"],
+    "rls-uitleg": ["Concept_Blueprint_ChatManta.md"],
+    "supabase-region": ["Concept_Blueprint_ChatManta.md"],
+    "fallback-gedrag": ["Concept_Blueprint_ChatManta.md"],
+    "hosting-platform": ["Concept_Blueprint_ChatManta.md"],
+    "embedding-model": ["Concept_Blueprint_ChatManta.md"],
+    "firecrawl-limit": ["Concept_Blueprint_ChatManta.md"],
+    "multi-hop-llm-in-eu": ["Concept_Blueprint_ChatManta.md"],
+    "multi-hop-anti-hallucinatie-mechanisme": ["Concept_Blueprint_ChatManta.md"],
+    "multi-hop-embedding-vector": ["Concept_Blueprint_ChatManta.md"],
+    "typo-llm-informeel": ["Concept_Blueprint_ChatManta.md"],
+    "typo-vector-db-informeel": ["Concept_Blueprint_ChatManta.md"],
+    "typo-wat-doet-informeel": ["Concept_Blueprint_ChatManta.md"],
+    "planted-fact-hetzner": ["Concept_Blueprint_ChatManta.md"],
+    "false-premise-geen-rls": ["Concept_Blueprint_ChatManta.md"]
+  }
+}

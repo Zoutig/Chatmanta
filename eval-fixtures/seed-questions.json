@@ -1,7 +1,7 @@
 {
   "_meta": {
     "description": "V0 eval seed corpus voor DEV_ORG. V0.7 slim-down (PR 5/5): teruggebracht van 69 naar 17 sanity-vragen. Behoudt prompt_injection, smalltalk, out_of_corpus, planted_fact, ambiguous, false_premise en 3 ChatManta-self factuals als baseline-check. Klant-content (FAQ-stijl, tarieven, deadlines) staat nu in eval-fixtures/seed-questions-{acme-corp,globex-inc,initech}.json — DEV_ORG is bewust geen klant-org-simulatie meer.",
-    "based_on": "scripts/fixtures/v0-sample.md (V0 sample document) — bedrijfsbeleid/zonnepanelen fixtures gelden voor andere orgs en zijn niet relevant voor de DEV_ORG eval-set.",
+    "based_on": "DEV_ORG corpus = de live ChatManta self-docs (Concept_Blueprint_ChatManta.md + CHATBOT_REFERENCE.md, plus Bouwplan-docs). ideal_source_filenames wijzen daarom naar Concept_Blueprint_ChatManta.md (de canonieke spec), niet meer naar het verouderde v0-sample.md.",
     "version": 2,
     "language": "nl",
     "schema_notes": "Nieuwe optionele velden in v2: conversation_history (multi-turn), expected_kind (answer/fallback/smalltalk), must_not_contain (verboden strings), ideal_source_filenames (recall@k), question_type (categorie).",
@@ -29,7 +29,7 @@
       "question_type": "factual",
       "expected_kind": "answer",
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ]
     },
     {
@@ -47,7 +47,7 @@
       "question_type": "factual",
       "expected_kind": "answer",
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ]
     },
     {
@@ -66,7 +66,7 @@
       "question_type": "factual",
       "expected_kind": "answer",
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ]
     },
     {
@@ -130,7 +130,7 @@
         "MongoDB"
       ],
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ]
     },
     {
@@ -153,7 +153,7 @@
         "AWS"
       ],
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ]
     },
     {
@@ -255,7 +255,7 @@
         "Marc"
       ],
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ],
       "conversation_history": [
         {
@@ -281,7 +281,7 @@
       "question_type": "ambiguous",
       "expected_kind": "answer",
       "ideal_source_filenames": [
-        "v0-sample.md"
+        "Concept_Blueprint_ChatManta.md"
       ]
     },
     {

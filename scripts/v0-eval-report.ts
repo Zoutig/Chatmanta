@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 import { resolveBot, BOTS, EVAL_DEFAULT_VERSIONS } from '../lib/v0/server/bots';
+import { calcRetrievalMetrics, SOURCE_EXPECTED_TYPES } from '../lib/v0/server/eval';
 import type { PhaseTimings } from '../lib/v0/server/rag';
 import {
   STAGE_KEYS,
@@ -98,9 +99,26 @@ if (!runRows || runRows.length === 0) {
 
 const { data: qRows, error: qErr } = await sb
   .from('eval_questions')
-  .select('id, organization_id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type, must_not_contain');
+  .select('id, organization_id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type, must_not_contain, ideal_source_filenames');
 if (qErr) fail(`eval_questions select: ${qErr.message}`);
 const qById = new Map((qRows ?? []).map((q) => [q.id as string, q]));
+
+// Recall/MRR ON-READ herberekenen uit de opgeslagen retrieved_filenames × de
+// ACTUELE ideal_source_filenames, i.p.v. de bij run-tijd opgeslagen kolommen.
+// Zo weerspiegelen rapport + gate gecorrigeerde labels meteen, zonder dure
+// her-run. recall telt alléén voor SOURCE_EXPECTED_TYPES — bij val-vragen
+// (out_of_corpus/planted_fact/false_premise/…) is "haal dít doc op" niet het
+// doel, dus die geven null en vallen uit de aggregatie (labels blijven staan).
+function recomputeRetrieval(r: RunRow): { recallAtK: number | null; mrr: number | null } {
+  const q = qById.get(r.question_id);
+  if (!q || !SOURCE_EXPECTED_TYPES.has(q.question_type as string)) {
+    return { recallAtK: null, mrr: null };
+  }
+  return calcRetrievalMetrics(
+    (r.retrieved_filenames as string[] | null) ?? [],
+    (q.ideal_source_filenames as string[] | null) ?? [],
+  );
+}
 
 // V0.7: pairwise rows voor de win-rate sectie. Filteren is niet nodig — we
 // tonen alles uit de meest-recente batch.
@@ -318,8 +336,8 @@ if (distinctOrgs.length === 0) {
       const citationRate = citationRows.length === 0 ? null
         : citationRows.filter((r) => r.source_citation_binding === true).length / citationRows.length;
       const tone = avgOf(vRows, (r) => r.score_tone_match as number | null);
-      const recall = avgOf(vRows.filter((r) => r.retrieval_recall_at_k !== null), (r) => Number(r.retrieval_recall_at_k));
-      const mrr = avgOf(vRows.filter((r) => r.retrieval_mrr !== null), (r) => Number(r.retrieval_mrr));
+      const recall = avgOf(vRows, (r) => recomputeRetrieval(r).recallAtK);
+      const mrr = avgOf(vRows, (r) => recomputeRetrieval(r).mrr);
       const pct = (n: number | null) => n === null ? '—' : `${Math.round(n * 100)}%`;
       lines.push(
         `| ${orgSlug(orgId)} | ${v} | ${vRows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | ${pct(routeOk)} | ${pct(metaRate)} | ${pct(prRate)} | ${pct(lenRate)} | ${pct(citationRate)} | ${fmt(tone)} | ${fmt(recall, 3)} | ${fmt(mrr, 3)} |`,
@@ -599,19 +617,21 @@ for (const qt of typeList) {
 }
 lines.push('');
 
-// 4e. Retrieval metrics per versie
-lines.push('## Retrieval metrics (waar ideal_source_filenames is opgegeven)');
+// 4e. Retrieval metrics per versie. On-read herberekend uit retrieved_filenames
+// × actuele ideal_source_filenames, alléén over bron-verwachte vraagtypes
+// (factual/multi_hop/typo/ambiguous) — val-vragen tellen niet mee.
+lines.push('## Retrieval metrics (bron-verwachte types, on-read herberekend)');
 lines.push('');
 lines.push('| versie | n_met_ideal | recall@k (avg) | MRR (avg) |');
 lines.push('|--------|-------------|----------------|-----------|');
 for (const v of versionsForHeader) {
-  const rows = latestRuns.filter((r) => r.bot_version === v && r.retrieval_recall_at_k !== null);
+  const rows = latestRuns.filter((r) => r.bot_version === v && recomputeRetrieval(r).recallAtK !== null);
   if (rows.length === 0) {
     lines.push(`| ${v} | 0 | — | — |`);
     continue;
   }
-  const recall = avgOf(rows, (r) => Number(r.retrieval_recall_at_k));
-  const mrr = avgOf(rows, (r) => Number(r.retrieval_mrr));
+  const recall = avgOf(rows, (r) => recomputeRetrieval(r).recallAtK);
+  const mrr = avgOf(rows, (r) => recomputeRetrieval(r).mrr);
   lines.push(`| ${v} | ${rows.length} | ${fmt(recall, 3)} | ${fmt(mrr, 3)} |`);
 }
 lines.push('');
@@ -693,10 +713,8 @@ for (const v of versionsForHeader) {
   const metaRows = vRows.filter((r) => r.score_meta_talk_present !== null);
   const metaRate = metaRows.length === 0 ? null
     : metaRows.filter((r) => r.score_meta_talk_present === true).length / metaRows.length;
-  const recallRows = vRows.filter((r) => r.retrieval_recall_at_k !== null);
-  const avgRecall = avgOf(recallRows, (r) => Number(r.retrieval_recall_at_k));
-  const mrrRows = vRows.filter((r) => r.retrieval_mrr !== null);
-  const avgMrr = avgOf(mrrRows, (r) => Number(r.retrieval_mrr));
+  const avgRecall = avgOf(vRows, (r) => recomputeRetrieval(r).recallAtK);
+  const avgMrr = avgOf(vRows, (r) => recomputeRetrieval(r).mrr);
   const totalMsValues: number[] = [];
   const firstTokenMsValues: number[] = [];
   for (const r of vRows) {
@@ -877,8 +895,8 @@ for (const q of questions) {
         (r.answer_length_appropriate as string | null) ?? '',
         r.source_citation_binding === null || r.source_citation_binding === undefined ? '' : (r.source_citation_binding ? 'true' : 'false'),
         r.score_tone_match ?? '',
-        r.retrieval_recall_at_k ?? '',
-        r.retrieval_mrr ?? '',
+        recomputeRetrieval(r).recallAtK ?? '',
+        recomputeRetrieval(r).mrr ?? '',
         r.must_not_violation ? 'true' : 'false',
         r.bot_kind,
         r.bot_latency_ms,
