@@ -242,7 +242,8 @@ async function main(): Promise<void> {
       const violation = row.must_not_violation ? ' 🚨MUST-NOT' : '';
       const kind = row.bot_kind === 'answer' ? '' : ` [${row.bot_kind}]`;
       const prod = row.production_ready === true ? ' ✓ship' : row.production_ready === false ? ' ✗ship' : '';
-      console.log(`  ✓ ${tag} ${scores}${prod}${kind}${flag}${violation}  bot:${row.bot_latency_ms}ms judge:${row.judge_latency_ms}ms`);
+      const hf = row.hard_fact_status === 'unsupported' ? ' ⚠HF-unsup' : row.hard_fact_status === 'unknown' ? ' ?HF-unknown' : '';
+      console.log(`  ✓ ${tag} ${scores}${prod}${kind}${flag}${violation}${hf}  bot:${row.bot_latency_ms}ms judge:${row.judge_latency_ms}ms`);
       return row;
     } catch (err) {
       console.error(`  ✗ ${tag} — ${err instanceof Error ? err.message : String(err)}`);

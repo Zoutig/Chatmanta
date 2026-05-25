@@ -25,6 +25,7 @@ import {
 } from './rag';
 import { resolveBot, type BotConfig } from './bots';
 import { getPersonaForOrgId, formatPersonaSection } from './eval-personas';
+import { containsHardFacts } from './hard-facts';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -200,6 +201,12 @@ export type EvalRunRow = {
   // rows (geen response) en theoretisch ook als de stream geen metrics-done
   // emit én response.extras.phaseTimingsMs leeg liet (zou nu nooit moeten).
   stage_timings_ms: PhaseTimings | null;
+  // Migration 0033 — hard-fact support in eval. hard_fact_status is altijd
+  // gezet (nooit null vanuit de runner); supported/missing zijn null bij
+  // none_detected/unknown.
+  hard_fact_supported: boolean | null;
+  missing_hard_facts: string[] | null;
+  hard_fact_status: 'supported' | 'unsupported' | 'none_detected' | 'unknown';
 };
 
 // ---------------------------------------------------------------------------
@@ -758,6 +765,49 @@ function checkMustNot(answer: string, forbidden: string[]): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Hard-fact eval-velden (migration 0033)
+// ---------------------------------------------------------------------------
+type HardFactEvalFields = {
+  hard_fact_supported: boolean | null;
+  missing_hard_facts: string[] | null;
+  hard_fact_status: EvalRunRow['hard_fact_status'];
+};
+
+/** Vertaalt runtime `response.extras.hardFactSupport` (kan undefined zijn op
+ *  fallback/smalltalk/error-paden) + de antwoordtekst naar de drie eval_runs
+ *  hard-fact-kolommen.
+ *
+ *  - verifier draaide + supported=false → 'unsupported' (risico).
+ *  - verifier draaide + supported=true  → 'supported' als het antwoord
+ *    daadwerkelijk harde feiten bevat, anders 'none_detected' (geen valse
+ *    groene 'supported' voor feitloze antwoorden).
+ *  - verifier draaide NIET maar het antwoord bevat harde feiten → 'unknown'
+ *    (= onverifieerbaar risico; in de gate NOOIT auto-PASS).
+ *  - verifier draaide NIET en geen harde feiten → 'none_detected'. */
+function computeHardFactEvalFields(
+  hfs: { supported: boolean; missing: string[] } | undefined,
+  answer: string,
+): HardFactEvalFields {
+  if (hfs) {
+    if (!hfs.supported) {
+      return {
+        hard_fact_supported: false,
+        missing_hard_facts: hfs.missing ?? [],
+        hard_fact_status: 'unsupported',
+      };
+    }
+    if (containsHardFacts(answer)) {
+      return { hard_fact_supported: true, missing_hard_facts: [], hard_fact_status: 'supported' };
+    }
+    return { hard_fact_supported: null, missing_hard_facts: null, hard_fact_status: 'none_detected' };
+  }
+  if (containsHardFacts(answer)) {
+    return { hard_fact_supported: null, missing_hard_facts: null, hard_fact_status: 'unknown' };
+  }
+  return { hard_fact_supported: null, missing_hard_facts: null, hard_fact_status: 'none_detected' };
+}
+
+// ---------------------------------------------------------------------------
 // Single (question × version) run
 // ---------------------------------------------------------------------------
 export async function runEvalRow(args: {
@@ -904,6 +954,11 @@ export async function runEvalRow(args: {
       retrieval_mrr: null,
       must_not_violation: false,
       stage_timings_ms: phaseTimings,
+      // Bot crashte → verifier draaide niet → 'unknown' (nooit auto-PASS op
+      // een hard-fact-risk case).
+      hard_fact_supported: null,
+      missing_hard_facts: null,
+      hard_fact_status: 'unknown',
     };
   }
 
@@ -936,6 +991,13 @@ export async function runEvalRow(args: {
   // leugen napraat).
   const mustNotViolation = checkMustNot(response.answer, question.must_not_contain);
 
+  // Hard-fact support (migration 0033). Verifier-output zit in extras op
+  // answer-kind; fallback/smalltalk hebben geen extras → undefined → de
+  // helper bepaalt none_detected vs unknown o.b.v. of het antwoord harde
+  // feiten bevat.
+  const hfs = response.kind === 'answer' ? response.extras?.hardFactSupport : undefined;
+  const hardFact = computeHardFactEvalFields(hfs, response.answer);
+
   return {
     organization_id: organizationId,
     question_id: question.id,
@@ -967,6 +1029,9 @@ export async function runEvalRow(args: {
     retrieval_mrr: mrr,
     must_not_violation: mustNotViolation,
     stage_timings_ms: phaseTimings,
+    hard_fact_supported: hardFact.hard_fact_supported,
+    missing_hard_facts: hardFact.missing_hard_facts,
+    hard_fact_status: hardFact.hard_fact_status,
   };
 }
 
