@@ -132,6 +132,37 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     unknownAnswerMessage:
       'Daar kan ik niet betrouwbaar antwoord op geven. Onze adviseurs helpen u graag persoonlijk.',
   },
+  // Lege demo-org — neutrale defaults die een nieuwe klant nog mag invullen.
+  // companyDescription bewust leeg: de layout leidt de chatbot-status hieruit af
+  // (lege omschrijving → status 'concept'), wat klopt voor een verse org.
+  'demo-nieuw': {
+    chatbotName: 'Mijn assistent',
+    companyName: 'Demo Nieuw',
+    companyDescription: '',
+    welcomeMessage: 'Hoi! Hoe kan ik je helpen?',
+    starterQuestions: [
+      'Wat doen jullie?',
+      'Welke diensten bieden jullie aan?',
+      'Hoe kan ik contact opnemen?',
+    ],
+    primaryLanguage: 'nl',
+    autoDetectLanguage: true,
+    extraLanguages: [],
+    toneOfVoice: 'friendly',
+    extraInstructions: '',
+    answerLength: 'normal',
+    mayMentionPrices: true,
+    mayShareContact: true,
+    sourceStrictness: 'normal',
+    honestAboutUnknown: true,
+    fallbackMessage:
+      'Ik weet dit niet zeker op basis van de beschikbare informatie. Neem gerust contact met ons op, dan helpen we je graag verder.',
+    contactEmail: '',
+    contactPhone: '',
+    contactPageUrl: '',
+    unknownAnswerMessage:
+      'Daar kan ik nu geen antwoord op geven. Wil je dat ik je doorverwijs naar een collega?',
+  },
 };
 
 export function getMockChatbotSettings(orgSlug: OrgSlug): ChatbotSettings {

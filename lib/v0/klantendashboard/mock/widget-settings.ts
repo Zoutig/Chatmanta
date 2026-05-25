@@ -64,6 +64,21 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
     isActive: false,
     lastCheckedAt: null,
   },
+  // Lege demo-org — widget nog niet geplaatst/actief → status blijft 'concept'.
+  'demo-nieuw': {
+    primaryColor: '#00CC9B',
+    position: 'bottom-right',
+    pulseEnabled: true,
+    logoStyle: 'brand-mark',
+    customLogoDataUrl: null,
+    title: 'Hoi! Hoe kan ik je helpen?',
+    subtitle: 'Stel je vraag, ik help je graag verder.',
+    launcherText: 'Chat met ons',
+    theme: 'auto',
+    isInstalled: false,
+    isActive: false,
+    lastCheckedAt: null,
+  },
 };
 
 export function getMockWidgetSettings(orgSlug: OrgSlug): WidgetSettings {

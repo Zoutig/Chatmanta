@@ -26,6 +26,7 @@ const SLUG_BY_ORG_ID: Readonly<Record<string, string>> = Object.freeze({
   '00000000-0000-0000-0000-0000000000a1': 'acme-corp',
   '00000000-0000-0000-0000-0000000000a2': 'globex-inc',
   '00000000-0000-0000-0000-0000000000a3': 'initech',
+  '00000000-0000-0000-0000-0000000000a4': 'demo-nieuw',
 });
 
 const PERSONA_DIR = resolve(process.cwd(), 'eval-fixtures', 'personas');

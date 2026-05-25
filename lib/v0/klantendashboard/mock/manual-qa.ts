@@ -135,6 +135,8 @@ const MOCK_QA: Record<OrgSlug, ManualQA[]> = {
       updatedAt: NOW,
     },
   ],
+  // Lege demo-org — nog geen handmatige Q&A's.
+  'demo-nieuw': [],
 };
 
 export function getMockManualQA(orgSlug: OrgSlug): ManualQA[] {

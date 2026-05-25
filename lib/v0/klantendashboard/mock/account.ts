@@ -34,6 +34,12 @@ const PROFILES: Record<
     email: 'joost@bakkervermeer.nl',
     plan: 'starter',
   },
+  'demo-nieuw': {
+    websiteUrl: '',
+    contactPerson: 'Nieuwe klant',
+    email: 'klant@voorbeeld.nl',
+    plan: 'test',
+  },
 };
 
 export function getMockAccountInfo(
