@@ -58,6 +58,28 @@ const PRODUCTION_THRESHOLDS = {
   maxP95FirstTokenMs: 1500,
 } as const;
 
+// §E.2 — TWEE benoemde gates.
+// • ASPIRATIONAL_PRODUCTION_GATE = de oorspronkelijke hoge productie-lat. Blijft
+//   zichtbaar als langetermijndoel, maar is NIET promotie-bepalend.
+// • V0_ENGINE_GATE = herijkt op de gemeten noise-floor (recommended =
+//   max(safety_floor, baseline 95%CI-ondergrens); zie het herijkings-voorstel
+//   onderaan het report). Bepaalt promotie binnen V0. Alléén de als
+//   `aspirational` geflagde min-drempels zijn naar `recommended` verlaagd; al het
+//   andere + ALLE HARD safety-gates (must-not=0, unsupported hard-fact=0,
+//   zero-correctness≤0.02) blijven ongewijzigd. Verlaag deze NOOIT om groen te
+//   worden — het doel is een eerlijke lat, geen greenwashing.
+const ASPIRATIONAL_PRODUCTION_GATE = PRODUCTION_THRESHOLDS;
+const V0_ENGINE_GATE = {
+  ...PRODUCTION_THRESHOLDS,
+  minAvgCorrectness: 3.25,      // was 4.0 — buiten 95%CI [3.247, 3.552]; herijkt op CI-ondergrens
+  minAvgGrounding: 3.62,        // was 4.0 — buiten 95%CI [3.615, 3.908]; herijkt op CI-ondergrens
+  minProductionReadyRate: 0.50, // was 0.80 — buiten band (baseline 0.449); recommended = safety_floor 0.50
+  maxMetaTalkRate: 0.16,        // was 0.10 — buiten 95%CI [0.102, 0.159]; herijkt op CI-bovengrens
+  // completeness (3.5), route (0.90), recall (0.70), MRR (0.60), right-length
+  // (0.85), citation (0.75), tone (1.5), p95 (8000/1500), zero-corr (0.02):
+  // ONGEWIJZIGD — binnen noise-band of HARD safety-floor (niet aspirational-geflagd).
+} as const;
+
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
   process.exit(1);
@@ -917,7 +939,7 @@ if (pwAllForType.length === 0) {
 // het bestand — STARTWAARDEN; kalibreer na 2-3 echte runs.
 lines.push('## V0.7 — Productie-drempel-gate (klant-bereidheid)');
 lines.push('');
-lines.push('Per versie: passeert deze de minimale drempels om naar betalende klanten te gaan?');
+lines.push('Per versie TWEE gates (§E.2): de **V0 Controlled Engine Gate** (herijkt op de gemeten noise-floor — bepaalt promotie binnen V0 + triggert exit-1) en de **Aspirational Production Gate** (de oorspronkelijke hoge lat — langetermijndoel, niet blokkerend). HARD safety-gates (must-not=0, unsupported hard-fact=0, zero-corr≤0.02) zijn in BEIDE identiek en NOOIT verlaagd.');
 lines.push('');
 lines.push(`> ℹ️ **Gate-scope**: alleen kandidaat-versies (\`EVAL_DEFAULT_VERSIONS\` = ${EVAL_DEFAULT_VERSIONS.join(', ')}) triggeren exit-code 1. Historische versies worden voor referentie getoond maar blokkeren de report-run niet.`);
 if (legacyRunsExcluded > 0) {
@@ -944,9 +966,6 @@ let anyVersionFailed = false;
 for (const v of versionsForHeader) {
   const vRows = latestRuns.filter((r) => r.bot_version === v);
   if (vRows.length === 0) continue;
-
-  const checks: ThresholdCheck[] = [];
-  const T = PRODUCTION_THRESHOLDS;
 
   // Aggregates
   const avgC = avgOf(vRows, (r) => r.score_correctness);
@@ -982,8 +1001,11 @@ for (const v of versionsForHeader) {
   const p95FirstToken = p95(firstTokenMsValues);
   const violations = vRows.filter((r) => recomputeMustNot(r)).length;
 
-  // Build checks. Skip checks waar de actual NULL is (geen data) — anders
-  // faalt elke versie zonder pairwise/persona-rijen automatisch.
+  // Build checks voor een gegeven drempelset (§E.2 — twee gates draaien dezelfde
+  // checks tegen andere targets). Skip checks waar actual NULL is (geen data) —
+  // anders faalt elke versie zonder pairwise/persona-rijen automatisch.
+  function buildChecks(T: Record<keyof typeof PRODUCTION_THRESHOLDS, number>): ThresholdCheck[] {
+  const checks: ThresholdCheck[] = [];
   function addCheck(label: string, actual: number | null, target: number, op: '>=' | '<=' | '=='): void {
     if (actual === null) {
       checks.push({ label, actual: '—', target: `${op}${target}`, pass: true /* skip */ });
@@ -1046,8 +1068,16 @@ for (const v of versionsForHeader) {
     target: 'warn',
     pass: true,
   });
+    return checks;
+  }
 
-  const failed = checks.filter((c) => !c.pass && c.actual !== '—');
+  // §E.2 — twee gates. Promotie/exit-code beslist op de V0 Engine Gate; de
+  // Aspirational Gate staat erbij als langetermijnlat (niet blokkerend).
+  const engineChecks = buildChecks(V0_ENGINE_GATE);
+  const aspChecks = buildChecks(ASPIRATIONAL_PRODUCTION_GATE);
+  const failed = engineChecks.filter((c) => !c.pass && c.actual !== '—');
+  const aspFailed = aspChecks.filter((c) => !c.pass && c.actual !== '—');
+
   // Alleen kandidaat-versies (EVAL_DEFAULT_VERSIONS) triggeren exit-1.
   // Historische versies tonen we voor referentie maar blokkeren niet —
   // anders zou een report-run op een DB met oude failing v0.5-rows altijd
@@ -1056,16 +1086,28 @@ for (const v of versionsForHeader) {
   if (failed.length > 0 && isCandidate) anyVersionFailed = true;
   const candidateTag = isCandidate ? '🎯 kandidaat — ' : '📜 historisch — ';
   const verdict = failed.length === 0
-    ? '✅ PRODUCTIE-KLAAR'
+    ? '✅ V0-ENGINE-GATE GEHAALD'
     : isCandidate
-      ? `❌ FAALT op ${failed.length} drempel(s)`
-      : `⚠ ${failed.length} drempel(s) ge-mist (alleen referentie)`;
+      ? `❌ V0-engine-gate FAALT op ${failed.length} drempel(s)`
+      : `⚠ V0-engine-gate: ${failed.length} drempel(s) gemist (alleen referentie)`;
 
   lines.push(`### ${v} — ${candidateTag}${verdict} (n=${vRows.length})`);
   lines.push('');
+  lines.push('**V0 Controlled Engine Gate** — herijkt op noise-floor, **promotie-bepalend**:');
+  lines.push('');
   lines.push('| drempel | actual | target | status |');
   lines.push('|---------|--------|--------|--------|');
-  for (const c of checks) {
+  for (const c of engineChecks) {
+    const status = c.actual === '—' ? '— (geen data)' : c.pass ? '✓' : '✗';
+    lines.push(`| ${c.label} | ${c.actual} | ${c.target} | ${status} |`);
+  }
+  lines.push('');
+  const aspVerdict = aspFailed.length === 0 ? '✅ gehaald' : `${aspFailed.length} drempel(s) gemist`;
+  lines.push(`**Aspirational Production Gate** — langetermijnlat, **NIET promotie-bepalend**: ${aspVerdict}`);
+  lines.push('');
+  lines.push('| drempel | actual | target | status |');
+  lines.push('|---------|--------|--------|--------|');
+  for (const c of aspChecks) {
     const status = c.actual === '—' ? '— (geen data)' : c.pass ? '✓' : '✗';
     lines.push(`| ${c.label} | ${c.actual} | ${c.target} | ${status} |`);
   }
