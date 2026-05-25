@@ -86,6 +86,7 @@ const { data: runRows, error: runErr } = await sb
      hyde_mode_requested, hyde_mode_actual,
      run_index, retrieved_filenames, retrieval_recall_at_k, retrieval_mrr,
      must_not_violation,
+     hard_fact_supported, missing_hard_facts, hard_fact_status,
      stage_timings_ms,
      created_at`,
   )
@@ -182,6 +183,51 @@ function fmt(n: number | null | undefined, digits = 2): string {
 function fmtScore(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
   return String(n);
+}
+
+// ---------------------------------------------------------------------------
+// v0.8 FASE 1.1 — statistiek-helpers voor de noise-floor.
+// ---------------------------------------------------------------------------
+type Stats = {
+  n: number;
+  mean: number | null;
+  std: number | null;     // sample standard deviation (n-1)
+  se: number | null;      // standard error = std / sqrt(n)
+  ci95Lo: number | null;
+  ci95Hi: number | null;
+};
+
+function computeStats(values: number[]): Stats {
+  const n = values.length;
+  if (n === 0) return { n: 0, mean: null, std: null, se: null, ci95Lo: null, ci95Hi: null };
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  if (n === 1) return { n, mean, std: 0, se: 0, ci95Lo: mean, ci95Hi: mean };
+  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+  const std = Math.sqrt(variance);
+  const se = std / Math.sqrt(n);
+  return { n, mean, std, se, ci95Lo: mean - 1.96 * se, ci95Hi: mean + 1.96 * se };
+}
+
+/** Small-n betrouwbaarheidslabel per spec 1.1 (gebaseerd op #cases, niet
+ *  #samples). */
+function smallNLabel(nCases: number): string {
+  if (nCases < 10) return 'sample too small — diagnostic only';
+  if (nCases < 20) return 'watchlist — weak signal';
+  if (nCases < 30) return 'moderate signal';
+  return 'normal verdict';
+}
+
+/** Verdict-helper voor een delta tussen twee versies: significant alleen als
+ *  de 95%-CI's NIET overlappen én beide buckets ≥ minCases hebben. */
+function deltaVerdict(a: Stats, b: Stats, minCases = 20): string {
+  if (a.n === 0 || b.n === 0) return 'no data';
+  if (a.ci95Lo === null || a.ci95Hi === null || b.ci95Lo === null || b.ci95Hi === null) {
+    return 'within measured noise — do not overinterpret';
+  }
+  const overlap = a.ci95Lo <= b.ci95Hi && b.ci95Lo <= a.ci95Hi;
+  if (overlap) return 'within measured noise — do not overinterpret';
+  if (a.n < minCases || b.n < minCases) return 'CI-separated but small-n — weak';
+  return 'significant (CI-separated)';
 }
 
 // Parsing-guard voor stage_timings_ms JSONB-kolom (migration 0019). Geeft een
@@ -639,6 +685,166 @@ for (const v of versionsForHeader) {
 }
 lines.push('');
 
+// ===========================================================================
+// v0.8 FASE 1.1 — Noise-floor (multi-run variance). Per versie × metric:
+// mean / std / SE / 95%-CI over ALLE samples (cases × runs) uit
+// allLatestVariance, plus n_cases en n_runs. De CI-breedte is de "noise-band":
+// een delta tussen versies telt pas als signaal als de CI's niet overlappen
+// (zie deltaVerdict + spec 1.1).
+// ===========================================================================
+type NoiseMetric = { key: string; label: string; pick: (r: RunRow) => number | null };
+const NOISE_METRICS: NoiseMetric[] = [
+  { key: 'correctness', label: 'correctness (0-5)', pick: (r) => r.score_correctness as number | null },
+  { key: 'completeness', label: 'completeness (0-5)', pick: (r) => r.score_completeness as number | null },
+  { key: 'grounding', label: 'grounding (0-5)', pick: (r) => r.score_grounding as number | null },
+  { key: 'production_ready', label: 'production-ready rate', pick: (r) => r.production_ready === null || r.production_ready === undefined ? null : (r.production_ready ? 1 : 0) },
+  { key: 'route_correct', label: 'route-correct rate', pick: (r) => r.score_route_correct === null || r.score_route_correct === undefined ? null : (r.score_route_correct ? 1 : 0) },
+  { key: 'meta_talk', label: 'meta-talk rate', pick: (r) => r.score_meta_talk_present === null || r.score_meta_talk_present === undefined ? null : (r.score_meta_talk_present ? 1 : 0) },
+  { key: 'must_not', label: 'must-not rate', pick: (r) => (r.must_not_violation ? 1 : 0) },
+  { key: 'unsupported_hard_fact', label: 'unsupported-hard-fact rate', pick: (r) => r.hard_fact_status == null ? null : (r.hard_fact_status === 'unsupported' ? 1 : 0) },
+];
+
+lines.push('## v0.8 — Noise-floor (multi-run variance)');
+lines.push('');
+lines.push('Per versie × metric over alle samples (cases × runs). 95%-CI = noise-band; een versie-delta telt pas als signaal als de CI’s niet overlappen én de bucket voldoende n heeft (spec 1.1).');
+lines.push('');
+lines.push('| versie | metric | n (samples) | n_cases | mean | std | SE | 95% CI | small-n |');
+lines.push('|--------|--------|-------------|---------|------|-----|-----|--------|---------|');
+const noiseStatsByVersionMetric = new Map<string, Stats>();
+for (const v of versionsForHeader) {
+  const vRows = allLatestVariance.filter((r) => r.bot_version === v);
+  const nCases = new Set(vRows.map((r) => r.question_id as string)).size;
+  const nRuns = vRows.length === 0 ? 0 : Math.max(...vRows.map((r) => (r.run_index ?? 0))) + 1;
+  for (const m of NOISE_METRICS) {
+    const vals = vRows.map(m.pick).filter((x): x is number => x !== null && Number.isFinite(x));
+    const s = computeStats(vals);
+    noiseStatsByVersionMetric.set(`${v}::${m.key}`, s);
+    const ci = s.ci95Lo === null ? '—' : `[${fmt(s.ci95Lo, 3)}, ${fmt(s.ci95Hi, 3)}]`;
+    lines.push(`| ${v} | ${m.label} | ${s.n} | ${nCases} | ${fmt(s.mean, 3)} | ${fmt(s.std, 3)} | ${fmt(s.se, 3)} | ${ci} | ${smallNLabel(nCases)} (n_runs=${nRuns}) |`);
+  }
+}
+lines.push('');
+
+// Delta-verdict tussen de twee kandidaat-versies (indien beide aanwezig) —
+// CI-overlap-check per metric.
+const candidatesPresent = EVAL_DEFAULT_VERSIONS.filter((v) => versionsForHeader.includes(v));
+if (candidatesPresent.length === 2) {
+  const [vA, vB] = candidatesPresent;
+  lines.push(`### Delta-verdict ${vA} → ${vB} (CI-overlap)`);
+  lines.push('');
+  lines.push('| metric | ' + vA + ' mean | ' + vB + ' mean | Δ | verdict |');
+  lines.push('|--------|------------|------------|---|---------|');
+  for (const m of NOISE_METRICS) {
+    const sA = noiseStatsByVersionMetric.get(`${vA}::${m.key}`);
+    const sB = noiseStatsByVersionMetric.get(`${vB}::${m.key}`);
+    if (!sA || !sB || sA.mean === null || sB.mean === null) continue;
+    const delta = sB.mean - sA.mean;
+    lines.push(`| ${m.label} | ${fmt(sA.mean, 3)} | ${fmt(sB.mean, 3)} | ${delta >= 0 ? '+' : ''}${fmt(delta, 3)} | ${deltaVerdict(sA, sB)} |`);
+  }
+  lines.push('');
+}
+
+// ===========================================================================
+// v0.8 FASE 1.2 — Hard-fact support. Unsupported hard facts (= hallucinatie-
+// risico op prijzen/datums/aantallen) overall, per question_type, per versie,
+// + slug-lijst. unknown-op-risk-case = warning (nooit auto-PASS).
+// ===========================================================================
+const RISK_QUESTION_TYPES = new Set(['factual', 'planted_fact', 'false_premise', 'multi_hop']);
+function qTypeOf(qid: string): string {
+  const q = qById.get(qid);
+  return ((q?.question_type as string | null) ?? 'factual');
+}
+lines.push('## v0.8 — Hard-fact support');
+lines.push('');
+lines.push('`unsupported` = bot noemde een hard feit dat niet in de sources staat (hallucinatie-risico). `unknown` = verifier draaide niet (fallback/smalltalk/error) terwijl de output wél harde feiten bevatte — op een risk-case telt dit als warning, **nooit** auto-PASS. `none_detected` = geen harde feiten. Snapshot = run_index 0.');
+lines.push('');
+lines.push('| versie | n | none_detected | supported | unsupported | unknown | unsupported-rate | unknown-on-risk |');
+lines.push('|--------|---|---------------|-----------|-------------|---------|------------------|-----------------|');
+const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number }>();
+for (const v of versionsForHeader) {
+  const vRows = latestRuns.filter((r) => r.bot_version === v);
+  if (vRows.length === 0) continue;
+  const withStatus = vRows.filter((r) => r.hard_fact_status != null);
+  const none = withStatus.filter((r) => r.hard_fact_status === 'none_detected').length;
+  const sup = withStatus.filter((r) => r.hard_fact_status === 'supported').length;
+  const unsup = withStatus.filter((r) => r.hard_fact_status === 'unsupported').length;
+  const unk = withStatus.filter((r) => r.hard_fact_status === 'unknown').length;
+  const unkOnRisk = withStatus.filter((r) => r.hard_fact_status === 'unknown' && RISK_QUESTION_TYPES.has(qTypeOf(r.question_id as string))).length;
+  const unsupRate = withStatus.length === 0 ? '—' : `${Math.round((unsup / withStatus.length) * 100)}%`;
+  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk });
+  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
+}
+lines.push('');
+// Slug-lijst van unsupported hard facts (per versie) — directe diagnose.
+for (const v of versionsForHeader) {
+  const unsupRows = latestRuns.filter((r) => r.bot_version === v && r.hard_fact_status === 'unsupported');
+  if (unsupRows.length === 0) continue;
+  lines.push(`**${v} — unsupported hard facts (${unsupRows.length}):**`);
+  for (const r of unsupRows) {
+    const q = qById.get(r.question_id as string);
+    const missing = Array.isArray(r.missing_hard_facts) ? (r.missing_hard_facts as string[]).join(', ') : '—';
+    lines.push(`- _${q?.slug ?? '?'}_ (${qTypeOf(r.question_id as string)}): missing ${missing}`);
+  }
+  lines.push('');
+}
+// Per question_type × versie — unsupported-rate.
+lines.push('### Hard-fact-status per question_type × versie');
+lines.push('');
+lines.push('| question_type | versie | n_met_status | unsupported | unknown | unsupported-rate |');
+lines.push('|---------------|--------|--------------|-------------|---------|------------------|');
+for (const qt of [...allTypesForHardFact()].sort()) {
+  for (const v of versionsForHeader) {
+    const rows = latestRuns.filter((r) => r.bot_version === v && qTypeOf(r.question_id as string) === qt && r.hard_fact_status != null);
+    if (rows.length === 0) continue;
+    const unsup = rows.filter((r) => r.hard_fact_status === 'unsupported').length;
+    const unk = rows.filter((r) => r.hard_fact_status === 'unknown').length;
+    lines.push(`| ${qt} | ${v} | ${rows.length} | ${unsup} | ${unk} | ${Math.round((unsup / rows.length) * 100)}% |`);
+  }
+}
+lines.push('');
+function allTypesForHardFact(): Set<string> {
+  const s = new Set<string>();
+  for (const q of questions) s.add(((q.question_type as string | null) ?? 'factual'));
+  return s;
+}
+
+// ===========================================================================
+// v0.8 FASE 1.4 — Pairwise per question_type (primair relatief signaal).
+// ===========================================================================
+lines.push('## v0.8 — Pairwise win-rate per question_type');
+lines.push('');
+const pwAllForType = pairwiseRows ?? [];
+if (pwAllForType.length === 0) {
+  lines.push('_Geen pairwise rijen._');
+} else {
+  type PwRow2 = NonNullable<typeof pairwiseRows>[number];
+  const pwLatest2 = new Map<string, PwRow2>();
+  for (const r of pwAllForType) {
+    const k = `${r.organization_id}::${r.question_id}::${r.bot_version_a}::${r.bot_version_b}`;
+    if (!pwLatest2.has(k)) pwLatest2.set(k, r);
+  }
+  const pwRecent2 = [...pwLatest2.values()];
+  const versionPairs2 = [...new Set(pwRecent2.map((r) => `${r.bot_version_a}::${r.bot_version_b}`))].sort();
+  for (const pair of versionPairs2) {
+    const [vA, vB] = pair.split('::');
+    lines.push(`### ${vA} vs ${vB} — per question_type`);
+    lines.push('');
+    lines.push('| question_type | n | A wint | tie | B wint | winrate A | small-n |');
+    lines.push('|---------------|---|--------|-----|--------|-----------|---------|');
+    const types = [...new Set(pwRecent2.map((r) => qTypeOf(r.question_id as string)))].sort();
+    for (const qt of types) {
+      const rows = pwRecent2.filter((r) => r.bot_version_a === vA && r.bot_version_b === vB && qTypeOf(r.question_id as string) === qt);
+      if (rows.length === 0) continue;
+      const n = rows.length;
+      const wA = rows.filter((r) => r.winner === 'A').length;
+      const wB = rows.filter((r) => r.winner === 'B').length;
+      const ties = rows.filter((r) => r.winner === 'tie').length;
+      lines.push(`| ${qt} | ${n} | ${wA} | ${ties} | ${wB} | ${Math.round((wA / n) * 100)}% | ${smallNLabel(n)} |`);
+    }
+    lines.push('');
+  }
+}
+
 // 4g. V0.7 — Productie-drempel-gate. Per versie: passeert alle drempels?
 // Niet alleen averages — ook p95 latency, hallucinatie-rate, etc.
 // Bij faal: exit-code 1. Drempels staan in PRODUCTION_THRESHOLDS bovenaan
@@ -745,6 +951,24 @@ for (const v of versionsForHeader) {
     target: '=0',
     pass: violations === 0,
   });
+  // v0.8 — binaire hard-fact gate. unsupported = bot noemde een hard feit dat
+  // niet in de sources staat = hallucinatie op een hard-fact-risk case.
+  // Hardgrens =0; mag NOOIT versoepeld worden (safety gate).
+  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0 };
+  checks.push({
+    label: 'unsupported hard facts',
+    actual: String(hfGate.unsupported),
+    target: '=0',
+    pass: hfGate.unsupported === 0,
+  });
+  // unknown-op-risk: warning (telt nooit als auto-PASS maar blokkeert de gate
+  // niet — kan legitiem fallback zijn). Zichtbaar zodat het niet wegvalt.
+  checks.push({
+    label: 'unknown hard-fact on risk-case (warn)',
+    actual: String(hfGate.unknownOnRisk),
+    target: 'warn',
+    pass: true,
+  });
 
   const failed = checks.filter((c) => !c.pass && c.actual !== '—');
   // Alleen kandidaat-versies (EVAL_DEFAULT_VERSIONS) triggeren exit-1.
@@ -773,6 +997,56 @@ for (const v of versionsForHeader) {
 
 lines.push('_Drempels zijn STARTWAARDEN (zie `PRODUCTION_THRESHOLDS` in `scripts/v0-eval-report.ts`). Kalibreer na 2-3 echte multi-org runs._');
 lines.push('');
+
+// ===========================================================================
+// v0.8 FASE 1.5 — Threshold-herijkings-voorstel (geen greenwashing).
+// recommended_min = max(safety_floor, baseline_mean − noise_margin), waar
+// noise_margin de gemeten 95%-CI-halfbreedte is. Aspirational = de huidige
+// drempel ligt buiten de gemeten noise-band (waarschijnlijk te streng).
+// Binaire safety-gates (must-not, unsupported hard fact, planted_fact) blijven
+// HARD en worden hier NIET voorgesteld te verlagen.
+// ===========================================================================
+const proposalVersion = [...EVAL_DEFAULT_VERSIONS].reverse().find((v) => versionsForHeader.includes(v)) ?? versionsForHeader[versionsForHeader.length - 1];
+lines.push('## v0.8 — Threshold-herijkings-voorstel');
+lines.push('');
+if (!proposalVersion) {
+  lines.push('_Geen versie beschikbaar voor een voorstel._');
+} else {
+  lines.push(`Baseline-versie voor het voorstel: **${proposalVersion}**. Formule: \`recommended = max(safety_floor, baseline_95%CI-ondergrens)\` voor min-drempels; \`min(safety_ceiling, 95%CI-bovengrens)\` voor max-drempels. **Pas waarden alleen toe als veilig + transparant.**`);
+  lines.push('');
+  type ThProposal = { label: string; current: number; metricKey: string; dir: 'min' | 'max'; floor: number };
+  const proposals: ThProposal[] = [
+    { label: 'minAvgCorrectness', current: PRODUCTION_THRESHOLDS.minAvgCorrectness, metricKey: 'correctness', dir: 'min', floor: 3.0 },
+    { label: 'minAvgCompleteness', current: PRODUCTION_THRESHOLDS.minAvgCompleteness, metricKey: 'completeness', dir: 'min', floor: 2.5 },
+    { label: 'minAvgGrounding', current: PRODUCTION_THRESHOLDS.minAvgGrounding, metricKey: 'grounding', dir: 'min', floor: 3.0 },
+    { label: 'minProductionReadyRate', current: PRODUCTION_THRESHOLDS.minProductionReadyRate, metricKey: 'production_ready', dir: 'min', floor: 0.50 },
+    { label: 'minRouteCorrectRate', current: PRODUCTION_THRESHOLDS.minRouteCorrectRate, metricKey: 'route_correct', dir: 'min', floor: 0.70 },
+    { label: 'maxMetaTalkRate', current: PRODUCTION_THRESHOLDS.maxMetaTalkRate, metricKey: 'meta_talk', dir: 'max', floor: 0.20 },
+  ];
+  lines.push('| drempel | huidig | baseline mean | 95% CI | recommended | aspirational? |');
+  lines.push('|---------|--------|---------------|--------|-------------|---------------|');
+  for (const p of proposals) {
+    const s = noiseStatsByVersionMetric.get(`${proposalVersion}::${p.metricKey}`);
+    if (!s || s.mean === null || s.ci95Lo === null || s.ci95Hi === null) {
+      lines.push(`| ${p.label} | ${p.current} | — | — | (geen data) | — |`);
+      continue;
+    }
+    const ci = `[${fmt(s.ci95Lo, 3)}, ${fmt(s.ci95Hi, 3)}]`;
+    let recommended: number;
+    let aspirational: boolean;
+    if (p.dir === 'min') {
+      recommended = Math.max(p.floor, Math.round(s.ci95Lo * 100) / 100);
+      aspirational = p.current > s.ci95Hi; // drempel boven de noise-band = te streng
+    } else {
+      recommended = Math.min(p.floor, Math.round(s.ci95Hi * 100) / 100);
+      aspirational = p.current < s.ci95Lo; // drempel onder de noise-band = te streng
+    }
+    lines.push(`| ${p.label} | ${p.current} | ${fmt(s.mean, 3)} | ${ci} | ${fmt(recommended, 2)} | ${aspirational ? '⚠ ja (buiten noise-band)' : 'nee'} |`);
+  }
+  lines.push('');
+  lines.push('**HARD — niet verlagen (binaire safety-gates):** `must-not violations` (=0), `unsupported hard facts` (=0), planted_fact-meebewegen. Deze blijven ongewijzigd ongeacht baseline.');
+  lines.push('');
+}
 
 // (Multi-run variance sectie weggehaald — was alleen relevant bij --runs > 1
 // en gaf in de praktijk een lege/ruisige tabel. Multi-run data blijft wel in
