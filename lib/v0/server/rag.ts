@@ -1373,7 +1373,9 @@ export type StreamEvent =
   | {
       kind: 'replacement';
       response: ChatResponse;
-      reason: 'claim-regenerate';
+      // v0.8.1: 'history-entity-adoption' = deterministisch weiger-template bij
+      // gedetecteerde adoptie van een history-entiteit (geen LLM-poging).
+      reason: 'claim-regenerate' | 'history-entity-adoption';
       regeneratedVerifiedRatio: number | null;
     }
   | { kind: 'error'; code: AppErrorCode; retryAfterSec?: number };
@@ -2548,10 +2550,45 @@ KRITISCHE FORMAT-REGELS:
   // de bronnen staat. Voegt toe aan de bestaande trigger (OR blijft OR).
   const unsupportedHistoryEntity =
     bot.historyEntityVerification === true && adoptedHistoryEntities.length > 0;
+  // v0.8.1 anti-adoptie — DETERMINISTISCH pad. Bij een gedetecteerde adoptie
+  // van een history-entiteit vervangen we het antwoord door een vast, eerlijk
+  // weiger-template (géén creatieve LLM-call). Reden: een tweede LLM-poging met
+  // anti-adoptie-instructie bleek empirisch onbetrouwbaar (de bot adopteerde
+  // alsnog). Een deterministisch template verwijdert de hallucinatie hard.
+  // Werkt op élk pad (ook fast-path, waar verify/claims geskipt zijn). Dit is
+  // de Option-A "deterministisch template"-aanpak, geen parallelle gate.
+  if (bot.claimRegenerateEnabled && unsupportedHistoryEntity) {
+    const entityList = adoptedHistoryEntities.slice(0, 3).join(', ');
+    activeAnswerText =
+      `Ik kan ${entityList} niet in onze gegevens terugvinden, dus dat kan ik niet bevestigen. ` +
+      `Iets dat in een eerder bericht is genoemd, neem ik niet zomaar over als juist. ` +
+      `Voor de juiste persoon of een afspraak kunt u het beste rechtstreeks contact met ons opnemen.`;
+    activeResponse = {
+      ...activeResponse,
+      answer: activeAnswerText,
+      extras: {
+        ...(activeResponse.extras ?? {}),
+        adoptedHistoryEntities: [...adoptedHistoryEntities],
+      },
+      ...(bot.knowledgeGapLogging ? { gapKind: 'low_grounding' as const } : {}),
+    };
+    yield {
+      kind: 'replacement',
+      response: activeResponse,
+      reason: 'history-entity-adoption',
+      regeneratedVerifiedRatio: null,
+    };
+  }
+
+  // Claim/hard-fact regenerate (LLM-poging) — alleen wanneer GEEN history-
+  // entiteit-adoptie (die is hierboven al deterministisch afgehandeld) en er
+  // geverifieerde claims zijn.
+  const claimBasedTrigger =
+    (lowClaimConfidence || unsupportedHardFact) && !!claimsList && claimsList.length > 0;
   if (
     bot.claimRegenerateEnabled &&
-    (lowClaimConfidence || unsupportedHardFact || unsupportedHistoryEntity) &&
-    claimsList && claimsList.length > 0 &&
+    !unsupportedHistoryEntity &&
+    claimBasedTrigger &&
     (withinBudget() || markSkipped('claimRegenerate'))
   ) {
     const REGENERATE_SYSTEM_ADDON = `
@@ -2560,10 +2597,6 @@ KRITISCHE FORMAT-REGELS:
 Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of bijna letterlijk in de aangeleverde chunks staan. Bij twijfel of een feit echt in de context staat: laat het feit weg. Liever een korter, voorzichtiger antwoord dan een antwoord met onverifieerbare claims.${
       unsupportedHardFact && missingHardFacts && missingHardFacts.length > 0
         ? `\n\nSpecifiek: in de vorige poging stonden harde feiten die NIET in de bronnen zijn terug te vinden (${missingHardFacts.slice(0, 5).join(', ')}). Laat zulke bedragen/datums/aantallen/contactgegevens weg of vervang ze met een algemeen "neem contact op voor exacte details".`
-        : ''
-    }${
-      unsupportedHistoryEntity
-        ? `\n\nLet op: in de vorige poging nam je een naam/entiteit over die de GEBRUIKER noemde maar die NIET in de bronnen voorkomt (${adoptedHistoryEntities.slice(0, 5).join(', ')}). Wat de gebruiker beweert is GEEN feit uit de kennisbasis. Bevestig die persoon/entiteit niet en doe er geen toezeggingen over; zeg eerlijk dat je deze niet in de gegevens terugvindt en verwijs naar de juiste route (bv. receptie/contact).`
         : ''
     }`;
     try {
@@ -2634,7 +2667,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       // bot.knowledgeGapLogging, anders blijft gapKind undefined.
       const gapKindForRegenerate: 'low_grounding' | 'low_confidence' | undefined =
         bot.knowledgeGapLogging
-          ? unsupportedHardFact || unsupportedHistoryEntity
+          ? unsupportedHardFact
             ? 'low_grounding'
             : 'low_confidence'
           : undefined;

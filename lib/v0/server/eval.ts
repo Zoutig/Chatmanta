@@ -871,6 +871,12 @@ export async function runEvalRow(args: {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         markFirstToken();
         response = ev.response;
+      } else if (ev.kind === 'replacement') {
+        // v0.8: meet het FINALE antwoord dat de gebruiker krijgt — claim-
+        // regenerate (v0.6.1+) én de v0.8.1 anti-adoptie-template vervangen
+        // het answer-done-antwoord via dit event. Vóór deze fix mat de eval
+        // de pre-regenerate poging en onderschatte ze regenerate-fixes.
+        response = ev.response;
       } else if (ev.kind === 'answer-delta') {
         // Streaming-path: eerste delta = TTFT. Tekst zelf negeren — final
         // antwoord komt uit answer-done event.

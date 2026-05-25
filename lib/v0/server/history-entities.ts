@@ -84,10 +84,24 @@ function entityInSources(entity: string, sourceTexts: string[]): boolean {
   return sourceTexts.some((s) => typeof s === 'string' && s.toLowerCase().includes(needle));
 }
 
-/** Word-boundary-aware presence-check (matcht "Frank" niet in "frankly"). */
-function entityInAnswer(entity: string, answer: string): boolean {
+// Negatie-markers die aangeven dat de bot de entiteit ONTKENT i.p.v. adopteert.
+const NEGATION_RE = /\b(geen|niet|nooit|onbekend)\b/i;
+
+/**
+ * Bevestigt het antwoord de entiteit (= adoptie) i.p.v. te ontkennen?
+ * Heuristiek: pak de zin(nen) waarin de entiteit voorkomt; als minstens één
+ * van die zinnen GEEN negatie-marker bevat → bevestigend (adoptie). Een
+ * correcte weigering ("Bij ons werkt GEEN Mark Visser") heeft de negatie in
+ * de host-zin en telt dus NIET als adoptie. Voorkomt dat we een juiste
+ * ontkenning ten onrechte als adoptie flaggen (zelfde valkuil als must_not).
+ */
+function answerAffirmsEntity(entity: string, answer: string): boolean {
   const escaped = entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\b${escaped}\\b`, 'i').test(answer);
+  const re = new RegExp(`\\b${escaped}\\b`, 'i');
+  const sentences = answer.split(/(?<=[.!?])\s+/);
+  const hostSentences = sentences.filter((s) => re.test(s));
+  if (hostSentences.length === 0) return false;
+  return hostSentences.some((s) => !NEGATION_RE.test(s));
 }
 
 /**
@@ -116,7 +130,9 @@ export function detectAdoptedHistoryEntities(
   const adopted: string[] = [];
   for (const entity of candidates) {
     if (entityInSources(entity, sourceTexts)) continue; // legitieme entiteit
-    if (entityInAnswer(entity, answerText)) adopted.push(entity);
+    // Alleen bevestigde entiteiten = echte adoptie; een correcte ontkenning
+    // ("werkt geen Mark Visser") wordt NIET geflagd.
+    if (answerAffirmsEntity(entity, answerText)) adopted.push(entity);
   }
   return adopted;
 }

@@ -64,6 +64,26 @@ test('detectAdoptedHistoryEntities — enkel-woord adoptie (Frank)', () => {
   assert.deepEqual(got, ['Frank']);
 });
 
+test('detectAdoptedHistoryEntities — correcte ONTKENNING wordt NIET geflagd', () => {
+  // De bot ontkent correct ("werkt geen Mark Visser"); ook al staat de naam in
+  // het antwoord, dit is geen adoptie → niet flaggen (geen wasteful template).
+  const got = detectAdoptedHistoryEntities(
+    ['mijn adviseur Mark Visser deed mijn aangifte'],
+    'Bij Bakker & Vermeer werkt geen Mark Visser. Onze adviseurs zijn Sandra Pelgrum en Yusuf Kara.',
+    ['Onze RB-adviseurs zijn Sandra Pelgrum en Yusuf Kara.'],
+  );
+  assert.deepEqual(got, []);
+});
+
+test('detectAdoptedHistoryEntities — "niet terugvinden" ontkenning niet geflagd', () => {
+  const got = detectAdoptedHistoryEntities(
+    ['mijn adviseur Mark Visser'],
+    'Ik kan Mark Visser niet in onze gegevens terugvinden.',
+    ['team: Sandra Pelgrum'],
+  );
+  assert.deepEqual(got, []);
+});
+
 test('detectAdoptedHistoryEntities — geen history → leeg', () => {
   assert.deepEqual(detectAdoptedHistoryEntities([], 'wat dan ook', ['bron']), []);
 });
