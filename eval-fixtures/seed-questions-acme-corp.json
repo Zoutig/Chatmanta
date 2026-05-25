@@ -860,7 +860,7 @@
       "question": "Wat kost een EPDM-dak van 40 m² ongeveer, en hoeveel jaar garantie zit erop?",
       "gold_answer": "EPDM kost bij ons € 95 tot € 115 per m² (incl. arbeid, excl. btw), dus voor 40 m² komt dat ruwweg op € 3.800-4.600 excl. btw. Qua garantie: de werkgarantie is 10 jaar (tot 20 jaar met onderhoudscontract) en op het Firestone RubberCover-materiaal zit 20 jaar fabrikantgarantie. Voor een exacte prijs maakt Linda een gratis offerte: 033 - 555 14 22.",
       "gold_facts": ["EPDM €95-115/m²", "40 m² ≈ €3.800-4.600 excl. btw", "werkgarantie 10 jaar (max 20 met contract)", "Firestone EPDM 20 jaar fabrikantgarantie"],
-      "tags": ["multi-hop", "pricing", "garantie"],
+      "tags": ["multi-hop", "pricing", "garantie", "calculation_required"],
       "difficulty": "medium",
       "question_type": "multi_hop",
       "expected_kind": "answer",

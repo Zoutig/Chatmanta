@@ -800,25 +800,44 @@ function qTypeOf(qid: string): string {
   const q = qById.get(qid);
   return ((q?.question_type as string | null) ?? 'factual');
 }
+// §E.6 — een als `calculation_required` getagde vraag is vooraf (handmatig, §E.5)
+// gecertificeerd als SCHONE, deterministische, reconstrueerbare rekenkunde uit
+// getallen die letterlijk in de bron staan (bv. 40 m² × €95-115/m² = €3.800-4.600).
+// De hard-fact-verifier flag't de berékende uitkomst als 'unsupported' omdat die niet
+// verbatim in een chunk staat — hier een rekenartefact, geen hallucinatie. Zulke
+// cases tellen als WARNING (zichtbaar, nooit auto-PASS), niet als gate-fail.
+// Alle NIET-rekenkunde unsupported hard-facts blijven HARD fail: tiered tax/Vpb
+// (staffels + interpretatie), echoed-question-numbers, out-of-corpus. Daarom is
+// de tag bewust spaarzaam toegekend, NIET aan de Vpb-cases (die §E.6 niet halen).
+function isCalcWarning(r: RunRow): boolean {
+  if (r.hard_fact_status !== 'unsupported') return false;
+  const q = qById.get(r.question_id as string);
+  return ((q?.tags as string[] | null) ?? []).includes('calculation_required');
+}
 lines.push('## v0.8 — Hard-fact support');
 lines.push('');
 lines.push('`unsupported` = bot noemde een hard feit dat niet in de sources staat (hallucinatie-risico). `unknown` = verifier draaide niet (fallback/smalltalk/error) terwijl de output wél harde feiten bevatte — op een risk-case telt dit als warning, **nooit** auto-PASS. `none_detected` = geen harde feiten. Snapshot = run_index 0.');
 lines.push('');
-lines.push('| versie | n | none_detected | supported | unsupported | unknown | unsupported-rate | unknown-on-risk |');
-lines.push('|--------|---|---------------|-----------|-------------|---------|------------------|-----------------|');
-const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number }>();
+lines.push('`calc-warn` (§E.6) = als `calculation_required` getagde schone rekenkunde-case waarvan de berekende uitkomst niet verbatim in de bron staat — telt als warning, NIET als gate-fail. `unsupported` hieronder is al exclusief calc-warn.');
+lines.push('');
+lines.push('| versie | n | none_detected | supported | unsupported | calc-warn | unknown | unsupported-rate | unknown-on-risk |');
+lines.push('|--------|---|---------------|-----------|-------------|-----------|---------|------------------|-----------------|');
+const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number; calcWarn: number }>();
 for (const v of versionsForHeader) {
   const vRows = latestRuns.filter((r) => r.bot_version === v);
   if (vRows.length === 0) continue;
   const withStatus = vRows.filter((r) => r.hard_fact_status != null);
   const none = withStatus.filter((r) => r.hard_fact_status === 'none_detected').length;
   const sup = withStatus.filter((r) => r.hard_fact_status === 'supported').length;
-  const unsup = withStatus.filter((r) => r.hard_fact_status === 'unsupported').length;
+  // §E.6: schone-rekenkunde unsupported (calc-warn) telt NIET als gate-fail.
+  const unsupAll = withStatus.filter((r) => r.hard_fact_status === 'unsupported');
+  const calcWarn = unsupAll.filter((r) => isCalcWarning(r)).length;
+  const unsup = unsupAll.length - calcWarn;
   const unk = withStatus.filter((r) => r.hard_fact_status === 'unknown').length;
   const unkOnRisk = withStatus.filter((r) => r.hard_fact_status === 'unknown' && RISK_QUESTION_TYPES.has(qTypeOf(r.question_id as string))).length;
   const unsupRate = withStatus.length === 0 ? '—' : `${Math.round((unsup / withStatus.length) * 100)}%`;
-  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk });
-  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
+  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk, calcWarn });
+  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${calcWarn} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
 }
 lines.push('');
 // Slug-lijst van unsupported hard facts (per versie) — directe diagnose.
@@ -829,7 +848,8 @@ for (const v of versionsForHeader) {
   for (const r of unsupRows) {
     const q = qById.get(r.question_id as string);
     const missing = Array.isArray(r.missing_hard_facts) ? (r.missing_hard_facts as string[]).join(', ') : '—';
-    lines.push(`- _${q?.slug ?? '?'}_ (${qTypeOf(r.question_id as string)}): missing ${missing}`);
+    const calcTag = isCalcWarning(r) ? ' — 🧮 calc-warn (§E.6, telt niet als gate-fail)' : '';
+    lines.push(`- _${q?.slug ?? '?'}_ (${qTypeOf(r.question_id as string)}): missing ${missing}${calcTag}`);
   }
   lines.push('');
 }
@@ -1001,13 +1021,22 @@ for (const v of versionsForHeader) {
   });
   // v0.8 — binaire hard-fact gate. unsupported = bot noemde een hard feit dat
   // niet in de sources staat = hallucinatie op een hard-fact-risk case.
-  // Hardgrens =0; mag NOOIT versoepeld worden (safety gate).
-  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0 };
+  // Hardgrens =0; mag NOOIT versoepeld worden (safety gate). §E.6: schone-
+  // rekenkunde (calc-warn) is hier al uit `unsupported` gehaald en telt als
+  // aparte warning — de hardgrens zelf blijft =0, niet versoepeld.
+  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0, calcWarn: 0 };
   checks.push({
     label: 'unsupported hard facts',
     actual: String(hfGate.unsupported),
     target: '=0',
     pass: hfGate.unsupported === 0,
+  });
+  // §E.6 calc-warn: zichtbaar, telt nooit als gate-fail (en nooit als auto-PASS).
+  checks.push({
+    label: 'calc-required hard-fact (warn §E.6)',
+    actual: String(hfGate.calcWarn),
+    target: 'warn',
+    pass: true,
   });
   // unknown-op-risk: warning (telt nooit als auto-PASS maar blokkeert de gate
   // niet — kan legitiem fallback zijn). Zichtbaar zodat het niet wegvalt.
