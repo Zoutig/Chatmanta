@@ -35,8 +35,8 @@ export function MetricStrip({ metrics }: { metrics: OverviewMetrics }) {
         value={metrics.helpfulness.rate === null ? '—' : `${metrics.helpfulness.rate}%`}
         sub={
           metrics.helpfulness.total > 0
-            ? `op ${metrics.helpfulness.total} reactie${metrics.helpfulness.total === 1 ? '' : 's'}`
-            : 'nog geen feedback'
+            ? `op ${metrics.helpfulness.total} gesprek${metrics.helpfulness.total === 1 ? '' : 'ken'}`
+            : 'nog geen gesprekken'
         }
       />
       <MetricCard

@@ -19,11 +19,17 @@ export type ChatbotStatus = 'concept' | 'testing' | 'live' | 'paused';
 
 export type WidgetStatus = 'not_installed' | 'detected' | 'active';
 
-/** Behulpzaamheid: up/down-ratio uit v0_feedback. `rate` null bij 0 stemmen. */
+/**
+ * Behulpzaamheid: % succesvolle gesprekken deze kalendermaand. Een gesprek is
+ * niet succesvol als het laatste antwoord een fallback was óf het een duim-
+ * omlaag kreeg. `rate` is null bij 0 gesprekken (UI toont "nog geen gesprekken").
+ * `total` = alle gesprekken deze maand, `successful` = de rest na aftrek van de
+ * niet-succesvolle. Naam blijft `HelpfulnessRate` voor continuïteit; het label
+ * in de UI blijft "Behulpzaam".
+ */
 export type HelpfulnessRate = {
   rate: number | null;
-  up: number;
-  down: number;
+  successful: number;
   total: number;
 };
 

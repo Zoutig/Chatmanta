@@ -107,12 +107,20 @@ export function OnboardingTour({
   tourKey,
   autoStart = true,
   steps = DEFAULT_STEPS,
+  setupChecklistVisible = true,
 }: {
   /** Per-org sleutel zodat de seen-flag per werkomgeving geldt. */
   tourKey: string;
   autoStart?: boolean;
   steps?: TourStep[];
+  /** Of de "Aan de slag"-checklist op de pagina staat. Zodra alle setup-stappen
+   *  voltooid zijn verbergt Overzicht die checklist; dan laten we de bijhorende
+   *  tour-stap weg zodat hij niet als losse, doelloze kaart blijft hangen. */
+  setupChecklistVisible?: boolean;
 }) {
+  const tourSteps = setupChecklistVisible
+    ? steps
+    : steps.filter((s) => s.selector !== '#setup-checklist');
   const [index, setIndex] = useState<number | null>(null);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
@@ -134,7 +142,7 @@ export function OnboardingTour({
     return () => window.removeEventListener(START_TOUR_EVENT, start);
   }, [tourKey, autoStart]);
 
-  const step = index === null ? null : steps[index] ?? null;
+  const step = index === null ? null : tourSteps[index] ?? null;
 
   // Meet de target-rect; herbereken bij stap-wissel, resize en scroll.
   useLayoutEffect(() => {
@@ -172,7 +180,7 @@ export function OnboardingTour({
 
   if (index === null || !step) return null;
 
-  const total = steps.length;
+  const total = tourSteps.length;
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const spotlightOn = step.placement !== 'center' && !!step.selector && !!rect;
