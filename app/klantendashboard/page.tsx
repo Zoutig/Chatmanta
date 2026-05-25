@@ -70,6 +70,10 @@ export default async function OverviewPage() {
     getTopQuestions(activeOrg.slug, settings.topQuestions),
   ]);
 
+  // Zodra alle setup-stappen voltooid zijn, verdwijnt de "Aan de slag"-checklist
+  // (de klant heeft de nudge niet meer nodig). every() op de 6 vaste stappen.
+  const allStepsDone = checklist.every((s) => s.status === 'completed');
+
   const hasAnySource =
     metrics.sources.websitePages + metrics.sources.documents + metrics.sources.qaItems > 0;
 
@@ -145,13 +149,22 @@ export default async function OverviewPage() {
         <MetricStrip metrics={metrics} />
       </div>
 
-      {/* Twee-koloms: meest gestelde vragen + setup. Stapelt onder 880px. */}
-      <section className="grid-2col-stack" style={{ marginTop: 16 }}>
-        <TopQuestionsBars result={topQuestions} />
-        <div id="setup-checklist">
-          <SetupChecklist steps={checklist} />
+      {/* Twee-koloms zolang de setup-checklist relevant is. Zodra alle stappen
+          voltooid zijn verdwijnt de checklist en krijgt de vragen-grafiek de
+          volle breedte — anders zou die halfbreed in de 2-koloms-grid hangen
+          met een lege rechterkolom. Stapelt onder 880px. */}
+      {allStepsDone ? (
+        <div style={{ marginTop: 16 }}>
+          <TopQuestionsBars result={topQuestions} />
         </div>
-      </section>
+      ) : (
+        <section className="grid-2col-stack" style={{ marginTop: 16 }}>
+          <TopQuestionsBars result={topQuestions} />
+          <div id="setup-checklist">
+            <SetupChecklist steps={checklist} />
+          </div>
+        </section>
+      )}
 
       {/* Interactieve rondleiding — start automatisch bij eerste bezoek per org. */}
       <OnboardingTour tourKey={activeOrg.slug} />
