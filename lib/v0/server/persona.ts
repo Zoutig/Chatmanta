@@ -44,6 +44,7 @@ const ORG_SLUG_TO_ID: Record<OrgSlug, string> = {
   'acme-corp': '00000000-0000-0000-0000-0000000000a1',
   'globex-inc': '00000000-0000-0000-0000-0000000000a2',
   initech: '00000000-0000-0000-0000-0000000000a3',
+  'demo-nieuw': '00000000-0000-0000-0000-0000000000a4',
 };
 
 export type OrgPersona = {
@@ -233,6 +234,24 @@ const PERSONAS: Record<OrgSlug, OrgPersona> = {
       ' Wil je weten hoe Bakker & Vermeer hier specifiek mee omgaat? Vraag gerust.',
     offTopicScope:
       'accountancy en aanverwante onderwerpen — denk aan administratie, belastingen, jaarrekeningen',
+  },
+
+  // Lege demo-org — neutrale persona. Heeft geen RAG-content, dus deze velden
+  // worden in de praktijk nauwelijks gebruikt; ze houden de demo wél generiek
+  // en voorkomen dat de DEV_ORG/ChatManta-persona doorlekt.
+  'demo-nieuw': {
+    company: 'Demo Nieuw',
+    companySuffix: '',
+    audience:
+      'meestal klanten en geïnteresseerden die meer willen weten over onze producten en diensten',
+    citationExample1: 'Onze openingstijden staan op de contactpagina',
+    citationExample2: 'We zijn telefonisch en per e-mail bereikbaar',
+    smalltalkGreeting: 'Hoi! Leuk dat je er bent. Waar kan ik je mee helpen?',
+    smalltalkHelpScope:
+      'onze producten, diensten, tarieven en contactmogelijkheden',
+    domainKeywords: ['producten', 'diensten', 'tarieven', 'contact', 'openingstijden'],
+    generalKnowledgeClosing: ' Wil je weten hoe wij hier specifiek mee omgaan? Vraag gerust.',
+    offTopicScope: 'onze producten en diensten — denk aan aanbod, tarieven, contact',
   },
 };
 

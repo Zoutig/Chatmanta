@@ -31,7 +31,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { DEV_ORG_ID } from './rag';
 
-export type OrgSlug = 'dev-org' | 'acme-corp' | 'globex-inc' | 'initech';
+export type OrgSlug = 'dev-org' | 'acme-corp' | 'globex-inc' | 'initech' | 'demo-nieuw';
 
 export type KnownOrg = {
   id: string;
@@ -59,6 +59,13 @@ export const KNOWN_ORGS: Record<OrgSlug, KnownOrg> = {
     id: '00000000-0000-0000-0000-0000000000a3',
     slug: 'initech',
     name: 'Bakker & Vermeer Accountants',
+  },
+  // Lege demo-org — geen documenten/content. Toont de "verse klant"-ervaring
+  // van het klantendashboard (status concept, alle metrics 0, onboarding-tour).
+  'demo-nieuw': {
+    id: '00000000-0000-0000-0000-0000000000a4',
+    slug: 'demo-nieuw',
+    name: 'Demo Nieuw',
   },
 };
 

@@ -19,6 +19,8 @@ import { Btn } from './components/ui/btn';
 import { Icon } from './components/ui/icons';
 import { SetupChecklist } from './components/setup-checklist';
 import { DismissibleBanner } from './components/dismissible-banner';
+import { OnboardingTour } from './components/onboarding-tour';
+import { StartTourButton } from './components/start-tour-button';
 import { TriagePanel } from './components/overview/triage-panel';
 import { MetricStrip } from './components/overview/metric-strip';
 import { TopQuestionsBars } from './components/overview/top-questions-bars';
@@ -89,6 +91,7 @@ export default async function OverviewPage() {
         )}
         actions={
           <>
+            <StartTourButton />
             <Btn
               href="/widget"
               variant="secondary"
@@ -145,8 +148,13 @@ export default async function OverviewPage() {
       {/* Twee-koloms: meest gestelde vragen + setup. Stapelt onder 880px. */}
       <section className="grid-2col-stack" style={{ marginTop: 16 }}>
         <TopQuestionsBars result={topQuestions} />
-        <SetupChecklist steps={checklist} />
+        <div id="setup-checklist">
+          <SetupChecklist steps={checklist} />
+        </div>
       </section>
+
+      {/* Interactieve rondleiding — start automatisch bij eerste bezoek per org. */}
+      <OnboardingTour tourKey={activeOrg.slug} />
     </>
   );
 }

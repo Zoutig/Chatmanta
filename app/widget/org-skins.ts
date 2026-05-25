@@ -145,11 +145,30 @@ const INITECH: OrgSkin = {
   cardColor: '#ffffff',
 };
 
+// Lege demo-org — geen markdown-bronnen. Door `pages: []` valt 'demo-nieuw'
+// automatisch buiten ORG_SLUGS_WIDGET (de /widget demo-rotatie), net als dev-org.
+const DEMO_NIEUW: OrgSkin = {
+  slug: 'demo-nieuw',
+  companyName: 'Demo Nieuw',
+  tagline: 'Nieuwe demo-organisatie',
+  suggestedQuestions: [
+    'Wat doen jullie?',
+    'Welke diensten bieden jullie aan?',
+    'Hoe kan ik contact opnemen?',
+  ],
+  pages: [],
+  primaryColor: '#00CC9B',
+  bgColor: '#0a1118',
+  textColor: '#eaf6fb',
+  cardColor: 'rgba(255,255,255,0.04)',
+};
+
 export const ORG_SKINS: Record<OrgSlug, OrgSkin> = {
   'dev-org': DEV_ORG,
   'acme-corp': ACME_CORP,
   'globex-inc': GLOBEX_INC,
   initech: INITECH,
+  'demo-nieuw': DEMO_NIEUW,
 };
 
 export const ORG_SLUGS_ORDERED: OrgSlug[] = [
@@ -157,6 +176,7 @@ export const ORG_SLUGS_ORDERED: OrgSlug[] = [
   'acme-corp',
   'globex-inc',
   'initech',
+  'demo-nieuw',
 ];
 
 /**

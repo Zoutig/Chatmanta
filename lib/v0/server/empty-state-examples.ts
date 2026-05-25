@@ -80,6 +80,18 @@ export const EXAMPLES_BY_ORG: Record<OrgSlug, ExampleQuestion[]> = {
     { label: 'Jaarrekening', q: 'wat doen jullie bij een jaarrekening?' },
     { label: 'Erfbelasting', q: 'kunnen jullie helpen bij erfbelasting en schenking?' },
   ],
+
+  // Demo Nieuw — lege demo-org zonder fixtures. Generieke starter-vragen zodat
+  // de chat-empty-state niet leeg is. Zonder RAG-content leunen antwoorden op
+  // het fallback-pad; dat is bewust — dit is de "verse klant"-demo.
+  'demo-nieuw': [
+    { label: 'Wat doen jullie?', q: 'wat doen jullie?' },
+    { label: 'Diensten', q: 'welke diensten bieden jullie aan?' },
+    { label: 'Openingstijden', q: 'wat zijn jullie openingstijden?' },
+    { label: 'Tarieven', q: 'wat kost het?' },
+    { label: 'Contact', q: 'hoe kan ik contact opnemen?' },
+    { label: 'Locatie', q: 'waar zijn jullie gevestigd?' },
+  ],
 };
 
 const FALLBACK: ExampleQuestion[] = EXAMPLES_BY_ORG['dev-org'];
