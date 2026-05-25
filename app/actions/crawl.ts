@@ -20,6 +20,7 @@ import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
 import { startCrawl } from '@/lib/v0/crawler/firecrawl';
 import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
+import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 
 const KENNISBANK_PATH = '/klantendashboard/kennisbank';
 
@@ -138,5 +139,28 @@ export async function deleteWebsiteSourceAction(sourceId: string): Promise<Actio
 /** Leest de huidige crawler-state — voor client-polling tijdens een lopende crawl. */
 export async function refreshWebsiteState(): Promise<WebsiteState> {
   const activeOrg = await getActiveOrgFromCookies();
+  return getWebsiteState(activeOrg.id);
+}
+
+/**
+ * Client-gedreven "tick": verwerkt openstaande crawl-jobs van de actieve org en
+ * geeft de verse state terug. Vervangt de Vercel-cron als motor (Hobby-vriendelijk).
+ * Bewust niet rate-limited — het is een lichte poll, geen mutatie-trigger.
+ */
+export async function tickCrawlIngestAction(): Promise<WebsiteState> {
+  const activeOrg = await getActiveOrgFromCookies();
+  const sb = await getSystemJobClient({ reason: 'process_crawls_tick' });
+  const { data: jobs, error: jobsError } = await sb
+    .from('processing_jobs')
+    .select('id, organization_id, target_id, external_job_id, attempts')
+    .eq('organization_id', activeOrg.id)
+    .eq('job_type', 'crawl_website')
+    .in('status', ['pending', 'processing'])
+    .order('created_at', { ascending: true })
+    .limit(JOBS_PER_TICK);
+  if (jobsError) throw jobsError;
+  if (jobs && jobs.length > 0) {
+    await processCrawlJobs(sb, jobs as OpenJob[]);
+  }
   return getWebsiteState(activeOrg.id);
 }

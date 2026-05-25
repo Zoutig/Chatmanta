@@ -7,6 +7,7 @@ import {
   startWebsiteCrawlAction,
   deleteWebsiteSourceAction,
   refreshWebsiteState,
+  tickCrawlIngestAction,
 } from '@/app/actions/crawl';
 import type { WebsiteState } from '@/lib/v0/server/crawler';
 
@@ -32,15 +33,24 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
   const isCrawling = job?.status === 'pending' || job?.status === 'processing';
   const jobFailed = job?.status === 'failed';
 
-  // Pollt de state terwijl een crawl loopt; de cron-route ingest op de achtergrond.
+  // Inhaal-tick bij openen: alleen als de server-render al een lopende job ziet
+  // (een crawl kan afgerond zijn server-side maar nog niet geïngest terwijl de tab dicht was).
+  useEffect(() => {
+    const j = initialState.job;
+    if (!j || (j.status !== 'pending' && j.status !== 'processing')) return;
+    let cancelled = false;
+    tickCrawlIngestAction()
+      .then((s) => { if (!cancelled) setState(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Tijdens een lopende crawl: elke 4s de tick draaien (poll + ingest).
   useEffect(() => {
     if (!isCrawling) return;
     const timer = setInterval(async () => {
-      try {
-        setState(await refreshWebsiteState());
-      } catch {
-        /* netwerk-hapering — volgende tick probeert opnieuw */
-      }
+      try { setState(await tickCrawlIngestAction()); } catch { /* volgende tick */ }
     }, 4000);
     return () => clearInterval(timer);
   }, [isCrawling]);
