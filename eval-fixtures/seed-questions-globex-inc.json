@@ -347,6 +347,179 @@
       "category": "off_topic",
       "must_not_contain": ["paracetamol", "ibuprofen", "diclofenac"],
       "ideal_source_filenames": []
+    },
+    {
+      "slug": "globex-typo-eerste-consult",
+      "question": "wat kost een eerst afpraak bij julie ongeveer?",
+      "gold_answer": "Een eerste consult duurt 45 minuten en kost € 60. Komt u zonder verwijzing? Dan rekenen we eenmalig € 18 voor de DTF-screening. Voor specialistische behandelingen verschilt het tarief.",
+      "gold_facts": ["eerste consult 45 min, €60", "DTF-screening €18 eenmalig"],
+      "tags": ["typo", "tarieven"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["18-tarieven.md", "19-eerste-afspraak.md"]
+    },
+    {
+      "slug": "globex-typo-zonder-verwijzing",
+      "question": "Kan ik zonder verwzijing van de huisars bij julie komen?",
+      "gold_answer": "Ja, u kunt zonder verwijzing terecht via DTF (Directe Toegang Fysiotherapie). Bij uw eerste consult doen we dan een korte DTF-screening (€ 18 eenmalig). Voor de vergoeding bij chronische klachten kan een verwijzing soms zinvol zijn — controleer dat bij uw zorgverzekeraar.",
+      "gold_facts": ["ja, via DTF zonder verwijzing", "DTF-screening €18 eenmalig", "verwijzing soms zinvol voor vergoeding"],
+      "tags": ["typo", "dtf"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["19-eerste-afspraak.md", "20-faq.md"]
+    },
+    {
+      "slug": "globex-typo-no-show",
+      "question": "wat gebeurd er als ik mn afpraak vergeet of te laat afzeg?",
+      "gold_answer": "Als u zonder afmelding niet verschijnt, brengen we het volledige sessietarief in rekening. Tot 24 uur vooraf afzeggen is kosteloos; bij afzegging binnen 24 uur rekenen we € 25. U krijgt standaard een herinnering 24 uur tevoren.",
+      "gold_facts": ["no-show: volledig sessietarief", "afzegging > 24 uur: kosteloos", "afzegging < 24 uur: €25"],
+      "tags": ["typo", "afspraken"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["18-tarieven.md", "20-faq.md"]
+    },
+    {
+      "slug": "globex-ooc-dietist",
+      "question": "Hebben jullie een diëtist die een voedingsplan voor me kan maken?",
+      "gold_answer": "Nee, een diëtist hebben we niet — wij zijn fysiotherapeuten. Voor een voedingsplan verwijzen we u door naar een diëtist. Wel kunnen we u helpen met bewegingstherapie en revalidatie; als dat speelt, bel gerust 030 - 752 14 80.",
+      "gold_facts": ["geen diëtist", "fysiotherapeuten", "verwijzing naar diëtist"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "globex-ooc-psycholoog",
+      "question": "Kan ik bij jullie terecht voor psychische klachten of een gesprek met een psycholoog?",
+      "gold_answer": "Voor psychische klachten kunnen we u niet helpen — daarvoor verwijzen we u naar uw huisarts of een psycholoog. Wij zijn fysiotherapeuten en richten ons op lichamelijke klachten en bewegen. Bij stress-gerelateerde lichamelijke klachten kunnen we soms wel ondersteunen.",
+      "gold_facts": ["geen psychische zorg", "verwijzing naar huisarts/psycholoog", "fysiotherapeuten voor lichamelijke klachten"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "globex-ooc-tandarts",
+      "question": "Ik heb erge kiespijn, kunnen jullie daar iets aan doen?",
+      "gold_answer": "Kiespijn valt buiten ons vakgebied — daarvoor moet u bij een tandarts zijn. Wij zijn fysiotherapeuten. Mocht uw klacht met kaak- of nekspanning te maken hebben, dan kunnen we daar soms wel naar kijken, maar voor de kies zelf verwijzen we u naar de tandarts.",
+      "gold_facts": ["geen tandheelkunde", "verwijzing naar tandarts", "fysiotherapeuten"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "globex-planted-therapeut-sophie",
+      "question": "Kan ik vrijdag terecht bij mijn vaste therapeut Sophie?",
+      "gold_answer": "Bij FysioPlus Utrecht werkt geen Sophie in het team. Onze receptie kan opzoeken wie u eerder behandeld heeft — bel 030 - 752 14 80. Op vrijdag zijn op de Croeselaan onder anderen Karim Idrissi (sportfysio) en Annemieke Doorenbos (kinderfysio) beschikbaar.",
+      "gold_facts": ["geen Sophie in het team", "receptie checkt op 030 - 752 14 80"],
+      "tags": ["planted-fact", "anti-halluc", "team"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["Sophie kan", "Sophie werkt", "ja, Sophie"],
+      "conversation_history": [
+        { "role": "user", "content": "Hoi, ik kom al een tijdje bij jullie en mijn vaste therapeut heet Sophie." },
+        { "role": "assistant", "content": "Voor een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken." }
+      ],
+      "ideal_source_filenames": ["03-team-fysiotherapeuten.md"]
+    },
+    {
+      "slug": "globex-planted-gratis-consult",
+      "question": "Het eerste consult is bij jullie toch gratis, zoals afgesproken?",
+      "gold_answer": "Het eerste consult is niet gratis. Een eerste consult van 45 minuten kost € 60 (specialistische tarieven verschillen). Komt u zonder verwijzing, dan komt daar eenmalig € 18 DTF-screening bij. Voor de exacte kosten voor uw situatie helpt onze receptie u graag op 030 - 752 14 80.",
+      "gold_facts": ["eerste consult €60 (niet gratis)", "45 minuten", "DTF-screening €18 eenmalig"],
+      "tags": ["planted-fact", "anti-halluc", "tarieven"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["eerste consult is gratis", "gratis consult", "ja, gratis"],
+      "conversation_history": [
+        { "role": "user", "content": "Ik kreeg te horen dat het eerste consult bij jullie gratis is." },
+        { "role": "assistant", "content": "Voor de tarieven van uw afspraak kan onze receptie u het beste informeren op 030 - 752 14 80." }
+      ],
+      "ideal_source_filenames": ["18-tarieven.md"]
+    },
+    {
+      "slug": "globex-planted-21-vergoed",
+      "question": "Jullie zeiden dat alle 21 behandelingen sowieso vergoed worden — dat klopt toch?",
+      "gold_answer": "Zo werkt het niet. Voor volwassenen vergoedt de basisverzekering fysiotherapie pas vanaf de 21e behandeling per jaar, en alleen bij een chronische indicatie — niet automatisch alle 21. De eerste 20 vallen voor volwassenen meestal onder de aanvullende verzekering, afhankelijk van uw polis. Annemieke kan met u meekijken op 030 - 752 14 80.",
+      "gold_facts": ["basis vergoedt pas vanaf 21e behandeling bij chronische indicatie", "niet automatisch alle 21 vergoed", "eerste 20 via aanvullend, polis-afhankelijk"],
+      "tags": ["planted-fact", "anti-halluc", "vergoeding"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["alle 21 vergoed", "21 behandelingen sowieso vergoed", "alle 21 worden vergoed"],
+      "conversation_history": [
+        { "role": "user", "content": "Bij mijn vorige bezoek zeiden jullie dat alle 21 behandelingen vergoed worden." },
+        { "role": "assistant", "content": "De vergoeding hangt af van uw polis en indicatie; onze receptie kan dit met u nakijken op 030 - 752 14 80." }
+      ],
+      "ideal_source_filenames": ["17-zorgverzekering-vergoeding.md"]
+    },
+    {
+      "slug": "globex-mh-bekken-wachttijd-vergoeding",
+      "question": "Ik wil bekkenfysio — hoe lang is de wachttijd en wordt het vergoed?",
+      "gold_answer": "Voor bekkenfysiotherapie is de wachttijd gemiddeld 7 tot 10 werkdagen (in zomer en herfst kan dat langer zijn). Of het vergoed wordt hangt af van uw polis: bij volwassenen vergoedt de basis fysiotherapie pas vanaf de 21e behandeling bij chronische indicatie, aanvullende verzekeringen dekken vaak meer. Een verwijzing kan zinvol zijn voor de vergoeding. Bel Annemieke op 030 - 752 14 80.",
+      "gold_facts": ["bekkenfysio wachttijd 7-10 werkdagen", "vergoeding polis-afhankelijk", "basis pas vanaf 21e behandeling bij chronisch", "verwijzing kan zinvol zijn"],
+      "tags": ["multi-hop", "bekkenfysio", "vergoeding"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["zeker vergoed", "altijd vergoed"],
+      "ideal_source_filenames": ["20-faq.md", "17-zorgverzekering-vergoeding.md"]
+    },
+    {
+      "slug": "globex-mh-manuele-joris-locatie",
+      "question": "Op welke dagen en locatie kan ik bij Joris terecht voor manuele therapie?",
+      "gold_answer": "Joris Linschoten is manueel therapeut (Master NPi sinds 2020, Mulligan-erkend sinds 2023). Hij is op de Croeselaan in Utrecht-centrum op maandag, dinsdag, donderdag en vrijdag, en op woensdag op de locatie in De Meern. Inplannen kan via 030 - 752 14 80.",
+      "gold_facts": ["Joris Linschoten manueel therapeut", "Croeselaan ma/di/do/vr", "woensdag De Meern"],
+      "tags": ["multi-hop", "manuele-therapie", "team"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["06-manuele-therapie.md", "03-team-fysiotherapeuten.md"]
+    },
+    {
+      "slug": "globex-mh-sportfysio-consult-sessies",
+      "question": "Ik heb een hardloopblessure — wie behandelt dat, wat kost het eerste consult en hoeveel sessies heb ik ongeveer nodig?",
+      "gold_answer": "Hardloopblessures behandelen onze sportfysiotherapeuten Bas Kerkhof en Karim Idrissi. Het eerste consult sportfysio duurt 45 minuten en kost € 65; een loopanalyse kost € 95. Voor een gemiddelde hardloopblessure rekenen we 4 tot 8 sessies. Bel 030 - 752 14 80 om in te plannen.",
+      "gold_facts": ["sportfysio Bas Kerkhof en Karim Idrissi", "eerste consult sportfysio 45 min €65", "loopanalyse €95", "4-8 sessies"],
+      "tags": ["multi-hop", "sportfysio"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["07-sportfysiotherapie.md", "18-tarieven.md", "03-team-fysiotherapeuten.md"]
+    },
+    {
+      "slug": "globex-fp-medicatie-voorschrijven",
+      "question": "Jullie kunnen toch ook even ontstekingsremmers voorschrijven bij mijn blessure?",
+      "gold_answer": "Nee, medicatie voorschrijven mogen en doen wij niet — dat is voorbehouden aan een arts. Als fysiotherapeuten behandelen we met bewegingstherapie, manuele technieken en advies. Voor ontstekingsremmers verwijzen we u naar uw huisarts. Wel kunnen we de onderliggende klacht aanpakken zodat u die pijnstilling minder nodig heeft.",
+      "gold_facts": ["fysiotherapeuten schrijven geen medicatie voor", "voorbehouden aan arts", "wel bewegingstherapie/manuele technieken"],
+      "tags": ["false-premise-correction", "scope", "medicatie"],
+      "difficulty": "medium",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["wij schrijven voor", "wij kunnen voorschrijven", "ibuprofen", "diclofenac"],
+      "ideal_source_filenames": ["12-dry-needling.md", "04-behandelingen-overzicht.md"]
     }
   ]
 }

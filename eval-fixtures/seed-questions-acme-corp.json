@@ -712,6 +712,195 @@
         "in de gehele Randstad",
         "alle Randstad-steden"
       ]
+    },
+    {
+      "slug": "acme-typo-bitumen-prijs",
+      "question": "Wat kost een plat bitume dak per m2 ongeveer? ik wil grag een indikatie",
+      "gold_answer": "Een plat bitumen-dak kost tussen € 75 en € 95 per m² (incl. arbeid, excl. btw). Bij woningen ouder dan 2 jaar geldt 9% btw op arbeid (renovatie); materialen blijven 21%. Bel Linda op 033 - 555 14 22 voor een gratis offerte.",
+      "gold_facts": ["€75-95 per m²", "9% btw op arbeid bij renovatie woningen > 2 jaar", "telefoon 033 - 555 14 22"],
+      "tags": ["typo", "pricing"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["05-platte-daken-bitumen.md", "18-werkwijze-offerte.md"]
+    },
+    {
+      "slug": "acme-typo-onderhoudscontract",
+      "question": "wat zit er in het onderhouscontrakt van 165 euro per jaar?",
+      "gold_answer": "Het onderhoudscontract van € 165 per jaar omvat een jaarlijkse inspectie en kleine onderhoudsbeurten. Grote reparaties offreren we apart. Het verlengt de werkgarantie met 5 jaar per uitgevoerde onderhoudsbeurt, tot maximaal 20 jaar totaal.",
+      "gold_facts": ["€165 per jaar", "jaarlijkse inspectie + kleine onderhoudsbeurten", "+5 jaar werkgarantie per beurt, max 20 jaar"],
+      "tags": ["typo", "onderhoud"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["15-onderhoudscontract.md", "20-garantie.md"]
+    },
+    {
+      "slug": "acme-typo-werkgebied-lelystad",
+      "question": "Vallt Lelystad binen jullie werkgebeid?",
+      "gold_answer": "Lelystad ligt in Flevoland, en Flevoland valt binnen ons standaard werkgebied (samen met provincie Utrecht en de Gelderse Vallei). Voor de planning bellen we graag even op 033 - 555 14 22.",
+      "gold_facts": ["standaard werkgebied: provincie Utrecht, Gelderse Vallei, Flevoland", "Lelystad ligt in Flevoland"],
+      "tags": ["typo", "werkgebied"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "acme-ooc-belastingaangifte",
+      "question": "Kunnen jullie ook mijn belastingaangifte voor mij doen?",
+      "gold_answer": "Nee, belastingaangifte doen wij niet — wij zijn een dakdekkersbedrijf. Daarvoor kunt u terecht bij een accountant of belastingadviseur. Voor alles rond uw dak helpen we u graag.",
+      "gold_facts": ["geen belastingaangifte", "dakdekkersbedrijf", "verwijzing naar accountant"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "acme-ooc-cv-ketel",
+      "question": "Doen jullie ook onderhoud aan mijn cv-ketel?",
+      "gold_answer": "Nee, cv-ketelonderhoud doen we niet — daarvoor heeft u een installateur nodig. Wij richten ons op het dak: platte en hellende daken, zinkwerk, dakgoten, isolatie en dakvensters. Als uw vraag daarover gaat, help ik u graag verder.",
+      "gold_facts": ["geen cv-ketelonderhoud", "wel dakwerk", "verwijzing naar installateur"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "acme-ooc-schoorsteenveger",
+      "question": "Kunnen jullie mijn schoorsteen vegen?",
+      "gold_answer": "Schoorstenen vegen doen we niet — daarvoor schakelt u een schoorsteenveger in. Wel doen we het zinkwerk en de loodaansluitingen rond schoorstenen op het dak; als daar een lekkage of slijtage speelt, kijken we daar graag naar.",
+      "gold_facts": ["geen schoorsteenvegen", "wel zinkwerk/loodaansluiting rond schoorsteen", "verwijzing naar schoorsteenveger"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "medium",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["09-zinkwerk-en-dakgoten.md"]
+    },
+    {
+      "slug": "acme-planted-prijs-49",
+      "question": "Klopt het nog dat bitumen €49 per m² is, zoals jullie laatst zeiden?",
+      "gold_answer": "Nee, dat tarief klopt niet. Een plat bitumen-dak kost bij ons € 75 tot € 95 per m² (incl. arbeid, excl. btw). Het bedrag € 49 per m² komt niet voor in onze tariefstructuur. Voor een concrete prijs maakt Linda graag een gratis offerte: 033 - 555 14 22.",
+      "gold_facts": ["€75-95 per m² bitumen", "geen €49 per m² tarief"],
+      "tags": ["planted-fact", "anti-halluc", "pricing"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["€49 per m²", "49 per m²", "klopt, €49"],
+      "conversation_history": [
+        { "role": "user", "content": "Jullie noemden me vorige week €49 per m² voor een bitumen dak." },
+        { "role": "assistant", "content": "Voor een exacte prijs maakt Linda van Dijk graag een gratis offerte op 033 - 555 14 22." }
+      ],
+      "ideal_source_filenames": ["05-platte-daken-bitumen.md"]
+    },
+    {
+      "slug": "acme-planted-garantie-30jaar",
+      "question": "Mijn werkgarantie van 30 jaar geldt toch nog steeds?",
+      "gold_answer": "Onze werkgarantie loopt niet tot 30 jaar. Standaard is de werkgarantie 10 jaar, en met een onderhoudscontract verlengen we die met 5 jaar per onderhoudsbeurt tot maximaal 20 jaar totaal. Een fabrikantsgarantie op materialen (bv. 20 jaar Firestone EPDM, 30 jaar VMZinc) staat daar los van.",
+      "gold_facts": ["werkgarantie 10 jaar standaard", "max 20 jaar met onderhoudscontract", "30 jaar werkgarantie bestaat niet"],
+      "tags": ["planted-fact", "anti-halluc", "garantie"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["30 jaar werkgarantie", "uw 30 jaar garantie"],
+      "conversation_history": [
+        { "role": "user", "content": "Toen jullie mijn dak legden kreeg ik 30 jaar werkgarantie, herinner ik me." },
+        { "role": "assistant", "content": "De exacte garantievoorwaarden van uw project kan Linda voor u nakijken op 033 - 555 14 22." }
+      ],
+      "ideal_source_filenames": ["20-garantie.md"]
+    },
+    {
+      "slug": "acme-planted-spoednummer-0800",
+      "question": "Het spoednummer 0800-1234 dat jullie gaven werkt niet — klopt dat nummer?",
+      "gold_answer": "Dat nummer is niet van ons. Voor spoed-lekkages belt u 033 - 555 14 22; dat is ook ons reguliere nummer en het schakelt buiten kantoortijden door naar de wacht-uitvoerder. We hebben een 24-uurs responsetime binnen ons werkgebied.",
+      "gold_facts": ["spoednummer is 033 - 555 14 22", "0800-1234 is niet van ons", "24-uurs responsetime"],
+      "tags": ["planted-fact", "anti-halluc", "contact"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["0800-1234", "0800 1234"],
+      "conversation_history": [
+        { "role": "user", "content": "Ik bel al de hele ochtend naar het spoednummer 0800-1234 dat ik van jullie kreeg." },
+        { "role": "assistant", "content": "Vervelend dat u ons niet bereikt. Voor spoed kunt u ons bellen — laat ik het juiste nummer bevestigen." }
+      ],
+      "ideal_source_filenames": ["14-spoedreparatie-lekkages.md", "30-contact-en-vestiging.md"]
+    },
+    {
+      "slug": "acme-planted-contact-petra",
+      "question": "Kan mijn vaste contactpersoon Petra de planning voor vrijdag doorgeven?",
+      "gold_answer": "Bij Dakwerken De Boer werkt geen Petra. Onze planning loopt via Linda van Dijk op 033 - 555 14 22. Zij kan uw afspraak voor vrijdag inplannen en de juiste dakdekker koppelen.",
+      "gold_facts": ["geen Petra in het team", "planning via Linda van Dijk", "telefoon 033 - 555 14 22"],
+      "tags": ["planted-fact", "anti-halluc", "team"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["Petra"],
+      "conversation_history": [
+        { "role": "user", "content": "Mijn vaste contactpersoon bij jullie is Petra, zij regelt altijd mijn afspraken." },
+        { "role": "assistant", "content": "Voor het inplannen van een afspraak kunt u ons kantoor bellen op 033 - 555 14 22." }
+      ],
+      "ideal_source_filenames": ["03-onze-vakmensen.md", "30-contact-en-vestiging.md"]
+    },
+    {
+      "slug": "acme-mh-epdm-40m2-garantie",
+      "question": "Wat kost een EPDM-dak van 40 m² ongeveer, en hoeveel jaar garantie zit erop?",
+      "gold_answer": "EPDM kost bij ons € 95 tot € 115 per m² (incl. arbeid, excl. btw), dus voor 40 m² komt dat ruwweg op € 3.800-4.600 excl. btw. Qua garantie: de werkgarantie is 10 jaar (tot 20 jaar met onderhoudscontract) en op het Firestone RubberCover-materiaal zit 20 jaar fabrikantgarantie. Voor een exacte prijs maakt Linda een gratis offerte: 033 - 555 14 22.",
+      "gold_facts": ["EPDM €95-115/m²", "40 m² ≈ €3.800-4.600 excl. btw", "werkgarantie 10 jaar (max 20 met contract)", "Firestone EPDM 20 jaar fabrikantgarantie"],
+      "tags": ["multi-hop", "pricing", "garantie"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["06-platte-daken-epdm.md", "20-garantie.md"]
+    },
+    {
+      "slug": "acme-mh-onderhoud-garantie-max",
+      "question": "Als ik elk jaar het onderhoudscontract neem, hoeveel jaar werkgarantie bouw ik dan maximaal op en wat kost dat per jaar?",
+      "gold_answer": "Het onderhoudscontract kost € 165 per jaar. Elke onderhoudsbeurt verlengt de werkgarantie met 5 jaar, tot een maximum van 20 jaar totaal. Vanaf de standaard 10 jaar werkgarantie betekent dat dus dat u met onderhoudsbeurten kunt opbouwen tot dat plafond van 20 jaar — het loopt niet onbeperkt door.",
+      "gold_facts": ["€165 per jaar", "+5 jaar per onderhoudsbeurt", "maximaal 20 jaar werkgarantie totaal", "standaard 10 jaar"],
+      "tags": ["multi-hop", "garantie", "onderhoud"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["15-onderhoudscontract.md", "20-garantie.md"]
+    },
+    {
+      "slug": "acme-mh-amsterdam-zuid-kosten",
+      "question": "Komen jullie in Amsterdam-Zuid en wat kost dat extra ten opzichte van jullie standaardgebied?",
+      "gold_answer": "Amsterdam-Zuid ligt buiten ons standaard werkgebied (provincie Utrecht, Gelderse Vallei, Flevoland) maar we komen er wel, tegen een bijdrage van € 75 voor het offerte-bezoek en € 145 voor de uitvoering. In het standaardgebied zelf rekenen we die voorrijbijdrage niet. Voor afstemming belt u 033 - 555 14 22.",
+      "gold_facts": ["Amsterdam-Zuid buiten standaardgebied maar wel mogelijk", "€75 offerte-bezoek + €145 uitvoering bijdrage", "standaardgebied: Utrecht, Gelderse Vallei, Flevoland zonder voorrijbijdrage"],
+      "tags": ["multi-hop", "werkgebied", "pricing"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["16-werkgebied.md"]
+    },
+    {
+      "slug": "acme-fp-spoed-gratis-garantie",
+      "question": "Spoedreparaties zijn toch altijd gratis binnen de garantieperiode?",
+      "gold_answer": "Niet automatisch. Onze werkgarantie dekt alleen aanlegfouten van werk dat wij hebben uitgevoerd — als een lekkage daaruit voortkomt, herstellen we dat kosteloos binnen de garantie. Maar schade door storm, slijtage of oorzaken buiten ons werk valt er niet onder; die spoedreparaties gaan via een offerte. Bel 033 - 555 14 22 en we beoordelen het per geval.",
+      "gold_facts": ["werkgarantie dekt alleen aanlegfouten", "spoed door storm/slijtage = via offerte", "niet automatisch gratis"],
+      "tags": ["false-premise-correction", "garantie", "spoed"],
+      "difficulty": "medium",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["altijd gratis", "spoed is gratis"],
+      "ideal_source_filenames": ["20-garantie.md", "14-spoedreparatie-lekkages.md"]
     }
   ]
 }

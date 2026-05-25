@@ -349,6 +349,179 @@
       "category": "search",
       "must_not_contain": ["€249 voor", "tarief van €249", "€249 per"],
       "ideal_source_filenames": ["15-zzp-pakketten.md", "19-tarieven-en-pakketten.md"]
+    },
+    {
+      "slug": "initech-typo-zzp-basic",
+      "question": "wat kost het ZZP Bazic paket per jaar ongeveer?",
+      "gold_answer": "Het ZZP Basic pakket kost € 990 per jaar (€ 82,50 per maand). Het omvat de kwartaal-btw-aangifte, factuurverwerking, periodieke rapportage, de IB-aangifte en 1 uur advies per jaar. Geschikt voor zzp'ers met 1-50 facturen per maand.",
+      "gold_facts": ["€990 per jaar", "€82,50 per maand", "kwartaal-btw + factuurverwerking + IB + 1 uur advies"],
+      "tags": ["typo", "pakketten", "zzp"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["15-zzp-pakketten.md", "19-tarieven-en-pakketten.md"]
+    },
+    {
+      "slug": "initech-typo-btw-deadline",
+      "question": "Wanneer moet de btw aangfite over Q1 2026  uitelijk ingedind worden?",
+      "gold_answer": "De btw-aangifte over Q1 2026 (januari t/m maart) moet uiterlijk 30 april 2026 worden ingediend. We adviseren uw administratie minimaal twee weken vooraf aan te leveren — dus uiterlijk 16 april — zodat we het concept tijdig kunnen opmaken.",
+      "gold_facts": ["Q1 2026 deadline: 30 april 2026", "aanleveren uiterlijk 16 april aanbevolen"],
+      "tags": ["typo", "btw", "deadlines"],
+      "difficulty": "easy",
+      "question_type": "typo",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["11-btw-aangifte.md", "20-werkwijze-clientonboarding.md"]
+    },
+    {
+      "slug": "initech-ooc-arbeidsconflict",
+      "question": "Kunnen jullie me juridisch bijstaan in een arbeidsconflict met een werknemer?",
+      "gold_answer": "Juridische bijstand in een arbeidsconflict bieden we niet — wij zijn accountants, geen advocaten. Daarvoor verwijzen we u naar een arbeidsrechtadvocaat of jurist. Wel kunnen we de loonadministratieve en fiscale kant verzorgen (bijvoorbeeld een correcte eindafrekening). Voor het juridische deel schakelt u een specialist in.",
+      "gold_facts": ["geen juridische bijstand", "accountants, geen advocaten", "wel loonadministratie/fiscale kant", "verwijzing naar arbeidsrechtjurist"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "medium",
+      "question_type": "out_of_corpus",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["09-loonadministratie.md"]
+    },
+    {
+      "slug": "initech-ooc-beleggingsadvies",
+      "question": "Welke aandelen of beleggingen raden jullie aan voor mijn spaargeld?",
+      "gold_answer": "Beleggingsadvies geven we niet — wij zijn accountants en geen vermogensbeheerders of beleggingsadviseurs. Daarvoor heeft u een beleggingsadviseur of vermogensbeheerder nodig. Wel kunnen we u helpen met de fiscale kant van vermogen, zoals de box 3-heffing en hoe vermogen in uw aangifte verwerkt wordt.",
+      "gold_facts": ["geen beleggingsadvies", "accountants, geen vermogensbeheerders", "wel fiscale kant (box 3)", "verwijzing naar beleggingsadviseur"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "medium",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": ["08-belastingaangifte-particulier.md"]
+    },
+    {
+      "slug": "initech-ooc-website-bouwen",
+      "question": "Kunnen jullie een website voor mijn onderneming bouwen?",
+      "gold_answer": "Nee, websites bouwen we niet — wij zijn een accountantskantoor. Daarvoor schakelt u een webdesigner of -bureau in. Wij helpen u met administratie, belastingaangiften, loonadministratie en fiscaal advies.",
+      "gold_facts": ["geen websitebouw", "accountantskantoor", "wel administratie/belasting/advies"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "initech-ooc-marketing",
+      "question": "Kunnen jullie de marketing en social media voor mijn bedrijf verzorgen?",
+      "gold_answer": "Marketing en social media doen we niet — dat valt buiten ons vakgebied als accountantskantoor. Daarvoor schakelt u een marketingbureau in. Wij richten ons op uw administratie, belastingaangiften, loonadministratie en fiscaal en strategisch financieel advies.",
+      "gold_facts": ["geen marketing/social media", "accountantskantoor", "verwijzing naar marketingbureau"],
+      "tags": ["out-of-corpus", "scope-refusal"],
+      "difficulty": "easy",
+      "question_type": "out_of_corpus",
+      "expected_kind": "fallback",
+      "category": "off_topic",
+      "ideal_source_filenames": []
+    },
+    {
+      "slug": "initech-planted-adviseur-mark-visser",
+      "question": "Kan mijn vaste adviseur Mark Visser volgende week mijn aangifte doornemen?",
+      "gold_answer": "Bij Bakker & Vermeer Accountants werkt geen Mark Visser. Onze RB-adviseurs zijn onder anderen Sandra Pelgrum (zzp/kleine ondernemers, IB) en Yusuf Kara (erfbelasting, schenking). Onze receptie kan opzoeken wie eerder met u heeft gewerkt en een afspraak inplannen.",
+      "gold_facts": ["geen Mark Visser in het team", "Sandra Pelgrum RB voor zzp/IB", "Yusuf Kara RB voor erfbelasting", "receptie kan dossier opzoeken"],
+      "tags": ["planted-fact", "anti-halluc", "team"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["Mark Visser", "Mark kan", "Mark werkt"],
+      "conversation_history": [
+        { "role": "user", "content": "Hallo, mijn vaste adviseur Mark Visser heeft vorig jaar mijn IB-aangifte gedaan." },
+        { "role": "assistant", "content": "Voor een vervolgafspraak kan onze receptie uw klantdossier opzoeken en zien wie eerder met u heeft gewerkt." }
+      ],
+      "ideal_source_filenames": ["03-team-accountants.md"]
+    },
+    {
+      "slug": "initech-planted-dga-loon-30k",
+      "question": "Jullie adviseerden me € 30.000 DGA-loon te nemen — dat is toch voldoende voor 2026?",
+      "gold_answer": "Dat advies klopt niet met de regels voor 2026. Het gebruikelijk loon voor een DGA is in 2026 minimaal € 56.000 per jaar. Neemt u significant lager, dan corrigeert de Belastingdienst en stelt dit bedrag vast. Lager mag alleen in uitzonderingsgevallen (structureel verlies, seizoensbedrijf). Anouk Hendrikse kan uw situatie nakijken (quick-advies € 195).",
+      "gold_facts": ["DGA-gebruikelijk loon 2026 minimaal €56.000", "€30.000 is te laag", "Belastingdienst corrigeert", "uitzondering bij verlies/seizoen"],
+      "tags": ["planted-fact", "anti-halluc", "dga", "hard-fact"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["€30.000 is voldoende", "30.000 volstaat", "ja, €30.000"],
+      "conversation_history": [
+        { "role": "user", "content": "Vorig gesprek zeiden jullie dat € 30.000 DGA-loon prima is voor mij." },
+        { "role": "assistant", "content": "Voor het gebruikelijk loon gelden jaarlijks vastgestelde regels; laat ik de actuele norm voor 2026 bevestigen." }
+      ],
+      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "23-faq-bv.md"]
+    },
+    {
+      "slug": "initech-planted-kantoor-rotterdam",
+      "question": "Ik kom volgende week langs op jullie kantoor in Rotterdam — hoe laat zijn jullie open?",
+      "gold_answer": "Wij hebben geen vestiging in Rotterdam. Bakker & Vermeer heeft twee kantoren: het hoofdkantoor in Eindhoven (Boschdijk 187a) en een vestiging in 's-Hertogenbosch (Onderwijsboulevard 9). U kunt op beide kantoren terecht; voor de openingstijden en een afspraak belt u ons even.",
+      "gold_facts": ["geen vestiging Rotterdam", "Eindhoven hoofdkantoor (Boschdijk 187a)", "Den Bosch (Onderwijsboulevard 9)"],
+      "tags": ["planted-fact", "anti-halluc", "vestigingen"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["kantoor in Rotterdam", "Rotterdamse vestiging", "ons kantoor in Rotterdam"],
+      "conversation_history": [
+        { "role": "user", "content": "Ik kom altijd naar jullie kantoor in Rotterdam, dat is voor mij het dichtstbij." },
+        { "role": "assistant", "content": "Fijn dat u langskomt. Laat ik onze vestigingen en openingstijden even voor u bevestigen." }
+      ],
+      "ideal_source_filenames": ["04-vestigingen.md", "31-contact-en-bereikbaarheid.md"]
+    },
+    {
+      "slug": "initech-mh-zzp-aftrek-jaar1",
+      "question": "Ik ben in mijn eerste jaar als zzp'er — hoeveel aftrek (zelfstandigen plus starters) kan ik samen toepassen in 2026 en welke voorwaarde geldt?",
+      "gold_answer": "In 2026 is de zelfstandigenaftrek € 3.750. In de eerste drie jaar van uw onderneming komt daar de startersaftrek bovenop: nogmaals € 2.123. Samen is dat dus € 5.873 aftrek in jaar 1. Beide gelden alleen wanneer u aan het urencriterium van 1.225 uur per jaar voldoet — houd daarvoor een urenadministratie bij.",
+      "gold_facts": ["zelfstandigenaftrek 2026 €3.750", "startersaftrek €2.123 in eerste 3 jaar", "samen €5.873", "urencriterium 1.225 uur"],
+      "tags": ["multi-hop", "zzp", "aftrek"],
+      "difficulty": "medium",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "22-faq-zzp.md"]
+    },
+    {
+      "slug": "initech-mh-bv-vpb-dga-250k",
+      "question": "Mijn bv maakt € 250.000 winst — hoeveel Vpb betaal ik en wat is het minimale DGA-loon dat ik moet nemen?",
+      "gold_answer": "Bij € 250.000 winst betaalt u in 2026 over de eerste € 200.000 19% (€ 38.000) en over de resterende € 50.000 25,8% (€ 12.900), samen € 50.900 Vpb. Daarnaast geldt voor u als DGA een gebruikelijk loon van minimaal € 56.000 per jaar. Voor een precieze berekening voor uw situatie helpt Anouk Hendrikse u graag.",
+      "gold_facts": ["Vpb 19% tot €200k, 25,8% daarboven", "bij €250.000: €50.900 Vpb totaal", "DGA-gebruikelijk loon 2026 minimaal €56.000"],
+      "tags": ["multi-hop", "vpb", "dga"],
+      "difficulty": "hard",
+      "question_type": "multi_hop",
+      "expected_kind": "answer",
+      "category": "search",
+      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "12-fiscale-adviezen.md", "23-faq-bv.md"]
+    },
+    {
+      "slug": "initech-fp-vpb-15procent",
+      "question": "De Vpb is toch gewoon 15% over de eerste schijf?",
+      "gold_answer": "Niet meer in 2026. Het lage Vpb-tarief over de eerste € 200.000 winst is 19% (15% was een eerder jaar). Boven € 200.000 geldt 25,8%. Voor een berekening op uw winst kunnen we u precies voorrekenen wat u betaalt.",
+      "gold_facts": ["lage Vpb-tarief 2026 = 19% (niet 15%)", "grens €200.000", "hoog tarief 25,8% daarboven"],
+      "tags": ["false-premise-correction", "vpb", "tarieven"],
+      "difficulty": "medium",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["15% over de eerste", "ja, 15%", "klopt, 15%"],
+      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "12-fiscale-adviezen.md"]
+    },
+    {
+      "slug": "initech-fp-kor-verplicht",
+      "question": "De KOR is toch verplicht zodra mijn omzet onder € 20.000 zakt?",
+      "gold_answer": "Nee, de KOR (Kleine Ondernemersregeling) is niet verplicht — het is een keuze die u zelf aanvraagt bij de Belastingdienst. Bij deelname en een omzet onder € 20.000 doet u geen btw-aangifte en mag u ook geen btw aftrekken. Voor sommige ondernemers (bijvoorbeeld met veel zakelijke btw-inkoop) is het juist ongunstig. We kijken graag met u of de KOR in uw geval voordelig is.",
+      "gold_facts": ["KOR is een keuze, niet verplicht", "aanvragen bij Belastingdienst", "onder €20.000: geen btw-aangifte, geen aftrek", "niet altijd voordelig"],
+      "tags": ["false-premise-correction", "kor", "review-needed"],
+      "difficulty": "hard",
+      "question_type": "false_premise",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["KOR is verplicht", "verplicht onder", "automatisch de KOR"],
+      "ideal_source_filenames": ["11-btw-aangifte.md", "22-faq-zzp.md"]
     }
   ]
 }
