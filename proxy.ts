@@ -28,6 +28,6 @@ export const config = {
   // De chat-route doet zelf dual-auth (cookie OF embed-token + origin-lock);
   // de ping-route idem. Zie app/api/v0/chat/route.ts.
   matcher: [
-    '/((?!login|embed|api/v0/cron|api/v0/chat|api/v0/widget|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|embed|api/v0/cron|api/v0/chat|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };

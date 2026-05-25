@@ -9,7 +9,7 @@ export function EmbedClient(props: Props) {
   // Heartbeat: één ping bij mount. host komt uit ?h= dat de loader meegaf.
   useEffect(() => {
     const host = new URLSearchParams(window.location.search).get('h') ?? undefined;
-    void fetch('/api/v0/widget/ping', {
+    void fetch(`/api/v0/widget/ping?org=${encodeURIComponent(props.orgSlug)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
