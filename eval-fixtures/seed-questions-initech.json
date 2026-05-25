@@ -522,6 +522,40 @@
       "category": "search",
       "must_not_contain": ["KOR is verplicht", "verplicht onder", "automatisch de KOR"],
       "ideal_source_filenames": ["11-btw-aangifte.md", "22-faq-zzp.md"]
+    },
+    {
+      "slug": "initech-planted-tarief-50-uur",
+      "question": "Jullie rekenen toch € 50 per uur voor fiscaal advies, zoals eerder besproken?",
+      "gold_answer": "Dat tarief klopt niet. Fiscaal advies rekenen we op € 150-195 per uur (afhankelijk van complexiteit en adviseur). Een quick-advies kost bijvoorbeeld € 195. Voor een precieze opgave voor uw vraag plannen we graag een verkennend gesprek — dat is gratis.",
+      "gold_facts": ["fiscaal advies €150-195 per uur", "geen €50-uurtarief", "verkennend gesprek gratis"],
+      "tags": ["planted-fact", "anti-halluc", "pricing"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["€50 per uur klopt", "ja, €50 per uur", "tarief van €50 per uur", "€50 per uur voor advies"],
+      "conversation_history": [
+        { "role": "user", "content": "We hadden afgesproken dat jullie € 50 per uur rekenen voor fiscaal advies." },
+        { "role": "assistant", "content": "Voor een opgave van de advieskosten plannen we graag een verkennend gesprek; dat is gratis." }
+      ],
+      "ideal_source_filenames": ["19-tarieven-en-pakketten.md", "12-fiscale-adviezen.md"]
+    },
+    {
+      "slug": "initech-planted-spoedlijn-0900",
+      "question": "Werkt jullie spoedlijn 0900-1234 nog? Ik krijg er geen gehoor.",
+      "gold_answer": "Wij hebben geen spoedlijn op 0900-1234 — dat nummer is niet van ons. U kunt ons bereiken via het hoofdkantoor in Eindhoven of de vestiging in 's-Hertogenbosch tijdens kantooruren. Laat me u het juiste contactnummer en de openingstijden bevestigen.",
+      "gold_facts": ["geen spoedlijn 0900-1234", "bereikbaar via Eindhoven en Den Bosch tijdens kantooruren"],
+      "tags": ["planted-fact", "anti-halluc", "contact"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["0900-1234 is correct", "bel 0900-1234", "0900-1234 werkt", "spoedlijn 0900-1234 is bereikbaar"],
+      "conversation_history": [
+        { "role": "user", "content": "Ik bel al de hele ochtend naar jullie spoedlijn 0900-1234 die ik van jullie kreeg." },
+        { "role": "assistant", "content": "Vervelend dat u ons niet bereikt. Laat ik de juiste contactgegevens even voor u bevestigen." }
+      ],
+      "ideal_source_filenames": ["31-contact-en-bereikbaarheid.md", "04-vestigingen.md"]
     }
   ]
 }

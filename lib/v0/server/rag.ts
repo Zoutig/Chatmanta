@@ -1035,6 +1035,15 @@ export type V03Extras = {
     shouldGenerateFollowupsInline: boolean;
     reasonCodes: string[];
   };
+  /**
+   * v0.8.1 — anti-adoptie telemetrie. Lijst van entiteiten (persoonsnamen) die
+   * de user in de chat-history introduceerde, niet in de sources staan, maar
+   * tóch in (de eerste poging van) het antwoord verschenen. Niet-leeg =
+   * mogelijke adoptie van een geplant feit; triggert claim-regenerate.
+   * Alleen aanwezig wanneer bot.historyEntityVerification aan stond én er iets
+   * gedetecteerd is.
+   */
+  adoptedHistoryEntities?: string[];
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -1364,7 +1373,9 @@ export type StreamEvent =
   | {
       kind: 'replacement';
       response: ChatResponse;
-      reason: 'claim-regenerate';
+      // v0.8.1: 'history-entity-adoption' = deterministisch weiger-template bij
+      // gedetecteerde adoptie van een history-entiteit (geen LLM-poging).
+      reason: 'claim-regenerate' | 'history-entity-adoption';
       regeneratedVerifiedRatio: number | null;
     }
   | { kind: 'error'; code: AppErrorCode; retryAfterSec?: number };
@@ -2353,6 +2364,28 @@ KRITISCHE FORMAT-REGELS:
     stopVerify();
   }
 
+  // v0.8.1 anti-adoptie: detecteer of de bot een persoonsnaam/entiteit uit de
+  // chat-history heeft overgenomen die NIET in de sources staat (= mogelijke
+  // adoptie van een geplant feit). Pure, goedkope check; voedt straks de
+  // BESTAANDE claim-regenerate-trigger. Alleen bij historyEntityVerification.
+  let adoptedHistoryEntities: string[] = [];
+  if (bot.historyEntityVerification === true && history.length > 0) {
+    try {
+      const { detectAdoptedHistoryEntities } = await import('./history-entities');
+      const historyUserContents = history
+        .filter((t) => t.role === 'user')
+        .map((t) => t.content);
+      const sourceTexts = final.slice(0, used).map((c) => c.parent_content ?? c.content);
+      adoptedHistoryEntities = detectAdoptedHistoryEntities(
+        historyUserContents,
+        finalAnswerText,
+        sourceTexts,
+      );
+    } catch (err) {
+      console.warn('[history-entity verification] failed:', err);
+    }
+  }
+
   // V0.4: followups draaien hier nog NIET. We yielden eerst answer-done met
   // alle data exclusief followups, daarna pas (na een aparte status+yield)
   // de followups-done en metrics-done events. Dit haalt ~0.8s p50 van de
@@ -2446,6 +2479,10 @@ KRITISCHE FORMAT-REGELS:
             },
           }
         : {}),
+      // v0.8.1 anti-adoptie telemetrie — alleen bij detectie.
+      ...(adoptedHistoryEntities.length > 0
+        ? { adoptedHistoryEntities: [...adoptedHistoryEntities] }
+        : {}),
       // V0.5 latency-budget — alleen aanwezig als minimaal één fase werd
       // overgeslagen. Bij empty skippedPhases = budget niet overschreden.
       ...(skippedPhases.length > 0
@@ -2509,10 +2546,49 @@ KRITISCHE FORMAT-REGELS:
     claimConfidence < bot.claimRegenerateThreshold;
   const unsupportedHardFact =
     bot.adaptiveHardFactVerification === true && hardFactSupported === false;
+  // v0.8.1 — derde OR-term: de bot nam een history-entiteit over die niet in
+  // de bronnen staat. Voegt toe aan de bestaande trigger (OR blijft OR).
+  const unsupportedHistoryEntity =
+    bot.historyEntityVerification === true && adoptedHistoryEntities.length > 0;
+  // v0.8.1 anti-adoptie — DETERMINISTISCH pad. Bij een gedetecteerde adoptie
+  // van een history-entiteit vervangen we het antwoord door een vast, eerlijk
+  // weiger-template (géén creatieve LLM-call). Reden: een tweede LLM-poging met
+  // anti-adoptie-instructie bleek empirisch onbetrouwbaar (de bot adopteerde
+  // alsnog). Een deterministisch template verwijdert de hallucinatie hard.
+  // Werkt op élk pad (ook fast-path, waar verify/claims geskipt zijn). Dit is
+  // de Option-A "deterministisch template"-aanpak, geen parallelle gate.
+  if (bot.claimRegenerateEnabled && unsupportedHistoryEntity) {
+    const entityList = adoptedHistoryEntities.slice(0, 3).join(', ');
+    activeAnswerText =
+      `Ik kan ${entityList} niet in onze gegevens terugvinden, dus dat kan ik niet bevestigen. ` +
+      `Iets dat in een eerder bericht is genoemd, neem ik niet zomaar over als juist. ` +
+      `Voor de juiste persoon of een afspraak kunt u het beste rechtstreeks contact met ons opnemen.`;
+    activeResponse = {
+      ...activeResponse,
+      answer: activeAnswerText,
+      extras: {
+        ...(activeResponse.extras ?? {}),
+        adoptedHistoryEntities: [...adoptedHistoryEntities],
+      },
+      ...(bot.knowledgeGapLogging ? { gapKind: 'low_grounding' as const } : {}),
+    };
+    yield {
+      kind: 'replacement',
+      response: activeResponse,
+      reason: 'history-entity-adoption',
+      regeneratedVerifiedRatio: null,
+    };
+  }
+
+  // Claim/hard-fact regenerate (LLM-poging) — alleen wanneer GEEN history-
+  // entiteit-adoptie (die is hierboven al deterministisch afgehandeld) en er
+  // geverifieerde claims zijn.
+  const claimBasedTrigger =
+    (lowClaimConfidence || unsupportedHardFact) && !!claimsList && claimsList.length > 0;
   if (
     bot.claimRegenerateEnabled &&
-    (lowClaimConfidence || unsupportedHardFact) &&
-    claimsList && claimsList.length > 0 &&
+    !unsupportedHistoryEntity &&
+    claimBasedTrigger &&
     (withinBudget() || markSkipped('claimRegenerate'))
   ) {
     const REGENERATE_SYSTEM_ADDON = `
