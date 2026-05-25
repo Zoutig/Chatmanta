@@ -693,7 +693,22 @@ export async function runPairwiseJudge(args: {
 // ---------------------------------------------------------------------------
 // Retrieval metrics + must-not check
 // ---------------------------------------------------------------------------
-function calcRetrievalMetrics(
+// Vraagtypes waar retrieval een bron HOORT op te halen — alleen daar is
+// recall@k / MRR een zinnig signaal. Bij adversariële types (out_of_corpus,
+// planted_fact, false_premise, prompt_injection, smalltalk) is "haal dít doc op"
+// niet het succescriterium: de bot moet juist weigeren of een premisse
+// corrigeren. recall@k over die types meet labelkwaliteit, geen retrieval.
+// Zowel de retrieval-audit als de productie-gate aggregeren recall alléén over
+// deze set, zodat de val-vragen hun labels mogen houden zonder de meting te
+// vervuilen.
+export const SOURCE_EXPECTED_TYPES: ReadonlySet<string> = new Set([
+  'factual',
+  'multi_hop',
+  'typo',
+  'ambiguous',
+]);
+
+export function calcRetrievalMetrics(
   retrieved: string[],
   ideal: string[],
 ): { recallAtK: number | null; mrr: number | null } {

@@ -18,6 +18,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { EVAL_DEFAULT_VERSIONS } from '../lib/v0/server/bots';
+import { calcRetrievalMetrics, SOURCE_EXPECTED_TYPES } from '../lib/v0/server/eval';
 
 // Score-grenzen voor de bucket-split. avg = (C+P+G)/3 op 0-5 schaal.
 const LOW_SCORE_MAX = 3.0;   // avg ≤ 3 → "lage" score
@@ -56,8 +57,6 @@ type RunRow = {
   score_correctness: number | null;
   score_completeness: number | null;
   score_grounding: number | null;
-  retrieval_recall_at_k: number | string | null;
-  retrieval_mrr: number | string | null;
   retrieved_filenames: string[] | null;
   created_at: string;
 };
@@ -70,12 +69,9 @@ type QRow = {
   ideal_source_filenames: string[] | null;
 };
 
-// Vraagtypes waar retrieval een bron HOORT op te halen. Alleen hier betekent
-// recall@k=0 een echte retrieval-fout. Voor de adversariële types (out_of_corpus,
-// false_premise, planted_fact, prompt_injection, smalltalk) is recall@k=0 vaak
-// het correcte gedrag — de bot moet juist NIET een bron vinden. Die uitsluiten,
-// anders telt "bot weigerde correct" mee als "retrieval faalde".
-const SOURCE_EXPECTED_TYPES = new Set(['factual', 'multi_hop', 'typo', 'ambiguous']);
+// SOURCE_EXPECTED_TYPES (factual/multi_hop/typo/ambiguous) komt uit
+// lib/v0/server/eval — dezelfde set die de productie-gate gebruikt, zodat audit
+// en gate identiek redeneren over welke vraagtypes voor recall meetellen.
 
 /** Gemiddelde van de drie kern-judge-dimensies. Null als één ontbreekt
  *  (judge-parse-error) — die rij telt niet mee in de split. */
@@ -83,13 +79,6 @@ function avgScore(r: RunRow): number | null {
   const { score_correctness: c, score_completeness: p, score_grounding: g } = r;
   if (c === null || p === null || g === null) return null;
   return (c + p + g) / 3;
-}
-
-/** numeric(4,3) komt als string terug uit supabase-js. */
-function num(v: number | string | null): number | null {
-  if (v === null) return null;
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  return Number.isFinite(n) ? n : null;
 }
 
 function pct(n: number, total: number): string {
@@ -108,7 +97,7 @@ async function main(): Promise<void> {
     .select(
       `question_id, organization_id, bot_version, run_index,
        score_correctness, score_completeness, score_grounding,
-       retrieval_recall_at_k, retrieval_mrr, retrieved_filenames, created_at`,
+       retrieved_filenames, created_at`,
     )
     .in('bot_version', EVAL_DEFAULT_VERSIONS)
     .order('created_at', { ascending: false });
@@ -153,8 +142,15 @@ async function main(): Promise<void> {
   let noScoreCount = 0;
 
   for (const r of runs) {
-    const recall = num(r.retrieval_recall_at_k);
-    if (recall === null) {
+    const q = qById.get(r.question_id);
+    // Recall ON-READ herberekenen uit de opgeslagen retrieved_filenames × de
+    // ACTUELE ideal_source_filenames. Zo weerspiegelt de audit gecorrigeerde
+    // labels meteen, zonder dure her-run. recall=null ⇔ vraag heeft geen ideal.
+    const { recallAtK } = calcRetrievalMetrics(
+      r.retrieved_filenames ?? [],
+      q?.ideal_source_filenames ?? [],
+    );
+    if (recallAtK === null) {
       noIdealCount++;
       continue;
     }
@@ -163,7 +159,6 @@ async function main(): Promise<void> {
       noScoreCount++;
       continue;
     }
-    const q = qById.get(r.question_id);
     const qtype = q?.question_type ?? 'unknown';
     withRecall.push({
       run: r,
@@ -171,7 +166,7 @@ async function main(): Promise<void> {
       qtype,
       sourceExpected: SOURCE_EXPECTED_TYPES.has(qtype),
       avg,
-      recall,
+      recall: recallAtK,
     });
   }
 
