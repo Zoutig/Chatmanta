@@ -17,6 +17,7 @@
 //   npm run audit:labels
 
 import { createClient } from '@supabase/supabase-js';
+import { SOURCE_EXPECTED_TYPES } from '../lib/v0/server/eval';
 
 const LOW_SCORE_MAX = 3.0;
 const HIGH_SCORE_MIN = 4.0;
@@ -25,8 +26,8 @@ const HIGH_SCORE_MIN = 4.0;
 const RECALL_HIT_FLOOR = 0.5;
 
 // Vraagtypes waar een bron HOORT te komen — alleen daar is een ontbrekend label
-// of een echte miss betekenisvol.
-const SOURCE_EXPECTED_TYPES = new Set(['factual', 'multi_hop', 'typo', 'ambiguous']);
+// of een echte miss betekenisvol. Geïmporteerd uit eval.ts zodat de label-doctor,
+// audit:retrieval én de productie-gate dezelfde canonieke set delen (geen drift).
 
 const ORG_SLUG_BY_ID: Readonly<Record<string, string>> = Object.freeze({
   '00000000-0000-0000-0000-0000000000d0': 'dev-org',
@@ -177,7 +178,12 @@ async function main(): Promise<void> {
     } else if (avg !== null && avg >= HIGH_SCORE_MIN) {
       flag = 'TE_STRENG?'; // goede antwoorden ondanks gemiste ideal → label te smal
     } else if (avg !== null && avg <= LOW_SCORE_MAX) {
-      flag = 'ECHTE_MISS?'; // slechte antwoorden + gemiste ideal → echte retrieval-gap
+      // Een echte retrieval-gap telt alléén voor bron-verwachte types. Bij
+      // adversariële types (planted_fact/out_of_corpus/false_premise) is recall=0
+      // het correcte gedrag — de bot hóórt de "ideal" niet te gebruiken — dus een
+      // lage score daar is geen retrieval-miss. Die routen we naar CHECK i.p.v.
+      // het ECHTE_MISS?-budget te vervuilen (vgl. audit:retrieval/SOURCE_EXPECTED_TYPES).
+      flag = sourceExpected ? 'ECHTE_MISS?' : 'CHECK';
     } else {
       flag = 'CHECK';
     }
