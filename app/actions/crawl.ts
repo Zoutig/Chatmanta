@@ -20,7 +20,7 @@ import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
 import { startCrawl } from '@/lib/v0/crawler/firecrawl';
 import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
-import { processCrawlJobs, type OpenJob } from '@/lib/v0/crawler/processJobs';
+import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 
 const KENNISBANK_PATH = '/klantendashboard/kennisbank';
 
@@ -150,14 +150,15 @@ export async function refreshWebsiteState(): Promise<WebsiteState> {
 export async function tickCrawlIngestAction(): Promise<WebsiteState> {
   const activeOrg = await getActiveOrgFromCookies();
   const sb = await getSystemJobClient({ reason: 'process_crawls_tick' });
-  const { data: jobs } = await sb
+  const { data: jobs, error: jobsError } = await sb
     .from('processing_jobs')
     .select('id, organization_id, target_id, external_job_id, attempts')
     .eq('organization_id', activeOrg.id)
     .eq('job_type', 'crawl_website')
     .in('status', ['pending', 'processing'])
     .order('created_at', { ascending: true })
-    .limit(5);
+    .limit(JOBS_PER_TICK);
+  if (jobsError) throw jobsError;
   if (jobs && jobs.length > 0) {
     await processCrawlJobs(sb, jobs as OpenJob[]);
   }

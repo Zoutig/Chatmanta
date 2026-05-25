@@ -1,11 +1,16 @@
+// V0 Website Crawler — cron/pinger-entrypoint.
+//
+// Pollt openstaande crawl-jobs en ingest afgeronde crawls via processCrawlJobs.
+// Sinds de client-tick (tickCrawlIngestAction) is deze route NIET meer vereist —
+// hij blijft bestaan voor een optionele externe pinger (bv. cron-job.org).
+// Auth: Bearer CRON_SECRET. Service-role via getSystemJobClient (SA-5).
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSystemJobClient } from '@/lib/supabase/admin';
-import { processCrawlJobs, type OpenJob } from '@/lib/v0/crawler/processJobs';
+import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const JOBS_PER_TICK = 5;
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;

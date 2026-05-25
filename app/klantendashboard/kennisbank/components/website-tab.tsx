@@ -33,13 +33,17 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
   const isCrawling = job?.status === 'pending' || job?.status === 'processing';
   const jobFailed = job?.status === 'failed';
 
-  // Inhaal-tick bij openen: een crawl kan afgerond zijn terwijl de tab dicht was.
+  // Inhaal-tick bij openen: alleen als de server-render al een lopende job ziet
+  // (een crawl kan afgerond zijn server-side maar nog niet geïngest terwijl de tab dicht was).
   useEffect(() => {
+    const j = initialState.job;
+    if (!j || (j.status !== 'pending' && j.status !== 'processing')) return;
     let cancelled = false;
     tickCrawlIngestAction()
       .then((s) => { if (!cancelled) setState(s); })
       .catch(() => {});
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Tijdens een lopende crawl: elke 4s de tick draaien (poll + ingest).

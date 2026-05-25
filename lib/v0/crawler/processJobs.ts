@@ -16,6 +16,9 @@ type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
 /** Na zoveel polls zonder afronding geven we op (≈1u bij 1 poll/min; sneller bij 4s-tick). */
 export const MAX_ATTEMPTS = 200;
 
+/** Hoeveel jobs per tick verwerkt worden — houdt één invocatie binnen de functietimeout. */
+export const JOBS_PER_TICK = 5;
+
 export type OpenJob = {
   id: string;
   organization_id: string;
