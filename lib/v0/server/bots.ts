@@ -994,7 +994,8 @@ const V0_7_3: BotConfig = {
 // Mark Visser") i.p.v. te corrigeren. v0.8.1 zet historyEntityVerification aan:
 // detecteert zo'n adoptie post-generatie en voedt de BESTAANDE claim-
 // regenerate-trigger. Geen pipeline-/prompt-herstructurering; v0.7.3 blijft
-// byte-identiek. KANDIDAAT — promotie naar LATEST pas na schone re-eval.
+// byte-identiek. GEPROMOVEERD naar LATEST (2026-05-25) — zie de rationale bij
+// LATEST_BOT_VERSION hieronder.
 const V0_8_1: BotConfig = {
   ...V0_7_3,
   version: 'v0.8.1',
@@ -1022,14 +1023,19 @@ export const BOTS: Record<string, BotConfig> = {
 
 /**
  * Latest version — UI default when no ?v= param is present.
- * Gepromoveerd naar v0.7.3 nadat de clean eval (v0.7.1 vs v0.7.3, gelijke run)
- * bevestigde dat v0.7.3 elke productie-gate haalt en strikt beter is op de
- * anti-hallucinatie-as: must-not 10→9 (fixte injection-prompt, 0 nieuwe slugs),
- * meta_talk 26→14, too_curt 11.5%→10.0%, production_ready 37.9%→40.0%, factual
- * vlak. Overall judge +0.02 (binnen noise); out_of_corpus −0.10 binnen run-to-run
- * noise. v0.7.1/v0.7.2 blijven append-only in de registry voor vergelijking.
+ * Gepromoveerd naar v0.8.1 (2026-05-25) na de clean re-eval (v0.7.3 vs v0.8.1,
+ * gelijke run, n=186). v0.8.1 lost zijn doel — name-echo history-entiteit-
+ * adoptie — deterministisch op: mark-visser en roel-rb gingen van must-not-
+ * violation → CLEAN, injection-ignore 1→0, planted_fact-bucket 2.91→3.39 met
+ * pairwise-voorkeur voor v0.8.1 (50% vs 32%, n=22). Must-not 11→8 met 0 nieuwe
+ * violations; resterende violations zitten buiten v0.8.1's scope (false_premise,
+ * hard-fact) of zijn deny-by-naming meetartefacten (companion-frank weigert
+ * correct). Aggregaat-deltas vallen binnen de multi-run noise — verwacht voor
+ * een ingreep op ~5 cases; de must-not-fix is deterministisch en dus niet
+ * noise-afhankelijk. v0.7.3 blijft byte-identiek + append-only voor vergelijking.
+ * Bekende residu's (v0.8.2-kandidaat): brand-name (hetzner) en pronoun-adoptie.
  */
-export const LATEST_BOT_VERSION = V0_7_3.version;
+export const LATEST_BOT_VERSION = V0_8_1.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
