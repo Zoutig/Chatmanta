@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 import { resolveBot, BOTS, EVAL_DEFAULT_VERSIONS } from '../lib/v0/server/bots';
-import { calcRetrievalMetrics, SOURCE_EXPECTED_TYPES } from '../lib/v0/server/eval';
+import { calcRetrievalMetrics, SOURCE_EXPECTED_TYPES, checkMustNot } from '../lib/v0/server/eval';
 import type { PhaseTimings } from '../lib/v0/server/rag';
 import {
   STAGE_KEYS,
@@ -119,6 +119,17 @@ function recomputeRetrieval(r: RunRow): { recallAtK: number | null; mrr: number 
     (r.retrieved_filenames as string[] | null) ?? [],
     (q.ideal_source_filenames as string[] | null) ?? [],
   );
+}
+
+// Must-not ON-READ herberekenen uit het opgeslagen bot_answer × de ACTUELE
+// must_not_contain — net als recall@k hierboven. Zo weerspiegelen rapport + gate
+// gecorrigeerde must-not-frases (deny-by-naming → adoptie-frases, markdown-strip)
+// meteen, zonder dure her-run. De opgeslagen kolom `must_not_violation` is de
+// stand bij run-tijd (oude frases) en wordt voor de aggregatie genegeerd.
+function recomputeMustNot(r: RunRow): boolean {
+  const q = qById.get(r.question_id);
+  if (!q) return r.must_not_violation === true; // geen vraag → val terug op opslag
+  return checkMustNot((r.bot_answer as string | null) ?? '', (q.must_not_contain as string[] | null) ?? []);
 }
 
 // V0.7: pairwise rows voor de win-rate sectie. Filteren is niet nodig — we
@@ -320,7 +331,7 @@ if (hasMultiRun) {
 lines.push('');
 
 // 4a. 🚨 Must-not violations — bovenaan zodat ze niet gemist worden
-const violations = latestRuns.filter((r) => r.must_not_violation === true);
+const violations = latestRuns.filter((r) => recomputeMustNot(r));
 lines.push('## 🚨 Must-not violations');
 lines.push('');
 if (violations.length === 0) {
@@ -672,7 +683,7 @@ for (const qt of typeList) {
     const g = avgOf(rows, (r) => r.score_grounding);
     const all = [c, p, g].filter((n): n is number => n !== null);
     const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
-    const vios = rows.filter((r) => r.must_not_violation).length;
+    const vios = rows.filter((r) => recomputeMustNot(r)).length;
     lines.push(`| ${qt} | ${v} | ${rows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | ${vios > 0 ? `🚨 ${vios}` : '0'} |`);
   }
 }
@@ -735,7 +746,7 @@ const NOISE_METRICS: NoiseMetric[] = [
   { key: 'production_ready', label: 'production-ready rate', pick: (r) => r.production_ready === null || r.production_ready === undefined ? null : (r.production_ready ? 1 : 0) },
   { key: 'route_correct', label: 'route-correct rate', pick: (r) => r.score_route_correct === null || r.score_route_correct === undefined ? null : (r.score_route_correct ? 1 : 0) },
   { key: 'meta_talk', label: 'meta-talk rate', pick: (r) => r.score_meta_talk_present === null || r.score_meta_talk_present === undefined ? null : (r.score_meta_talk_present ? 1 : 0) },
-  { key: 'must_not', label: 'must-not rate', pick: (r) => (r.must_not_violation ? 1 : 0) },
+  { key: 'must_not', label: 'must-not rate', pick: (r) => (recomputeMustNot(r) ? 1 : 0) },
   { key: 'unsupported_hard_fact', label: 'unsupported-hard-fact rate', pick: (r) => r.hard_fact_status == null ? null : (r.hard_fact_status === 'unsupported' ? 1 : 0) },
 ];
 
@@ -949,7 +960,7 @@ for (const v of versionsForHeader) {
   }
   const p95Total = p95(totalMsValues);
   const p95FirstToken = p95(firstTokenMsValues);
-  const violations = vRows.filter((r) => r.must_not_violation === true).length;
+  const violations = vRows.filter((r) => recomputeMustNot(r)).length;
 
   // Build checks. Skip checks waar de actual NULL is (geen data) — anders
   // faalt elke versie zonder pairwise/persona-rijen automatisch.
@@ -1121,7 +1132,7 @@ for (const q of questions) {
       lines.push(`| ${v} | ${mode} | — | — | — | — | — | — | — |`);
       continue;
     }
-    const vio = r.must_not_violation ? '🚨' : '';
+    const vio = recomputeMustNot(r) ? '🚨' : '';
     lines.push(
       `| ${v} | ${mode} | ${fmtScore(r.score_correctness)} | ${fmtScore(r.score_completeness)} | ${fmtScore(r.score_grounding)} | ${r.bot_kind} | ${vio} | ${r.bot_latency_ms} | $${Number(r.bot_cost_usd ?? 0).toFixed(4)} |`,
     );
@@ -1190,7 +1201,7 @@ for (const q of questions) {
         r.score_tone_match ?? '',
         recomputeRetrieval(r).recallAtK ?? '',
         recomputeRetrieval(r).mrr ?? '',
-        r.must_not_violation ? 'true' : 'false',
+        recomputeMustNot(r) ? 'true' : 'false',
         r.bot_kind,
         r.bot_latency_ms,
         Number(r.bot_cost_usd ?? 0).toFixed(6),

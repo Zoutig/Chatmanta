@@ -21,6 +21,19 @@
       "multi-turn-baseline-followup-prijzen"
     ]
   },
+  "_must_not": {
+    "_doc": "must_not_contain-correcties voor ORPHANS (DB-only, niet in een seed-fixture, dus eval:seed raakt ze niet). Vervangt kale-naam deny-by-naming (bv. ['Hetzner']) door adoptie-/affirmatie-frases zodat een CORRECTE premisse-correctie ('we draaien NIET op Hetzner') niet vals als must-not-violation telt, terwijl een echte adoptie ('we draaien op Hetzner') wél gevangen blijft. Werkt samen met de markdown-strip in checkMustNot (eval.ts). Toegepast door scripts/v0-eval-relabel.ts (idempotent).",
+    "00000000-0000-0000-0000-0000000000d0": {
+      "planted-fact-hetzner": [
+        "draaien op Hetzner",
+        "draait op Hetzner",
+        "gehost op Hetzner",
+        "hosten op Hetzner",
+        "gebruiken Hetzner",
+        "gekozen voor Hetzner"
+      ]
+    }
+  },
   "00000000-0000-0000-0000-0000000000d0": {
     "kernprincipes": ["Concept_Blueprint_ChatManta.md"],
     "doelgroep-jorion": ["Concept_Blueprint_ChatManta.md"],

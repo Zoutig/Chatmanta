@@ -58,9 +58,12 @@ async function main(): Promise<void> {
     fail(`Kon ${path} niet lezen/parsen: ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  // Org-blokken = alle top-level keys behalve _meta en _legacy (die laatste is
-  // een aparte slug-lijst die een tag zet, geen ideal_source_filenames-correctie).
-  const orgIds = Object.keys(raw).filter((k) => k !== '_meta' && k !== '_legacy');
+  // Org-blokken = alle top-level keys behalve de speciale blokken. _legacy zet
+  // een tag; _must_not corrigeert must_not_contain op orphans. Beide zijn geen
+  // ideal_source_filenames-correctie.
+  const orgIds = Object.keys(raw).filter(
+    (k) => k !== '_meta' && k !== '_legacy' && k !== '_must_not',
+  );
   let updated = 0;
   let unchanged = 0;
   let notFound = 0;
@@ -169,6 +172,55 @@ async function main(): Promise<void> {
     }
   }
 
+  // --- must_not_contain correctie-pass (orphans) ------------------------------
+  // Vervangt must_not_contain op DB-only orphans (niet in een fixture, dus
+  // eval:seed raakt ze niet). Idempotent; raakt alleen eval_questions.must_not_contain.
+  let mnUpdated = 0;
+  let mnUnchanged = 0;
+  let mnNotFound = 0;
+  const mnBlock = raw['_must_not'];
+  if (mnBlock && typeof mnBlock === 'object') {
+    for (const [orgId, slugs] of Object.entries(mnBlock as Record<string, unknown>)) {
+      if (orgId === '_doc') continue;
+      if (typeof slugs !== 'object' || slugs === null) fail(`_must_not/${orgId} is geen object`);
+      for (const [slug, phrases] of Object.entries(slugs as Record<string, unknown>)) {
+        if (!Array.isArray(phrases) || !phrases.every((p) => typeof p === 'string')) {
+          fail(`_must_not/${orgSlug(orgId)}/${slug} is geen string-array`);
+        }
+        const { data: rows, error: selErr } = await sb
+          .from('eval_questions')
+          .select('id, must_not_contain')
+          .eq('organization_id', orgId)
+          .eq('slug', slug);
+        if (selErr) fail(`must_not select ${orgSlug(orgId)}/${slug}: ${selErr.message}`);
+        if (!rows || rows.length === 0) {
+          console.log(`  ⚠ must_not niet gevonden: ${orgSlug(orgId)}/${slug} (geen rij in eval_questions)`);
+          mnNotFound++;
+          continue;
+        }
+        for (const row of rows) {
+          const current = (row.must_not_contain as string[] | null) ?? [];
+          if (eqFilenames(current, phrases as string[])) {
+            mnUnchanged++;
+            continue;
+          }
+          console.log(
+            `  ${dryRun ? '→' : '✓'} must_not ${orgSlug(orgId)}/${slug}: ` +
+              `${JSON.stringify(current)} → ${JSON.stringify(phrases)}`,
+          );
+          if (!dryRun) {
+            const { error: updErr } = await sb
+              .from('eval_questions')
+              .update({ must_not_contain: phrases })
+              .eq('id', row.id as string);
+            if (updErr) fail(`must_not update ${orgSlug(orgId)}/${slug}: ${updErr.message}`);
+          }
+          mnUpdated++;
+        }
+      }
+    }
+  }
+
   console.log('');
   console.log('───────────────────────────────────────────────────────────');
   console.log(
@@ -178,6 +230,10 @@ async function main(): Promise<void> {
   console.log(
     `legacy-tag: ${tagged} ${dryRun ? 'zou taggen' : 'getagd'} · ` +
       `${tagUnchanged} al legacy · ${tagNotFound} niet gevonden`,
+  );
+  console.log(
+    `must_not: ${mnUpdated} ${dryRun ? 'zou wijzigen' : 'gewijzigd'} · ` +
+      `${mnUnchanged} al goed · ${mnNotFound} niet gevonden`,
   );
   if (dryRun) console.log('DRY RUN — niets geschreven. Run zonder --dry om toe te passen.');
   console.log('───────────────────────────────────────────────────────────');
