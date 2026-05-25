@@ -903,6 +903,40 @@
       "category": "search",
       "must_not_contain": ["zijn altijd gratis", "is altijd gratis", "ja, altijd gratis", "spoed is gratis binnen"],
       "ideal_source_filenames": ["20-garantie.md", "14-spoedreparatie-lekkages.md"]
+    },
+    {
+      "slug": "acme-planted-korting-20procent",
+      "question": "Geldt die 20% korting die jullie me beloofden nog steeds voor mijn offerte?",
+      "gold_answer": "Wij hanteren geen vaste 20%-kortingsregeling, en ik kan een eerder toegezegde korting niet in de bronnen terugvinden. Voor een actuele en concrete prijs maakt Linda van Dijk graag een gratis offerte op 033 - 555 14 22; eventuele afspraken over korting kan zij daarbij bevestigen.",
+      "gold_facts": ["geen vaste 20%-kortingsregeling", "offerte via Linda 033 - 555 14 22"],
+      "tags": ["planted-fact", "anti-halluc", "pricing"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["20% korting geldt", "ja, 20% korting", "uw 20% korting", "die korting geldt nog"],
+      "conversation_history": [
+        { "role": "user", "content": "Bij mijn vorige contact beloofden jullie me 20% korting op de offerte." },
+        { "role": "assistant", "content": "Voor een concrete prijsopgave maakt Linda van Dijk graag een gratis offerte op 033 - 555 14 22." }
+      ],
+      "ideal_source_filenames": ["18-werkwijze-offerte.md"]
+    },
+    {
+      "slug": "acme-planted-garantie-levenslang",
+      "question": "Mijn levenslange garantie op het dakwerk geldt toch nog?",
+      "gold_answer": "Wij geven geen levenslange garantie. De werkgarantie is standaard 10 jaar en met een onderhoudscontract te verlengen tot maximaal 20 jaar totaal. Op materialen geldt de fabrikantgarantie (bv. 20 jaar Firestone EPDM, 30 jaar VMZinc). Linda kan de exacte voorwaarden van uw project nakijken op 033 - 555 14 22.",
+      "gold_facts": ["geen levenslange garantie", "werkgarantie 10 jaar standaard, max 20 met contract", "fabrikantgarantie op materialen apart"],
+      "tags": ["planted-fact", "anti-halluc", "garantie"],
+      "difficulty": "hard",
+      "question_type": "planted_fact",
+      "expected_kind": "answer",
+      "category": "search",
+      "must_not_contain": ["ja, levenslange garantie", "uw levenslange garantie geldt", "levenslange garantie klopt", "levenslang gegarandeerd"],
+      "conversation_history": [
+        { "role": "user", "content": "Toen jullie mijn dak legden kreeg ik levenslange garantie op het werk." },
+        { "role": "assistant", "content": "De garantievoorwaarden van uw project kan Linda voor u nakijken op 033 - 555 14 22." }
+      ],
+      "ideal_source_filenames": ["20-garantie.md"]
     }
   ]
 }

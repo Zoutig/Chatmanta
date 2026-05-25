@@ -259,6 +259,17 @@ export type BotConfig = {
    */
   hardFactNumericFallback?: boolean;
   /**
+   * v0.8.1: anti-adoptie. Na generatie detecteert de pipeline of een
+   * entiteit (persoonsnaam) die de user in de chat-history introduceerde —
+   * en die NIET in de retrieval-sources voorkomt — tóch in het antwoord
+   * verschijnt (= mogelijke adoptie van een geplant onwaar feit). Zo ja:
+   * voed de BESTAANDE claim-regenerate-trigger (Stage 15) als extra OR-term,
+   * met een instructie de onbevestigde entiteit niet over te nemen. Geen
+   * nieuwe parallelle gate; vereist bot.claimRegenerateEnabled om effect te
+   * hebben. Default false/undefined → identiek aan v0.7.3 (append-only).
+   */
+  historyEntityVerification?: boolean;
+  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
@@ -977,6 +988,22 @@ const V0_7_3: BotConfig = {
   systemPrompt: V0_6.systemPrompt + V0_7_3_OUTPUT_RULES_BLOCK,
 };
 
+// v0.8.1 — data-driven candidate uit de v0.8.0-baseline. De baseline toonde
+// planted_fact adoptie als dominante genuine failure-mode: de bot neemt een
+// in de chat-history geplante persoonsnaam over ("Ja, je kunt afspreken met
+// Mark Visser") i.p.v. te corrigeren. v0.8.1 zet historyEntityVerification aan:
+// detecteert zo'n adoptie post-generatie en voedt de BESTAANDE claim-
+// regenerate-trigger. Geen pipeline-/prompt-herstructurering; v0.7.3 blijft
+// byte-identiek. KANDIDAAT — promotie naar LATEST pas na schone re-eval.
+const V0_8_1: BotConfig = {
+  ...V0_7_3,
+  version: 'v0.8.1',
+  label: 'v0.8.1 — anti-adoptie (history-entiteit)',
+  description:
+    'v0.7.3 plus historyEntityVerification: detecteert of de bot een persoonsnaam/entiteit uit de chat-history overneemt die niet in de bronnen staat (planted_fact adoptie), en triggert daarop de bestaande claim-regenerate met een anti-adoptie-instructie. Consolidatie in de bestaande verify/regenerate-laag — geen parallelle gate, geen prompt-only fix. v0.7.3 byte-identiek.',
+  historyEntityVerification: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -990,6 +1017,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_7_1.version]: V0_7_1,
   [V0_7_2.version]: V0_7_2,
   [V0_7_3.version]: V0_7_3,
+  [V0_8_1.version]: V0_8_1,
 };
 
 /**
@@ -1014,6 +1042,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_7_1.version,
   V0_7_2.version,
   V0_7_3.version,
+  V0_8_1.version,
 ];
 
 /**

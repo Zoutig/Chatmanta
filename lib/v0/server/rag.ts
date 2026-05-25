@@ -1035,6 +1035,15 @@ export type V03Extras = {
     shouldGenerateFollowupsInline: boolean;
     reasonCodes: string[];
   };
+  /**
+   * v0.8.1 — anti-adoptie telemetrie. Lijst van entiteiten (persoonsnamen) die
+   * de user in de chat-history introduceerde, niet in de sources staan, maar
+   * tóch in (de eerste poging van) het antwoord verschenen. Niet-leeg =
+   * mogelijke adoptie van een geplant feit; triggert claim-regenerate.
+   * Alleen aanwezig wanneer bot.historyEntityVerification aan stond én er iets
+   * gedetecteerd is.
+   */
+  adoptedHistoryEntities?: string[];
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -2353,6 +2362,28 @@ KRITISCHE FORMAT-REGELS:
     stopVerify();
   }
 
+  // v0.8.1 anti-adoptie: detecteer of de bot een persoonsnaam/entiteit uit de
+  // chat-history heeft overgenomen die NIET in de sources staat (= mogelijke
+  // adoptie van een geplant feit). Pure, goedkope check; voedt straks de
+  // BESTAANDE claim-regenerate-trigger. Alleen bij historyEntityVerification.
+  let adoptedHistoryEntities: string[] = [];
+  if (bot.historyEntityVerification === true && history.length > 0) {
+    try {
+      const { detectAdoptedHistoryEntities } = await import('./history-entities');
+      const historyUserContents = history
+        .filter((t) => t.role === 'user')
+        .map((t) => t.content);
+      const sourceTexts = final.slice(0, used).map((c) => c.parent_content ?? c.content);
+      adoptedHistoryEntities = detectAdoptedHistoryEntities(
+        historyUserContents,
+        finalAnswerText,
+        sourceTexts,
+      );
+    } catch (err) {
+      console.warn('[history-entity verification] failed:', err);
+    }
+  }
+
   // V0.4: followups draaien hier nog NIET. We yielden eerst answer-done met
   // alle data exclusief followups, daarna pas (na een aparte status+yield)
   // de followups-done en metrics-done events. Dit haalt ~0.8s p50 van de
@@ -2446,6 +2477,10 @@ KRITISCHE FORMAT-REGELS:
             },
           }
         : {}),
+      // v0.8.1 anti-adoptie telemetrie — alleen bij detectie.
+      ...(adoptedHistoryEntities.length > 0
+        ? { adoptedHistoryEntities: [...adoptedHistoryEntities] }
+        : {}),
       // V0.5 latency-budget — alleen aanwezig als minimaal één fase werd
       // overgeslagen. Bij empty skippedPhases = budget niet overschreden.
       ...(skippedPhases.length > 0
@@ -2509,9 +2544,13 @@ KRITISCHE FORMAT-REGELS:
     claimConfidence < bot.claimRegenerateThreshold;
   const unsupportedHardFact =
     bot.adaptiveHardFactVerification === true && hardFactSupported === false;
+  // v0.8.1 — derde OR-term: de bot nam een history-entiteit over die niet in
+  // de bronnen staat. Voegt toe aan de bestaande trigger (OR blijft OR).
+  const unsupportedHistoryEntity =
+    bot.historyEntityVerification === true && adoptedHistoryEntities.length > 0;
   if (
     bot.claimRegenerateEnabled &&
-    (lowClaimConfidence || unsupportedHardFact) &&
+    (lowClaimConfidence || unsupportedHardFact || unsupportedHistoryEntity) &&
     claimsList && claimsList.length > 0 &&
     (withinBudget() || markSkipped('claimRegenerate'))
   ) {
@@ -2521,6 +2560,10 @@ KRITISCHE FORMAT-REGELS:
 Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of bijna letterlijk in de aangeleverde chunks staan. Bij twijfel of een feit echt in de context staat: laat het feit weg. Liever een korter, voorzichtiger antwoord dan een antwoord met onverifieerbare claims.${
       unsupportedHardFact && missingHardFacts && missingHardFacts.length > 0
         ? `\n\nSpecifiek: in de vorige poging stonden harde feiten die NIET in de bronnen zijn terug te vinden (${missingHardFacts.slice(0, 5).join(', ')}). Laat zulke bedragen/datums/aantallen/contactgegevens weg of vervang ze met een algemeen "neem contact op voor exacte details".`
+        : ''
+    }${
+      unsupportedHistoryEntity
+        ? `\n\nLet op: in de vorige poging nam je een naam/entiteit over die de GEBRUIKER noemde maar die NIET in de bronnen voorkomt (${adoptedHistoryEntities.slice(0, 5).join(', ')}). Wat de gebruiker beweert is GEEN feit uit de kennisbasis. Bevestig die persoon/entiteit niet en doe er geen toezeggingen over; zeg eerlijk dat je deze niet in de gegevens terugvindt en verwijs naar de juiste route (bv. receptie/contact).`
         : ''
     }`;
     try {
@@ -2591,7 +2634,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       // bot.knowledgeGapLogging, anders blijft gapKind undefined.
       const gapKindForRegenerate: 'low_grounding' | 'low_confidence' | undefined =
         bot.knowledgeGapLogging
-          ? unsupportedHardFact
+          ? unsupportedHardFact || unsupportedHistoryEntity
             ? 'low_grounding'
             : 'low_confidence'
           : undefined;
