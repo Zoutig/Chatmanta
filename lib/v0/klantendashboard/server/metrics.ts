@@ -11,8 +11,7 @@ import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getWebsiteState } from '@/lib/v0/server/crawler';
 import { getOrgSettings } from './settings';
-import { countUnansweredThreads } from './conversations';
-import { getHelpfulnessRate } from './feedback';
+import { countUnansweredThreads, getConversationSuccessRate } from './conversations';
 import type {
   OverviewMetrics,
   UnansweredQuestion,
@@ -72,7 +71,7 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
       countConversationsThisMonth(orgId),
       getWebsiteState(orgId).then((s) => s.pages).catch(() => []),
       getOrgSettings(orgSlug),
-      getHelpfulnessRate(orgSlug),
+      getConversationSuccessRate(orgSlug),
       getConversationsWeekDelta(orgId),
       getConversationsTrend(orgId),
       getWeeklyAnswerSplit(orgId),
