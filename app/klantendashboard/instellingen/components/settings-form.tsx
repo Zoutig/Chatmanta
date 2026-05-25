@@ -74,13 +74,6 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
             onChange={(e) => update('chatbotName', e.target.value)}
           />
         </Field>
-        <Field label="Bedrijfsnaam">
-          <input
-            className="klant-input"
-            value={s.companyName}
-            onChange={(e) => update('companyName', e.target.value)}
-          />
-        </Field>
         <Field label="Korte bedrijfsomschrijving" hint="Eén of twee zinnen — gebruikt in de system-prompt zodat de bot context heeft.">
           <textarea
             className="klant-textarea"
@@ -130,38 +123,10 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
         </Field>
         <Toggle
           label="Automatisch taal herkennen"
-          help="Detecteer de taal van de bezoeker en antwoord in die taal."
+          help="Aan: als een bezoeker in een andere taal schrijft, antwoordt de bot in die taal. Uit: de bot blijft altijd in de hoofdtaal."
           value={s.autoDetectLanguage}
           onChange={(v) => update('autoDetectLanguage', v)}
         />
-        <Field label="Extra talen" hint="Welke andere talen mag de chatbot ook gebruiken?">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {(['nl', 'en', 'de', 'fr', 'es'] as Language[])
-              .filter((l) => l !== s.primaryLanguage)
-              .map((l) => {
-                const active = s.extraLanguages.includes(l);
-                return (
-                  <button
-                    type="button"
-                    key={l}
-                    onClick={() =>
-                      update(
-                        'extraLanguages',
-                        active
-                          ? s.extraLanguages.filter((x) => x !== l)
-                          : [...s.extraLanguages, l],
-                      )
-                    }
-                    className="klant-btn"
-                    data-variant={active ? 'primary' : 'ghost'}
-                    style={{ fontSize: 12, padding: '5px 10px' }}
-                  >
-                    {LANG_LABEL[l]}
-                  </button>
-                );
-              })}
-          </div>
-        </Field>
       </Section>
 
       {/* Tone of voice */}
@@ -291,6 +256,20 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
           value={s.honestAboutUnknown}
           onChange={(v) => update('honestAboutUnknown', v)}
         />
+        {s.honestAboutUnknown && (
+          <Field
+            label="Formulering bij twijfel"
+            hint="Wat zegt de bot wanneer hij iets niet zeker weet? Leeg laten = generieke 'ik weet het niet zeker'-formulering."
+          >
+            <textarea
+              className="klant-textarea"
+              value={s.unknownAnswerMessage}
+              onChange={(e) => update('unknownAnswerMessage', e.target.value)}
+              rows={2}
+              placeholder="Bijv. 'Daar kan ik niet zeker antwoord op geven. Wil je dat ik je doorverwijs naar een collega?'"
+            />
+          </Field>
+        )}
       </Section>
 
       {/* Fallback & contact */}

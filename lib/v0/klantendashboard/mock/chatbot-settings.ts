@@ -12,7 +12,6 @@ import type { ChatbotSettings } from '../types';
 const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
   'dev-org': {
     chatbotName: 'Demo Bot',
-    companyName: 'Demo Organisatie',
     companyDescription: 'Sandbox-org voor RAG-tuning en demo\'s.',
     welcomeMessage: 'Hoi! Stel je vraag, ik kijk wat ik kan vinden.',
     starterQuestions: [
@@ -22,7 +21,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: true,
-    extraLanguages: ['en'],
     toneOfVoice: 'friendly',
     extraInstructions:
       'Antwoord vriendelijk en duidelijk. Houd antwoorden kort. Verwijs bij twijfel naar onze contactpagina.',
@@ -41,7 +39,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
   },
   'acme-corp': {
     chatbotName: 'Dakwerken-assistent',
-    companyName: 'Dakwerken De Boer',
     companyDescription:
       'Familiebedrijf voor dakreparaties, dakvervanging en lekkage-onderzoek in Noord-Holland.',
     welcomeMessage:
@@ -53,7 +50,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: false,
-    extraLanguages: [],
     toneOfVoice: 'professional',
     extraInstructions:
       'Spreek de klant aan met "u". Verwijs voor concrete offertes altijd door naar onze contactpagina.',
@@ -72,7 +68,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
   },
   'globex-inc': {
     chatbotName: 'FysioPlus chat-assistent',
-    companyName: 'FysioPlus Utrecht',
     companyDescription:
       'Fysiotherapie-praktijk in Utrecht-Oost. Algemene fysio, sportfysio en manuele therapie.',
     welcomeMessage:
@@ -84,7 +79,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: true,
-    extraLanguages: ['en'],
     toneOfVoice: 'friendly',
     extraInstructions:
       'Wees warm en geruststellend. Voor medische vragen altijd doorverwijzen naar een fysiotherapeut of huisarts.',
@@ -103,7 +97,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
   },
   initech: {
     chatbotName: 'Bakker & Vermeer · adviesbot',
-    companyName: 'Bakker & Vermeer Accountants',
     companyDescription:
       'Accountantskantoor voor MKB-ondernemers en particulieren. Administratie, belastingen en advies.',
     welcomeMessage:
@@ -115,7 +108,6 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: false,
-    extraLanguages: [],
     toneOfVoice: 'professional',
     extraInstructions:
       'Wees zakelijk en nauwkeurig. Geef geen fiscaal advies dat afhangt van persoonlijke situatie — verwijs door.',
