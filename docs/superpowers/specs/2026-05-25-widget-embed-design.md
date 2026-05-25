@@ -25,10 +25,13 @@ bestaat (zie `app/klantendashboard/widget/components/widget-form.tsx:58` en
 - `proxy.ts`: `/embed` en `/api/v0/chat` uit de wachtwoord-redirect halen; de chat-route
   doet voortaan zelf dual-auth (cookie OF token).
 - De klantendashboard-snippet (`widget-form.tsx`) werkend + origin-aware maken.
+- **Echte installatie-detectie** via heartbeat-ping: de embed-iframe pingt bij load;
+  de Live-status in het dashboard toont echte `lastSeenAt` + domein i.p.v. mock.
 
 **Expliciet buiten scope (YAGNI / V1):**
 - `app/components/embed-view.tsx` (V0-admin right-panel preview) — blijft ongewijzigd.
-- Echte installatie-detectie ("Gevonden op website" / "Installatie testen") — blijft mock.
+- Server-side actieve probe (server fetcht de klant-URL en grept de snippet) — fragiel
+  (CORS/SSR/CSR), niet nodig: de ping-heartbeat bewijst installatie betrouwbaarder.
 - CORS + per-chatbot public token + origin-allowlist als productie-model — V1 Fase 6/7.
 - Per-org dag-budget (EUR) — V1 (V0 verzamelt alleen telemetrie).
 - Productie-CDN (`cdn.chatmanta.nl`). De loader wordt vanaf de app-origin geserveerd.
@@ -43,14 +46,19 @@ Externe klant-pagina (bv. test.html op file:// of evil-ander-domein.nl)
      injecteert <iframe src="https://<origin>/embed/acme-corp">  ── same-origin t.o.v. de API
        │
        ▼  (in de iframe, op chatmanta's origin)
-     /embed/[slug]  →  rendert <ChatMantaWidget orgSlug="acme-corp" ...>
+     /embed/[slug]?h=<parent-host>  →  rendert <ChatMantaWidget orgSlug="acme-corp" ...>
                        + injecteert kortlevend embed-token (server-side)
+       │  bij load  → POST /api/v0/widget/ping  (token + parent-host)  ── heartbeat
        │  FAB open/dicht → postMessage({type:'chatmanta:resize', state}) → parent
        ▼
      widget chat-fetch  POST /api/v0/chat?org=acme-corp
                         header: x-chatmanta-embed: <token>
                         (same-origin → geen CORS)
 ```
+
+De loader geeft de host van de parent-pagina mee als query-param `?h=` op de iframe-src
+(display-only telemetrie, niet security-kritisch). De embed-pagina leest die en stuurt 'm
+mee in de ping zodat het dashboard kan tonen op welk domein de widget draait.
 
 Waarom iframe: hergebruikt 100% de bestaande React-widget, geeft CSS/JS-isolatie op de
 klant-site (geen stijl-botsingen), en houdt de chat-fetch *same-origin* (geen CORS).
@@ -121,6 +129,32 @@ Dit is het patroon van Intercom/Crisp/Drift.
 - `data-org=<slug>` i.p.v. de niet-resolvebare `data-chatbot-id`-UUID.
 - `workspaceId`-prop → vervangen door de org-slug (uit `activeOrg.slug`).
 
+### 4.8 Installatie-detectie (heartbeat-ping)
+- **`WidgetSettings`-type uitbreiden** (`lib/v0/klantendashboard/types.ts`, geen migration —
+  jsonb partial-merge): `lastSeenAt: string | null` (laatste ping) + `installOrigin: string | null`
+  (host waar gezien). Mock-defaults (`lib/v0/klantendashboard/mock/widget-settings.ts`) → beide `null`.
+- **`app/api/v0/widget/ping/route.ts` (nieuw, publiek pad):**
+  - Zelfde gate als chat: rate-limit (per-IP) → embed-token + origin-lock; faalt → 401, geen write.
+  - Body: `{ host?: string }` (de parent-host uit `?h=`). Validatie: max 255 chars, alleen
+    hostname-tekens; anders genegeerd (`installOrigin` blijft ongewijzigd).
+  - Schrijft via `saveWidgetSettings(slug, { lastSeenAt: nowIso, installOrigin: host ?? prev, isInstalled: true })`.
+  - Response 204 (geen body). Cheap: geen LLM, één jsonb-upsert.
+- **Embed-pagina pingt bij load** (`app/embed/[slug]`): client-glue doet één
+  `fetch('/api/v0/widget/ping', { method:'POST', headers:{'x-chatmanta-embed':token}, body: JSON.stringify({host}) })`
+  na mount. `host` uit `new URLSearchParams(location.search).get('h')`. Best-effort (fouten geslikt).
+
+### 4.9 Live-status echt maken (`widget-form.tsx` + server-action)
+- **`checkWidgetInstallationAction()` (nieuw, `app/klantendashboard/actions.ts`):** leest
+  settings, berekent `installed = lastSeenAt !== null && (now - lastSeenAt) < WINDOW`
+  (`WINDOW` = `WIDGET_INSTALL_FRESHNESS_SEC`, default 7 dagen). Persisteert
+  `{ isInstalled: installed, lastCheckedAt: nowIso }` zodat de status niet eeuwig "Ja" blijft
+  als de widget weken niet gezien is. Returnt `{ isInstalled, lastSeenAt, installOrigin, lastCheckedAt }`.
+- **`widget-form.tsx` Live-status sectie:** "Installatie testen"-knop roept
+  `checkWidgetInstallationAction()` aan (i.p.v. de mock `persist({isInstalled:true,...})`).
+  Toon `installOrigin` als extra cel ("Gezien op: jouwwebsite.nl") wanneer aanwezig.
+  "Gevonden op website" + StatusBadge + "Laatste check" lezen voortaan de echte returnwaarde.
+- `isActive` (pauzeren/activeren) blijft een gewone settings-write zoals nu.
+
 ## 5. Beveiligingsmodel (samenvatting)
 
 | Laag | Wat | Tegen |
@@ -140,6 +174,7 @@ rate-limited. V1 vervangt dit door origin-allowlist + per-chatbot token + dag-bu
 - `EMBED_TOKEN_TTL_SEC` (optioneel, default 1800)
 - `USE_UPSTASH=true` + `UPSTASH_REDIS_REST_URL` / `_TOKEN` (aanbevolen vóór prod-blootstelling)
 - `INJECTION_MODE=block` (optioneel scherper op het publieke pad)
+- `WIDGET_INSTALL_FRESHNESS_SEC` (optioneel, default 604800 = 7 dagen)
 
 ## 7. Error-handling
 - Chat-API zonder geldige auth → 401 `UNAUTHORIZED`; de widget toont al
@@ -156,6 +191,9 @@ rate-limited. V1 vervangt dit door origin-allowlist + per-chatbot token + dag-bu
   plakken → openen in een **incognito**-venster (geen demo-cookie) → FAB verschijnt → chat
   werkt en is gescoped op de juiste org. Daarna `curl` op `/api/v0/chat?org=...` zonder token
   → 401 bevestigen.
+- **Installatie-detectie:** met de test.html nog open → in het dashboard "Installatie testen"
+  klikken → "Gevonden op website: Ja" + "Gezien op: <host>" + verse "Laatste check". `curl` op
+  `/api/v0/widget/ping` zonder token → 401, geen state-wijziging.
 - **Regressie:** ingelogd `/widget/<slug>` chat werkt nog (cookie-pad), admin-testtool werkt nog.
 - **Build:** `next build` groen (metadata-route / outputFileTracing-valkuilen).
 
