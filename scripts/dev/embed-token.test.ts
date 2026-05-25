@@ -2,7 +2,7 @@
 //   node --env-file=.env.local --conditions=react-server --import tsx scripts/dev/embed-token.test.ts
 // Geen unit-framework in deze repo; dit script throwt bij de eerste mismatch.
 import assert from 'node:assert/strict';
-import { createEmbedToken, verifyEmbedToken } from '../../lib/v0/server/embed-token.ts';
+import { createEmbedToken, verifyEmbedToken } from '../../lib/v0/server/embed-token';
 
 // Eigen test-secret zodat de test niet van .env.local-inhoud afhangt. De module
 // leest de secret lazy (in secret()), dus zetten ná de import is voldoende.
