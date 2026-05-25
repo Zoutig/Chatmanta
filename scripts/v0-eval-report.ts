@@ -148,8 +148,23 @@ function modeKey(r: RunRow): string {
 // - latestRuns: voor de hoofdtabellen dedup op (q, v, mode) → laagste
 //   run_index (typisch 0). Zo kan een --runs=3 batch alle 3 variance-rijen
 //   bewaren maar het hoofdrapport blijft één regel per cel tonen.
+// Task 3 cleanup: dev-org pre-slim-down cruft (off-topic / algemene-kennis /
+// multi-turn-baseline) draagt de 'legacy'-tag en valt uit de héle headline-
+// aggregatie (gate, per-org, per-type, pairwise, CI noise-band, CSV). Die cases
+// testen de bot-engine niet op corpus-grounding — een off-topic/general antwoord
+// heeft per definitie geen bron en zou de grounding-gate kunstmatig drukken. De
+// rijen blijven in de DB (queryable als regressieset via tags=legacy, niet
+// verwijderd — eval_runs.question_id FK). Reports defaulten zo op de active corpus.
+const legacyQuestionIds = new Set(
+  (qRows ?? [])
+    .filter((q) => ((q.tags as string[] | null) ?? []).includes('legacy'))
+    .map((q) => q.id as string),
+);
+const activeRunRows = runRows.filter((r) => !legacyQuestionIds.has(r.question_id as string));
+const legacyRunsExcluded = runRows.length - activeRunRows.length;
+
 const latestByQuad = new Map<string, RunRow>();
-for (const r of runRows) {
+for (const r of activeRunRows) {
   const key = `${r.question_id}::${r.bot_version}::${modeKey(r)}::${r.run_index ?? 0}`;
   if (!latestByQuad.has(key)) latestByQuad.set(key, r);
 }
@@ -874,6 +889,10 @@ lines.push('');
 lines.push('Per versie: passeert deze de minimale drempels om naar betalende klanten te gaan?');
 lines.push('');
 lines.push(`> ℹ️ **Gate-scope**: alleen kandidaat-versies (\`EVAL_DEFAULT_VERSIONS\` = ${EVAL_DEFAULT_VERSIONS.join(', ')}) triggeren exit-code 1. Historische versies worden voor referentie getoond maar blokkeren de report-run niet.`);
+if (legacyRunsExcluded > 0) {
+  lines.push('');
+  lines.push(`> 🧹 **Active corpus**: ${legacyRunsExcluded} \`legacy\`-getagde dev-org run(s) (off-topic / algemene-kennis / multi-turn-baseline pre-slim-down cruft) zijn uit deze aggregatie gesloten. Ze blijven in de DB als regressieset (queryable via \`tags=legacy\`).`);
+}
 lines.push('');
 
 type ThresholdCheck = {

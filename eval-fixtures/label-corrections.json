@@ -4,7 +4,22 @@
     "context": "Deze dev-org orphans dateren van vóór de V0.7 slim-down (69→17): de fixture is geslankt maar de oude rijen leven nog in eval_questions en worden nog steeds gerund. Hun ideal_source_filenames wezen naar het verouderde 'v0-sample.md'; het live DEV_ORG-corpus is de echte ChatManta self-docs, met Concept_Blueprint_ChatManta.md als canonieke spec.",
     "in_fixture_corrections": "Correcties voor vragen die WÉL in een fixture staan (7 dev-org + acme-249) zijn in de fixture-JSONs zelf gedaan en landen via `npm run eval:seed`. Dit bestand bevat alleen de orphans.",
     "format": "{ \"<organization_id>\": { \"<slug>\": [\"file.md\", ...] } }",
-    "applied_by": "scripts/v0-eval-relabel.ts (idempotent, $0, raakt alleen eval_questions.ideal_source_filenames)"
+    "applied_by": "scripts/v0-eval-relabel.ts (idempotent, $0, raakt alleen eval_questions.ideal_source_filenames + de 'legacy'-tag uit _legacy)"
+  },
+  "_legacy": {
+    "_doc": "dev-org pre-slim-down cruft (off-topic / algemene-kennis / multi-turn-baseline) die NIET de bot-engine op corpus-grounding test. Off-topic + general-knowledge antwoorden hebben per definitie geen corpus-bron → ze drukken de grounding-aggregatie kunstmatig omlaag in de klant-bereidheids-gate. Ze krijgen de 'legacy'-tag zodat reports + gate defaulten op de active corpus; de rijen blijven in eval_questions/eval_runs (queryable als regressieset, NIET verwijderd — eval_runs.question_id FK). Geen seed-fixture bevat deze slugs, dus eval:seed reset de tag niet. Toegepast door scripts/v0-eval-relabel.ts (idempotent).",
+    "00000000-0000-0000-0000-0000000000d0": [
+      "off-topic-gedicht",
+      "off-topic-hoofdstad",
+      "off-topic-rekensom",
+      "general-rag",
+      "general-saas",
+      "general-mkb",
+      "general-klantcontact",
+      "general-vector-database",
+      "multi-turn-baseline-stack",
+      "multi-turn-baseline-followup-prijzen"
+    ]
   },
   "00000000-0000-0000-0000-0000000000d0": {
     "kernprincipes": ["Concept_Blueprint_ChatManta.md"],
