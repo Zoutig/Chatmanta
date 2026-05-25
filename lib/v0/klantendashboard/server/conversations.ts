@@ -235,7 +235,7 @@ export async function getConversationSuccessRate(orgSlug: OrgSlug): Promise<Help
         .from('v0_thread_messages')
         .select('thread_id, role, position, response')
         .in('thread_id', ids)
-        .order('position', { ascending: true }),
+        .order('position', { ascending: false }),
       sb()
         .from('v0_feedback')
         .select('thread_id')
@@ -244,12 +244,17 @@ export async function getConversationSuccessRate(orgSlug: OrgSlug): Promise<Help
         .in('thread_id', ids),
     ]);
 
-    // Rijen komen oplopend op position binnen, dus de laatste overschrijving per
-    // thread is het laatste assistant-antwoord (zelfde patroon als listConversations).
-    const lastResponseByThread = new Map<string, { kind?: string } | undefined>();
+    // Rijen komen aflopend op position binnen, dus de EERSTE assistant-rij die we
+    // per thread zien is de hoogste positie = het laatste antwoord (set-if-absent).
+    // DESC i.p.v. de ASC+last-wins van listConversations: mocht een server-side
+    // row-cap de select ooit afkappen, dan vallen de láágste posities weg — niet
+    // de finale antwoorden die we hier nodig hebben. Bij V0-volumes (honderden
+    // rijen) wordt niets afgekapt; de echte schaal-fix is de SQL-aggregatie bij V1.
+    const lastResponseByThread = new Map<string, { kind?: string }>();
     for (const r of msgRes.data ?? []) {
-      if (r.role === 'assistant' && r.response) {
-        lastResponseByThread.set(r.thread_id as string, r.response as { kind?: string });
+      const tid = r.thread_id as string;
+      if (r.role === 'assistant' && r.response && !lastResponseByThread.has(tid)) {
+        lastResponseByThread.set(tid, r.response as { kind?: string });
       }
     }
 

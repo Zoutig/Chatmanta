@@ -166,8 +166,10 @@ export default async function OverviewPage() {
         </section>
       )}
 
-      {/* Interactieve rondleiding — start automatisch bij eerste bezoek per org. */}
-      <OnboardingTour tourKey={activeOrg.slug} />
+      {/* Interactieve rondleiding — start automatisch bij eerste bezoek per org.
+          Is de checklist verborgen (alles voltooid), dan laat de tour de
+          bijhorende stap weg zodat hij niet naar een afwezig element wijst. */}
+      <OnboardingTour tourKey={activeOrg.slug} setupChecklistVisible={!allStepsDone} />
     </>
   );
 }
