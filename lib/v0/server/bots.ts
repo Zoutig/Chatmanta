@@ -1069,7 +1069,18 @@ export const BOTS: Record<string, BotConfig> = {
  * noise-afhankelijk. v0.7.3 blijft byte-identiek + append-only voor vergelijking.
  * Bekende residu's (v0.8.2-kandidaat): brand-name (hetzner) en pronoun-adoptie.
  */
-export const LATEST_BOT_VERSION = V0_8_1.version;
+// GEPROMOVEERD naar v0.9 (iter2, 2026-05-26) onder het criterium dimensie-
+// verbetering + geen regressie (niet de volledige Engine Gate). Proof-eval
+// (n=176, runs=1, judge gpt-4o): avg 3.48→3.70, Engine-gate-failures 10→6
+// (completeness/production-ready/route-correct flippen naar pass), pairwise
+// v0.9 45% vs v0.8.1 29% (n=186, +16pp). Safety VERBETERD zonder regressie:
+// zero-correctness 0.12→0.09, unsupported-hard-fact 5→3, must-not 4→4 (zelfde
+// 4 slugs, geen nieuwe violation). Geen org regredieert op absolute C/P/G.
+// Caveat: v0.9-scores zijn n=1 (aggregaat-deltas binnen-ruis) — de promotie
+// steunt op de robuuste large-n pairwise + safety-verbetering + nul regressie;
+// runs=3-herbevestiging bewust overgeslagen onder de $10-cap. v0.8.1 blijft
+// append-only behouden. Zie docs/evals/2026-05-26-v0.9-analysis.md.
+export const LATEST_BOT_VERSION = V0_9.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [

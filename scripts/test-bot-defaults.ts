@@ -154,7 +154,7 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.8.1', 'LATEST_BOT_VERSION moet v0.8.1 zijn (v0.9 gebouwd maar nog niet gepromoveerd — wacht op proof-eval)');
+assert.equal(LATEST_BOT_VERSION, 'v0.9', 'LATEST_BOT_VERSION moet v0.9 zijn (gepromoveerd iter2: dimensie-verbetering + geen regressie; pairwise +16pp, gate-failures 10→6, safety verbeterd)');
 assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9']);
 
 // v0.9 (iter2) — append-only deterministische hard-fact-weigering. Aanwezig in de
@@ -181,4 +181,4 @@ console.log(`✓ v0.7.1 = output-clarity (outputStyleVersion=v2, was 'v0.7')`);
 console.log(`✓ v0.7.2 = output-clarity tune (outputStyleVersion=v3, rebuild vanaf v0.6, geen v0.7.1-stacking)`);
 console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.7.2-blok, rebuild vanaf v0.6)`);
 console.log(`✓ v0.9 = deterministische hard-fact-weigering (hardFactDeterministicRefusal=true), v0.8.1 byte-identiek (append-only)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.8.1 (v0.9 nog niet gepromoveerd), BOT_VERSIONS_ORDERED = [v0.1..v0.9]`);
+console.log(`✓ LATEST_BOT_VERSION = v0.9 (gepromoveerd iter2), BOT_VERSIONS_ORDERED = [v0.1..v0.9]`);
