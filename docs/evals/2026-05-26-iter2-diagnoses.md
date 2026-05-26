@@ -67,3 +67,41 @@ Voeg `adaptive_decision` (of minimaal `path`) toe aan de eval-snapshot zodat fas
 De binding-gate-fail (0.46) is **geen citation-botzwakte**: de bot emitteert markers (64%) en die worden niet gestript. De 74 false-cases splitsen ~54/46 in (a) **judge-strengheid/excerpt-afkapping** (correcte gegronde antwoorden, binding=false omdat één claim buiten het afgekapte ~800-char-excerpt valt of de judge "één onvindbaar getal = false" toepast) en (b) **dezelfde grounding-zwakte** als de unsupported_claim-bucket. → Een aparte citation-botfix zou ~54% niet-bestaande "fout" proberen te repareren en ~46% dupliceren met de grounding-fix.
 
 **Optionele eval/report-fix (geen botfix, niet vannacht gebouwd):** geef de judge een langer/volledig bron-excerpt voor de binding-beoordeling, óf behandel `source-citation rate` als meet-artefact i.p.v. promotie-drempel (hij meet niet wat de naam suggereert). Dit sluit een gate-dimensie via de meetlat, niet via de bot. Vastgelegd als aanbeveling; de grounding-helft wordt door Taak 4/6 opgepakt.
+
+---
+
+## 3. `unsupported_claim` sub-taxonomy (Taak 4) — `npm run audit:subtax`
+
+**Verdict: dominant subtype `out_of_corpus_overanswer` (n=12, 3 orgs) — GO-kandidaat voor de beslisgate. Convergeert met must-not + unsupported-hard-fact + zero-correctness.**
+
+De #104-bucket `unsupported_claim` (29 cases) splitst in:
+
+| subtype | n | #orgs | orgs | types | fixwaardig? |
+|---------|---|-------|------|-------|-------------|
+| **out_of_corpus_overanswer** | **12** | **3** | dev-org, globex, initech | out_of_corpus | **JA (kandidaat)** |
+| unsupported_extra_detail | 10 | 3 | dev-org, globex, initech | 7 types (ambiguous…typo) | nee — te heterogeen (7 types) voor één fix |
+| multi_hop_synthesis_error | 4 | 3 | — | multi_hop | nee — <8 cases |
+| unknown | 4 | 2 | — | — | nee |
+| fallback_overfill | 1 | 1 | — | planted_fact | nee |
+
+### §E.5 — handmatige verificatie van het dominante subtype (out_of_corpus_overanswer)
+De judge-reasoning bevestigt dat dit **echt botgedrag** is, geen judge/label-artefact. ≥8 van de 12 zijn ondubbelzinnige hallucinaties — de bot noemt mét stelligheid + `[1]`-citatie een specifiek getal/datum op een out_of_corpus-vraag waarvan de gold = "niet beschikbaar / geen vaste structuur":
+- `v063-hardfact-v2-kwartaal` C=0 G=0 → "Q2 2026" verzonnen
+- `v063-hardfact-tarief-per-gesprek` C=0 G=0 → "€0,07" (= must-not-violation)
+- `v063-hardfact-max-doc-size` C=0 G=0 → "10 MB" (= must-not-violation)
+- `v063-hardfact-grounding-rate` C=0 G=0 → "85%" (= must-not-violation)
+- `v063-hardfact-aantal-pricing-tiers` C=0 G=0 → "vijf tiers" (= must-not-violation)
+- `v063-hardfact-launch-datum` C=1 G=0 → "2026-Q2" verzonnen
+- `v063-hardfact-api-rate-limit` C=0 G=0 → "100/30 calls" verzonnen
+- `initech-out-of-corpus-notaris` C=0 G=0 → "wij stellen oprichtingsakte op, €1450" (juridisch onjuist + verzonnen prijs)
+
+**False positives / nuance:** `globex-out-of-corpus-lymfedrainage` (C=3 G=1) en `initech-ooc-beleggingsadvies` (C=1 G=1) zijn mildere "correcte-weigering + ongegrond detail"-gevallen (dubbel getagd met unsupported_extra_detail). Kern: ~10/12 zijn echte over-answer-hallucinatie.
+
+### Convergentie (het sterke signaal)
+Dit subtype is **dezelfde faalmodus als drie gate-blockers tegelijk**: de 4 must-not-violations zitten állemaal in deze bucket, het levert het leeuwendeel van de 7 unsupported-hard-facts, en het drijft zero-correctness (de meeste cases zijn C=0). Eén effectieve fix raakt dus 3 safety/kwaliteit-dimensies in één klap. Dat is de hoogste hefboom in het hele veld.
+
+### Aandachtspunten voor de beslisgate (Taak 6)
+- **dev-org-zwaar**: 8–9/12 zijn `dev-org v063-hardfact-*`-probes (adversariële hard-fact-tests). ≥2-orgs-criterium is gehaald (initech + globex), maar de generalisatie buiten dev-org steunt op 2–3 cases. Een fix moet niet dev-org-overfitten.
+- **Laag-eis (§C)**: dit is een refusal/hallucinatie-faalmodus → **geen prompt-only fix toegestaan**; moet in een bestaande verify/regenerate/threshold-laag. Te toetsen in Taak 6/7: bestaat er één bestaande laag (hard-fact-verifier→regenerate / `reclassifyAfterZeroHits` / threshold-filter) waarin één flag-guarded wijziging ≥60% van deze bucket verklaart, zónder nieuwe parallelle gate? De cases retrieven wél chunks (geen zero-hit), dus `reclassifyAfterZeroHits` alléén dekt ze niet — de hard-fact-verifier (die ze al detecteert als "unsupported") is de meest waarschijnlijke ankerlaag.
+
+**Go/no-go:** `out_of_corpus_overanswer` = **GO-kandidaat** (≥8 cases ✓, ≥2 orgs ✓, niet-artefact ✓). De ≥60%-één-laag-toets volgt in Taak 6. Overige subtypes: no-go (te klein of te heterogeen).
