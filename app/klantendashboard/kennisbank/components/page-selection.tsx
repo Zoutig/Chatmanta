@@ -59,7 +59,7 @@ export function PageSelection({
     const open = isOpen(key);
     const allOn = us.length > 0 && us.every((u) => selected.has(u));
     return (
-      <div key={key} style={{ border: '1px solid var(--klant-border-strong)', borderRadius: 10, overflow: 'hidden' }}>
+      <div key={key} style={{ border: '1px solid var(--klant-border-strong)', borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--klant-surface-deep)' }}>
           <button type="button" onClick={() => toggleCollapse(key)} aria-label={open ? 'Inklappen' : 'Uitklappen'}
             style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--klant-fg-dim)', flexShrink: 0 }}>
@@ -120,7 +120,7 @@ export function PageSelection({
         {fLoose.length > 0 && (
           groups.length > 0
             ? groupBox('_loose', 'Losse pagina’s', fLoose)
-            : <div style={{ border: '1px solid var(--klant-border-strong)', borderRadius: 10, overflow: 'hidden' }}>{fLoose.map(row)}</div>
+            : <div style={{ border: '1px solid var(--klant-border-strong)', borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>{fLoose.map(row)}</div>
         )}
         {visibleUrls.length === 0 && (
           <div style={{ padding: '14px 12px', fontSize: 13, color: 'var(--klant-fg-dim)' }}>Geen pagina&apos;s gevonden voor “{query}”.</div>
