@@ -27,7 +27,7 @@ export type OpenJob = {
   attempts: number;
 };
 
-export type JobOutcome = { jobId: string; outcome: string };
+export type JobOutcome = { jobId: string; outcome: string; completed: number; total: number };
 
 /** Verwerkt een batch openstaande crawl-jobs. Muteert job- en bron-status. */
 export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutcome[]> {
@@ -42,7 +42,7 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
     try {
       if (!crawlId) {
         await failJob(sb, jobId, sourceId, 'Geen Firecrawl crawl-ID op de job.');
-        summary.push({ jobId, outcome: 'failed:no-crawl-id' });
+        summary.push({ jobId, outcome: 'failed:no-crawl-id', completed: 0, total: 0 });
         continue;
       }
 
@@ -51,20 +51,20 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
       if (status.status === 'scraping') {
         if (attempts + 1 >= MAX_ATTEMPTS) {
           await failJob(sb, jobId, sourceId, 'Crawl duurde te lang (timeout na max polls).');
-          summary.push({ jobId, outcome: 'failed:timeout' });
+          summary.push({ jobId, outcome: 'failed:timeout', completed: status.completed, total: status.total });
         } else {
           await sb
             .from('processing_jobs')
             .update({ status: 'processing', attempts: attempts + 1, updated_at: now() })
             .eq('id', jobId);
-          summary.push({ jobId, outcome: 'pending' });
+          summary.push({ jobId, outcome: 'pending', completed: status.completed, total: status.total });
         }
         continue;
       }
 
       if (status.status === 'failed') {
         await failJob(sb, jobId, sourceId, 'Firecrawl meldde een mislukte crawl.');
-        summary.push({ jobId, outcome: 'failed:firecrawl' });
+        summary.push({ jobId, outcome: 'failed:firecrawl', completed: 0, total: 0 });
         continue;
       }
 
@@ -74,10 +74,10 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
         .update({ status: 'completed', attempts: attempts + 1, finished_at: now(), updated_at: now(), error_message: null })
         .eq('id', jobId);
       await sb.from('knowledge_sources').update({ status: 'ready', updated_at: now() }).eq('id', sourceId);
-      summary.push({ jobId, outcome: `completed:${result.pagesCrawled}p/${result.chunks}c` });
+      summary.push({ jobId, outcome: `completed:${result.pagesCrawled}p/${result.chunks}c`, completed: status.completed, total: status.total });
     } catch (err) {
       await failJob(sb, jobId, sourceId, err instanceof Error ? err.message : 'onbekende fout');
-      summary.push({ jobId, outcome: 'failed:exception' });
+      summary.push({ jobId, outcome: 'failed:exception', completed: 0, total: 0 });
     }
   }
 

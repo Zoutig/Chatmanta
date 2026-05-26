@@ -16,7 +16,7 @@ export type SourceStatus = 'pending' | 'crawling' | 'ready' | 'failed';
 export type WebsiteState = {
   source: { id: string; rootUrl: string | null; status: SourceStatus } | null;
   /** Laatste crawl-job voor deze bron, of null als er nog nooit gecrawld is. */
-  job: { status: CrawlJobStatus; error: string | null } | null;
+  job: { status: CrawlJobStatus; error: string | null; completed: number; total: number } | null;
   pages: WebsitePage[];
 };
 
@@ -77,7 +77,7 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
       status: source.status as SourceStatus,
     },
     job: job
-      ? { status: job.status as CrawlJobStatus, error: (job.error_message as string | null) ?? null }
+      ? { status: job.status as CrawlJobStatus, error: (job.error_message as string | null) ?? null, completed: 0, total: 0 }
       : null,
     pages,
   };

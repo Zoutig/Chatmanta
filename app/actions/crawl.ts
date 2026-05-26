@@ -144,10 +144,14 @@ export async function tickCrawlIngestAction(): Promise<WebsiteState> {
     .order('created_at', { ascending: true })
     .limit(JOBS_PER_TICK);
   if (jobsError) throw jobsError;
-  if (jobs && jobs.length > 0) {
-    await processCrawlJobs(sb, jobs as OpenJob[]);
+  const outcomes = jobs && jobs.length > 0 ? await processCrawlJobs(sb, jobs as OpenJob[]) : [];
+  const state = await getWebsiteState(activeOrg.id);
+  // Merge live completed/total counts from the most recent job outcome into the state.
+  if (state.job && (state.job.status === 'pending' || state.job.status === 'processing') && outcomes.length > 0) {
+    const o = outcomes[0];
+    if (o) { state.job.completed = o.completed; state.job.total = o.total; }
   }
-  return getWebsiteState(activeOrg.id);
+  return state;
 }
 
 /** A1: zet één pagina aan/uit. Goedkoop — alleen een vlag; RPC doet de rest. */
