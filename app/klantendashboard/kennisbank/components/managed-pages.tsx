@@ -1,6 +1,6 @@
 'use client';
 import { useState, useTransition, type CSSProperties } from 'react';
-import { RefreshCw, Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2, ChevronRight, Search } from 'lucide-react';
 import {
   setPageIncludedAction, retryPageAction, deleteWebsiteSourceAction, refreshWebsiteState,
 } from '@/app/actions/crawl';
@@ -11,14 +11,31 @@ import { SinglePageImport } from './single-page-import';
 
 // Zichtbaar vinkje in dark mode: native checkboxes verdwijnen zonder accent-color.
 const checkbox: CSSProperties = { width: 16, height: 16, accentColor: 'var(--klant-accent)', cursor: 'pointer', flexShrink: 0 };
-const groupHeader: CSSProperties = { padding: '10px 12px', background: 'var(--klant-surface-deep)', fontWeight: 600, fontSize: 13, color: 'var(--klant-fg)' };
 
 export function ManagedPages({ state, onChange }: { state: WebsiteState; onChange: (s: WebsiteState) => void }) {
   const { source, pages } = state;
-  const [pending, start] = useTransition();
-  const [busyId, setBusyId] = useState<string | null>(null);
   const byUrl = new Map(pages.map((p) => [p.url, p]));
   const { groups, loose } = groupPagesForDisplay(pages.map((p) => p.url));
+  const groupKeys = groups.length > 0 ? [...groups.map((g) => g.key), ...(loose.length ? ['_loose'] : [])] : [];
+
+  const [pending, start] = useTransition();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(groupKeys));
+
+  const q = query.trim().toLowerCase();
+  const filtering = q !== '';
+  const matches = (u: string) => {
+    if (!filtering) return true;
+    const p = byUrl.get(u);
+    return u.toLowerCase().includes(q) || pathLabel(u).toLowerCase().includes(q) || (p?.title?.toLowerCase().includes(q) ?? false);
+  };
+  const isOpen = (key: string) => filtering || !collapsed.has(key);
+
+  const fGroups = groups.map((g) => ({ ...g, urls: g.urls.filter(matches) })).filter((g) => g.urls.length > 0);
+  const fLoose = loose.filter(matches);
+  const visibleCount = fGroups.reduce((n, g) => n + g.urls.length, 0) + fLoose.length;
+
   const counts = {
     active: pages.filter((p) => p.status === 'active').length,
     off: pages.filter((p) => p.status === 'disabled').length,
@@ -34,6 +51,8 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
     if (!source || !confirm('Website-bron verwijderen? Alle pagina’s gaan uit de kennisbank.')) return;
     start(async () => { await deleteWebsiteSourceAction(source.id); onChange({ source: null, job: null, pages: [] }); });
   };
+  const toggleCollapse = (key: string) => setCollapsed((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  const allCollapsed = groupKeys.length > 0 && groupKeys.every((k) => collapsed.has(k));
 
   const row = (u: string) => {
     const p = byUrl.get(u);
@@ -43,7 +62,7 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
     const secondary = realTitle ? pathLabel(p.url) : null;
     const busy = pending && busyId === p.id;
     return (
-      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: '1px solid var(--klant-border)' }}>
+      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px 9px 34px', borderTop: '1px solid var(--klant-border)' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div title={p.url} style={{ fontWeight: 500, color: 'var(--klant-fg)', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{primary}</div>
           {secondary && (
@@ -69,6 +88,18 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
     );
   };
 
+  const groupHeader = (key: string, label: string, n: number) => {
+    const open = isOpen(key);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--klant-surface-deep)', cursor: 'pointer' }}
+        onClick={() => toggleCollapse(key)}>
+        <ChevronRight size={16} style={{ color: 'var(--klant-fg-dim)', flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
+        <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13, color: 'var(--klant-fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        <span style={{ color: 'var(--klant-fg-dim)', fontSize: 12, flexShrink: 0 }}>{n}</span>
+      </div>
+    );
+  };
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="klant-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -85,24 +116,36 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
 
       <SinglePageImport onAdded={onChange} />
 
+      {pages.length > 8 && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, color: 'var(--klant-fg-dim)', pointerEvents: 'none' }} />
+            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Zoek pagina’s…" className="klant-input" style={{ paddingLeft: 30, width: '100%' }} />
+          </div>
+          {groupKeys.length > 0 && !filtering && (
+            <button type="button" className="klant-btn" data-variant="ghost" style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+              onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groupKeys))}>
+              {allCollapsed ? 'Alles uitklappen' : 'Alles inklappen'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
-        {groups.map((g) => (
+        {fGroups.map((g) => (
           <div key={g.key}>
-            <div style={groupHeader}>
-              {g.label} <span style={{ color: 'var(--klant-fg-dim)', fontWeight: 500, fontSize: 12 }}>· {g.urls.length}</span>
-            </div>
-            {g.urls.map(row)}
+            {groupHeader(g.key, g.label, g.urls.length)}
+            {isOpen(g.key) && g.urls.map(row)}
           </div>
         ))}
-        {loose.length > 0 && (
-          <div>
-            {groups.length > 0 && (
-              <div style={groupHeader}>
-                Losse pagina’s <span style={{ color: 'var(--klant-fg-dim)', fontWeight: 500, fontSize: 12 }}>· {loose.length}</span>
-              </div>
-            )}
-            {loose.map(row)}
-          </div>
+        {fLoose.length > 0 && (
+          groups.length > 0
+            ? <div>{groupHeader('_loose', 'Losse pagina’s', fLoose.length)}{isOpen('_loose') && fLoose.map(row)}</div>
+            : <div>{fLoose.map(row)}</div>
+        )}
+        {visibleCount === 0 && (
+          <div style={{ padding: '14px 12px', fontSize: 13, color: 'var(--klant-fg-dim)' }}>Geen pagina&apos;s gevonden voor “{query}”.</div>
         )}
       </div>
     </section>
