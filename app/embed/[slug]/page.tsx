@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 
 import { LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
-import type { OrgSlug } from '@/lib/v0/server/active-org';
-import { applyWidgetOverrides, getSkin, ORG_SLUGS_WIDGET } from '@/app/widget/org-skins';
+import { ALL_ORG_SLUGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import { applyWidgetOverrides, getSkin } from '@/app/widget/org-skins';
 import { createEmbedToken } from '@/lib/v0/server/embed-token';
 import { EmbedClient } from './embed-client';
 
@@ -15,7 +15,10 @@ type PageProps = { params: Promise<{ slug: string }> };
 
 export default async function EmbedPage({ params }: PageProps) {
   const { slug } = await params;
-  if (!ORG_SLUGS_WIDGET.includes(slug as (typeof ORG_SLUGS_WIDGET)[number])) {
+  // Alle bekende orgs zijn embeddable — niet alleen de /widget demo-rotatie.
+  // ORG_SLUGS_WIDGET sluit dev-org + demo-nieuw uit (geen fake-site pagina's),
+  // maar die hebben wél widget-settings en zijn dus prima embedbaar.
+  if (!ALL_ORG_SLUGS.includes(slug as OrgSlug)) {
     notFound();
   }
 
