@@ -2,7 +2,7 @@
 import { useState, useEffect, useTransition } from 'react';
 import {
   discoverPagesAction, startSelectedCrawlAction, tickCrawlIngestAction,
-  refreshWebsiteState,
+  refreshWebsiteState, deleteWebsiteSourceAction,
 } from '@/app/actions/crawl';
 import type { WebsiteState } from '@/lib/v0/server/crawler';
 import { CrawlProgress } from './crawl-progress';
@@ -12,7 +12,8 @@ import { ManagedPages } from './managed-pages';
 export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
   const [state, setState] = useState<WebsiteState>(initialState);
   const [discovered, setDiscovered] = useState<{ rootUrl: string; urls: string[] } | null>(null);
-  const [url, setUrl] = useState('');
+  // Voorgevuld met de bron-URL zodat een vastgelopen bron (0 pagina's) in één klik opnieuw kan.
+  const [url, setUrl] = useState(initialState.source?.rootUrl ?? '');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -60,6 +61,23 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
     });
   }
 
+  function onDelete() {
+    if (!source || pending) return;
+    if (!confirm('Website-bron verwijderen? Je kunt daarna opnieuw beginnen.')) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteWebsiteSourceAction(source.id);
+      if (!res.ok) { setError(res.error); return; }
+      setState({ source: null, job: null, pages: [] });
+      setUrl('');
+    });
+  }
+
+  // Invoerveld tonen als er nog geen bron is, óf als een bron geen pagina's opleverde
+  // (crawl volledig mislukt) — dan kan de klant opnieuw of een andere URL proberen.
+  const showInput = !isCrawling && pages.length === 0;
+  const stuckSource = Boolean(source) && showInput;
+
   // State machine render: selecting > crawling > managed > input
   if (discovered && !isCrawling) {
     return <PageSelection rootUrl={discovered.rootUrl} urls={discovered.urls} pending={pending}
@@ -67,11 +85,17 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
   }
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {!source && (
+      {showInput && (
         <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <h3 className="klant-section-title">Voeg je website toe</h3>
-            <p className="klant-section-help">Geef je website-URL op. We zoeken eerst de pagina&apos;s, daarna kies je welke meegaan.</p>
+            <h3 className="klant-section-title">
+              {stuckSource ? 'Geen pagina’s gevonden' : 'Voeg je website toe'}
+            </h3>
+            <p className="klant-section-help">
+              {stuckSource
+                ? `De vorige poging op ${source?.rootUrl} leverde geen pagina’s op. Probeer het opnieuw, met dezelfde of een andere URL.`
+                : 'Geef je website-URL op. We zoeken eerst de pagina’s, daarna kies je welke meegaan.'}
+            </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input type="url" placeholder="https://jouwwebsite.nl" value={url}
@@ -80,6 +104,12 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
             <button type="button" onClick={onDiscover} className="klant-btn" data-variant="primary"
               disabled={pending || !url.trim()}>{pending ? 'Zoeken…' : "Pagina's zoeken"}</button>
           </div>
+          {stuckSource && (
+            <button type="button" onClick={onDelete} className="klant-btn" data-variant="ghost"
+              disabled={pending} style={{ alignSelf: 'flex-start', fontSize: 12 }}>
+              Website-bron verwijderen
+            </button>
+          )}
         </div>
       )}
       {error && (
@@ -88,11 +118,6 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
       {isCrawling && <CrawlProgress completed={job?.completed ?? 0} total={job?.total ?? 0} />}
       {source && !isCrawling && pages.length > 0 && (
         <ManagedPages state={state} onChange={setState} />
-      )}
-      {source && !isCrawling && pages.length === 0 && (
-        <div className="klant-card" style={{ fontSize: 13, color: 'var(--klant-fg-dim)' }}>
-          Nog geen pagina&apos;s gevonden. Gebruik bovenstaand veld om een URL op te geven.
-        </div>
       )}
     </section>
   );
