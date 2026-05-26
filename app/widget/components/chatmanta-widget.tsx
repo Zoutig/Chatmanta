@@ -229,11 +229,15 @@ export function ChatMantaWidget({
   // zodat hij de iframe kan resizen. Side meegestuurd voor de hoek-positie.
   useEffect(() => {
     if (!embedded || typeof window === 'undefined' || window.parent === window) return;
+    // 'peek' = ingeklapt mét zichtbare launcher-tooltip; de loader maakt de iframe
+    // dan tijdelijk groter zodat de tooltip boven de knop niet wordt afgesneden.
+    const peeking = !open && (tooltipVisible || tooltipHovered);
+    const state = open ? 'open' : peeking ? 'peek' : 'collapsed';
     window.parent.postMessage(
-      { type: 'chatmanta:resize', state: open ? 'open' : 'collapsed', side: position },
+      { type: 'chatmanta:resize', state, side: position },
       parentOrigin,
     );
-  }, [embedded, open, position, parentOrigin]);
+  }, [embedded, open, tooltipVisible, tooltipHovered, position, parentOrigin]);
 
   // Submit-handler voor de duim-knoppen onder een bot-bubble. Werkt voor
   // beide ratings; bij 'up' is de comment altijd null (geen disclosure-flow),
