@@ -16,14 +16,14 @@ export type SourceStatus = 'pending' | 'crawling' | 'ready' | 'failed';
 export type WebsiteState = {
   source: { id: string; rootUrl: string | null; status: SourceStatus } | null;
   /** Laatste crawl-job voor deze bron, of null als er nog nooit gecrawld is. */
-  job: { status: CrawlJobStatus; error: string | null } | null;
+  job: { status: CrawlJobStatus; error: string | null; completed: number; total: number } | null;
   pages: WebsitePage[];
 };
 
-function toUiPageStatus(db: string): WebsitePageStatus {
-  if (db === 'crawled') return 'active';
-  if (db === 'excluded') return 'disabled';
-  return 'error'; // 'failed'
+function toUiPageStatus(db: string, included: boolean): WebsitePageStatus {
+  if (db === 'failed') return 'error';
+  if (!included || db === 'excluded') return 'disabled';
+  return 'active';
 }
 
 /** Haalt de (enige) website-bron van een org op met job-status + pagina's. */
@@ -54,7 +54,7 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
       .maybeSingle(),
     sb
       .from('website_pages')
-      .select('id, url, title, status, last_crawled_at')
+      .select('id, url, title, status, last_crawled_at, included, error_message')
       .eq('knowledge_source_id', source.id)
       .is('deleted_at', null)
       .order('url', { ascending: true }),
@@ -64,8 +64,10 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
     id: p.id as string,
     title: (p.title as string | null) ?? (p.url as string),
     url: p.url as string,
-    status: toUiPageStatus(p.status as string),
+    status: toUiPageStatus(p.status as string, (p.included as boolean) ?? true),
     lastProcessedAt: (p.last_crawled_at as string | null) ?? '',
+    included: (p.included as boolean) ?? true,
+    errorMessage: (p.error_message as string | null) ?? null,
   }));
 
   return {
@@ -75,7 +77,7 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
       status: source.status as SourceStatus,
     },
     job: job
-      ? { status: job.status as CrawlJobStatus, error: (job.error_message as string | null) ?? null }
+      ? { status: job.status as CrawlJobStatus, error: (job.error_message as string | null) ?? null, completed: 0, total: 0 }
       : null,
     pages,
   };

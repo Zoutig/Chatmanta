@@ -107,6 +107,8 @@ export type WebsitePage = {
   url: string;
   status: WebsitePageStatus;
   lastProcessedAt: string;
+  included: boolean;
+  errorMessage: string | null;
 };
 
 export type DocumentStatus = 'ready' | 'processing' | 'error';

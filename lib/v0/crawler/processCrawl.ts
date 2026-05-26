@@ -67,6 +67,11 @@ export async function ingestCrawlResults(
         ? createHash('sha256').update(page.markdown).digest('hex')
         : null;
 
+    const errorMessage =
+      status === 'failed'
+        ? page.error ?? (page.statusCode != null ? `HTTP ${page.statusCode}` : 'Pagina kon niet worden opgehaald')
+        : null;
+
     const { data: inserted, error: pageErr } = await sb
       .from('website_pages')
       .insert({
@@ -77,6 +82,7 @@ export async function ingestCrawlResults(
         content_text: status === 'crawled' ? page.markdown : null,
         content_hash: contentHash,
         status,
+        error_message: errorMessage,
         last_crawled_at: now,
       })
       .select('id')
@@ -130,4 +136,65 @@ export async function ingestCrawlResults(
   ]);
 
   return result;
+}
+
+/**
+ * Ingest één losse pagina (C1 / retry). Vervangt een bestaande rij met dezelfde
+ * URL binnen de bron (idempotent), houdt de rest van de pagina's intact.
+ */
+export async function ingestSinglePage(
+  knowledgeSourceId: string,
+  organizationId: string,
+  page: CrawledPage,
+): Promise<{ status: 'crawled' | 'failed' | 'excluded'; pageId: string }> {
+  const sb = await getSystemJobClient({ reason: 'crawl_website' });
+
+  await sb
+    .from('website_pages')
+    .delete()
+    .eq('knowledge_source_id', knowledgeSourceId)
+    .eq('url', page.url);
+
+  const status = pageStatus(page);
+  const errorMessage =
+    status === 'failed'
+      ? page.error ?? (page.statusCode != null ? `HTTP ${page.statusCode}` : 'Pagina kon niet worden opgehaald')
+      : null;
+  const contentHash =
+    status === 'crawled' ? createHash('sha256').update(page.markdown).digest('hex') : null;
+
+  const { data: inserted, error: pageErr } = await sb
+    .from('website_pages')
+    .insert({
+      knowledge_source_id: knowledgeSourceId,
+      organization_id: organizationId,
+      url: page.url || '(onbekend)',
+      title: page.title,
+      content_text: status === 'crawled' ? page.markdown : null,
+      content_hash: contentHash,
+      status,
+      error_message: errorMessage,
+      last_crawled_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+  if (pageErr) throw new Error(`website_pages insert (${page.url}): ${pageErr.message}`);
+  const pageId = inserted.id as string;
+
+  if (status === 'crawled') {
+    const chunks = chunkText(page.markdown);
+    if (chunks.length > 0) {
+      const embed = await embedTexts(chunks);
+      const rows = chunks.map((content, i) => ({
+        organization_id: organizationId,
+        website_page_id: pageId,
+        content,
+        embedding: embed.vectors[i],
+        metadata: { chunk_index: i, url: page.url },
+      }));
+      const { error: chunkErr } = await sb.from('document_chunks').insert(rows);
+      if (chunkErr) throw new Error(`document_chunks insert (${page.url}): ${chunkErr.message}`);
+    }
+  }
+  return { status, pageId };
 }
