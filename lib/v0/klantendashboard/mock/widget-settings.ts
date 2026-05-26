@@ -21,6 +21,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
     isInstalled: false,
     isActive: false,
     lastCheckedAt: null,
+    lastSeenAt: null,
+    installOrigin: null,
   },
   'acme-corp': {
     primaryColor: '#d97706',
@@ -35,6 +37,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
     isInstalled: true,
     isActive: true,
     lastCheckedAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+    lastSeenAt: null,
+    installOrigin: null,
   },
   'globex-inc': {
     primaryColor: '#0891b2',
@@ -49,6 +53,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
     isInstalled: true,
     isActive: true,
     lastCheckedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    lastSeenAt: null,
+    installOrigin: null,
   },
   initech: {
     primaryColor: '#475569',
@@ -63,6 +69,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
     isInstalled: false,
     isActive: false,
     lastCheckedAt: null,
+    lastSeenAt: null,
+    installOrigin: null,
   },
   // Lege demo-org — widget nog niet geplaatst/actief → status blijft 'concept'.
   'demo-nieuw': {
@@ -78,6 +86,8 @@ const MOCK_WIDGET: Record<OrgSlug, WidgetSettings> = {
     isInstalled: false,
     isActive: false,
     lastCheckedAt: null,
+    lastSeenAt: null,
+    installOrigin: null,
   },
 };
 

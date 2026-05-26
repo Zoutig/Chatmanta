@@ -35,6 +35,8 @@ import {
 import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
+import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
+import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
 
 // Widget-detectie via referer-header. /widget/<slug> is in V0 het enige
 // publieke chat-pad; testtool zit op /klantendashboard/test en doet z'n
@@ -46,6 +48,34 @@ function isWidgetRequest(req: Request): boolean {
   if (!referer) return false;
   try {
     return new URL(referer).pathname.startsWith('/widget/');
+  } catch {
+    return false;
+  }
+}
+
+// Dual-auth voor het publieke chat-pad. Geldig als óf het V0-demo-cookie klopt
+// (ingelogde admin/test/widget-demo paden — geen regressie), óf een geldig
+// embed-token + same-origin. Anders 401. Rate-limit draait al ervóór.
+function isChatAuthorized(req: Request): boolean {
+  const cookie = req.headers
+    .get('cookie')
+    ?.match(new RegExp(`(?:^|;\\s*)${AUTH_COOKIE.name}=([^;]+)`))?.[1];
+  if (verifyAuthCookieValue(cookie ? decodeURIComponent(cookie) : undefined)) {
+    return true;
+  }
+
+  // Token moet bij de gevraagde org horen.
+  const orgSlug = resolveOrgSlugFromId(getActiveOrgId(req));
+  if (!orgSlug) return false;
+  const token = req.headers.get('x-chatmanta-embed');
+  if (!verifyEmbedToken(token, orgSlug)) return false;
+
+  // Origin-lock: same-origin POST stuurt een Origin die de app-host moet zijn.
+  const host = req.headers.get('host');
+  const originHdr = req.headers.get('origin') ?? req.headers.get('referer');
+  if (!host || !originHdr) return false;
+  try {
+    return new URL(originHdr).host === host;
   } catch {
     return false;
   }
@@ -119,6 +149,14 @@ export async function POST(req: Request) {
         'X-RateLimit-Reset': String(Math.floor(rl.resetAt / 1000)),
         'X-Request-Id': requestId,
       },
+    });
+  }
+
+  if (!isChatAuthorized(req)) {
+    const err = new AppError('AUTH_REQUIRED');
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status, // 401
+      headers: { 'X-Request-Id': requestId },
     });
   }
 

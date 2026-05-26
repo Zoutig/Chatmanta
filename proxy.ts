@@ -23,5 +23,11 @@ export const config = {
   // Vercel-cron-route. Die laatste heeft geen login-cookie (Vercel roept 'm
   // server-side aan) en beveiligt zichzelf via CRON_SECRET in de route-handler —
   // zou anders naar /login omgeleid worden en nooit draaien.
-  matcher: ['/((?!login|api/v0/cron|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)'],
+  // /embed/* en de publieke API-paden (chat + widget-ping) gaan NIET door de
+  // login-redirect: ze worden vanaf externe pagina's geladen zonder demo-cookie.
+  // De chat-route doet zelf dual-auth (cookie OF embed-token + origin-lock);
+  // de ping-route idem. Zie app/api/v0/chat/route.ts.
+  matcher: [
+    '/((?!login|embed|api/v0/cron|api/v0/chat|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+  ],
 };

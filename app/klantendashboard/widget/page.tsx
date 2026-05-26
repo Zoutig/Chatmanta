@@ -1,11 +1,11 @@
 // V0 Klantendashboard — Scherm 5: Widget.
 //
-// Installatie + uiterlijk + preview + live-status. Voor v0 zijn alle writes
-// (uiterlijk-save, activate/pause, "installatie testen") mock. De /widget
-// route op deze app (gemerged in PR #59) is een aparte demo-pagina voor
-// prospects — we linken er heen vanuit live-status.
+// Installatie + uiterlijk + preview + live-status. "Installatie testen" leest
+// nu de echte heartbeat-status (lastSeenAt) via checkWidgetInstallationAction;
+// uiterlijk-save + activate/pause persisteren in v0_org_settings.widget jsonb.
+// De embed-snippet wijst naar /widget.js → iframe op /embed/<slug>.
 
-import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
+import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { DashboardWidgetSwitch } from '@/app/components/dashboard-widget-switch';
 import { PageHead } from '../components/ui/page-head';
@@ -33,7 +33,7 @@ export default async function WidgetPage() {
         initial={widget}
         chatbotName={settings.chatbotName}
         welcomeMessage={settings.welcomeMessage}
-        workspaceId={KNOWN_ORGS[activeOrg.slug].id}
+        orgSlug={activeOrg.slug}
       />
     </>
   );

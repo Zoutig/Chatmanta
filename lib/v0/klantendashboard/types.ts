@@ -257,6 +257,10 @@ export type WidgetSettings = {
   isInstalled: boolean;
   isActive: boolean;
   lastCheckedAt: string | null;
+  /** ISO-tijd van de laatste heartbeat-ping uit een geladen embed-iframe. */
+  lastSeenAt: string | null;
+  /** Host waar de widget voor het laatst gezien is (uit ?h= van de loader). */
+  installOrigin: string | null;
 };
 
 // ---------------------------------------------------------------------------
