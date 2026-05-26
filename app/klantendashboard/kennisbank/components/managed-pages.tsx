@@ -132,7 +132,7 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
         </div>
       )}
 
-      <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="klant-card crawl-scroll" style={{ padding: 0, maxHeight: 'min(56vh, 520px)' }}>
         {fGroups.map((g) => (
           <div key={g.key}>
             {groupHeader(g.key, g.label, g.urls.length)}
