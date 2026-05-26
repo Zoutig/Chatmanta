@@ -19,7 +19,8 @@ import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getSystemJobClient } from '@/lib/supabase/admin';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
-import { mapSite, startBatchScrape, MAX_CRAWL_PAGES } from '@/lib/v0/crawler/firecrawl';
+import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES } from '@/lib/v0/crawler/firecrawl';
+import { ingestSinglePage } from '@/lib/v0/crawler/processCrawl';
 import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
@@ -147,6 +148,68 @@ export async function tickCrawlIngestAction(): Promise<WebsiteState> {
     await processCrawlJobs(sb, jobs as OpenJob[]);
   }
   return getWebsiteState(activeOrg.id);
+}
+
+/** A1: zet één pagina aan/uit. Goedkoop — alleen een vlag; RPC doet de rest. */
+export async function setPageIncludedAction(pageId: string, included: boolean): Promise<ActionResult> {
+  return actionTry(async () => {
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+    const activeOrg = await getActiveOrgFromCookies();
+    const sb = await getSystemJobClient({ reason: 'toggle_website_page' });
+    const { error } = await sb
+      .from('website_pages')
+      .update({ included })
+      .eq('id', pageId)
+      .eq('organization_id', activeOrg.id);
+    if (error) throw new Error(`website_pages toggle: ${error.message}`);
+    revalidatePath(KENNISBANK_PATH);
+    return {};
+  });
+}
+
+/** A3: herprobeer één mislukte pagina (synchrone scrape + ingest). */
+export async function retryPageAction(pageId: string): Promise<ActionResult> {
+  return actionTry(async () => {
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+    const activeOrg = await getActiveOrgFromCookies();
+    const sb = await getSystemJobClient({ reason: 'retry_website_page' });
+    const { data: row } = await sb
+      .from('website_pages')
+      .select('url, knowledge_source_id')
+      .eq('id', pageId)
+      .eq('organization_id', activeOrg.id)
+      .maybeSingle();
+    if (!row) fail('CRAWL_FAILED', 'Pagina niet gevonden.');
+    const check = await validateCrawlUrl(row.url as string);
+    if (!check.allowed) fail('CRAWL_FAILED', check.reason);
+    const page = await scrapeOne(row.url as string);
+    await ingestSinglePage(row.knowledge_source_id as string, activeOrg.id, page);
+    revalidatePath(KENNISBANK_PATH);
+    return {};
+  });
+}
+
+/** C1: importeer één losse pagina (synchroon). Maakt de bron aan als die nog niet bestaat. */
+export async function scrapeSinglePageAction(rawUrl: string): Promise<ActionResult> {
+  return actionTry(async () => {
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+    const url = normalizeUrl(rawUrl);
+    const check = await validateCrawlUrl(url);
+    if (!check.allowed) fail('CRAWL_FAILED', check.reason);
+    const activeOrg = await getActiveOrgFromCookies();
+    const sb = await getSystemJobClient({ reason: 'scrape_single_page' });
+    const sourceId = await upsertWebsiteSource(sb, activeOrg.id, url, hostnameOf(url));
+    const page = await scrapeOne(url);
+    page.url = page.url || url;
+    const { status } = await ingestSinglePage(sourceId, activeOrg.id, page);
+    if (status === 'failed') fail('CRAWL_FAILED', page.error ?? 'Pagina kon niet worden opgehaald.');
+    await sb.from('knowledge_sources').update({ status: 'ready' }).eq('id', sourceId);
+    revalidatePath(KENNISBANK_PATH);
+    return {};
+  });
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
