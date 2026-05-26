@@ -137,3 +137,44 @@ Nieuwe `isEchoedHardFact(r)` naast de bestaande `isCalcWarning`: een unsupported
 
 ### Runtime vs eval-only + aanbeveling
 **Eval-only** is de juiste laag: de echo's zijn een meet-artefact van de hard-fact-verifier (die elk getal in het antwoord eist verbatim in een chunk), niet een botgedrag dat klanten raakt — de bot reflecteert/weigert correct. Een runtime-verifier-wijziging zou een botversie-kandidaat zijn (concurreert in Taak 6), maar is **niet** nodig: de 4 resterende HARD-fails zijn grotendeels untagged tiered-Vpb-calc. **Aanbeveling (label-curatie, niet vannacht):** tag de Vpb-cases (`vpb-tarief-200k`, `mh-bv-vpb-dga-250k`) als `calculation_required` na §E.5-certificering — dan vallen ze onder calc-warn en daalt de echte unsupported-hard-fact verder. Dit is géén gate-versoepeling maar correcte §E.6-classificatie.
+
+---
+
+## 5. Beslisgate — welke fix krijgt de ene eval? (Taak 6)
+
+**Besluit: GO op `out_of_corpus_overanswer` via een DETERMINISTISCH hard-fact-weiger-template, in de bestaande regenerate-laag (`rag.ts`), gated op `unsupportedHardFact && lowClaimConfidence`. Nieuwe append-only versie `v0.9`.**
+
+### Samenvatting van de vier diagnoses
+| diagnose | uitkomst | botfix-kandidaat? |
+|----------|----------|-------------------|
+| Latency | generation = onvermijdelijke LLM-tijd; fast-path-onderbenutting niet bewijsbaar uit eval_runs | **NO-GO** (diagnose-only; te riskant onbewaakt) |
+| Citation-binding | 54% judge-strengheid/excerpt-artefact + 46% grounding-overlap | **NO-GO** (eval-artefact, geen botzwakte) |
+| unsupported_claim sub-taxonomy | dominant `out_of_corpus_overanswer` n=12, 3 orgs; convergeert met must-not + hard-fact + zero-correctness | **GO-kandidaat** |
+| Hard-fact-verifier | ~43% echo-artefact → eval-only recompute toegepast; rest = untagged calc | **NO-GO** (meetlat-fix gedaan, geen botversie) |
+
+### Go-criteria toegepast op `out_of_corpus_overanswer`
+| criterium | status |
+|-----------|--------|
+| ≥8 echte cases | ✓ 12 (≥10 na §E.5) |
+| ≥2 orgs | ✓ 3 (dev-org-zwaar; initech+globex aanwezig) |
+| niet primair eval/judge/label-artefact | ✓ echte over-answer-hallucinatie |
+| één kleine wijziging in één bestaande laag verklaart ≥60% van de bucket | ✓ (zie root-cause) |
+| geen nieuwe parallelle gate | ✓ (breidt bestaande regenerate-trigger uit) |
+| geen prompt-only refusal-fix | ✓ (deterministisch code-pad, geen prompt) |
+| regressierisico helder + gemitigeerd | ✓ (conjunctie-gating, zie onder) |
+
+### Root-cause (geverifieerd in `rag.ts`)
+Er bestáát al een regenerate-trigger op `(lowClaimConfidence || unsupportedHardFact)` (`rag.ts:2586-2587`), maar die doet een **tweede LLM-poging** met een "strikter" prompt. De v0.8.1-code documenteert zelf (`rag.ts:2554-2557`) dat een tweede LLM-poging om een hallucinatie te verwijderen **empirisch onbetrouwbaar** is — dáárom gebruikt de v0.8.1 history-entity-fix een **deterministisch weiger-template** (`rag.ts:2560-2581`) i.p.v. een LLM-call. De `out_of_corpus_overanswer`-cases glippen door omdat de LLM-regenerate het verzonnen getal opnieuw produceert.
+
+### De fix (v0.9) — proven pattern, één laag, flag-guarded
+Pas hetzelfde deterministische-template-recept toe op unsupported hard-facts: wanneer de bot een hard feit noemt dat **niet in de bronnen staat** ÉN het antwoord **ongegrond** is, vervang deterministisch door een eerlijk weiger/doorverwijs-template (geen LLM-poging). Nieuwe flag `hardFactDeterministicRefusal` op een `{...V0_8_1}`-config.
+
+**Regressie-mitigatie — de conjunctie is de sleutel.** Het runtime-signaal `unsupportedHardFact` alléén vuurt óók op de correcte tiered-Vpb-cases (`vpb-tarief-200k` C=5, `mh-bv-vpb-dga` — afgeleide getallen 50000/38000/12900 staan niet verbatim in chunks). Die zijn echter **gegrond** (G=3, claim-confidence hoog → `lowClaimConfidence=false`), terwijl de out_of_corpus-fabricaties **ongegrond** zijn (G=0 → `lowClaimConfidence=true`). Door te gaten op de **conjunctie `unsupportedHardFact && lowClaimConfidence`** (beide grounding-signalen falen) vuurt het template wél op de fabricaties en **niet** op de gegronde calc-antwoorden. Beide signalen bestaan al runtime — geen nieuwe gate, geen nieuwe drempel-tuning.
+
+### Verworpen alternatieven
+- **Threshold-filter verhogen** (refusal harder): globale recall-regressie op de factual-bucket; risicovolle tuning voor onbewaakt. ✗
+- **`reclassifyAfterZeroHits`**: de cases retrieven wél chunks (geen zero-hit) → dekt ze niet. ✗
+- **Deterministisch refuse op `unsupportedHardFact` alléén** (geen conjunctie): regredieert de gegronde Vpb-calc-antwoorden naar weigeringen. ✗ (de conjunctie lost dit op.)
+
+### Stopconditie-check
+Niet getriggerd: er is een dominante (12, 3 orgs), niet-artefact, ≥60%-één-laag-kandidaat met heldere, gemitigeerde regressie. **→ Taak 7: bouw v0.9.**
