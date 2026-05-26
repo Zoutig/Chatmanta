@@ -877,3 +877,27 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
     padding-right: calc(12px + var(--safe-right, 0px)) !important;
   }
 }
+
+/* Scrollbare pagina-lijst in de crawler (kies-scherm + beheerlijst): een
+   zichtbare scrollbar zodat duidelijk is dat de lijst verder scrollt, en
+   overscroll-containment zodat het wiel binnen het vak blijft. */
+.crawl-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--klant-border-strong) transparent;
+}
+.crawl-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.crawl-scroll::-webkit-scrollbar-thumb {
+  background: var(--klant-border-strong);
+  border-radius: 6px;
+}
+.crawl-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--klant-fg-dim);
+}
+.crawl-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

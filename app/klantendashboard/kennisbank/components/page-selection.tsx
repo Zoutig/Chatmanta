@@ -115,7 +115,7 @@ export function PageSelection({
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
+      <div className="crawl-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 'min(56vh, 520px)', paddingRight: 4 }}>
         {fGroups.map((g) => groupBox(g.key, g.label, g.urls))}
         {fLoose.length > 0 && (
           groups.length > 0
