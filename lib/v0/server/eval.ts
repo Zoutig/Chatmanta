@@ -745,8 +745,15 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function checkMustNot(answer: string, forbidden: string[]): boolean {
+export function checkMustNot(answerRaw: string, forbidden: string[]): boolean {
   if (forbidden.length === 0) return false;
+  // Markdown-emphasis (*/** bold/italic) strippen vóór de match. De bot zet
+  // entiteiten vaak vet ("**Frank**"), wat een multi-woord adoptie-frase als
+  // "companion heet Frank" anders zou breken op de tussenliggende asterisks.
+  // Strippen is monotone-veilig: het kan een bestaande match nooit wegnemen
+  // (woordgrens/substring matchen óók mét asterisks), alleen frases dwars door
+  // markdown heen laten matchen. Underscores laten we staan (snake_case).
+  const answer = answerRaw.replace(/\*/g, '');
   for (const word of forbidden) {
     if (!word.trim()) continue;
     // Woordgrens-match voor woorden die met letters beginnen/eindigen

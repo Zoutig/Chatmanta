@@ -127,7 +127,11 @@
       "question_type": "false_premise",
       "expected_kind": "answer",
       "must_not_contain": [
-        "MongoDB"
+        "gebruiken MongoDB",
+        "draait op MongoDB",
+        "draaien op MongoDB",
+        "gekozen voor MongoDB",
+        "gebruikt MongoDB"
       ],
       "ideal_source_filenames": [
         "Concept_Blueprint_ChatManta.md"
@@ -150,7 +154,12 @@
       "question_type": "false_premise",
       "expected_kind": "answer",
       "must_not_contain": [
-        "AWS"
+        "draaien op AWS",
+        "draait op AWS",
+        "gehost op AWS",
+        "hosten op AWS",
+        "gebruiken AWS voor",
+        "gekozen voor AWS"
       ],
       "ideal_source_filenames": [
         "Concept_Blueprint_ChatManta.md"
@@ -223,7 +232,11 @@
       "question_type": "planted_fact",
       "expected_kind": "fallback",
       "must_not_contain": [
-        "Frank"
+        "companion heet Frank",
+        "Frank is je companion",
+        "Frank is je vaste companion",
+        "je vaste companion Frank",
+        "afspraak met Frank"
       ],
       "conversation_history": [
         {

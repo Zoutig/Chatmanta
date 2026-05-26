@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 import { resolveBot, BOTS, EVAL_DEFAULT_VERSIONS } from '../lib/v0/server/bots';
-import { calcRetrievalMetrics, SOURCE_EXPECTED_TYPES } from '../lib/v0/server/eval';
+import { calcRetrievalMetrics, SOURCE_EXPECTED_TYPES, checkMustNot } from '../lib/v0/server/eval';
 import type { PhaseTimings } from '../lib/v0/server/rag';
 import {
   STAGE_KEYS,
@@ -56,6 +56,28 @@ const PRODUCTION_THRESHOLDS = {
   minAvgMrr: 0.60,
   maxP95TotalMs: 8000,
   maxP95FirstTokenMs: 1500,
+} as const;
+
+// §E.2 — TWEE benoemde gates.
+// • ASPIRATIONAL_PRODUCTION_GATE = de oorspronkelijke hoge productie-lat. Blijft
+//   zichtbaar als langetermijndoel, maar is NIET promotie-bepalend.
+// • V0_ENGINE_GATE = herijkt op de gemeten noise-floor (recommended =
+//   max(safety_floor, baseline 95%CI-ondergrens); zie het herijkings-voorstel
+//   onderaan het report). Bepaalt promotie binnen V0. Alléén de als
+//   `aspirational` geflagde min-drempels zijn naar `recommended` verlaagd; al het
+//   andere + ALLE HARD safety-gates (must-not=0, unsupported hard-fact=0,
+//   zero-correctness≤0.02) blijven ongewijzigd. Verlaag deze NOOIT om groen te
+//   worden — het doel is een eerlijke lat, geen greenwashing.
+const ASPIRATIONAL_PRODUCTION_GATE = PRODUCTION_THRESHOLDS;
+const V0_ENGINE_GATE = {
+  ...PRODUCTION_THRESHOLDS,
+  minAvgCorrectness: 3.25,      // was 4.0 — buiten 95%CI [3.247, 3.552]; herijkt op CI-ondergrens
+  minAvgGrounding: 3.62,        // was 4.0 — buiten 95%CI [3.615, 3.908]; herijkt op CI-ondergrens
+  minProductionReadyRate: 0.50, // was 0.80 — buiten band (baseline 0.449); recommended = safety_floor 0.50
+  maxMetaTalkRate: 0.16,        // was 0.10 — buiten 95%CI [0.102, 0.159]; herijkt op CI-bovengrens
+  // completeness (3.5), route (0.90), recall (0.70), MRR (0.60), right-length
+  // (0.85), citation (0.75), tone (1.5), p95 (8000/1500), zero-corr (0.02):
+  // ONGEWIJZIGD — binnen noise-band of HARD safety-floor (niet aspirational-geflagd).
 } as const;
 
 function fail(msg: string): never {
@@ -121,6 +143,17 @@ function recomputeRetrieval(r: RunRow): { recallAtK: number | null; mrr: number 
   );
 }
 
+// Must-not ON-READ herberekenen uit het opgeslagen bot_answer × de ACTUELE
+// must_not_contain — net als recall@k hierboven. Zo weerspiegelen rapport + gate
+// gecorrigeerde must-not-frases (deny-by-naming → adoptie-frases, markdown-strip)
+// meteen, zonder dure her-run. De opgeslagen kolom `must_not_violation` is de
+// stand bij run-tijd (oude frases) en wordt voor de aggregatie genegeerd.
+function recomputeMustNot(r: RunRow): boolean {
+  const q = qById.get(r.question_id);
+  if (!q) return r.must_not_violation === true; // geen vraag → val terug op opslag
+  return checkMustNot((r.bot_answer as string | null) ?? '', (q.must_not_contain as string[] | null) ?? []);
+}
+
 // V0.7: pairwise rows voor de win-rate sectie. Filteren is niet nodig — we
 // tonen alles uit de meest-recente batch.
 const { data: pairwiseRows, error: pwErr } = await sb
@@ -148,8 +181,23 @@ function modeKey(r: RunRow): string {
 // - latestRuns: voor de hoofdtabellen dedup op (q, v, mode) → laagste
 //   run_index (typisch 0). Zo kan een --runs=3 batch alle 3 variance-rijen
 //   bewaren maar het hoofdrapport blijft één regel per cel tonen.
+// Task 3 cleanup: dev-org pre-slim-down cruft (off-topic / algemene-kennis /
+// multi-turn-baseline) draagt de 'legacy'-tag en valt uit de héle headline-
+// aggregatie (gate, per-org, per-type, pairwise, CI noise-band, CSV). Die cases
+// testen de bot-engine niet op corpus-grounding — een off-topic/general antwoord
+// heeft per definitie geen bron en zou de grounding-gate kunstmatig drukken. De
+// rijen blijven in de DB (queryable als regressieset via tags=legacy, niet
+// verwijderd — eval_runs.question_id FK). Reports defaulten zo op de active corpus.
+const legacyQuestionIds = new Set(
+  (qRows ?? [])
+    .filter((q) => ((q.tags as string[] | null) ?? []).includes('legacy'))
+    .map((q) => q.id as string),
+);
+const activeRunRows = runRows.filter((r) => !legacyQuestionIds.has(r.question_id as string));
+const legacyRunsExcluded = runRows.length - activeRunRows.length;
+
 const latestByQuad = new Map<string, RunRow>();
-for (const r of runRows) {
+for (const r of activeRunRows) {
   const key = `${r.question_id}::${r.bot_version}::${modeKey(r)}::${r.run_index ?? 0}`;
   if (!latestByQuad.has(key)) latestByQuad.set(key, r);
 }
@@ -305,7 +353,7 @@ if (hasMultiRun) {
 lines.push('');
 
 // 4a. 🚨 Must-not violations — bovenaan zodat ze niet gemist worden
-const violations = latestRuns.filter((r) => r.must_not_violation === true);
+const violations = latestRuns.filter((r) => recomputeMustNot(r));
 lines.push('## 🚨 Must-not violations');
 lines.push('');
 if (violations.length === 0) {
@@ -657,7 +705,7 @@ for (const qt of typeList) {
     const g = avgOf(rows, (r) => r.score_grounding);
     const all = [c, p, g].filter((n): n is number => n !== null);
     const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
-    const vios = rows.filter((r) => r.must_not_violation).length;
+    const vios = rows.filter((r) => recomputeMustNot(r)).length;
     lines.push(`| ${qt} | ${v} | ${rows.length} | ${fmt(c)} | ${fmt(p)} | ${fmt(g)} | **${fmt(overall)}** | ${vios > 0 ? `🚨 ${vios}` : '0'} |`);
   }
 }
@@ -720,7 +768,7 @@ const NOISE_METRICS: NoiseMetric[] = [
   { key: 'production_ready', label: 'production-ready rate', pick: (r) => r.production_ready === null || r.production_ready === undefined ? null : (r.production_ready ? 1 : 0) },
   { key: 'route_correct', label: 'route-correct rate', pick: (r) => r.score_route_correct === null || r.score_route_correct === undefined ? null : (r.score_route_correct ? 1 : 0) },
   { key: 'meta_talk', label: 'meta-talk rate', pick: (r) => r.score_meta_talk_present === null || r.score_meta_talk_present === undefined ? null : (r.score_meta_talk_present ? 1 : 0) },
-  { key: 'must_not', label: 'must-not rate', pick: (r) => (r.must_not_violation ? 1 : 0) },
+  { key: 'must_not', label: 'must-not rate', pick: (r) => (recomputeMustNot(r) ? 1 : 0) },
   { key: 'unsupported_hard_fact', label: 'unsupported-hard-fact rate', pick: (r) => r.hard_fact_status == null ? null : (r.hard_fact_status === 'unsupported' ? 1 : 0) },
 ];
 
@@ -774,25 +822,44 @@ function qTypeOf(qid: string): string {
   const q = qById.get(qid);
   return ((q?.question_type as string | null) ?? 'factual');
 }
+// §E.6 — een als `calculation_required` getagde vraag is vooraf (handmatig, §E.5)
+// gecertificeerd als SCHONE, deterministische, reconstrueerbare rekenkunde uit
+// getallen die letterlijk in de bron staan (bv. 40 m² × €95-115/m² = €3.800-4.600).
+// De hard-fact-verifier flag't de berékende uitkomst als 'unsupported' omdat die niet
+// verbatim in een chunk staat — hier een rekenartefact, geen hallucinatie. Zulke
+// cases tellen als WARNING (zichtbaar, nooit auto-PASS), niet als gate-fail.
+// Alle NIET-rekenkunde unsupported hard-facts blijven HARD fail: tiered tax/Vpb
+// (staffels + interpretatie), echoed-question-numbers, out-of-corpus. Daarom is
+// de tag bewust spaarzaam toegekend, NIET aan de Vpb-cases (die §E.6 niet halen).
+function isCalcWarning(r: RunRow): boolean {
+  if (r.hard_fact_status !== 'unsupported') return false;
+  const q = qById.get(r.question_id as string);
+  return ((q?.tags as string[] | null) ?? []).includes('calculation_required');
+}
 lines.push('## v0.8 — Hard-fact support');
 lines.push('');
 lines.push('`unsupported` = bot noemde een hard feit dat niet in de sources staat (hallucinatie-risico). `unknown` = verifier draaide niet (fallback/smalltalk/error) terwijl de output wél harde feiten bevatte — op een risk-case telt dit als warning, **nooit** auto-PASS. `none_detected` = geen harde feiten. Snapshot = run_index 0.');
 lines.push('');
-lines.push('| versie | n | none_detected | supported | unsupported | unknown | unsupported-rate | unknown-on-risk |');
-lines.push('|--------|---|---------------|-----------|-------------|---------|------------------|-----------------|');
-const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number }>();
+lines.push('`calc-warn` (§E.6) = als `calculation_required` getagde schone rekenkunde-case waarvan de berekende uitkomst niet verbatim in de bron staat — telt als warning, NIET als gate-fail. `unsupported` hieronder is al exclusief calc-warn.');
+lines.push('');
+lines.push('| versie | n | none_detected | supported | unsupported | calc-warn | unknown | unsupported-rate | unknown-on-risk |');
+lines.push('|--------|---|---------------|-----------|-------------|-----------|---------|------------------|-----------------|');
+const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number; calcWarn: number }>();
 for (const v of versionsForHeader) {
   const vRows = latestRuns.filter((r) => r.bot_version === v);
   if (vRows.length === 0) continue;
   const withStatus = vRows.filter((r) => r.hard_fact_status != null);
   const none = withStatus.filter((r) => r.hard_fact_status === 'none_detected').length;
   const sup = withStatus.filter((r) => r.hard_fact_status === 'supported').length;
-  const unsup = withStatus.filter((r) => r.hard_fact_status === 'unsupported').length;
+  // §E.6: schone-rekenkunde unsupported (calc-warn) telt NIET als gate-fail.
+  const unsupAll = withStatus.filter((r) => r.hard_fact_status === 'unsupported');
+  const calcWarn = unsupAll.filter((r) => isCalcWarning(r)).length;
+  const unsup = unsupAll.length - calcWarn;
   const unk = withStatus.filter((r) => r.hard_fact_status === 'unknown').length;
   const unkOnRisk = withStatus.filter((r) => r.hard_fact_status === 'unknown' && RISK_QUESTION_TYPES.has(qTypeOf(r.question_id as string))).length;
   const unsupRate = withStatus.length === 0 ? '—' : `${Math.round((unsup / withStatus.length) * 100)}%`;
-  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk });
-  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
+  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk, calcWarn });
+  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${calcWarn} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
 }
 lines.push('');
 // Slug-lijst van unsupported hard facts (per versie) — directe diagnose.
@@ -803,7 +870,8 @@ for (const v of versionsForHeader) {
   for (const r of unsupRows) {
     const q = qById.get(r.question_id as string);
     const missing = Array.isArray(r.missing_hard_facts) ? (r.missing_hard_facts as string[]).join(', ') : '—';
-    lines.push(`- _${q?.slug ?? '?'}_ (${qTypeOf(r.question_id as string)}): missing ${missing}`);
+    const calcTag = isCalcWarning(r) ? ' — 🧮 calc-warn (§E.6, telt niet als gate-fail)' : '';
+    lines.push(`- _${q?.slug ?? '?'}_ (${qTypeOf(r.question_id as string)}): missing ${missing}${calcTag}`);
   }
   lines.push('');
 }
@@ -871,9 +939,13 @@ if (pwAllForType.length === 0) {
 // het bestand — STARTWAARDEN; kalibreer na 2-3 echte runs.
 lines.push('## V0.7 — Productie-drempel-gate (klant-bereidheid)');
 lines.push('');
-lines.push('Per versie: passeert deze de minimale drempels om naar betalende klanten te gaan?');
+lines.push('Per versie TWEE gates (§E.2): de **V0 Controlled Engine Gate** (herijkt op de gemeten noise-floor — bepaalt promotie binnen V0 + triggert exit-1) en de **Aspirational Production Gate** (de oorspronkelijke hoge lat — langetermijndoel, niet blokkerend). HARD safety-gates (must-not=0, unsupported hard-fact=0, zero-corr≤0.02) zijn in BEIDE identiek en NOOIT verlaagd.');
 lines.push('');
 lines.push(`> ℹ️ **Gate-scope**: alleen kandidaat-versies (\`EVAL_DEFAULT_VERSIONS\` = ${EVAL_DEFAULT_VERSIONS.join(', ')}) triggeren exit-code 1. Historische versies worden voor referentie getoond maar blokkeren de report-run niet.`);
+if (legacyRunsExcluded > 0) {
+  lines.push('');
+  lines.push(`> 🧹 **Active corpus**: ${legacyRunsExcluded} \`legacy\`-getagde dev-org run(s) (off-topic / algemene-kennis / multi-turn-baseline pre-slim-down cruft) zijn uit deze aggregatie gesloten. Ze blijven in de DB als regressieset (queryable via \`tags=legacy\`).`);
+}
 lines.push('');
 
 type ThresholdCheck = {
@@ -894,9 +966,6 @@ let anyVersionFailed = false;
 for (const v of versionsForHeader) {
   const vRows = latestRuns.filter((r) => r.bot_version === v);
   if (vRows.length === 0) continue;
-
-  const checks: ThresholdCheck[] = [];
-  const T = PRODUCTION_THRESHOLDS;
 
   // Aggregates
   const avgC = avgOf(vRows, (r) => r.score_correctness);
@@ -930,10 +999,13 @@ for (const v of versionsForHeader) {
   }
   const p95Total = p95(totalMsValues);
   const p95FirstToken = p95(firstTokenMsValues);
-  const violations = vRows.filter((r) => r.must_not_violation === true).length;
+  const violations = vRows.filter((r) => recomputeMustNot(r)).length;
 
-  // Build checks. Skip checks waar de actual NULL is (geen data) — anders
-  // faalt elke versie zonder pairwise/persona-rijen automatisch.
+  // Build checks voor een gegeven drempelset (§E.2 — twee gates draaien dezelfde
+  // checks tegen andere targets). Skip checks waar actual NULL is (geen data) —
+  // anders faalt elke versie zonder pairwise/persona-rijen automatisch.
+  function buildChecks(T: Record<keyof typeof PRODUCTION_THRESHOLDS, number>): ThresholdCheck[] {
+  const checks: ThresholdCheck[] = [];
   function addCheck(label: string, actual: number | null, target: number, op: '>=' | '<=' | '=='): void {
     if (actual === null) {
       checks.push({ label, actual: '—', target: `${op}${target}`, pass: true /* skip */ });
@@ -971,13 +1043,22 @@ for (const v of versionsForHeader) {
   });
   // v0.8 — binaire hard-fact gate. unsupported = bot noemde een hard feit dat
   // niet in de sources staat = hallucinatie op een hard-fact-risk case.
-  // Hardgrens =0; mag NOOIT versoepeld worden (safety gate).
-  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0 };
+  // Hardgrens =0; mag NOOIT versoepeld worden (safety gate). §E.6: schone-
+  // rekenkunde (calc-warn) is hier al uit `unsupported` gehaald en telt als
+  // aparte warning — de hardgrens zelf blijft =0, niet versoepeld.
+  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0, calcWarn: 0 };
   checks.push({
     label: 'unsupported hard facts',
     actual: String(hfGate.unsupported),
     target: '=0',
     pass: hfGate.unsupported === 0,
+  });
+  // §E.6 calc-warn: zichtbaar, telt nooit als gate-fail (en nooit als auto-PASS).
+  checks.push({
+    label: 'calc-required hard-fact (warn §E.6)',
+    actual: String(hfGate.calcWarn),
+    target: 'warn',
+    pass: true,
   });
   // unknown-op-risk: warning (telt nooit als auto-PASS maar blokkeert de gate
   // niet — kan legitiem fallback zijn). Zichtbaar zodat het niet wegvalt.
@@ -987,8 +1068,16 @@ for (const v of versionsForHeader) {
     target: 'warn',
     pass: true,
   });
+    return checks;
+  }
 
-  const failed = checks.filter((c) => !c.pass && c.actual !== '—');
+  // §E.2 — twee gates. Promotie/exit-code beslist op de V0 Engine Gate; de
+  // Aspirational Gate staat erbij als langetermijnlat (niet blokkerend).
+  const engineChecks = buildChecks(V0_ENGINE_GATE);
+  const aspChecks = buildChecks(ASPIRATIONAL_PRODUCTION_GATE);
+  const failed = engineChecks.filter((c) => !c.pass && c.actual !== '—');
+  const aspFailed = aspChecks.filter((c) => !c.pass && c.actual !== '—');
+
   // Alleen kandidaat-versies (EVAL_DEFAULT_VERSIONS) triggeren exit-1.
   // Historische versies tonen we voor referentie maar blokkeren niet —
   // anders zou een report-run op een DB met oude failing v0.5-rows altijd
@@ -997,16 +1086,28 @@ for (const v of versionsForHeader) {
   if (failed.length > 0 && isCandidate) anyVersionFailed = true;
   const candidateTag = isCandidate ? '🎯 kandidaat — ' : '📜 historisch — ';
   const verdict = failed.length === 0
-    ? '✅ PRODUCTIE-KLAAR'
+    ? '✅ V0-ENGINE-GATE GEHAALD'
     : isCandidate
-      ? `❌ FAALT op ${failed.length} drempel(s)`
-      : `⚠ ${failed.length} drempel(s) ge-mist (alleen referentie)`;
+      ? `❌ V0-engine-gate FAALT op ${failed.length} drempel(s)`
+      : `⚠ V0-engine-gate: ${failed.length} drempel(s) gemist (alleen referentie)`;
 
   lines.push(`### ${v} — ${candidateTag}${verdict} (n=${vRows.length})`);
   lines.push('');
+  lines.push('**V0 Controlled Engine Gate** — herijkt op noise-floor, **promotie-bepalend**:');
+  lines.push('');
   lines.push('| drempel | actual | target | status |');
   lines.push('|---------|--------|--------|--------|');
-  for (const c of checks) {
+  for (const c of engineChecks) {
+    const status = c.actual === '—' ? '— (geen data)' : c.pass ? '✓' : '✗';
+    lines.push(`| ${c.label} | ${c.actual} | ${c.target} | ${status} |`);
+  }
+  lines.push('');
+  const aspVerdict = aspFailed.length === 0 ? '✅ gehaald' : `${aspFailed.length} drempel(s) gemist`;
+  lines.push(`**Aspirational Production Gate** — langetermijnlat, **NIET promotie-bepalend**: ${aspVerdict}`);
+  lines.push('');
+  lines.push('| drempel | actual | target | status |');
+  lines.push('|---------|--------|--------|--------|');
+  for (const c of aspChecks) {
     const status = c.actual === '—' ? '— (geen data)' : c.pass ? '✓' : '✗';
     lines.push(`| ${c.label} | ${c.actual} | ${c.target} | ${status} |`);
   }
@@ -1102,7 +1203,7 @@ for (const q of questions) {
       lines.push(`| ${v} | ${mode} | — | — | — | — | — | — | — |`);
       continue;
     }
-    const vio = r.must_not_violation ? '🚨' : '';
+    const vio = recomputeMustNot(r) ? '🚨' : '';
     lines.push(
       `| ${v} | ${mode} | ${fmtScore(r.score_correctness)} | ${fmtScore(r.score_completeness)} | ${fmtScore(r.score_grounding)} | ${r.bot_kind} | ${vio} | ${r.bot_latency_ms} | $${Number(r.bot_cost_usd ?? 0).toFixed(4)} |`,
     );
@@ -1171,7 +1272,7 @@ for (const q of questions) {
         r.score_tone_match ?? '',
         recomputeRetrieval(r).recallAtK ?? '',
         recomputeRetrieval(r).mrr ?? '',
-        r.must_not_violation ? 'true' : 'false',
+        recomputeMustNot(r) ? 'true' : 'false',
         r.bot_kind,
         r.bot_latency_ms,
         Number(r.bot_cost_usd ?? 0).toFixed(6),
