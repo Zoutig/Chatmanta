@@ -50,7 +50,7 @@ bewezen en gepromoveerd — wat tegelijk de hard rule *"één botfix per sessie"
   `detectInjection` / threshold-filter / cascade / hard-fact-verifier / claim-verification / regenerate.
 - **Append-only botversies.** Nieuwe versie = `{ ...V0_8_1 }`, flag-guarded; v0.8.1 blíjft byte-identiek.
 - **Niet versoepelen:** `claim-regenerate` OR→AND, `hardFactNumericFallback: false`, partial answering als default.
-- **Promotie alleen bij V0 Engine Gate PASS.**
+- **Promotie-criterium = dimensie-verbetering + géén regressie** (niet de volledige 9-drempel-gate): promoveer als de fix z'n target-dimensie meetbaar verbetert buiten judge-ruis (~0.12) én geen andere drempel/HARD safety-gate verslechtert t.o.v. v0.8.1. v0.8.1 is al LATEST mét open failures, dus "geen regressie" volstaat. Een nieuwe/gestegen HARD safety-violation is een absolute promotie-blocker.
 
 ## 4. Fasen
 
@@ -127,11 +127,12 @@ betaalbaar. Safety-buckets meelopen (planted_fact/out_of_corpus/false_premise/ha
 target-bucket. **Auto-skip** zodra de raming het resterende budget overschrijdt.
 
 ### Fase 7 — Promotie of vasthouden ($0)
+Promotie-criterium: **dimensie-verbetering + géén regressie** (niet de volledige 9-drempel-gate).
 Promoveer-niet-triggers (enumeratie): must-not stijgt · unsupported hard-fact stijgt (buiten artefact/warning)
 · zero-correctness stijgt · factual daalt buiten ruis · andere org regredieert · safety-bucket verslechtert ·
 verbetering alleen small-n/judge-ruis · p95 explodeert (tenzij niet-latency-fix met bewuste trade-off) ·
-gate faalt op harde safety.
-- **PASS + geen trigger** → `LATEST_BOT_VERSION` verschuiven + `test-bot-defaults.ts` ophogen + tsc/test PASS.
+nieuwe/gestegen HARD safety-violation (absolute blocker).
+- **Target-dimensie verbeterd + geen trigger** → `LATEST_BOT_VERSION` verschuiven + `test-bot-defaults.ts` ophogen + tsc/test PASS.
 - **Anders** → vasthouden; v0.8.1 blijft LATEST; resterende blockers documenteren.
 - **Niet-gekozen kandidaat-configs blijven niet als losse stubs in `bots.ts`.** Alleen de gekozen/gepromoveerde
   (of, bij FAIL, géén) config blijft; de exacte diffs van niet-gekozen fixes worden vastgelegd in het
@@ -151,7 +152,7 @@ gate faalt op harde safety.
 4. (bij botfix) nieuwe append-only versie in `lib/v0/server/bots.ts`.
 
 ## 6. Eindstatus (één van)
-`PROMOTED — V0 engine-gate gehaald (controlled-test-candidate)` · `BOT VERSION CANDIDATE — needs iteration` ·
+`PROMOTED — target-dimensie verbeterd, geen regressie (controlled-test-candidate)` · `BOT VERSION CANDIDATE — needs iteration` ·
 `NO BOT VERSION — built but unproven (budget-skip)` · `NO BOT VERSION — eval/infra artefact found` ·
 `NEED MORE DIAGNOSIS`. **Altijd** opgeleverd: latency-report, citation-binding-verdict, sub-taxonomy,
 verfijnde verifier, en de niet-gekozen fix als ready-to-apply patch.

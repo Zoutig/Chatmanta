@@ -37,6 +37,8 @@ ChatManta is een RAG website-chatbot SaaS voor MKB. Kernregel: **anti-hallucinat
 
 ## B. Bevestigde code-ankers (geverifieerd 2026-05-26)
 
+> ⚠️ Regelnummers zijn een hint, geen waarheid — ze schuiven bij elke rebase/edit. **Anker altijd op symboolnamen** (grep `const V0_8_1`, `const BOTS`, `BOT_VERSIONS_ORDERED`, `LATEST_BOT_VERSION =`) vóór je insert/edit. De nummers hieronder waren correct op 2026-05-26.
+
 - **Versie-registry** `lib/v0/server/bots.ts`: `V0_8_1` = regels 999–1006; `BOTS` = 1011–1022; `LATEST_BOT_VERSION` = 1038; `BOT_VERSIONS_ORDERED` = 1041–1052; `EVAL_DEFAULT_VERSIONS = BOT_VERSIONS_ORDERED.slice(-2)` = 1060 (→ een nieuwe v0.9 maakt de default-eval automatisch `[v0.8.1, v0.9]`).
 - **Latency-data:** `eval_runs.stage_timings_ms` (JSONB, migration 0019). `PhaseTimings` type = `rag.ts:1050`; `first_token_ms` = `rag.ts:1069` ("tijd tot eerste answer-delta"), in de eval gemerged in `stage_timings_ms` (`eval.ts:929-933`). Pure percentiel-helpers bestaan al: `lib/v0/server/eval-latency-stats.ts` (`STAGE_KEYS`, `computeStagePercentiles`, `slowestStageByQuestionType`, `compareBaseline`). ⚠ `first_token_ms` staat **niet** in `STAGE_KEYS` — lees dat veld direct.
 - **Judge & citations:** `eval.ts` `buildJudgeUserPrompt` (regel 283) geeft de judge `s.parentExcerpt ?? s.contentExcerpt` (regel 322); `bot_answer` opgeslagen = `response.answer` (regel 1020, RAW); `source_citation_binding` is een judge-output (boolean|null). `rag.ts:1860` doet "post-hoc sanitization" van het antwoord.
@@ -49,6 +51,7 @@ ChatManta is een RAG website-chatbot SaaS voor MKB. Kernregel: **anti-hallucinat
 - **Werk in worktree `../chatmanta-engine-iter2`, branch `feat/seb/bot-engine-iter2`. NOOIT naar `main` mergen** (push + PR mag). Vóór elke commit: `git rev-parse --abbrev-ref HEAD` = `feat/seb/bot-engine-iter2`.
 - **$10 harde cap met AUTO-SKIP.** Vóór de betaalde eval een kostenraming printen. Past het niet binnen het resterende budget → **skip de eval, promoveer niet**, eindig "gebouwd maar onbewezen". Er is 's nachts niemand voor een go; de cap beslist.
 - **HARD safety-gates nooit versoepelen:** must-not = 0 · unsupported hard-fact = 0 (m.u.v. goedgekeurde calc-warning) · zero-correctness ≤ 0.02.
+- **Promotie-criterium = dimensie-verbetering + géén regressie** (niet de volledige 9-drempel-gate). Promoveer wanneer de fix z'n target-dimensie meetbaar (buiten judge-ruis ~0.12) verbetert ÉN geen enkele andere drempel of HARD safety-gate verslechtert t.o.v. v0.8.1. De volledige Engine Gate hoeft NIET te slagen — v0.8.1 is al LATEST mét open gate-failures, dus "geen regressie" volstaat voor een netto-verbetering. **Absolute blocker (niet versoepelen):** een fix die must-not / unsupported-hard-fact / zero-correctness omhoog brengt of een nieuwe violation introduceert promoveert nóóit, ook al verbetert z'n eigen dimensie.
 - **Geen prompt-only refusal/hallucination-fix; geen nieuwe parallelle gating-laag; append-only botversies (v0.8.1 byte-identiek); flag-guard elke fix.**
 - **Niet versoepelen:** `claim-regenerate` OR→AND, `hardFactNumericFallback: false`, partial answering als default.
 - **Geen echte klantdata in V0.** Alleen fake demo-data.
@@ -100,6 +103,13 @@ Expected: PASS; output bevestigt `LATEST_BOT_VERSION = v0.8.1`.
 
 Run: `npm run audit:labels` en `npm run audit:retrieval` en `npm run eval:report`
 Expected: active corpus n≈176; recall@k ≈ 0.72 / MRR ≈ 0.82; V0 Engine Gate faalt op ≈9 drempels; must-not ≈4; unsupported hard-fact ≈7; p95 first_token ≈7765ms; source-citation ≈0.46. (Exacte waarden mogen binnen ruis afwijken.)
+
+- [ ] **Stap 2b: Veld-volledigheidscheck — de $0-diagnoses hangen hieraan.** De gate reproduceren is niet genoeg; bevestig dat de velden die Taak 2–4 lezen ook echt gevuld zijn op de nieuwste `eval_runs` van `LATEST_BOT_VERSION`:
+  - `stage_timings_ms` niet-leeg, incl. `first_token_ms` (Taak 2) — runs van ná migration 0019;
+  - `bot_answer` aanwezig, en behoudt inline `[N]`-markers indien de bot die emitteert (Taak 3);
+  - `judge_reasoning` niet-leeg (Taak 4).
+
+  Een snelle `select count(*) where <veld> is null` per veld volstaat. **STOP** (zelfde conditie als Stap 4) als een diagnose-kritiek veld grotendeels leeg is op de actuele runs — diagnose op incomplete data is misleidend; rapporteer en eindig `NEED MORE DIAGNOSIS — eval_runs incompleet`.
 
 - [ ] **Stap 3: Schrijf het precheck-doc.**
 
@@ -170,8 +180,9 @@ git commit -m "feat(eval): $0 latency-diagnose (audit:latency) + iter2-diagnoses
 - [ ] **Stap 1: Lees de runtime-locus vóór je iets concludeert.** Lees:
 - `lib/v0/server/rag.ts` rond regel 1840–1880 (de "post-hoc sanitization") — **strip die `[N]`-citatie-markers uit `response.answer`?**
 - `lib/v0/server/eval.ts` regel 255–330 (`buildJudgeUserPrompt`) — krijgt de judge een instructie om `source_citation_binding` te bepalen op een antwoord dat mogelijk geen markers meer heeft? Welke tekst krijgt hij (`bot_answer` raw + `parentExcerpt`)?
+- **De answer-generatie-prompt** (de system/user-prompt waarmee `response.answer` ontstaat — `rag.ts`/`prompts.ts`): **instrueert die de bot überhaupt om `[N]`-bronmarkers te zetten?** Zo nee, dan is een lage citation-rate géén stripping- én géén judge-artefact maar "feature niet gebouwd" (zie 4e verdict in Stap 4) — een andere conclusie dan de andere drie.
 
-Noteer feitelijk: behoudt het opgeslagen `bot_answer` inline `[N]`-markers, ja/nee.
+Noteer feitelijk: (a) behoudt het opgeslagen `bot_answer` inline `[N]`-markers, ja/nee; (b) vráágt de answer-prompt om citaties, ja/nee.
 
 - [ ] **Stap 2: Schrijf het integriteits-script.**
 
@@ -190,7 +201,7 @@ In `package.json` ná `audit:latency`:
 Run: `npm run audit:citations`
 Expected: een duidelijk getal voor "% antwoorden met inline marker". Is dat **laag** (bv. <30%) terwijl grounding vaak ≥3 → sterk signaal voor **stripping/logging-artefact** (geen botzwakte). Is het **hoog** maar binding tóch laag → mogelijk echte binding- of judge-strengheid.
 
-- [ ] **Stap 4: Verdict (kies één, onderbouwd):** `eval/logging-artefact` (markers gestript vóór judge / judge ziet schoongemaakte output) · `judge-strengheid` (binding=false bij correcte, gegronde antwoorden) · `echte botzwakte` (antwoord mist daadwerkelijk claim-bron-binding). Bij artefact: beschrijf de minimale **eval/report-fix** (níet een botfix) — bv. de judge op het raw-met-markers antwoord laten scoren, of `source_citation_binding` recompute-on-read.
+- [ ] **Stap 4: Verdict (kies één, onderbouwd):** `eval/logging-artefact` (markers gestript vóór judge / judge ziet schoongemaakte output) · `judge-strengheid` (binding=false bij correcte, gegronde antwoorden) · `feature-niet-gebouwd` (de answer-prompt vraagt nooit om `[N]`-markers → 0.46 is geen artefact én geen zwakte, maar een ontbrekende capability) · `echte botzwakte` (prompt vráágt citaties, maar het antwoord mist claim-bron-binding). Bij `eval/logging-artefact`: minimale **eval/report-fix** (judge op het raw-met-markers antwoord laten scoren, of `source_citation_binding` recompute-on-read) — geen botfix. Bij `feature-niet-gebouwd`: dit is een botfix-kandidaat voor Taak 6 (citation-instructie in de answer-prompt), géén eval-fix — weeg wel het regressierisico op andere dimensies.
 
 - [ ] **Stap 5: Schrijf de Citation-binding-sectie** in `docs/evals/2026-05-26-iter2-diagnoses.md`: oorzaakverdeling, dominante oorzaak, verdict, en of dit een eval-fix dan wel botfix-kandidaat is voor Taak 6.
 
@@ -329,7 +340,8 @@ git commit -m "docs(eval): iter2 beslisgate — gekozen botfix (of geen) + onder
 
 - [ ] **Stap 1: Root-cause-bevestiging (§E.4).** Bij een grounding-fix: bepaal per ≥3 cases de exacte bron (matched-span misuse / surrounding-context overuse / regenerate drift / fallback overfill). Mist de final-context in `eval_runs` → doe een kleine $0 dev-run (`npm run v0:chat -- --org <org> --v v0.8.1 --q "<failing vraag>"`) en lees de runtime; diagnose niet blind.
 
-- [ ] **Stap 2: Schrijf de falende test eerst (TDD).** Maak een deterministische test voor het fix-gedrag in de gekozen laag. Voorbeeld-vorm (pas aan op de echte functie-signatuur die je in Stap 1 vond):
+- [ ] **Stap 2: Falende test / before-baseline eerst — kies de vorm naar het fix-type.**
+  - **Deterministische laag** (hard-fact echo/negated-detectie, threshold-/reclassify-filter, citation-marker-injectie, history-entity): schrijf een **deterministische unit-test** op de pure functie-signatuur die je in Stap 1 vond. Voorbeeld-vorm (pas aan op de echte signatuur):
 
 ```ts
 // scripts/test-iter2-fix.ts  (of een __tests__ naast de laag)
@@ -341,13 +353,13 @@ if (/* out bevat nog de ongegronde toevoeging / mist de gegronde herschrijving *
 }
 console.log('PASS');
 ```
+  - **LLM-bemiddelde laag** (regenerate/claim-grounding, gedrag niet-deterministisch): een pure unit-test is hier schijn-zekerheid — verzin er geen. Leg in plaats daarvan een **before-baseline vast op ≥3 echte failing cases** uit de sub-taxonomy: `npm run v0:chat -- --org <org> --v v0.8.1 --q "<case>"` en noteer de ongegronde output. De "test" is de gedocumenteerde before→after-vergelijking in Stap 7.
 
-- [ ] **Stap 3: Run de test → faalt.**
+- [ ] **Stap 3: Baseline bevestigen.**
+  - Deterministische fix → `node --import tsx scripts/test-iter2-fix.ts` → **FAIL** (de fix bestaat nog niet).
+  - LLM-bemiddelde fix → de ≥3 before-runs reproduceren de ongegronde output (gedocumenteerd; tel ~$0.01/run mee in de spend-ledger van Taak 8).
 
-Run: `node --import tsx scripts/test-iter2-fix.ts`
-Expected: FAIL (de fix bestaat nog niet).
-
-- [ ] **Stap 4: Voeg de append-only config toe** in `bots.ts` ná regel 1006:
+- [ ] **Stap 4: Voeg de append-only config toe** in `bots.ts`, **direct ná de `V0_8_1`-config** (grep `const V0_8_1` om de plek te vinden — vertrouw geen regelnummer, dat schuift):
 
 ```ts
 const V0_9: BotConfig = {
@@ -358,13 +370,13 @@ const V0_9: BotConfig = {
   <flagNaam>: true, // nieuwe flag die de fix guardt
 };
 ```
-Registreer in `BOTS` (ná regel 1021): `[V0_9.version]: V0_9,` en in `BOT_VERSIONS_ORDERED` (ná 1051): `V0_9.version,`. **`LATEST_BOT_VERSION` NOG NIET wijzigen.** (Is het een `v0.8.2`-entity/hard-fact-fix, gebruik dan die naam i.p.v. `v0.9`.)
+Registreer in het `BOTS`-object (grep `const BOTS`): `[V0_9.version]: V0_9,` en in `BOT_VERSIONS_ORDERED` (grep `BOT_VERSIONS_ORDERED`): `V0_9.version,` als laatste element. **`LATEST_BOT_VERSION` NOG NIET wijzigen.** (Is het een `v0.8.2`-entity/hard-fact-fix, gebruik dan die naam i.p.v. `v0.9`.)
 
 - [ ] **Stap 5: Implementeer de fix flag-guarded** in de gekozen laag, zó dat het v0.8.1-pad byte-identiek blijft (`if (bot.<flagNaam>) { ...nieuw pad... }`). Geen prompt-only fix bij safety/refusal; consolideer in de bestaande verify/regenerate/threshold-laag.
 
-- [ ] **Stap 6: Run de test → slaagt, en invariant-test.**
+- [ ] **Stap 6: Fix-bewijs + invariant-test.**
 
-Run: `node --import tsx scripts/test-iter2-fix.ts` → PASS.
+Deterministische fix → `node --import tsx scripts/test-iter2-fix.ts` → PASS. (LLM-bemiddelde fix → het after-bewijs komt in Stap 7's smoke; sla de pure-test-PASS over, die zou schijn-zekerheid zijn.)
 Run: `node --import tsx scripts/test-bot-defaults.ts` → PASS (LATEST nog v0.8.1).
 Run: `npx tsc --noEmit` → schoon op de gewijzigde files.
 
@@ -386,9 +398,9 @@ git commit -m "feat(v0.9): <fix> via bestaande <laag>; append-only, flag-guarded
 
 **Files:** geen (eval-run + telemetrie).
 
-- [ ] **Stap 1: Print een concrete kostenraming.** Bereken: # vragen (active ≈176) × # versies (2: v0.8.1 + kandidaat) × runs=1 bot-calls (`gpt-4o-mini`, goedkoop) + judge-calls (`gpt-4o`, de hoofdkost) + pairwise op de target-bucket + eventueel `--runs=3` op het effectgebied. Geef een USD-range. Het report toont per-run cost via `query_log.cost_usd`/eval-telemetrie; gebruik de #104-raming ~$5–8 als richtlijn.
+- [ ] **Stap 1: Bereken het resterende budget uit een lopende spend-ledger — niet uit één vooraf-raming.** Houd vanaf Taak 7 een cumulatief logje bij van élke betaalde call (smoke-tests Stap 7 ~$0.01/stuk, §E.4 dev-runs en de ≥3 before-runs via `v0:chat`). `resterend = $10 − reeds_besteed`. Raam dan de proof-eval: # vragen (active ≈176) × # versies (2: v0.8.1 + kandidaat) × runs=1 bot-calls (`gpt-4o-mini`, goedkoop) + judge-calls (`gpt-4o`, de hoofdkost) + pairwise op de target-bucket + eventueel `--runs=3` op het effectgebied. Geef een USD-range; het report toont per-run cost via `query_log.cost_usd`/eval-telemetrie; gebruik #104's ~$5–8 als richtlijn. **Print zowel `reeds_besteed` als de eval-raming.**
 
-- [ ] **Stap 2: AUTO-SKIP-beslissing.** Past de raming **niet** binnen het resterende deel van de $10-cap → **skip de eval**, promoveer niet, schrijf in het analyse-doc `NO BOT VERSION — built but unproven (budget-skip)` en ga naar Taak 10. (Er is 's nachts niemand voor een go.)
+- [ ] **Stap 2: AUTO-SKIP op resterend budget (niet op de volle $10).** Past de eval-raming **niet binnen `resterend`** → **skip de eval**, promoveer niet, schrijf in het analyse-doc `NO BOT VERSION — built but unproven (budget-skip)` en ga naar Taak 10. (Er is 's nachts niemand voor een go.) Overschrijdt de werkelijke spend tijdens de eval onverwacht de cap → laat de lopende run aflopen maar start géén vervolg-`--runs=3`.
 
 - [ ] **Stap 3: (Past het) draai de gerichte eval.**
 
@@ -407,17 +419,18 @@ Expected: gate-uitkomst voor beide versies + per-bucket deltas.
 
 **Files:**
 - Create: `docs/evals/2026-05-26-v0.9-analysis.md`
-- Modify (alleen bij PASS): `lib/v0/server/bots.ts:1038`, `scripts/test-bot-defaults.ts`
+- Modify (alleen bij promotie): `lib/v0/server/bots.ts` (`LATEST_BOT_VERSION =`, grep — niet op regelnummer), `scripts/test-bot-defaults.ts`
 
 - [ ] **Stap 1: Schrijf de promotie-analyse.** Topline C/P/G/overall/prod-ready/$/latency · V0 Engine Gate + Aspirational Gate · must-not-delta · unsupported-hard-fact-delta · zero-correctness-delta · source-citation-delta · latency-delta · target-bucket-score · pairwise win/loss/tie · per-org regressies · small-n-waarschuwingen.
 
-- [ ] **Stap 2: Toets de PROMOVEER-NIET-triggers.** Niet promoveren als één geldt: must-not stijgt of nieuwe violation · unsupported hard-fact stijgt (buiten artefact/warning) · zero-correctness stijgt · factual daalt buiten ruis · andere org regredieert · safety-bucket verslechtert · verbetering alleen small-n/judge-ruis · p95 explodeert (tenzij niet-latency-fix met bewuste trade-off) · gate faalt op harde safety.
+- [ ] **Stap 2: Pas het promotie-criterium toe — dimensie-verbetering + géén regressie (NIET de volledige 9-drempel-gate).** Promoveer wanneer ÁLLE geldt: (a) de fix verbetert z'n target-dimensie meetbaar buiten judge-ruis (~0.12); (b) géén andere drempel verslechtert t.o.v. v0.8.1; (c) géén HARD safety-regressie. De volledige Engine Gate hoeft NIET te slagen — v0.8.1 is al LATEST mét open failures, dus een netto-verbetering zonder regressie is promoveerbaar.
+  **PROMOVEER-NIET-triggers (één is genoeg):** must-not stijgt of nieuwe violation · unsupported hard-fact stijgt (buiten artefact/warning) · zero-correctness stijgt · factual daalt buiten ruis · andere org regredieert · safety-bucket verslechtert · verbetering alleen small-n/judge-ruis · p95 explodeert (tenzij niet-latency-fix met bewuste trade-off). **Absolute blocker:** een nieuwe of gestegen HARD safety-violation (must-not / unsupported-hard-fact / zero-correctness) promoveert nóóit, ook al verbetert de target-dimensie.
 
-- [ ] **Stap 3a: PASS + geen trigger → promoveren.**
+- [ ] **Stap 3a: Target-dimensie verbeterd + geen trigger → promoveren.**
 
-In `bots.ts:1038`: `export const LATEST_BOT_VERSION = V0_9.version;` (+ rationale-comment zoals bij v0.8.1). Hoog de assert in `scripts/test-bot-defaults.ts` op naar de nieuwe versie.
+In `bots.ts` (grep `LATEST_BOT_VERSION =`): `export const LATEST_BOT_VERSION = V0_9.version;` (+ rationale-comment zoals bij v0.8.1). Hoog de assert in `scripts/test-bot-defaults.ts` op naar de nieuwe versie.
 Run: `npx tsc --noEmit` en `node --import tsx scripts/test-bot-defaults.ts` → PASS.
-Eindstatus: `PROMOTED — V0 engine-gate gehaald (controlled-test-candidate)`.
+Eindstatus: `PROMOTED — target-dimensie verbeterd, geen regressie (controlled-test-candidate; volledige Engine Gate nog niet gehaald)`.
 
 - [ ] **Stap 3b: Verbetert maar FAIL → vasthouden.** `LATEST_BOT_VERSION` blijft v0.8.1. Documenteer resterende blockers + volgende-iteratie-advies. Eindstatus: `BOT VERSION CANDIDATE — needs iteration`. (De v0.9-config blijft append-only geregistreerd voor vergelijking.)
 
@@ -463,7 +476,7 @@ gh pr create --fill
 2. `docs/evals/2026-05-26-iter2-diagnoses.md` — latency + citation-binding + sub-taxonomy + hard-fact + beslisgate (één doc, secties per taak).
 3. Nieuwe $0-audit-scripts: `audit:latency`, `audit:citations`, `audit:subtax`.
 4. (bij botfix) nieuwe append-only versie in `bots.ts` + `docs/evals/2026-05-26-v0.9-analysis.md`.
-5. Eén eindstatus: `PROMOTED — V0 engine-gate gehaald` · `BOT VERSION CANDIDATE — needs iteration` · `NO BOT VERSION — built but unproven (budget-skip)` · `NO BOT VERSION — eval/infra artefact found` · `NEED MORE DIAGNOSIS`.
+5. Eén eindstatus: `PROMOTED — target-dimensie verbeterd, geen regressie` · `BOT VERSION CANDIDATE — needs iteration` · `NO BOT VERSION — built but unproven (budget-skip)` · `NO BOT VERSION — eval/infra artefact found` · `NEED MORE DIAGNOSIS`.
 6. Een open PR op `feat/seb/bot-engine-iter2` (nooit gemerged).
 
 **Wees streng:** promoveer alleen op data (gate PASS + geen promoveer-niet-trigger). Schend geen hard rule uit §C. Bij twijfel: geen botfix.
