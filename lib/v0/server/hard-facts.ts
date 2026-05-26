@@ -361,3 +361,39 @@ export function containsHardFacts(text: string): boolean {
     f.numbers.length > 0
   );
 }
+
+/** iter2 v0.9 — beslis of een ongegronde hard-fact-hallucinatie DETERMINISTISCH
+ *  geweigerd moet worden i.p.v. een tweede LLM-poging (die empirisch onbetrouwbaar
+ *  is in het verwijderen van het verzonnen getal — zie de v0.8.1 history-entity
+ *  les in rag.ts). Dit is de dominante `out_of_corpus_overanswer`-faalmodus uit de
+ *  iter2 sub-taxonomy: de bot noemt een specifiek bedrag/datum/aantal dat niet in
+ *  de bronnen staat op een vraag die uit het corpus niet te beantwoorden is.
+ *
+ *  KERN — de RETRIEVAL-STERKTE is de regressie-mitigatie: vuur alléén wanneer de
+ *  hard-fact niet in de bron staat ÉN de retrieval ZWAK/MEDIUM was. claim-confidence
+ *  scheidt deze gevallen NIET (een fabricatie heeft confidence≈1 — embeddings matchen
+ *  vorm, niet waarde; dat is juist waarom de hard-fact-verifier bestaat). Empirisch
+ *  (iter2-smoke): een out_of_corpus-fabricatie haalt retrievalStrength='medium', een
+ *  gegronde tiered-Vpb-calc 'strong'. 'strong' = directe brondekking (bv. tax-doc met
+ *  tarieven) → NIET weigeren (geen over-refusal op correcte rekenkunde). 'none' =
+ *  zero-hits, al afgehandeld door reclassifyAfterZeroHits.
+ *
+ *  Pure functie → tsx-testbaar (scripts/test-iter2-fix.ts), geen side-effects. */
+export function shouldDeterministicallyRefuseHardFact(args: {
+  /** bot.hardFactDeterministicRefusal — flag-guard; false → v0.8.1-gedrag. */
+  enabled: boolean;
+  /** result.hardFactSupported (undefined = verifier draaide niet). */
+  hardFactSupported: boolean | undefined;
+  /** decision.retrievalStrength (undefined = geen adaptive decision). */
+  retrievalStrength: 'none' | 'weak' | 'medium' | 'strong' | undefined;
+  /** Al deterministisch afgehandeld door de history-entity-tak → niet dubbel. */
+  adoptedHistoryEntity: boolean;
+}): boolean {
+  const { enabled, hardFactSupported, retrievalStrength, adoptedHistoryEntity } = args;
+  if (!enabled || adoptedHistoryEntity) return false;
+  const unsupportedHardFact = hardFactSupported === false;
+  // Gevarenzone: zwakke/medium retrieval (over-answer-risico). STRONG = gegronde
+  // directe match → spaar correcte calc. NONE → al afgehandeld vóór dit punt.
+  const weakRetrieval = retrievalStrength === 'weak' || retrievalStrength === 'medium';
+  return unsupportedHardFact && weakRetrieval;
+}

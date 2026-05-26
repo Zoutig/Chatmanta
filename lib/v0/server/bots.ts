@@ -270,6 +270,19 @@ export type BotConfig = {
    */
   historyEntityVerification?: boolean;
   /**
+   * v0.9 (iter2): deterministisch hard-fact-weiger-template. Wanneer de bot een
+   * hard feit (bedrag/datum/aantal) noemt dat NIET in de bronnen staat ÉN het
+   * antwoord ongegrond is (lage claim-confidence), vervang het antwoord
+   * deterministisch door een eerlijk weiger/doorverwijs-template i.p.v. de
+   * (empirisch onbetrouwbare) tweede LLM-poging. Adresseert de dominante
+   * out_of_corpus_overanswer-faalmodus. De conjunctie (beide grounding-signalen
+   * falen) spaart gegronde tiered-calc — geen over-refusal. Consolidatie in de
+   * bestaande regenerate-laag; geen parallelle gate, geen prompt-only fix.
+   * Vereist bot.claimRegenerateEnabled + bot.adaptiveHardFactVerification.
+   * Default false/undefined → identiek aan v0.8.1 (append-only).
+   */
+  hardFactDeterministicRefusal?: boolean;
+  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
@@ -1005,6 +1018,26 @@ const V0_8_1: BotConfig = {
   historyEntityVerification: true,
 };
 
+// v0.9 (iter2) — data-driven candidate uit de iter2-diagnoses. De dominante
+// genuine failure-mode was `out_of_corpus_overanswer` (n=12, 3 orgs): de bot
+// verzint een specifiek bedrag/datum/aantal op een vraag die uit het corpus niet
+// te beantwoorden is — convergeert met must-not + unsupported-hard-fact +
+// zero-correctness. De bestaande hard-fact-regenerate doet een tweede LLM-poging
+// die het verzonnen getal vaak opnieuw produceert (zelfde onbetrouwbaarheid als
+// de v0.8.1 history-entity-les). v0.9 vervangt die bij een ONGEGRONDE hard-fact-
+// hallucinatie (conjunctie hardFactSupported=false ÉN lage claim-confidence) door
+// een deterministisch weiger/doorverwijs-template. De conjunctie spaart gegronde
+// tiered-Vpb-calc → geen over-refusal. Consolidatie in de bestaande regenerate-
+// laag; geen parallelle gate, geen prompt-only fix. v0.8.1 byte-identiek.
+const V0_9: BotConfig = {
+  ...V0_8_1,
+  version: 'v0.9',
+  label: 'v0.9 — deterministische hard-fact-weigering',
+  description:
+    'v0.8.1 plus hardFactDeterministicRefusal: bij een ongegronde hard-fact-hallucinatie (bedrag/datum/aantal niet in bronnen ÉN lage claim-confidence) vervangt de bestaande regenerate-laag het antwoord deterministisch door een eerlijk weiger/doorverwijs-template i.p.v. een onbetrouwbare tweede LLM-poging. Adresseert out_of_corpus_overanswer (iter2). Conjunctie-gating spaart gegronde tiered-calc — geen over-refusal. Geen parallelle gate, geen prompt-only fix. v0.8.1 byte-identiek.',
+  hardFactDeterministicRefusal: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1019,6 +1052,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_7_2.version]: V0_7_2,
   [V0_7_3.version]: V0_7_3,
   [V0_8_1.version]: V0_8_1,
+  [V0_9.version]: V0_9,
 };
 
 /**
@@ -1049,6 +1083,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_7_2.version,
   V0_7_3.version,
   V0_8_1.version,
+  V0_9.version,
 ];
 
 /**
