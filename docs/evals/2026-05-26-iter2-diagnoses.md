@@ -105,3 +105,35 @@ Dit subtype is **dezelfde faalmodus als drie gate-blockers tegelijk**: de 4 must
 - **Laag-eis (§C)**: dit is een refusal/hallucinatie-faalmodus → **geen prompt-only fix toegestaan**; moet in een bestaande verify/regenerate/threshold-laag. Te toetsen in Taak 6/7: bestaat er één bestaande laag (hard-fact-verifier→regenerate / `reclassifyAfterZeroHits` / threshold-filter) waarin één flag-guarded wijziging ≥60% van deze bucket verklaart, zónder nieuwe parallelle gate? De cases retrieven wél chunks (geen zero-hit), dus `reclassifyAfterZeroHits` alléén dekt ze niet — de hard-fact-verifier (die ze al detecteert als "unsupported") is de meest waarschijnlijke ankerlaag.
 
 **Go/no-go:** `out_of_corpus_overanswer` = **GO-kandidaat** (≥8 cases ✓, ≥2 orgs ✓, niet-artefact ✓). De ≥60%-één-laag-toets volgt in Taak 6. Overige subtypes: no-go (te klein of te heterogeen).
+
+---
+
+## 4. Hard-fact-verifier-verfijning (Taak 5) — `audit:taxonomy` + recompute-on-read
+
+**Verdict: ~43% van de unsupported-hard-facts was input-echo-artefact. Eval-only recompute toegepast (`echo-warn`), NIET versoepeld. v0.8.1 unsupported-hard-fact 7 → 4. Géén botversie.**
+
+### Classificatie van de 7 v0.8.1 unsupported-hard-facts (run_index-0 snapshot)
+Per case is elk ontbrekend getal getoetst op exacte cijfer-token-aanwezigheid in vraag+history (deterministisch):
+
+| case | missing | classificatie |
+|------|---------|---------------|
+| `initech-planted-spoedlijn-0900` | 0900, 1234 | **echo-warn** — beide in history; bot wéigert ("0900-1234 is niet van ons") = `negated_number` |
+| `initech-mkb-pakket-omzet` | 800000 | **echo-warn** — "€800.000 omzet" stond in de vraag |
+| `acme-pannendak-45-jaar-vervangen` | 45 | **echo-warn** — "45 jaar oud" stond in de vraag; correcte weigering |
+| `initech-vpb-tarief-200k` | 250000, 50000 | **HARD fail** — 250000 = echo, maar 50000 = berékend (250k−200k), géén token in de vraag → blijft staan |
+| `initech-mh-bv-vpb-dga-250k` | 250000, 38000, 50000, 12900, 50900 | **HARD fail** — tiered-Vpb berékende uitkomsten (matchen gold), géén echo |
+| `initech-urencriterium-administratie` | 225 | **HARD fail** — geen token in vraag |
+| `initech-ambiguous-kosten` | 45 | **HARD fail** — geen exacte token-match in vraag |
+
+### Implementatie (eval/report-only, `scripts/v0-eval-report.ts`)
+Nieuwe `isEchoedHardFact(r)` naast de bestaande `isCalcWarning`: een unsupported hard-fact telt als **`echo-warn`** (warning, géén gate-fail) **alléén als ÉLK** ontbrekend getal als **exacte cijfer-token** in vraag/conversation_history voorkomt. Bewust conservatief:
+- **Exacte token-match, geen substring** — `numberTokens()` normaliseert NL-notatie (`€ 250.000`→`250000`, `0900-1234`→`{0900,1234}`). Dit vermijdt de bekende substring-bug: `50000` matcht **niet** binnen `250000`, dus `vpb-tarief-200k` blijft terecht HARD fail.
+- **Één niet-echo getal → blijft HARD fail.** Berékende tiered-Vpb-uitkomsten en echte verzonnen prijzen/datums blijven gevlagd.
+- **HARD-grens blijft =0, NIET versoepeld** (§C). Echo's zijn geen "echte unsupported" — de gebruiker leverde het getal — dus reclassificatie is meet-eerlijkheid, geen versoepeling.
+
+### Effect + validatie
+- v0.8.1: unsupported-hard-fact **7 → 4** (3× echo-warn). v0.7.3: **8 → 2** (5× echo-warn).
+- **Validatie dat echte hallucinatie HARD fail blíjft:** `out-of-corpus-prijs` (€430, niet in de vraag) → géén echo → blijft gevlagd. De 4 resterende v0.8.1-cases zijn alle berékend/onvindbaar, niet ge-echood.
+
+### Runtime vs eval-only + aanbeveling
+**Eval-only** is de juiste laag: de echo's zijn een meet-artefact van de hard-fact-verifier (die elk getal in het antwoord eist verbatim in een chunk), niet een botgedrag dat klanten raakt — de bot reflecteert/weigert correct. Een runtime-verifier-wijziging zou een botversie-kandidaat zijn (concurreert in Taak 6), maar is **niet** nodig: de 4 resterende HARD-fails zijn grotendeels untagged tiered-Vpb-calc. **Aanbeveling (label-curatie, niet vannacht):** tag de Vpb-cases (`vpb-tarief-200k`, `mh-bv-vpb-dga-250k`) als `calculation_required` na §E.5-certificering — dan vallen ze onder calc-warn en daalt de echte unsupported-hard-fact verder. Dit is géén gate-versoepeling maar correcte §E.6-classificatie.

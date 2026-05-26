@@ -122,7 +122,7 @@ if (!runRows || runRows.length === 0) {
 
 const { data: qRows, error: qErr } = await sb
   .from('eval_questions')
-  .select('id, organization_id, slug, question, gold_answer, gold_facts, tags, difficulty, question_type, must_not_contain, ideal_source_filenames');
+  .select('id, organization_id, slug, question, conversation_history, gold_answer, gold_facts, tags, difficulty, question_type, must_not_contain, ideal_source_filenames');
 if (qErr) fail(`eval_questions select: ${qErr.message}`);
 const qById = new Map((qRows ?? []).map((q) => [q.id as string, q]));
 
@@ -836,30 +836,70 @@ function isCalcWarning(r: RunRow): boolean {
   const q = qById.get(r.question_id as string);
   return ((q?.tags as string[] | null) ?? []).includes('calculation_required');
 }
+// iter2 Taak 5 — echoed-question-number / negated-number-verfijning (§E.6-uitbreiding).
+// Een unsupported hard-fact waarvan ELK ontbrekend getal (als exacte cijfer-token)
+// letterlijk in de VRAAG of conversation_history voorkomt, is geen corpus-
+// hallucinatie maar een echo van de input: de gebruiker leverde het getal en de bot
+// reflecteert het (vpb-winst €250.000) of weigert het (geplant "0900-1234 — dat
+// nummer is niet van ons"). Telt als WARNING (zichtbaar), niet als gate-fail.
+//
+// VERSOEPELT NIETS aan echte verzonnen prijzen/datums: conservatief (ÉÉN niet-echo
+// getal → blijft HARD fail) en op exacte token-match, niet substring — "45" matcht
+// dus NIET binnen "450" (vermijdt de bekende numeric-substring-bug). calc-warn heeft
+// voorrang; tiered-Vpb berékende uitkomsten (38000/12900/50900) zijn géén echo en
+// blijven HARD fail.
+function numberTokens(s: string): Set<string> {
+  const out = new Set<string>();
+  // Maximale groep cijfers met . , of enkele spatie ertussen (NL-notatie:
+  // "€ 250.000" → "250000", "250 000" → "250000"). Hyphen/letters splitsen tokens:
+  // "0900-1234" → "0900","1234". Leidende nul behouden ("0900").
+  for (const m of s.matchAll(/\d[\d.,\s]*\d|\d/g)) {
+    const norm = m[0].replace(/[.,\s]/g, '');
+    if (norm) out.add(norm);
+  }
+  return out;
+}
+function isEchoedHardFact(r: RunRow): boolean {
+  if (r.hard_fact_status !== 'unsupported') return false;
+  if (isCalcWarning(r)) return false; // calc-warn heeft voorrang
+  const missing = Array.isArray(r.missing_hard_facts) ? (r.missing_hard_facts as string[]) : [];
+  if (missing.length === 0) return false;
+  const q = qById.get(r.question_id as string);
+  if (!q) return false;
+  const hist = ((q.conversation_history as Array<{ role: string; content: string }> | null) ?? [])
+    .map((t) => t.content).join(' ');
+  const tokens = numberTokens(`${(q.question as string) ?? ''} ${hist}`);
+  // ELK ontbrekend getal moet als exacte cijfer-token in vraag/history staan.
+  return missing.every((m) => {
+    const d = (m.split(':')[1] ?? '').replace(/[.,\s]/g, '');
+    return d.length > 0 && tokens.has(d);
+  });
+}
 lines.push('## v0.8 — Hard-fact support');
 lines.push('');
 lines.push('`unsupported` = bot noemde een hard feit dat niet in de sources staat (hallucinatie-risico). `unknown` = verifier draaide niet (fallback/smalltalk/error) terwijl de output wél harde feiten bevatte — op een risk-case telt dit als warning, **nooit** auto-PASS. `none_detected` = geen harde feiten. Snapshot = run_index 0.');
 lines.push('');
-lines.push('`calc-warn` (§E.6) = als `calculation_required` getagde schone rekenkunde-case waarvan de berekende uitkomst niet verbatim in de bron staat — telt als warning, NIET als gate-fail. `unsupported` hieronder is al exclusief calc-warn.');
+lines.push('`calc-warn` (§E.6) = als `calculation_required` getagde schone rekenkunde-case waarvan de berekende uitkomst niet verbatim in de bron staat — telt als warning, NIET als gate-fail. `echo-warn` (iter2 §E.6-uitbreiding) = unsupported hard-fact waarvan ÉLK ontbrekend getal letterlijk (exacte cijfer-token) in de vraag/history stond → echo van de input, geen corpus-hallucinatie. `unsupported` hieronder is al exclusief calc-warn én echo-warn.');
 lines.push('');
-lines.push('| versie | n | none_detected | supported | unsupported | calc-warn | unknown | unsupported-rate | unknown-on-risk |');
-lines.push('|--------|---|---------------|-----------|-------------|-----------|---------|------------------|-----------------|');
-const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number; calcWarn: number }>();
+lines.push('| versie | n | none_detected | supported | unsupported | calc-warn | echo-warn | unknown | unsupported-rate | unknown-on-risk |');
+lines.push('|--------|---|---------------|-----------|-------------|-----------|-----------|---------|------------------|-----------------|');
+const hardFactGateByVersion = new Map<string, { unsupported: number; unknownOnRisk: number; calcWarn: number; echoWarn: number }>();
 for (const v of versionsForHeader) {
   const vRows = latestRuns.filter((r) => r.bot_version === v);
   if (vRows.length === 0) continue;
   const withStatus = vRows.filter((r) => r.hard_fact_status != null);
   const none = withStatus.filter((r) => r.hard_fact_status === 'none_detected').length;
   const sup = withStatus.filter((r) => r.hard_fact_status === 'supported').length;
-  // §E.6: schone-rekenkunde unsupported (calc-warn) telt NIET als gate-fail.
+  // §E.6: schone-rekenkunde (calc-warn) én input-echo (echo-warn) tellen NIET als gate-fail.
   const unsupAll = withStatus.filter((r) => r.hard_fact_status === 'unsupported');
   const calcWarn = unsupAll.filter((r) => isCalcWarning(r)).length;
-  const unsup = unsupAll.length - calcWarn;
+  const echoWarn = unsupAll.filter((r) => isEchoedHardFact(r)).length;
+  const unsup = unsupAll.length - calcWarn - echoWarn;
   const unk = withStatus.filter((r) => r.hard_fact_status === 'unknown').length;
   const unkOnRisk = withStatus.filter((r) => r.hard_fact_status === 'unknown' && RISK_QUESTION_TYPES.has(qTypeOf(r.question_id as string))).length;
   const unsupRate = withStatus.length === 0 ? '—' : `${Math.round((unsup / withStatus.length) * 100)}%`;
-  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk, calcWarn });
-  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${calcWarn} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
+  hardFactGateByVersion.set(v, { unsupported: unsup, unknownOnRisk: unkOnRisk, calcWarn, echoWarn });
+  lines.push(`| ${v} | ${withStatus.length} | ${none} | ${sup} | ${unsup} | ${calcWarn} | ${echoWarn} | ${unk} | ${unsupRate} | ${unkOnRisk} |`);
 }
 lines.push('');
 // Slug-lijst van unsupported hard facts (per versie) — directe diagnose.
@@ -870,7 +910,8 @@ for (const v of versionsForHeader) {
   for (const r of unsupRows) {
     const q = qById.get(r.question_id as string);
     const missing = Array.isArray(r.missing_hard_facts) ? (r.missing_hard_facts as string[]).join(', ') : '—';
-    const calcTag = isCalcWarning(r) ? ' — 🧮 calc-warn (§E.6, telt niet als gate-fail)' : '';
+    const calcTag = isCalcWarning(r) ? ' — 🧮 calc-warn (§E.6, telt niet als gate-fail)'
+      : isEchoedHardFact(r) ? ' — 📣 echo-warn (getal stond in vraag/history, telt niet als gate-fail)' : '';
     lines.push(`- _${q?.slug ?? '?'}_ (${qTypeOf(r.question_id as string)}): missing ${missing}${calcTag}`);
   }
   lines.push('');
@@ -1046,7 +1087,7 @@ for (const v of versionsForHeader) {
   // Hardgrens =0; mag NOOIT versoepeld worden (safety gate). §E.6: schone-
   // rekenkunde (calc-warn) is hier al uit `unsupported` gehaald en telt als
   // aparte warning — de hardgrens zelf blijft =0, niet versoepeld.
-  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0, calcWarn: 0 };
+  const hfGate = hardFactGateByVersion.get(v) ?? { unsupported: 0, unknownOnRisk: 0, calcWarn: 0, echoWarn: 0 };
   checks.push({
     label: 'unsupported hard facts',
     actual: String(hfGate.unsupported),
@@ -1057,6 +1098,14 @@ for (const v of versionsForHeader) {
   checks.push({
     label: 'calc-required hard-fact (warn §E.6)',
     actual: String(hfGate.calcWarn),
+    target: 'warn',
+    pass: true,
+  });
+  // iter2 §E.6-uitbreiding echo-warn: getal stond in vraag/history → geen
+  // hallucinatie. Zichtbaar als warning; telt nooit als gate-fail of auto-PASS.
+  checks.push({
+    label: 'echoed-input hard-fact (warn iter2)',
+    actual: String(hfGate.echoWarn),
     target: 'warn',
     pass: true,
   });
