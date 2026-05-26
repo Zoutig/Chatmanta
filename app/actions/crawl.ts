@@ -19,7 +19,7 @@ import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getSystemJobClient } from '@/lib/supabase/admin';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
-import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES } from '@/lib/v0/crawler/firecrawl';
+import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v0/crawler/firecrawl';
 import { ingestSinglePage } from '@/lib/v0/crawler/processCrawl';
 import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
@@ -46,7 +46,7 @@ export async function discoverPagesAction(rawUrl: string): Promise<ActionResult<
     const check = await validateCrawlUrl(url);
     if (!check.allowed) fail('CRAWL_FAILED', check.reason);
 
-    const found = await mapSite(url, MAX_CRAWL_PAGES);
+    const found = await mapSite(url, MAX_DISCOVER_PAGES);
     // SSRF (SA-2): élke teruggegeven URL opnieuw toetsen — een site kan naar interne hosts linken.
     const validated = await filterPublicUrls([url, ...found]);
     return { rootUrl: url, urls: Array.from(new Set(validated)) };

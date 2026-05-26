@@ -12,8 +12,14 @@
 
 import Firecrawl, { type Document as FirecrawlDocument, type MapOptions } from '@mendable/firecrawl-js';
 
-/** Harde bovengrens per crawl. Voorkomt explosieve Firecrawl-kosten (blueprint sectie 14). */
+/** Harde bovengrens per crawl (= aantal pagina's dat we daadwerkelijk scrapen).
+ *  Voorkomt explosieve Firecrawl-kosten (blueprint sectie 14). */
 export const MAX_CRAWL_PAGES = 50;
+
+/** Bovengrens voor *ontdekken* (map). Map scrapet niets — het kost ~1 credit
+ *  ongeacht hoeveel URLs terugkomen — dus we tonen de klant ruim de hele sitemap.
+ *  Bewust losgekoppeld van MAX_CRAWL_PAGES: de scrape-cap blijft 50, de keuzelijst niet. */
+export const MAX_DISCOVER_PAGES = 500;
 
 /** Eén genormaliseerde gecrawlde pagina, klaar voor de ingest-pijplijn. */
 export type CrawledPage = {
@@ -58,7 +64,7 @@ function toCrawledPage(doc: FirecrawlDocument): CrawledPage {
 }
 
 /** Haalt de sitemap/pagina-lijst van een site op (geen scrape — alleen URLs). */
-export async function mapSite(url: string, limit: number = MAX_CRAWL_PAGES): Promise<string[]> {
+export async function mapSite(url: string, limit: number = MAX_DISCOVER_PAGES): Promise<string[]> {
   const opts: MapOptions = { sitemap: 'include', limit };
   const res = await getClient().map(url, opts);
   const urls = (res.links ?? []).map((l) => l.url).filter((u): u is string => typeof u === 'string');
