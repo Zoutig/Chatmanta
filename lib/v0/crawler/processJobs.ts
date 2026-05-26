@@ -8,7 +8,7 @@
 import 'server-only';
 
 import type { getSystemJobClient } from '@/lib/supabase/admin';
-import { getCrawlStatus } from '@/lib/v0/crawler/firecrawl';
+import { getCrawlJobStatus } from '@/lib/v0/crawler/firecrawl';
 import { ingestCrawlResults } from '@/lib/v0/crawler/processCrawl';
 
 type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
@@ -46,7 +46,7 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
         continue;
       }
 
-      const status = await getCrawlStatus(crawlId);
+      const status = await getCrawlJobStatus(crawlId);
 
       if (status.status === 'scraping') {
         if (attempts + 1 >= MAX_ATTEMPTS) {
