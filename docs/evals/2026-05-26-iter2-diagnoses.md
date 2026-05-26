@@ -44,3 +44,26 @@ Voeg `adaptive_decision` (of minimaal `path`) toe aan de eval-snapshot zodat fas
 
 ### Outlier-noot
 `werkgebied-heerlen-bridge-out` (56795ms, rerank 50408ms) en `globex-mh-bekken-wachttijd` (33478ms, rerank 20475ms) zijn cold-start/timeout-outliers, geen representatief gedrag — ze verklaren waarom de nieuwste-run-p95 (13180) boven de noise-floor-p95 (11850) ligt.
+
+---
+
+## 2. Citation-binding integriteitscheck (Taak 3) — `npm run audit:citations`
+
+**Verdict: `eval/logging-artefact` (dominant) + grounding-overlap. GEEN botfix-kandidaat. Eval/report-fix optioneel.**
+
+### Runtime-locus (gelezen vóór conclusie)
+- **De answer-prompt vráágt wél citaties** (`bots.ts:434/515/652`: "CITATIES (inline): plaats na elk feit een verwijzing tussen vierkante haken `[1]`"), en `citationStyle:'inline'`. → `feature-niet-gebouwd` is **uitgesloten**.
+- **Markers worden NIET gestript** uit de opgeslagen `bot_answer`: de RAG-antwoordextractie (`rag.ts:656`) haalt het `<answer>`-blok en strip alleen `<thinking>`/`<confidence>`; de post-hoc sanitization (`rag.ts:1860-1948`) is het out-of-corpus-fallback-pad (opening/closing-framing) en raakt `[N]` niet. `claims.ts` strip citaties alléén intern voor embedding/lengte, niet de output. → De judge ziet de ruwe `response.answer` mét markers.
+- **`source_citation_binding` meet GEEN markers.** De judge-instructie (`eval.ts` system-prompt regel 8): "voor élke niet-triviale feit-bewering — is er een chunk in BOT_SOURCES die die claim ondersteunt? … Als zelfs één numerieke claim niet in sources te vinden is: **false**." De judge ziet daarbij alleen `parentExcerpt ?? contentExcerpt` (~800 char, afgekapt) — niet het volledige brondocument.
+
+### Meting
+- inline-marker-rate: **64%** (112/176) — de bot citeert in de meeste antwoorden.
+- binding-rate: **46%** (64/138 bindbaar; gate ≥75% ✗).
+- Kruistabel: marker-aanwezig×binding=true 49 · marker-aanwezig×binding=false 62 · geen-marker×true 15 · geen-marker×false 12 → markers en binding correleren níet (markers aanwezig maar tóch false in 62 cases).
+- **Verdacht artefact (binding=false ÉN grounding≥3): 54%** (40/74) van de false-cases. Voorbeelden: `initech-vpb-tarief-200k` C=5 G=3, `planted-fact-hetzner` C=5 G=4, `rls-uitleg` C=3 G=3 — correcte, gegronde antwoorden die binding=false kregen.
+- Overlap met unsupported_claim (binding=false ÉN grounding≤2): **46%** (34/74) — dáár is het dezelfde grounding-zwakte (Taak 4), geen losse binding-dimensie.
+
+### Verdict + waarom géén botfix
+De binding-gate-fail (0.46) is **geen citation-botzwakte**: de bot emitteert markers (64%) en die worden niet gestript. De 74 false-cases splitsen ~54/46 in (a) **judge-strengheid/excerpt-afkapping** (correcte gegronde antwoorden, binding=false omdat één claim buiten het afgekapte ~800-char-excerpt valt of de judge "één onvindbaar getal = false" toepast) en (b) **dezelfde grounding-zwakte** als de unsupported_claim-bucket. → Een aparte citation-botfix zou ~54% niet-bestaande "fout" proberen te repareren en ~46% dupliceren met de grounding-fix.
+
+**Optionele eval/report-fix (geen botfix, niet vannacht gebouwd):** geef de judge een langer/volledig bron-excerpt voor de binding-beoordeling, óf behandel `source-citation rate` als meet-artefact i.p.v. promotie-drempel (hij meet niet wat de naam suggereert). Dit sluit een gate-dimensie via de meetlat, niet via de bot. Vastgelegd als aanbeveling; de grounding-helft wordt door Taak 4/6 opgepakt.
