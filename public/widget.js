@@ -18,6 +18,8 @@
 
   var SIZES = {
     collapsed: { width: '96px', height: '96px' },
+    // peek = FAB + launcher-tooltip erboven; ruim genoeg zodat de tooltip niet clipt.
+    peek: { width: 'min(360px, 100vw)', height: '150px' },
     open: { width: 'min(420px, 100vw)', height: 'min(640px, 100dvh)' },
   };
 
@@ -42,7 +44,7 @@
     if (e.origin !== origin) return;
     var d = e.data;
     if (!d || d.type !== 'chatmanta:resize') return;
-    var size = d.state === 'open' ? SIZES.open : SIZES.collapsed;
+    var size = d.state === 'open' ? SIZES.open : d.state === 'peek' ? SIZES.peek : SIZES.collapsed;
     iframe.style.width = size.width;
     iframe.style.height = size.height;
     // Side: links of rechts onderaan.
