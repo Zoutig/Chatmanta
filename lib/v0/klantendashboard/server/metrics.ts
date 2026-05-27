@@ -9,7 +9,7 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
-import { getWebsiteState } from '@/lib/v0/server/crawler';
+import { getWebsiteSources } from '@/lib/v0/server/crawler';
 import { getOrgSettings } from './settings';
 import { countUnansweredThreads, getConversationSuccessRate } from './conversations';
 import type {
@@ -69,7 +69,7 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
       listDocs(orgId).catch(() => []),
       countUnansweredThreads(orgSlug),
       countConversationsThisMonth(orgId),
-      getWebsiteState(orgId).then((s) => s.pages).catch(() => []),
+      getWebsiteSources(orgId).then((list) => list.flatMap((w) => w.pages)).catch(() => []),
       getOrgSettings(orgSlug),
       getConversationSuccessRate(orgSlug),
       getConversationsWeekDelta(orgId),

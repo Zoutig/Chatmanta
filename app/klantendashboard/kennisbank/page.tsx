@@ -6,7 +6,7 @@
 
 import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { listDocs } from '@/lib/v0/server/rag';
-import { getWebsiteState } from '@/lib/v0/server/crawler';
+import { getWebsiteSources } from '@/lib/v0/server/crawler';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { DocumentSummary } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from '../components/ui/page-head';
@@ -42,9 +42,9 @@ export default async function KennisbankPage({
   const activeOrg = await getActiveOrgFromCookies();
   const orgId = KNOWN_ORGS[activeOrg.slug].id;
 
-  const [rawDocs, websiteState, settings] = await Promise.all([
+  const [rawDocs, websiteSources, settings] = await Promise.all([
     listDocs(orgId).catch(() => []),
-    getWebsiteState(orgId).catch(() => ({ source: null, job: null, pages: [] })),
+    getWebsiteSources(orgId).catch(() => []),
     getOrgSettings(activeOrg.slug),
   ]);
   const qa = settings.qa;
@@ -73,13 +73,13 @@ export default async function KennisbankPage({
         active={activeTab}
         tabs={[
           { key: 'documenten', label: 'Documenten', count: docs.length },
-          { key: 'website', label: 'Website', count: websiteState.pages.length },
+          { key: 'website', label: 'Website', count: websiteSources.reduce((n, w) => n + w.pages.length, 0) },
           { key: 'qa', label: 'Handmatige Q&A', count: qa.length },
         ]}
       />
 
       {activeTab === 'documenten' && <DocumentsTab key={activeOrg.slug} initialDocs={docs} />}
-      {activeTab === 'website' && <WebsiteTab key={activeOrg.slug} initialState={websiteState} />}
+      {activeTab === 'website' && <WebsiteTab key={activeOrg.slug} initialSources={websiteSources} />}
       {activeTab === 'qa' && <QATab key={activeOrg.slug} initialQA={qa} />}
     </>
   );
