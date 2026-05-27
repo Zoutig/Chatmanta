@@ -45,8 +45,14 @@ export type CrawledPage = {
 export type CrawlStatus = {
   /** 'scraping' = nog bezig; 'completed' = klaar; 'failed' = mislukt (incl. cancelled). */
   status: 'scraping' | 'completed' | 'failed';
+  /** Rauwe Firecrawl-status-string vóór onze mapping (bv. 'cancelled') — voor diagnostiek. */
+  rawStatus: string;
   total: number;
   completed: number;
+  /** Paginatie-cursor aanwezig? Zo ja, dan zit niet alle data in déze respons. */
+  hasNext: boolean;
+  /** Door Firecrawl gerapporteerd credit-verbruik, of null als onbekend. */
+  creditsUsed: number | null;
   pages: CrawledPage[];
 };
 
@@ -110,23 +116,34 @@ export async function scrapeOne(url: string): Promise<CrawledPage> {
   return toCrawledPage(doc);
 }
 
-/** Start een async batch-scrape van een expliciete URL-set. Geeft het batch-ID terug. */
-export async function startBatchScrape(urls: string[]): Promise<{ crawlId: string }> {
+/** Start een async batch-scrape van een expliciete URL-set. Geeft het batch-ID +
+ *  de door Firecrawl geweigerde URLs terug (diagnostiek bij start). */
+export async function startBatchScrape(urls: string[]): Promise<{ crawlId: string; invalidURLs: string[] }> {
   const capped = urls.slice(0, MAX_CRAWL_PAGES);
   const res = await getClient().startBatchScrape(capped, {
     options: { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS },
   });
   if (!res?.id) throw new Error('Firecrawl startBatchScrape gaf geen job-ID terug.');
-  return { crawlId: res.id };
+  return { crawlId: res.id, invalidURLs: res.invalidURLs ?? [] };
 }
 
-/** Pollt een batch-scrape-job en normaliseert naar CrawlStatus. */
+/** Pollt een batch-scrape-job en normaliseert naar CrawlStatus.
+ *  Let op: `hasNext` betekent dat Firecrawl pagineert — dan zit niet alle data in
+ *  déze respons. We volgen de cursor (nog) niet; dit veld maakt dat zichtbaar. */
 export async function getCrawlJobStatus(jobId: string): Promise<CrawlStatus> {
   const job = await getClient().getBatchScrapeStatus(jobId);
   const status: CrawlStatus['status'] =
     job.status === 'completed' ? 'completed' : job.status === 'scraping' ? 'scraping' : 'failed';
   const pages = (job.data ?? []).map((d) => toCrawledPage(d));
-  return { status, total: job.total ?? 0, completed: job.completed ?? 0, pages };
+  return {
+    status,
+    rawStatus: job.status,
+    total: job.total ?? 0,
+    completed: job.completed ?? 0,
+    hasNext: job.next != null,
+    creditsUsed: typeof job.creditsUsed === 'number' ? job.creditsUsed : null,
+    pages,
+  };
 }
 
 // ─── sitemap-read (verse fallback naast Firecrawl's map-cache) ─────────────────
