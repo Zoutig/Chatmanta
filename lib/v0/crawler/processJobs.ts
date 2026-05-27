@@ -4,12 +4,16 @@
 // Aangeroepen door (a) de client-tick server action tijdens een lopende crawl
 // en (b) de cron-route (optioneel, voor een externe pinger). Service-role via
 // de meegegeven client (SA-5).
+//
+// Diagnostiek: elke poll en terminal-beslissing schrijft een crawl_events-rij
+// (best-effort) zodat een mislukte/lege crawl achteraf verklaarbaar is.
 
 import 'server-only';
 
 import type { getSystemJobClient } from '@/lib/supabase/admin';
 import { getCrawlJobStatus } from '@/lib/v0/crawler/firecrawl';
 import { ingestCrawlResults } from '@/lib/v0/crawler/processCrawl';
+import { recordCrawlEvent, buildPagesPayload } from '@/lib/v0/crawler/crawlEvents';
 
 type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
 
@@ -41,42 +45,78 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
 
     try {
       if (!crawlId) {
-        await failJob(sb, jobId, sourceId, 'Geen Firecrawl crawl-ID op de job.');
+        const msg = 'Geen Firecrawl crawl-ID op de job.';
+        await failJob(sb, jobId, sourceId, msg);
+        await recordCrawlEvent(sb, {
+          organizationId: orgId, eventType: 'fail', processingJobId: jobId,
+          knowledgeSourceId: sourceId, decision: 'no-crawl-id', message: msg,
+        });
         summary.push({ jobId, outcome: 'failed:no-crawl-id', completed: 0, total: 0 });
         continue;
       }
 
       const status = await getCrawlJobStatus(crawlId);
 
+      // Gedeelde diagnostiek-velden voor elk event van deze poll.
+      const base = {
+        organizationId: orgId,
+        processingJobId: jobId,
+        knowledgeSourceId: sourceId,
+        externalJobId: crawlId,
+        firecrawlStatus: status.rawStatus,
+        completed: status.completed,
+        total: status.total,
+        dataCount: status.pages.length,
+        hasNext: status.hasNext,
+        creditsUsed: status.creditsUsed,
+      };
+
       if (status.status === 'scraping') {
         if (attempts + 1 >= MAX_ATTEMPTS) {
-          await failJob(sb, jobId, sourceId, 'Crawl duurde te lang (timeout na max polls).');
+          const msg = `Crawl duurde te lang (timeout na ${MAX_ATTEMPTS} polls; Firecrawl-status '${status.rawStatus}').`;
+          await failJob(sb, jobId, sourceId, msg);
+          await recordCrawlEvent(sb, { ...base, eventType: 'fail', decision: 'timeout', message: msg });
           summary.push({ jobId, outcome: 'failed:timeout', completed: status.completed, total: status.total });
         } else {
           await sb
             .from('processing_jobs')
             .update({ status: 'processing', attempts: attempts + 1, updated_at: now() })
             .eq('id', jobId);
+          await recordCrawlEvent(sb, { ...base, eventType: 'poll', decision: 'pending' });
           summary.push({ jobId, outcome: 'pending', completed: status.completed, total: status.total });
         }
         continue;
       }
 
       if (status.status === 'failed') {
-        await failJob(sb, jobId, sourceId, 'Firecrawl meldde een mislukte crawl.');
-        summary.push({ jobId, outcome: 'failed:firecrawl', completed: 0, total: 0 });
+        const msg = `Firecrawl meldde status '${status.rawStatus}'.`;
+        await failJob(sb, jobId, sourceId, msg);
+        await recordCrawlEvent(sb, { ...base, eventType: 'fail', decision: 'firecrawl-failed', message: msg });
+        summary.push({ jobId, outcome: 'failed:firecrawl', completed: status.completed, total: status.total });
         continue;
       }
 
+      // completed → ingest. Het 'complete'-event bewaart de getrimde pagina-snapshot;
+      // bij data_count 0 terwijl total>0/has_next true is dát het zichtbare signaal.
       const result = await ingestCrawlResults(sourceId, orgId, status.pages);
       await sb
         .from('processing_jobs')
         .update({ status: 'completed', attempts: attempts + 1, finished_at: now(), updated_at: now(), error_message: null })
         .eq('id', jobId);
       await sb.from('knowledge_sources').update({ status: 'ready', updated_at: now() }).eq('id', sourceId);
+      const ingestMsg = `${result.pagesCrawled} gecrawld, ${result.pagesFailed} mislukt, ${result.pagesExcluded} leeg → ${result.chunks} chunks.`;
+      await recordCrawlEvent(sb, {
+        ...base, eventType: 'complete', decision: 'ingested', message: ingestMsg,
+        payload: buildPagesPayload(status.pages),
+      });
       summary.push({ jobId, outcome: `completed:${result.pagesCrawled}p/${result.chunks}c`, completed: status.completed, total: status.total });
     } catch (err) {
-      await failJob(sb, jobId, sourceId, err instanceof Error ? err.message : 'onbekende fout');
+      const msg = err instanceof Error ? err.message : 'onbekende fout';
+      await failJob(sb, jobId, sourceId, msg);
+      await recordCrawlEvent(sb, {
+        organizationId: orgId, eventType: 'fail', processingJobId: jobId,
+        knowledgeSourceId: sourceId, externalJobId: crawlId, decision: 'exception', message: msg,
+      });
       summary.push({ jobId, outcome: 'failed:exception', completed: 0, total: 0 });
     }
   }
