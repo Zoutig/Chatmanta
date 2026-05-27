@@ -127,21 +127,42 @@ export async function startBatchScrape(urls: string[]): Promise<{ crawlId: strin
   return { crawlId: res.id, invalidURLs: res.invalidURLs ?? [] };
 }
 
-/** Pollt een batch-scrape-job en normaliseert naar CrawlStatus.
- *  Let op: `hasNext` betekent dat Firecrawl pagineert — dan zit niet alle data in
- *  déze respons. We volgen de cursor (nog) niet; dit veld maakt dat zichtbaar. */
+/**
+ * Pollt een batch-scrape-job en normaliseert naar CrawlStatus.
+ *
+ * ⚠️ Request-zuinigheid: `getBatchScrapeStatus` doet standaard `autoPaginate:true`
+ * en haalt dán álle tot-nu-toe-pagina's op via een GET per data-pagina. Bij een
+ * 4s-poll-tick tikt dat hard door Firecrawl's per-minuut request-limiet heen
+ * (gemeten: 429 "Rate limit exceeded, consumed 502 req/min" → job faalde terwijl
+ * de scrape zélf al klaar was). Daarom: pollen met `autoPaginate:false` (één GET,
+ * alleen status/total/completed), en de volledige pagina-data pas paginerend
+ * ophalen op het enige moment dat we ze nodig hebben — als de job 'completed' is.
+ *
+ * `rawStatus`/`hasNext`/`creditsUsed` worden meegegeven voor diagnostiek
+ * (crawl_events). `hasNext` = paginatie-cursor aanwezig in déze respons.
+ */
 export async function getCrawlJobStatus(jobId: string): Promise<CrawlStatus> {
-  const job = await getClient().getBatchScrapeStatus(jobId);
+  const head = await getClient().getBatchScrapeStatus(jobId, { autoPaginate: false });
   const status: CrawlStatus['status'] =
-    job.status === 'completed' ? 'completed' : job.status === 'scraping' ? 'scraping' : 'failed';
-  const pages = (job.data ?? []).map((d) => toCrawledPage(d));
+    head.status === 'completed' ? 'completed' : head.status === 'scraping' ? 'scraping' : 'failed';
+  const total = head.total ?? 0;
+  const completed = head.completed ?? 0;
+  const creditsUsed = typeof head.creditsUsed === 'number' ? head.creditsUsed : null;
+
+  if (status !== 'completed') {
+    return { status, rawStatus: head.status, total, completed, hasNext: head.next != null, creditsUsed, pages: [] };
+  }
+
+  // Klaar → nu pas de volledige set ophalen (mét pagination).
+  const full = await getClient().getBatchScrapeStatus(jobId);
+  const pages = (full.data ?? []).map((d) => toCrawledPage(d));
   return {
     status,
-    rawStatus: job.status,
-    total: job.total ?? 0,
-    completed: job.completed ?? 0,
-    hasNext: job.next != null,
-    creditsUsed: typeof job.creditsUsed === 'number' ? job.creditsUsed : null,
+    rawStatus: head.status,
+    total: full.total ?? total,
+    completed: full.completed ?? completed,
+    hasNext: full.next != null,
+    creditsUsed: typeof full.creditsUsed === 'number' ? full.creditsUsed : creditsUsed,
     pages,
   };
 }
