@@ -35,16 +35,10 @@ export function WebsiteList({
         };
         return (
           <div key={id} className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div
-              role="button"
+            <div role="button" tabIndex={crawling ? -1 : 0}
               onClick={() => !crawling && toggle(id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '12px 14px',
-                cursor: crawling ? 'default' : 'pointer',
-              }}
+              onKeyDown={(e) => { if (!crawling && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(id); } }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: crawling ? 'default' : 'pointer' }}
             >
               <ChevronRight
                 size={16}
@@ -82,9 +76,7 @@ export function WebsiteList({
               </div>
             )}
             {!crawling && (
-              <div style={{ padding: '0 14px' }}>
-                <CrawlDiagnostics job={ws.job} pagesCount={ws.pages.length} isCrawling={false} />
-              </div>
+              <CrawlDiagnostics job={ws.job} pagesCount={ws.pages.length} isCrawling={false} style={{ margin: '0 14px 12px' }} />
             )}
             {isOpen && !crawling && (
               <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--klant-border)' }}>

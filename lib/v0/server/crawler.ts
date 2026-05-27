@@ -95,21 +95,20 @@ export async function getWebsiteSources(organizationId: string): Promise<Website
       .order('created_at', { ascending: false });
     for (const e of eventRows ?? []) {
       const jid = e.processing_job_id as string;
-      const list = eventsByJob.get(jid) ?? [];
-      if (list.length < 10) {
-        list.push({
-          eventType: e.event_type as string,
-          firecrawlStatus: (e.firecrawl_status as string | null) ?? null,
-          completed: (e.completed as number | null) ?? null,
-          total: (e.total as number | null) ?? null,
-          dataCount: (e.data_count as number | null) ?? null,
-          hasNext: (e.has_next as boolean | null) ?? null,
-          decision: (e.decision as string | null) ?? null,
-          message: (e.message as string | null) ?? null,
-          createdAt: (e.created_at as string | null) ?? '',
-        });
-      }
-      eventsByJob.set(jid, list);
+      if (!eventsByJob.has(jid)) eventsByJob.set(jid, []);
+      const list = eventsByJob.get(jid)!;
+      if (list.length >= 10) continue;
+      list.push({
+        eventType: e.event_type as string,
+        firecrawlStatus: (e.firecrawl_status as string | null) ?? null,
+        completed: (e.completed as number | null) ?? null,
+        total: (e.total as number | null) ?? null,
+        dataCount: (e.data_count as number | null) ?? null,
+        hasNext: (e.has_next as boolean | null) ?? null,
+        decision: (e.decision as string | null) ?? null,
+        message: (e.message as string | null) ?? null,
+        createdAt: (e.created_at as string | null) ?? '',
+      });
     }
   }
 
