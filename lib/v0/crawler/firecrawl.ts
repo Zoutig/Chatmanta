@@ -9,6 +9,13 @@
 //   scrape()          → Document
 //   startBatchScrape() → BatchScrapeResponse { id }
 //   getBatchScrapeStatus() → BatchScrapeJob { status, total, completed, data }
+//
+// ⚠️ Cache-discipline: Firecrawl cachet scrape-resultaten standaard ~2 dagen en
+// map-resultaten met een eigen TTL. Voor een "crawl mijn site nu"-feature is dat
+// fout — een klant die z'n site aanpast en herklaadt, kreeg dagenoude content.
+// Daarom: scrape-paden forceren verse content (maxAge=0), en discovery leest de
+// sitemap óók rechtstreeks uit (verse fetch) zodat we niet afhankelijk zijn van
+// Firecrawl's map-cache.
 
 import Firecrawl, { type Document as FirecrawlDocument, type MapOptions } from '@mendable/firecrawl-js';
 
@@ -20,6 +27,11 @@ export const MAX_CRAWL_PAGES = 50;
  *  ongeacht hoeveel URLs terugkomen — dus we tonen de klant ruim de hele sitemap.
  *  Bewust losgekoppeld van MAX_CRAWL_PAGES: de scrape-cap blijft 50, de keuzelijst niet. */
 export const MAX_DISCOVER_PAGES = 500;
+
+/** maxAge (ms) voor scrape-calls. 0 = nooit cache accepteren, altijd vers ophalen.
+ *  Bewust 0: de kennisbank moet de live site weerspiegelen, niet een dagenoude
+ *  Firecrawl-cache. Eén knop om later freshness vs. cost/snelheid te ruilen. */
+const SCRAPE_MAX_AGE_MS = 0;
 
 /** Eén genormaliseerde gecrawlde pagina, klaar voor de ingest-pijplijn. */
 export type CrawledPage = {
@@ -63,24 +75,47 @@ function toCrawledPage(doc: FirecrawlDocument): CrawledPage {
   };
 }
 
-/** Haalt de sitemap/pagina-lijst van een site op (geen scrape — alleen URLs). */
+/**
+ * Haalt de pagina-lijst van een site op (geen scrape — alleen URLs).
+ *
+ * Combineert twee bronnen en dedupliceert:
+ *  1. Firecrawl `map()` — vangt link-discovery + sites zónder sitemap.
+ *  2. De sitemap.xml die we zélf vers ophalen — vangt het geval waarin Firecrawl's
+ *     map-cache verouderd is (de bug die ons b: sitemap had 31 URLs, map gaf er 1).
+ *
+ * Faalt map én levert de sitemap niets op, dan pas gooien we de map-fout door.
+ */
 export async function mapSite(url: string, limit: number = MAX_DISCOVER_PAGES): Promise<string[]> {
   const opts: MapOptions = { sitemap: 'include', limit };
-  const res = await getClient().map(url, opts);
-  const urls = (res.links ?? []).map((l) => l.url).filter((u): u is string => typeof u === 'string');
-  return Array.from(new Set(urls)).slice(0, limit);
+  const [mapResult, sitemapUrls] = await Promise.all([
+    getClient()
+      .map(url, opts)
+      .then((res) => ({
+        ok: true as const,
+        urls: (res.links ?? []).map((l) => l.url).filter((u): u is string => typeof u === 'string'),
+      }))
+      .catch((err: unknown) => ({ ok: false as const, err })),
+    readSitemapUrls(url, limit),
+  ]);
+
+  const mapUrls = mapResult.ok ? mapResult.urls : [];
+  const merged = Array.from(new Set([...mapUrls, ...sitemapUrls]));
+  if (merged.length === 0 && !mapResult.ok) throw mapResult.err;
+  return merged.slice(0, limit);
 }
 
-/** Synchrone scrape van één pagina (C1: losse import). */
+/** Synchrone scrape van één pagina (C1: losse import). maxAge=0 → altijd vers. */
 export async function scrapeOne(url: string): Promise<CrawledPage> {
-  const doc = await getClient().scrape(url, { formats: ['markdown'] });
+  const doc = await getClient().scrape(url, { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS });
   return toCrawledPage(doc);
 }
 
 /** Start een async batch-scrape van een expliciete URL-set. Geeft het batch-ID terug. */
 export async function startBatchScrape(urls: string[]): Promise<{ crawlId: string }> {
   const capped = urls.slice(0, MAX_CRAWL_PAGES);
-  const res = await getClient().startBatchScrape(capped, { options: { formats: ['markdown'] } });
+  const res = await getClient().startBatchScrape(capped, {
+    options: { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS },
+  });
   if (!res?.id) throw new Error('Firecrawl startBatchScrape gaf geen job-ID terug.');
   return { crawlId: res.id };
 }
@@ -92,4 +127,69 @@ export async function getCrawlJobStatus(jobId: string): Promise<CrawlStatus> {
     job.status === 'completed' ? 'completed' : job.status === 'scraping' ? 'scraping' : 'failed';
   const pages = (job.data ?? []).map((d) => toCrawledPage(d));
   return { status, total: job.total ?? 0, completed: job.completed ?? 0, pages };
+}
+
+// ─── sitemap-read (verse fallback naast Firecrawl's map-cache) ─────────────────
+
+const MAX_CHILD_SITEMAPS = 20;
+
+/**
+ * <loc>-waarden uit een sitemap-XML trekken. De fetch loopt via Firecrawl-scrape
+ * (op hún infra, niet de onze) met maxAge=0 → vers én géén eigen SSRF-oppervlak,
+ * net als scrapeOne/startBatchScrape. Faalt stil → lege lijst.
+ */
+async function fetchSitemapLocs(sitemapUrl: string): Promise<string[]> {
+  try {
+    const doc = await getClient().scrape(sitemapUrl, {
+      formats: ['rawHtml'],
+      maxAge: SCRAPE_MAX_AGE_MS,
+      onlyMainContent: false,
+    });
+    const xml = (doc as { rawHtml?: string }).rawHtml ?? '';
+    return Array.from(xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)).map((m) => m[1]);
+  } catch {
+    return []; // geen sitemap / niet-bereikbaar / niet-XML → gewoon geen bron
+  }
+}
+
+/**
+ * Leest `${origin}/sitemap.xml` (vers via Firecrawl, omzeilt de map-cache) en
+ * volgt één niveau sitemap-index. Geeft uitsluitend same-origin http(s)-URLs
+ * terug — cross-origin child-sitemaps worden níét opgehaald en cross-origin
+ * <loc>'s weggefilterd. Faalt stil → [].
+ */
+async function readSitemapUrls(siteUrl: string, limit: number): Promise<string[]> {
+  let origin: string;
+  try {
+    origin = new URL(siteUrl).origin;
+  } catch {
+    return [];
+  }
+  const isSameOrigin = (u: string): boolean => {
+    try {
+      return new URL(u).origin === origin;
+    } catch {
+      return false;
+    }
+  };
+
+  const rootLocs = await fetchSitemapLocs(`${origin}/sitemap.xml`);
+  const isXml = (l: string) => /\.xml(\?|$)/i.test(l);
+
+  // Sitemap-index? Volg alleen same-origin child-sitemaps (geen externe fetches).
+  const childSitemaps = rootLocs.filter((l) => isXml(l) && isSameOrigin(l)).slice(0, MAX_CHILD_SITEMAPS);
+  const directPages = rootLocs.filter((l) => !isXml(l));
+  const childPages = childSitemaps.length
+    ? (await Promise.all(childSitemaps.map(fetchSitemapLocs))).flat()
+    : [];
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const loc of [...directPages, ...childPages]) {
+    if (out.length >= limit) break;
+    if (!isSameOrigin(loc) || seen.has(loc)) continue;
+    seen.add(loc);
+    out.push(loc);
+  }
+  return out;
 }
