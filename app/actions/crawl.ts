@@ -24,6 +24,7 @@ import { ingestSinglePage } from '@/lib/v0/crawler/processCrawl';
 import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
+import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
 
 const KENNISBANK_PATH = '/klantendashboard/kennisbank';
 
@@ -78,23 +79,41 @@ export async function startSelectedCrawlAction(
     const sourceId = await upsertWebsiteSource(sb, activeOrg.id, root, name);
 
     let crawlId: string;
+    let invalidURLs: string[] = [];
     try {
-      ({ crawlId } = await startBatchScrape(safe));
+      ({ crawlId, invalidURLs } = await startBatchScrape(safe));
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
       await sb.from('knowledge_sources').update({ status: 'failed' }).eq('id', sourceId);
-      fail('CRAWL_FAILED', err instanceof Error ? err.message : 'Crawl kon niet starten.');
+      await recordCrawlEvent(sb, {
+        organizationId: activeOrg.id, eventType: 'fail', knowledgeSourceId: sourceId,
+        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length },
+      });
+      fail('CRAWL_FAILED', msg);
     }
 
-    const { error: jobErr } = await sb.from('processing_jobs').insert({
-      organization_id: activeOrg.id,
-      job_type: 'crawl_website',
-      target_type: 'knowledge_source',
-      target_id: sourceId,
-      status: 'pending',
-      external_job_id: crawlId,
-      started_at: new Date().toISOString(),
-    });
+    const { data: insertedJob, error: jobErr } = await sb
+      .from('processing_jobs')
+      .insert({
+        organization_id: activeOrg.id,
+        job_type: 'crawl_website',
+        target_type: 'knowledge_source',
+        target_id: sourceId,
+        status: 'pending',
+        external_job_id: crawlId,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
     if (jobErr) throw new Error(`processing_jobs insert: ${jobErr.message}`);
+
+    await recordCrawlEvent(sb, {
+      organizationId: activeOrg.id, eventType: 'start',
+      processingJobId: insertedJob.id as string, knowledgeSourceId: sourceId,
+      externalJobId: crawlId,
+      message: `Batch-scrape gestart voor ${safe.length} pagina's${invalidURLs.length ? `, ${invalidURLs.length} geweigerd door Firecrawl` : ''}.`,
+      payload: { requestedUrls: safe.length, invalidURLs: invalidURLs.slice(0, 60) },
+    });
 
     revalidatePath(KENNISBANK_PATH);
     return {};

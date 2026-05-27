@@ -45,8 +45,14 @@ export type CrawledPage = {
 export type CrawlStatus = {
   /** 'scraping' = nog bezig; 'completed' = klaar; 'failed' = mislukt (incl. cancelled). */
   status: 'scraping' | 'completed' | 'failed';
+  /** Rauwe Firecrawl-status-string vóór onze mapping (bv. 'cancelled') — voor diagnostiek. */
+  rawStatus: string;
   total: number;
   completed: number;
+  /** Paginatie-cursor aanwezig? Zo ja, dan zit niet alle data in déze respons. */
+  hasNext: boolean;
+  /** Door Firecrawl gerapporteerd credit-verbruik, of null als onbekend. */
+  creditsUsed: number | null;
   pages: CrawledPage[];
 };
 
@@ -110,14 +116,15 @@ export async function scrapeOne(url: string): Promise<CrawledPage> {
   return toCrawledPage(doc);
 }
 
-/** Start een async batch-scrape van een expliciete URL-set. Geeft het batch-ID terug. */
-export async function startBatchScrape(urls: string[]): Promise<{ crawlId: string }> {
+/** Start een async batch-scrape van een expliciete URL-set. Geeft het batch-ID +
+ *  de door Firecrawl geweigerde URLs terug (diagnostiek bij start). */
+export async function startBatchScrape(urls: string[]): Promise<{ crawlId: string; invalidURLs: string[] }> {
   const capped = urls.slice(0, MAX_CRAWL_PAGES);
   const res = await getClient().startBatchScrape(capped, {
     options: { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS },
   });
   if (!res?.id) throw new Error('Firecrawl startBatchScrape gaf geen job-ID terug.');
-  return { crawlId: res.id };
+  return { crawlId: res.id, invalidURLs: res.invalidURLs ?? [] };
 }
 
 /**
@@ -130,6 +137,9 @@ export async function startBatchScrape(urls: string[]): Promise<{ crawlId: strin
  * de scrape zélf al klaar was). Daarom: pollen met `autoPaginate:false` (één GET,
  * alleen status/total/completed), en de volledige pagina-data pas paginerend
  * ophalen op het enige moment dat we ze nodig hebben — als de job 'completed' is.
+ *
+ * `rawStatus`/`hasNext`/`creditsUsed` worden meegegeven voor diagnostiek
+ * (crawl_events). `hasNext` = paginatie-cursor aanwezig in déze respons.
  */
 export async function getCrawlJobStatus(jobId: string): Promise<CrawlStatus> {
   const head = await getClient().getBatchScrapeStatus(jobId, { autoPaginate: false });
@@ -137,15 +147,24 @@ export async function getCrawlJobStatus(jobId: string): Promise<CrawlStatus> {
     head.status === 'completed' ? 'completed' : head.status === 'scraping' ? 'scraping' : 'failed';
   const total = head.total ?? 0;
   const completed = head.completed ?? 0;
+  const creditsUsed = typeof head.creditsUsed === 'number' ? head.creditsUsed : null;
 
   if (status !== 'completed') {
-    return { status, total, completed, pages: [] };
+    return { status, rawStatus: head.status, total, completed, hasNext: head.next != null, creditsUsed, pages: [] };
   }
 
   // Klaar → nu pas de volledige set ophalen (mét pagination).
   const full = await getClient().getBatchScrapeStatus(jobId);
   const pages = (full.data ?? []).map((d) => toCrawledPage(d));
-  return { status, total: full.total ?? total, completed: full.completed ?? completed, pages };
+  return {
+    status,
+    rawStatus: head.status,
+    total: full.total ?? total,
+    completed: full.completed ?? completed,
+    hasNext: full.next != null,
+    creditsUsed: typeof full.creditsUsed === 'number' ? full.creditsUsed : creditsUsed,
+    pages,
+  };
 }
 
 // ─── sitemap-read (verse fallback naast Firecrawl's map-cache) ─────────────────

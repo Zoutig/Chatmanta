@@ -6,6 +6,7 @@ import {
 } from '@/app/actions/crawl';
 import type { WebsiteState } from '@/lib/v0/server/crawler';
 import { CrawlProgress } from './crawl-progress';
+import { CrawlDiagnostics } from './crawl-diagnostics';
 import { PageSelection } from './page-selection';
 import { ManagedPages } from './managed-pages';
 
@@ -85,6 +86,7 @@ export function WebsiteTab({ initialState }: { initialState: WebsiteState }) {
   }
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <CrawlDiagnostics job={job} pagesCount={pages.length} isCrawling={isCrawling} />
       {showInput && (
         <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
