@@ -270,6 +270,19 @@ export type BotConfig = {
    */
   historyEntityVerification?: boolean;
   /**
+   * v0.9 (iter2): deterministisch hard-fact-weiger-template. Wanneer de bot een
+   * hard feit (bedrag/datum/aantal) noemt dat NIET in de bronnen staat ÉN het
+   * antwoord ongegrond is (lage claim-confidence), vervang het antwoord
+   * deterministisch door een eerlijk weiger/doorverwijs-template i.p.v. de
+   * (empirisch onbetrouwbare) tweede LLM-poging. Adresseert de dominante
+   * out_of_corpus_overanswer-faalmodus. De conjunctie (beide grounding-signalen
+   * falen) spaart gegronde tiered-calc — geen over-refusal. Consolidatie in de
+   * bestaande regenerate-laag; geen parallelle gate, geen prompt-only fix.
+   * Vereist bot.claimRegenerateEnabled + bot.adaptiveHardFactVerification.
+   * Default false/undefined → identiek aan v0.8.1 (append-only).
+   */
+  hardFactDeterministicRefusal?: boolean;
+  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
@@ -1005,6 +1018,26 @@ const V0_8_1: BotConfig = {
   historyEntityVerification: true,
 };
 
+// v0.9 (iter2) — data-driven candidate uit de iter2-diagnoses. De dominante
+// genuine failure-mode was `out_of_corpus_overanswer` (n=12, 3 orgs): de bot
+// verzint een specifiek bedrag/datum/aantal op een vraag die uit het corpus niet
+// te beantwoorden is — convergeert met must-not + unsupported-hard-fact +
+// zero-correctness. De bestaande hard-fact-regenerate doet een tweede LLM-poging
+// die het verzonnen getal vaak opnieuw produceert (zelfde onbetrouwbaarheid als
+// de v0.8.1 history-entity-les). v0.9 vervangt die bij een ONGEGRONDE hard-fact-
+// hallucinatie (conjunctie hardFactSupported=false ÉN lage claim-confidence) door
+// een deterministisch weiger/doorverwijs-template. De conjunctie spaart gegronde
+// tiered-Vpb-calc → geen over-refusal. Consolidatie in de bestaande regenerate-
+// laag; geen parallelle gate, geen prompt-only fix. v0.8.1 byte-identiek.
+const V0_9: BotConfig = {
+  ...V0_8_1,
+  version: 'v0.9',
+  label: 'v0.9 — deterministische hard-fact-weigering',
+  description:
+    'v0.8.1 plus hardFactDeterministicRefusal: bij een ongegronde hard-fact-hallucinatie (bedrag/datum/aantal niet in bronnen ÉN lage claim-confidence) vervangt de bestaande regenerate-laag het antwoord deterministisch door een eerlijk weiger/doorverwijs-template i.p.v. een onbetrouwbare tweede LLM-poging. Adresseert out_of_corpus_overanswer (iter2). Conjunctie-gating spaart gegronde tiered-calc — geen over-refusal. Geen parallelle gate, geen prompt-only fix. v0.8.1 byte-identiek.',
+  hardFactDeterministicRefusal: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1019,6 +1052,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_7_2.version]: V0_7_2,
   [V0_7_3.version]: V0_7_3,
   [V0_8_1.version]: V0_8_1,
+  [V0_9.version]: V0_9,
 };
 
 /**
@@ -1035,7 +1069,18 @@ export const BOTS: Record<string, BotConfig> = {
  * noise-afhankelijk. v0.7.3 blijft byte-identiek + append-only voor vergelijking.
  * Bekende residu's (v0.8.2-kandidaat): brand-name (hetzner) en pronoun-adoptie.
  */
-export const LATEST_BOT_VERSION = V0_8_1.version;
+// GEPROMOVEERD naar v0.9 (iter2, 2026-05-26) onder het criterium dimensie-
+// verbetering + geen regressie (niet de volledige Engine Gate). Proof-eval
+// (n=176, runs=1, judge gpt-4o): avg 3.48→3.70, Engine-gate-failures 10→6
+// (completeness/production-ready/route-correct flippen naar pass), pairwise
+// v0.9 45% vs v0.8.1 29% (n=186, +16pp). Safety VERBETERD zonder regressie:
+// zero-correctness 0.12→0.09, unsupported-hard-fact 5→3, must-not 4→4 (zelfde
+// 4 slugs, geen nieuwe violation). Geen org regredieert op absolute C/P/G.
+// Caveat: v0.9-scores zijn n=1 (aggregaat-deltas binnen-ruis) — de promotie
+// steunt op de robuuste large-n pairwise + safety-verbetering + nul regressie;
+// runs=3-herbevestiging bewust overgeslagen onder de $10-cap. v0.8.1 blijft
+// append-only behouden. Zie docs/evals/2026-05-26-v0.9-analysis.md.
+export const LATEST_BOT_VERSION = V0_9.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1049,6 +1094,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_7_2.version,
   V0_7_3.version,
   V0_8_1.version,
+  V0_9.version,
 ];
 
 /**

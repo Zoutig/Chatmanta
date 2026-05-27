@@ -154,8 +154,20 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.8.1', 'LATEST_BOT_VERSION moet v0.8.1 zijn (gepromoveerd; anti-adoptie history-entiteit)');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1']);
+assert.equal(LATEST_BOT_VERSION, 'v0.9', 'LATEST_BOT_VERSION moet v0.9 zijn (gepromoveerd iter2: dimensie-verbetering + geen regressie; pairwise +16pp, gate-failures 10→6, safety verbeterd)');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9']);
+
+// v0.9 (iter2) — append-only deterministische hard-fact-weigering. Aanwezig in de
+// registry, flag aan, en v0.8.1 blijft byte-identiek (krijgt de flag NIET).
+const v09 = BOTS['v0.9'];
+assert.ok(v09, 'v0.9 ontbreekt uit BOTS-registry');
+assert.equal(v09.version, 'v0.9', 'v0.9 version-veld moet v0.9 zijn');
+assert.equal(v09.hardFactDeterministicRefusal, true, 'v0.9 zet hardFactDeterministicRefusal=true');
+assert.equal(v09.historyEntityVerification, true, 'v0.9 erft historyEntityVerification=true van v0.8.1');
+assert.equal(v09.adaptiveHardFactVerification, true, 'v0.9 erft adaptiveHardFactVerification=true (vereist voor de fix)');
+assert.equal(v09.claimRegenerateEnabled, true, 'v0.9 erft claimRegenerateEnabled=true (vereist voor de fix)');
+const v081 = BOTS['v0.8.1'];
+assert.notEqual(v081.hardFactDeterministicRefusal, true, 'append-only: v0.8.1 krijgt de v0.9-flag NIET (byte-identiek)');
 
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
@@ -168,4 +180,5 @@ console.log(`✓ v0.6.1/v0.6.2/v0.6.3 staging-versies bestaan niet meer in BOTS`
 console.log(`✓ v0.7.1 = output-clarity (outputStyleVersion=v2, was 'v0.7')`);
 console.log(`✓ v0.7.2 = output-clarity tune (outputStyleVersion=v3, rebuild vanaf v0.6, geen v0.7.1-stacking)`);
 console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.7.2-blok, rebuild vanaf v0.6)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.8.1 (gepromoveerd; anti-adoptie history-entiteit), BOT_VERSIONS_ORDERED = [v0.1..v0.8.1]`);
+console.log(`✓ v0.9 = deterministische hard-fact-weigering (hardFactDeterministicRefusal=true), v0.8.1 byte-identiek (append-only)`);
+console.log(`✓ LATEST_BOT_VERSION = v0.9 (gepromoveerd iter2), BOT_VERSIONS_ORDERED = [v0.1..v0.9]`);

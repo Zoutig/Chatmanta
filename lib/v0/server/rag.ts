@@ -25,6 +25,7 @@ import {
   renderPersonaTemplate,
   type OrgPersona,
 } from './persona';
+import { shouldDeterministicallyRefuseHardFact } from './hard-facts';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
 import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
@@ -2580,14 +2581,58 @@ KRITISCHE FORMAT-REGELS:
     };
   }
 
+  // v0.9 (iter2) anti-hallucinatie — DETERMINISTISCH pad voor ongegronde hard-
+  // facts. Zelfde les als v0.8.1 history-entity: een tweede LLM-poging die het
+  // verzonnen bedrag/datum moet weglaten is empirisch onbetrouwbaar (de bot
+  // produceert het opnieuw). Bij een ONGEGRONDE hard-fact-hallucinatie (conjunctie
+  // hardFactSupported=false ÉN lage claim-confidence — beide grounding-signalen
+  // falen) vervangen we deterministisch door een eerlijk weiger/doorverwijs-
+  // template. De conjunctie spaart gegronde tiered-calc (hoge claim-confidence) →
+  // geen over-refusal op correcte rekenkunde. Geen parallelle gate.
+  const deterministicHardFactRefusal = shouldDeterministicallyRefuseHardFact({
+    enabled: bot.hardFactDeterministicRefusal === true,
+    hardFactSupported,
+    retrievalStrength: decision.retrievalStrength,
+    adoptedHistoryEntity: unsupportedHistoryEntity,
+  });
+  if (bot.claimRegenerateEnabled && deterministicHardFactRefusal) {
+    activeAnswerText =
+      `Ik kan dat specifieke gegeven niet terugvinden in onze informatie, dus dat kan ik niet met zekerheid bevestigen. ` +
+      `Voor exacte bedragen, datums of cijfers kunt u het beste even rechtstreeks contact met ons opnemen — dan krijgt u een antwoord waar u op kunt rekenen.`;
+    activeResponse = {
+      ...activeResponse,
+      answer: activeAnswerText,
+      extras: {
+        ...(activeResponse.extras ?? {}),
+        ...(hardFactSupported !== undefined
+          ? {
+              hardFactSupport: {
+                supported: false,
+                missing: missingHardFacts ?? [],
+                regenerateTriggered: true,
+              },
+            }
+          : {}),
+      },
+      ...(bot.knowledgeGapLogging ? { gapKind: 'low_grounding' as const } : {}),
+    };
+    yield {
+      kind: 'replacement',
+      response: activeResponse,
+      reason: 'claim-regenerate',
+      regeneratedVerifiedRatio: null,
+    };
+  }
+
   // Claim/hard-fact regenerate (LLM-poging) — alleen wanneer GEEN history-
-  // entiteit-adoptie (die is hierboven al deterministisch afgehandeld) en er
-  // geverifieerde claims zijn.
+  // entiteit-adoptie én GEEN deterministische hard-fact-weigering (beide hierboven
+  // al afgehandeld) en er geverifieerde claims zijn.
   const claimBasedTrigger =
     (lowClaimConfidence || unsupportedHardFact) && !!claimsList && claimsList.length > 0;
   if (
     bot.claimRegenerateEnabled &&
     !unsupportedHistoryEntity &&
+    !deterministicHardFactRefusal &&
     claimBasedTrigger &&
     (withinBudget() || markSkipped('claimRegenerate'))
   ) {

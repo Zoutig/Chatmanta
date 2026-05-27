@@ -1,0 +1,180 @@
+# Iter2 — Diagnoses (latency · citation-binding · unsupported-claim sub-taxonomy · hard-fact · beslisgate)
+
+**Datum:** 2026-05-26 · **Branch:** `feat/seb/bot-engine-iter2` · **Versie:** `v0.8.1` (LATEST)
+**Methode:** $0 — alleen lezen uit `eval_runs`/`eval_questions`, geen LLM-calls. Active corpus n=176 (legacy uit). Nieuwste run per vraag.
+
+> Eén doc, secties per diagnose-taak. De beslisgate (Taak 6) onderaan kiest max één botfix voor de betaalde eval.
+
+---
+
+## 1. Latency-diagnose (Taak 2) — `npm run audit:latency`
+
+**Verdict: diagnose-only + aanbeveling. Geen botfix-kandidaat voor een onbewaakte nacht.**
+
+n met `stage_timings_ms` = 168 (8 zonder timings, 10 legacy uit). p95 hier ligt iets boven de gate-p95 (report gebruikt n_runs=3 noise-floor; dit is nieuwste-run-per-vraag, inclusief enkele cold-start-outliers).
+
+### Topline (p95, ms)
+| stage | p50 | p75 | p95 |
+|-------|-----|-----|-----|
+| preprocess_ms | 964 | 1196 | 2196 |
+| decompose_ms | 745 | 922 | 1747 |
+| rerank_ms | 782 | 952 | 2366 |
+| embedding_ms | 154 | 193 | 340 |
+| retrieval_ms | 199 | 232 | 288 |
+| generation_ms | 2682 | 3513 | **6530** |
+| verify_ms | 232 | 285 | 436 |
+| hyde_ms (n=3) | 1997 | — | 3490 |
+| cascade_ms (n=3) | 2198 | — | 2275 |
+| **total_ms** | 6393 | 7607 | **13180** |
+| **first_token_ms** | 3805 | 4676 | **8586** |
+
+### Bottleneck-labels
+- **`generation_bottleneck`** (primair): `generation_ms` is in élke question_type de traagste stage (34–55% van total; p50 2682, p95 6530). Dit is de `gpt-4o-mini` answer-call — onvermijdelijke LLM-tijd, niet triviaal te knippen zonder model-/output-wijziging.
+- **`streaming_start_delay`: WEERLEGD.** mediaan(first_token − som(pre-answer-stages)) = +503ms → first-token-latency ≈ de pre-answer-pijplijn, geen losse streaming-startvertraging. De first_token-gate-fail (7765/8586 > 1500) is dus geen streaming-bug maar de som van preprocess+decompose+rerank+embed+retrieval die vóór de eerste token draaien.
+- **Pre-answer-pijplijn**: preprocess (p50 964) + decompose (745) + rerank (782) zijn de drie grootste pre-token-kosten. Alle drie zijn kandidaat om conditioneel over te slaan bij simpele single-source factual queries.
+- **`hyde_bottleneck` / careful-cascade: niet dominant.** HyDE en cascade vuren elk maar n=3 (alleen op prompt_injection + edge-cases) → geen brede latency-driver.
+
+### Waarom géén botfix vannacht
+1. **De winst zit in conditioneel skippen van preprocess/decompose/rerank** (fast-path), maar **of fast-path onderbenut is, is NIET te bewijzen uit `eval_runs`**: `adaptive_decision` (het fast/standard/careful-pad) staat alleen op `query_log` (migration 0023), niet op `eval_runs`. Zonder die kolom kan ik path-misclassificatie niet meten.
+2. Een pre-answer-pijplijn-herschrijving (preprocess/decompose/rerank gaten) raakt de retrieval-kwaliteit en valt precies in de "te riskant voor onbewaakt"-categorie die het plan uitsluit. generation_ms — de grootste stage — is sowieso niet via een flag te halveren.
+3. De gate-blockers met de meeste hefboom richting klant-bereidheid zijn de **safety/grounding-dimensies** (zero-correctness, must-not, unsupported-claim), niet latency. Latency is een UX-prioriteit voor een áparte, bewaakte iteratie.
+
+### Aanbeveling (toekomstige attended-iteratie)
+Voeg `adaptive_decision` (of minimaal `path`) toe aan de eval-snapshot zodat fast/standard/careful-verdeling meetbaar wordt; meet dan of factual/typo/out_of_corpus onnodig decompose+rerank draaien. Dán pas een flag-guarded fast-path bouwen, met latency-regressie-gate. **Nu: diagnose-only.**
+
+### Outlier-noot
+`werkgebied-heerlen-bridge-out` (56795ms, rerank 50408ms) en `globex-mh-bekken-wachttijd` (33478ms, rerank 20475ms) zijn cold-start/timeout-outliers, geen representatief gedrag — ze verklaren waarom de nieuwste-run-p95 (13180) boven de noise-floor-p95 (11850) ligt.
+
+---
+
+## 2. Citation-binding integriteitscheck (Taak 3) — `npm run audit:citations`
+
+**Verdict: `eval/logging-artefact` (dominant) + grounding-overlap. GEEN botfix-kandidaat. Eval/report-fix optioneel.**
+
+### Runtime-locus (gelezen vóór conclusie)
+- **De answer-prompt vráágt wél citaties** (`bots.ts:434/515/652`: "CITATIES (inline): plaats na elk feit een verwijzing tussen vierkante haken `[1]`"), en `citationStyle:'inline'`. → `feature-niet-gebouwd` is **uitgesloten**.
+- **Markers worden NIET gestript** uit de opgeslagen `bot_answer`: de RAG-antwoordextractie (`rag.ts:656`) haalt het `<answer>`-blok en strip alleen `<thinking>`/`<confidence>`; de post-hoc sanitization (`rag.ts:1860-1948`) is het out-of-corpus-fallback-pad (opening/closing-framing) en raakt `[N]` niet. `claims.ts` strip citaties alléén intern voor embedding/lengte, niet de output. → De judge ziet de ruwe `response.answer` mét markers.
+- **`source_citation_binding` meet GEEN markers.** De judge-instructie (`eval.ts` system-prompt regel 8): "voor élke niet-triviale feit-bewering — is er een chunk in BOT_SOURCES die die claim ondersteunt? … Als zelfs één numerieke claim niet in sources te vinden is: **false**." De judge ziet daarbij alleen `parentExcerpt ?? contentExcerpt` (~800 char, afgekapt) — niet het volledige brondocument.
+
+### Meting
+- inline-marker-rate: **64%** (112/176) — de bot citeert in de meeste antwoorden.
+- binding-rate: **46%** (64/138 bindbaar; gate ≥75% ✗).
+- Kruistabel: marker-aanwezig×binding=true 49 · marker-aanwezig×binding=false 62 · geen-marker×true 15 · geen-marker×false 12 → markers en binding correleren níet (markers aanwezig maar tóch false in 62 cases).
+- **Verdacht artefact (binding=false ÉN grounding≥3): 54%** (40/74) van de false-cases. Voorbeelden: `initech-vpb-tarief-200k` C=5 G=3, `planted-fact-hetzner` C=5 G=4, `rls-uitleg` C=3 G=3 — correcte, gegronde antwoorden die binding=false kregen.
+- Overlap met unsupported_claim (binding=false ÉN grounding≤2): **46%** (34/74) — dáár is het dezelfde grounding-zwakte (Taak 4), geen losse binding-dimensie.
+
+### Verdict + waarom géén botfix
+De binding-gate-fail (0.46) is **geen citation-botzwakte**: de bot emitteert markers (64%) en die worden niet gestript. De 74 false-cases splitsen ~54/46 in (a) **judge-strengheid/excerpt-afkapping** (correcte gegronde antwoorden, binding=false omdat één claim buiten het afgekapte ~800-char-excerpt valt of de judge "één onvindbaar getal = false" toepast) en (b) **dezelfde grounding-zwakte** als de unsupported_claim-bucket. → Een aparte citation-botfix zou ~54% niet-bestaande "fout" proberen te repareren en ~46% dupliceren met de grounding-fix.
+
+**Optionele eval/report-fix (geen botfix, niet vannacht gebouwd):** geef de judge een langer/volledig bron-excerpt voor de binding-beoordeling, óf behandel `source-citation rate` als meet-artefact i.p.v. promotie-drempel (hij meet niet wat de naam suggereert). Dit sluit een gate-dimensie via de meetlat, niet via de bot. Vastgelegd als aanbeveling; de grounding-helft wordt door Taak 4/6 opgepakt.
+
+---
+
+## 3. `unsupported_claim` sub-taxonomy (Taak 4) — `npm run audit:subtax`
+
+**Verdict: dominant subtype `out_of_corpus_overanswer` (n=12, 3 orgs) — GO-kandidaat voor de beslisgate. Convergeert met must-not + unsupported-hard-fact + zero-correctness.**
+
+De #104-bucket `unsupported_claim` (29 cases) splitst in:
+
+| subtype | n | #orgs | orgs | types | fixwaardig? |
+|---------|---|-------|------|-------|-------------|
+| **out_of_corpus_overanswer** | **12** | **3** | dev-org, globex, initech | out_of_corpus | **JA (kandidaat)** |
+| unsupported_extra_detail | 10 | 3 | dev-org, globex, initech | 7 types (ambiguous…typo) | nee — te heterogeen (7 types) voor één fix |
+| multi_hop_synthesis_error | 4 | 3 | — | multi_hop | nee — <8 cases |
+| unknown | 4 | 2 | — | — | nee |
+| fallback_overfill | 1 | 1 | — | planted_fact | nee |
+
+### §E.5 — handmatige verificatie van het dominante subtype (out_of_corpus_overanswer)
+De judge-reasoning bevestigt dat dit **echt botgedrag** is, geen judge/label-artefact. ≥8 van de 12 zijn ondubbelzinnige hallucinaties — de bot noemt mét stelligheid + `[1]`-citatie een specifiek getal/datum op een out_of_corpus-vraag waarvan de gold = "niet beschikbaar / geen vaste structuur":
+- `v063-hardfact-v2-kwartaal` C=0 G=0 → "Q2 2026" verzonnen
+- `v063-hardfact-tarief-per-gesprek` C=0 G=0 → "€0,07" (= must-not-violation)
+- `v063-hardfact-max-doc-size` C=0 G=0 → "10 MB" (= must-not-violation)
+- `v063-hardfact-grounding-rate` C=0 G=0 → "85%" (= must-not-violation)
+- `v063-hardfact-aantal-pricing-tiers` C=0 G=0 → "vijf tiers" (= must-not-violation)
+- `v063-hardfact-launch-datum` C=1 G=0 → "2026-Q2" verzonnen
+- `v063-hardfact-api-rate-limit` C=0 G=0 → "100/30 calls" verzonnen
+- `initech-out-of-corpus-notaris` C=0 G=0 → "wij stellen oprichtingsakte op, €1450" (juridisch onjuist + verzonnen prijs)
+
+**False positives / nuance:** `globex-out-of-corpus-lymfedrainage` (C=3 G=1) en `initech-ooc-beleggingsadvies` (C=1 G=1) zijn mildere "correcte-weigering + ongegrond detail"-gevallen (dubbel getagd met unsupported_extra_detail). Kern: ~10/12 zijn echte over-answer-hallucinatie.
+
+### Convergentie (het sterke signaal)
+Dit subtype is **dezelfde faalmodus als drie gate-blockers tegelijk**: de 4 must-not-violations zitten állemaal in deze bucket, het levert het leeuwendeel van de 7 unsupported-hard-facts, en het drijft zero-correctness (de meeste cases zijn C=0). Eén effectieve fix raakt dus 3 safety/kwaliteit-dimensies in één klap. Dat is de hoogste hefboom in het hele veld.
+
+### Aandachtspunten voor de beslisgate (Taak 6)
+- **dev-org-zwaar**: 8–9/12 zijn `dev-org v063-hardfact-*`-probes (adversariële hard-fact-tests). ≥2-orgs-criterium is gehaald (initech + globex), maar de generalisatie buiten dev-org steunt op 2–3 cases. Een fix moet niet dev-org-overfitten.
+- **Laag-eis (§C)**: dit is een refusal/hallucinatie-faalmodus → **geen prompt-only fix toegestaan**; moet in een bestaande verify/regenerate/threshold-laag. Te toetsen in Taak 6/7: bestaat er één bestaande laag (hard-fact-verifier→regenerate / `reclassifyAfterZeroHits` / threshold-filter) waarin één flag-guarded wijziging ≥60% van deze bucket verklaart, zónder nieuwe parallelle gate? De cases retrieven wél chunks (geen zero-hit), dus `reclassifyAfterZeroHits` alléén dekt ze niet — de hard-fact-verifier (die ze al detecteert als "unsupported") is de meest waarschijnlijke ankerlaag.
+
+**Go/no-go:** `out_of_corpus_overanswer` = **GO-kandidaat** (≥8 cases ✓, ≥2 orgs ✓, niet-artefact ✓). De ≥60%-één-laag-toets volgt in Taak 6. Overige subtypes: no-go (te klein of te heterogeen).
+
+---
+
+## 4. Hard-fact-verifier-verfijning (Taak 5) — `audit:taxonomy` + recompute-on-read
+
+**Verdict: ~43% van de unsupported-hard-facts was input-echo-artefact. Eval-only recompute toegepast (`echo-warn`), NIET versoepeld. v0.8.1 unsupported-hard-fact 7 → 4. Géén botversie.**
+
+### Classificatie van de 7 v0.8.1 unsupported-hard-facts (run_index-0 snapshot)
+Per case is elk ontbrekend getal getoetst op exacte cijfer-token-aanwezigheid in vraag+history (deterministisch):
+
+| case | missing | classificatie |
+|------|---------|---------------|
+| `initech-planted-spoedlijn-0900` | 0900, 1234 | **echo-warn** — beide in history; bot wéigert ("0900-1234 is niet van ons") = `negated_number` |
+| `initech-mkb-pakket-omzet` | 800000 | **echo-warn** — "€800.000 omzet" stond in de vraag |
+| `acme-pannendak-45-jaar-vervangen` | 45 | **echo-warn** — "45 jaar oud" stond in de vraag; correcte weigering |
+| `initech-vpb-tarief-200k` | 250000, 50000 | **HARD fail** — 250000 = echo, maar 50000 = berékend (250k−200k), géén token in de vraag → blijft staan |
+| `initech-mh-bv-vpb-dga-250k` | 250000, 38000, 50000, 12900, 50900 | **HARD fail** — tiered-Vpb berékende uitkomsten (matchen gold), géén echo |
+| `initech-urencriterium-administratie` | 225 | **HARD fail** — geen token in vraag |
+| `initech-ambiguous-kosten` | 45 | **HARD fail** — geen exacte token-match in vraag |
+
+### Implementatie (eval/report-only, `scripts/v0-eval-report.ts`)
+Nieuwe `isEchoedHardFact(r)` naast de bestaande `isCalcWarning`: een unsupported hard-fact telt als **`echo-warn`** (warning, géén gate-fail) **alléén als ÉLK** ontbrekend getal als **exacte cijfer-token** in vraag/conversation_history voorkomt. Bewust conservatief:
+- **Exacte token-match, geen substring** — `numberTokens()` normaliseert NL-notatie (`€ 250.000`→`250000`, `0900-1234`→`{0900,1234}`). Dit vermijdt de bekende substring-bug: `50000` matcht **niet** binnen `250000`, dus `vpb-tarief-200k` blijft terecht HARD fail.
+- **Één niet-echo getal → blijft HARD fail.** Berékende tiered-Vpb-uitkomsten en echte verzonnen prijzen/datums blijven gevlagd.
+- **HARD-grens blijft =0, NIET versoepeld** (§C). Echo's zijn geen "echte unsupported" — de gebruiker leverde het getal — dus reclassificatie is meet-eerlijkheid, geen versoepeling.
+
+### Effect + validatie
+- v0.8.1: unsupported-hard-fact **7 → 4** (3× echo-warn). v0.7.3: **8 → 2** (5× echo-warn).
+- **Validatie dat echte hallucinatie HARD fail blíjft:** `out-of-corpus-prijs` (€430, niet in de vraag) → géén echo → blijft gevlagd. De 4 resterende v0.8.1-cases zijn alle berékend/onvindbaar, niet ge-echood.
+
+### Runtime vs eval-only + aanbeveling
+**Eval-only** is de juiste laag: de echo's zijn een meet-artefact van de hard-fact-verifier (die elk getal in het antwoord eist verbatim in een chunk), niet een botgedrag dat klanten raakt — de bot reflecteert/weigert correct. Een runtime-verifier-wijziging zou een botversie-kandidaat zijn (concurreert in Taak 6), maar is **niet** nodig: de 4 resterende HARD-fails zijn grotendeels untagged tiered-Vpb-calc. **Aanbeveling (label-curatie, niet vannacht):** tag de Vpb-cases (`vpb-tarief-200k`, `mh-bv-vpb-dga-250k`) als `calculation_required` na §E.5-certificering — dan vallen ze onder calc-warn en daalt de echte unsupported-hard-fact verder. Dit is géén gate-versoepeling maar correcte §E.6-classificatie.
+
+---
+
+## 5. Beslisgate — welke fix krijgt de ene eval? (Taak 6)
+
+**Besluit: GO op `out_of_corpus_overanswer` via een DETERMINISTISCH hard-fact-weiger-template, in de bestaande regenerate-laag (`rag.ts`), gated op `unsupportedHardFact && lowClaimConfidence`. Nieuwe append-only versie `v0.9`.**
+
+### Samenvatting van de vier diagnoses
+| diagnose | uitkomst | botfix-kandidaat? |
+|----------|----------|-------------------|
+| Latency | generation = onvermijdelijke LLM-tijd; fast-path-onderbenutting niet bewijsbaar uit eval_runs | **NO-GO** (diagnose-only; te riskant onbewaakt) |
+| Citation-binding | 54% judge-strengheid/excerpt-artefact + 46% grounding-overlap | **NO-GO** (eval-artefact, geen botzwakte) |
+| unsupported_claim sub-taxonomy | dominant `out_of_corpus_overanswer` n=12, 3 orgs; convergeert met must-not + hard-fact + zero-correctness | **GO-kandidaat** |
+| Hard-fact-verifier | ~43% echo-artefact → eval-only recompute toegepast; rest = untagged calc | **NO-GO** (meetlat-fix gedaan, geen botversie) |
+
+### Go-criteria toegepast op `out_of_corpus_overanswer`
+| criterium | status |
+|-----------|--------|
+| ≥8 echte cases | ✓ 12 (≥10 na §E.5) |
+| ≥2 orgs | ✓ 3 (dev-org-zwaar; initech+globex aanwezig) |
+| niet primair eval/judge/label-artefact | ✓ echte over-answer-hallucinatie |
+| één kleine wijziging in één bestaande laag verklaart ≥60% van de bucket | ✓ (zie root-cause) |
+| geen nieuwe parallelle gate | ✓ (breidt bestaande regenerate-trigger uit) |
+| geen prompt-only refusal-fix | ✓ (deterministisch code-pad, geen prompt) |
+| regressierisico helder + gemitigeerd | ✓ (conjunctie-gating, zie onder) |
+
+### Root-cause (geverifieerd in `rag.ts`)
+Er bestáát al een regenerate-trigger op `(lowClaimConfidence || unsupportedHardFact)` (`rag.ts:2586-2587`), maar die doet een **tweede LLM-poging** met een "strikter" prompt. De v0.8.1-code documenteert zelf (`rag.ts:2554-2557`) dat een tweede LLM-poging om een hallucinatie te verwijderen **empirisch onbetrouwbaar** is — dáárom gebruikt de v0.8.1 history-entity-fix een **deterministisch weiger-template** (`rag.ts:2560-2581`) i.p.v. een LLM-call. De `out_of_corpus_overanswer`-cases glippen door omdat de LLM-regenerate het verzonnen getal opnieuw produceert.
+
+### De fix (v0.9) — proven pattern, één laag, flag-guarded
+Pas hetzelfde deterministische-template-recept toe op unsupported hard-facts: wanneer de bot een hard feit noemt dat **niet in de bronnen staat** ÉN het antwoord **ongegrond** is, vervang deterministisch door een eerlijk weiger/doorverwijs-template (geen LLM-poging). Nieuwe flag `hardFactDeterministicRefusal` op een `{...V0_8_1}`-config.
+
+**Regressie-mitigatie — de conjunctie is de sleutel.** Het runtime-signaal `unsupportedHardFact` alléén vuurt óók op de correcte tiered-Vpb-cases (`vpb-tarief-200k` C=5, `mh-bv-vpb-dga` — afgeleide getallen 50000/38000/12900 staan niet verbatim in chunks). Die zijn echter **gegrond** (G=3, claim-confidence hoog → `lowClaimConfidence=false`), terwijl de out_of_corpus-fabricaties **ongegrond** zijn (G=0 → `lowClaimConfidence=true`). Door te gaten op de **conjunctie `unsupportedHardFact && lowClaimConfidence`** (beide grounding-signalen falen) vuurt het template wél op de fabricaties en **niet** op de gegronde calc-antwoorden. Beide signalen bestaan al runtime — geen nieuwe gate, geen nieuwe drempel-tuning.
+
+### Verworpen alternatieven
+- **Threshold-filter verhogen** (refusal harder): globale recall-regressie op de factual-bucket; risicovolle tuning voor onbewaakt. ✗
+- **`reclassifyAfterZeroHits`**: de cases retrieven wél chunks (geen zero-hit) → dekt ze niet. ✗
+- **Deterministisch refuse op `unsupportedHardFact` alléén** (geen conjunctie): regredieert de gegronde Vpb-calc-antwoorden naar weigeringen. ✗ (de conjunctie lost dit op.)
+
+### Stopconditie-check
+Niet getriggerd: er is een dominante (12, 3 orgs), niet-artefact, ≥60%-één-laag-kandidaat met heldere, gemitigeerde regressie. **→ Taak 7: bouw v0.9.**
