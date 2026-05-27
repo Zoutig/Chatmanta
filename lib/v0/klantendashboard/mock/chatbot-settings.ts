@@ -35,7 +35,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     contactPhone: '+31 20 123 4567',
     contactPageUrl: 'https://demo.chatmanta.nl/contact',
     unknownAnswerMessage:
-      'Daar kan ik niet zeker antwoord op geven. Wil je dat ik je doorverwijs naar een collega?',
+      'Dat weet ik niet zeker op basis van wat ik heb. Neem gerust contact met ons op, dan helpen we je graag verder.',
   },
   'acme-corp': {
     chatbotName: 'Dakwerken-assistent',
@@ -151,7 +151,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     contactPhone: '',
     contactPageUrl: '',
     unknownAnswerMessage:
-      'Daar kan ik nu geen antwoord op geven. Wil je dat ik je doorverwijs naar een collega?',
+      'Dat weet ik niet zeker op basis van wat ik heb. Neem gerust contact met ons op, dan helpen we je graag verder.',
   },
 };
 
