@@ -21,7 +21,7 @@ import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
 import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v0/crawler/firecrawl';
 import { ingestSinglePage } from '@/lib/v0/crawler/processCrawl';
-import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
+import { getWebsiteSources, type WebsiteSource } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
@@ -129,6 +129,13 @@ export async function deleteWebsiteSourceAction(sourceId: string): Promise<Actio
 
     const activeOrg = await getActiveOrgFromCookies();
     const sb = await getSystemJobClient({ reason: 'delete_source' });
+    const now = new Date().toISOString();
+    await sb.from('processing_jobs')
+      .update({ status: 'failed', error_message: 'Bron verwijderd tijdens crawl.', finished_at: now, updated_at: now })
+      .eq('organization_id', activeOrg.id)
+      .eq('job_type', 'crawl_website')
+      .eq('target_id', sourceId)
+      .in('status', ['pending', 'processing']);
     const { error } = await sb
       .from('knowledge_sources')
       .delete()
@@ -141,18 +148,18 @@ export async function deleteWebsiteSourceAction(sourceId: string): Promise<Actio
   });
 }
 
-/** Leest de huidige crawler-state — voor client-polling tijdens een lopende crawl. */
-export async function refreshWebsiteState(): Promise<WebsiteState> {
+/** Leest alle website-bronnen — voor client-polling tijdens een lopende crawl. */
+export async function refreshWebsiteSources(): Promise<WebsiteSource[]> {
   const activeOrg = await getActiveOrgFromCookies();
-  return getWebsiteState(activeOrg.id);
+  return getWebsiteSources(activeOrg.id);
 }
 
 /**
  * Client-gedreven "tick": verwerkt openstaande crawl-jobs van de actieve org en
- * geeft de verse state terug. Vervangt de Vercel-cron als motor (Hobby-vriendelijk).
+ * geeft de verse bronnenlijst terug. Vervangt de Vercel-cron als motor (Hobby-vriendelijk).
  * Bewust niet rate-limited — het is een lichte poll, geen mutatie-trigger.
  */
-export async function tickCrawlIngestAction(): Promise<WebsiteState> {
+export async function tickCrawlIngestAction(): Promise<WebsiteSource[]> {
   const activeOrg = await getActiveOrgFromCookies();
   const sb = await getSystemJobClient({ reason: 'process_crawls_tick' });
   const { data: jobs, error: jobsError } = await sb
@@ -164,14 +171,8 @@ export async function tickCrawlIngestAction(): Promise<WebsiteState> {
     .order('created_at', { ascending: true })
     .limit(JOBS_PER_TICK);
   if (jobsError) throw jobsError;
-  const outcomes = jobs && jobs.length > 0 ? await processCrawlJobs(sb, jobs as OpenJob[]) : [];
-  const state = await getWebsiteState(activeOrg.id);
-  // Merge live completed/total counts from the most recent job outcome into the state.
-  if (state.job && (state.job.status === 'pending' || state.job.status === 'processing') && outcomes.length > 0) {
-    const o = outcomes[0];
-    if (o) { state.job.completed = o.completed; state.job.total = o.total; }
-  }
-  return state;
+  if (jobs && jobs.length > 0) await processCrawlJobs(sb, jobs as OpenJob[]);
+  return getWebsiteSources(activeOrg.id);
 }
 
 /** A1: zet één pagina aan/uit. Goedkoop — alleen een vlag; RPC doet de rest. */
