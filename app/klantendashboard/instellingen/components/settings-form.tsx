@@ -266,7 +266,7 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
               value={s.unknownAnswerMessage}
               onChange={(e) => update('unknownAnswerMessage', e.target.value)}
               rows={2}
-              placeholder="Bijv. 'Daar kan ik niet zeker antwoord op geven. Wil je dat ik je doorverwijs naar een collega?'"
+              placeholder="Bijv. 'Dat weet ik niet zeker op basis van wat ik heb. Neem gerust contact met ons op, dan helpen we je graag verder.'"
             />
           </Field>
         )}
