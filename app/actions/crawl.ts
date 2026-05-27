@@ -25,6 +25,7 @@ import { getWebsiteState, type WebsiteState } from '@/lib/v0/server/crawler';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
+import { normalizeHost } from '@/lib/v0/crawler/normalizeHost';
 
 const KENNISBANK_PATH = '/klantendashboard/kennisbank';
 
@@ -253,37 +254,58 @@ function hostnameOf(url: string): string {
   }
 }
 
-/** Hergebruikt of maakt de (enige) website-bron van de org; zet status op 'crawling'. */
+/** Hergebruikt of maakt de website-bron van de org VOOR DIT DOMEIN; zet status 'crawling'.
+ *  Match op normalized_host (uniek per org via index 0037). Race → 23505 → opnieuw lezen. */
 async function upsertWebsiteSource(
   sb: Awaited<ReturnType<typeof getSystemJobClient>>,
   orgId: string,
   rootUrl: string,
   name: string,
 ): Promise<string> {
-  const { data: existing } = await sb
-    .from('knowledge_sources')
-    .select('id')
-    .eq('organization_id', orgId)
-    .eq('type', 'website')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const host = normalizeHost(rootUrl);
+  const now = new Date().toISOString();
 
-  if (existing?.id) {
+  const findExisting = async () => {
+    const { data } = await sb
+      .from('knowledge_sources')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('type', 'website')
+      .eq('normalized_host', host)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    return data?.id as string | undefined;
+  };
+
+  const existingId = host ? await findExisting() : undefined;
+  if (existingId) {
     const { error } = await sb
       .from('knowledge_sources')
-      .update({ root_url: rootUrl, name, status: 'crawling', updated_at: new Date().toISOString() })
-      .eq('id', existing.id as string)
+      .update({ root_url: rootUrl, name, status: 'crawling', updated_at: now })
+      .eq('id', existingId)
       .eq('organization_id', orgId);
     if (error) throw new Error(`knowledge_sources update: ${error.message}`);
-    return existing.id as string;
+    return existingId;
   }
+
   const { data: created, error } = await sb
     .from('knowledge_sources')
-    .insert({ organization_id: orgId, type: 'website', name, root_url: rootUrl, status: 'crawling' })
+    .insert({ organization_id: orgId, type: 'website', name, root_url: rootUrl, normalized_host: host, status: 'crawling' })
     .select('id')
     .single();
-  if (error) throw new Error(`knowledge_sources insert: ${error.message}`);
+  if (error) {
+    // 23505 = unique_violation: een parallelle crawl van hetzelfde domein won de race.
+    if ((error as { code?: string }).code === '23505' && host) {
+      const raced = await findExisting();
+      if (raced) {
+        await sb.from('knowledge_sources')
+          .update({ root_url: rootUrl, name, status: 'crawling', updated_at: now })
+          .eq('id', raced).eq('organization_id', orgId);
+        return raced;
+      }
+    }
+    throw new Error(`knowledge_sources insert: ${error.message}`);
+  }
   return created.id as string;
 }
