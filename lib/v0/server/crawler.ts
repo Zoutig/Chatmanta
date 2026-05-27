@@ -13,10 +13,30 @@ import type { WebsitePage, WebsitePageStatus } from '@/lib/v0/klantendashboard/t
 export type CrawlJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type SourceStatus = 'pending' | 'crawling' | 'ready' | 'failed';
 
+/** Eén crawl-event in beknopte vorm voor de dashboard-diagnostiek. */
+export type CrawlEventLite = {
+  eventType: string;
+  firecrawlStatus: string | null;
+  completed: number | null;
+  total: number | null;
+  dataCount: number | null;
+  hasNext: boolean | null;
+  decision: string | null;
+  message: string | null;
+  createdAt: string;
+};
+
 export type WebsiteState = {
   source: { id: string; rootUrl: string | null; status: SourceStatus } | null;
   /** Laatste crawl-job voor deze bron, of null als er nog nooit gecrawld is. */
-  job: { status: CrawlJobStatus; error: string | null; completed: number; total: number } | null;
+  job: {
+    status: CrawlJobStatus;
+    error: string | null;
+    completed: number;
+    total: number;
+    /** Recente diagnostiek-events (nieuwste eerst), voor de "Technische details". */
+    events: CrawlEventLite[];
+  } | null;
   pages: WebsitePage[];
 };
 
@@ -45,7 +65,7 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
   const [{ data: job }, { data: pageRows }] = await Promise.all([
     sb
       .from('processing_jobs')
-      .select('status, error_message')
+      .select('id, status, error_message')
       .eq('organization_id', organizationId)
       .eq('job_type', 'crawl_website')
       .eq('target_id', source.id)
@@ -59,6 +79,30 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
       .is('deleted_at', null)
       .order('url', { ascending: true }),
   ]);
+
+  // Recente diagnostiek-events van de laatste job (nieuwste eerst).
+  let events: CrawlEventLite[] = [];
+  if (job?.id) {
+    const { data: eventRows } = await sb
+      .from('crawl_events')
+      .select('event_type, firecrawl_status, completed, total, data_count, has_next, decision, message, created_at')
+      .eq('processing_job_id', job.id as string)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    events = (eventRows ?? []).map((e) => ({
+      eventType: e.event_type as string,
+      firecrawlStatus: (e.firecrawl_status as string | null) ?? null,
+      completed: (e.completed as number | null) ?? null,
+      total: (e.total as number | null) ?? null,
+      dataCount: (e.data_count as number | null) ?? null,
+      hasNext: (e.has_next as boolean | null) ?? null,
+      decision: (e.decision as string | null) ?? null,
+      message: (e.message as string | null) ?? null,
+      createdAt: (e.created_at as string | null) ?? '',
+    }));
+  }
+  // Echte voortgang-teller: pak het nieuwste event dat counts bevat (vervangt 0/0).
+  const counted = events.find((e) => e.total != null);
 
   const pages: WebsitePage[] = (pageRows ?? []).map((p) => ({
     id: p.id as string,
@@ -77,7 +121,13 @@ export async function getWebsiteState(organizationId: string): Promise<WebsiteSt
       status: source.status as SourceStatus,
     },
     job: job
-      ? { status: job.status as CrawlJobStatus, error: (job.error_message as string | null) ?? null, completed: 0, total: 0 }
+      ? {
+          status: job.status as CrawlJobStatus,
+          error: (job.error_message as string | null) ?? null,
+          completed: counted?.completed ?? 0,
+          total: counted?.total ?? 0,
+          events,
+        }
       : null,
     pages,
   };
