@@ -1,19 +1,26 @@
 'use client';
 import { useState, useTransition, type CSSProperties } from 'react';
-import { RefreshCw, Trash2, ChevronRight, Search } from 'lucide-react';
+import { RefreshCw, ChevronRight, Search } from 'lucide-react';
 import {
-  setPageIncludedAction, retryPageAction, deleteWebsiteSourceAction, refreshWebsiteState,
+  setPageIncludedAction, retryPageAction, deleteWebsiteSourceAction, refreshWebsiteSources,
 } from '@/app/actions/crawl';
-import type { WebsiteState } from '@/lib/v0/server/crawler';
+import type { WebsiteSource } from '@/lib/v0/server/crawler';
 import { groupPagesForDisplay, pathLabel } from '@/lib/v0/klantendashboard/group-pages';
 import { StatusBadge } from '../../components/status-badge';
-import { SinglePageImport } from './single-page-import';
 
 // Zichtbaar vinkje in dark mode: native checkboxes verdwijnen zonder accent-color.
 const checkbox: CSSProperties = { width: 16, height: 16, accentColor: 'var(--klant-accent)', cursor: 'pointer', flexShrink: 0 };
 
-export function ManagedPages({ state, onChange }: { state: WebsiteState; onChange: (s: WebsiteState) => void }) {
-  const { source, pages } = state;
+export function ManagedPages({
+  data,
+  onChange,
+  onDelete,
+}: {
+  data: WebsiteSource;
+  onChange: (s: WebsiteSource[]) => void;
+  onDelete: (sourceId: string) => void;
+}) {
+  const { source, pages } = data;
   const byUrl = new Map(pages.map((p) => [p.url, p]));
   const { groups, loose } = groupPagesForDisplay(pages.map((p) => p.url));
   const groupKeys = groups.length > 0 ? [...groups.map((g) => g.key), ...(loose.length ? ['_loose'] : [])] : [];
@@ -36,23 +43,18 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
   const fLoose = loose.filter(matches);
   const visibleCount = fGroups.reduce((n, g) => n + g.urls.length, 0) + fLoose.length;
 
-  const counts = {
-    active: pages.filter((p) => p.status === 'active').length,
-    off: pages.filter((p) => p.status === 'disabled').length,
-    failed: pages.filter((p) => p.status === 'error').length,
-  };
+  const allCollapsed = groupKeys.length > 0 && groupKeys.every((k) => collapsed.has(k));
 
-  const refresh = async () => { try { onChange(await refreshWebsiteState()); } catch {} };
+  const refresh = async () => { try { onChange(await refreshWebsiteSources()); } catch {} };
   const toggle = (id: string, included: boolean) => start(async () => {
     setBusyId(id); await setPageIncludedAction(id, included); await refresh(); setBusyId(null);
   });
   const retry = (id: string) => start(async () => { setBusyId(id); await retryPageAction(id); await refresh(); setBusyId(null); });
   const del = () => {
-    if (!source || !confirm('Website-bron verwijderen? Alle pagina’s gaan uit de kennisbank.')) return;
-    start(async () => { await deleteWebsiteSourceAction(source.id); onChange({ source: null, job: null, pages: [] }); });
+    if (!confirm('Website-bron verwijderen? Alle pagina’s gaan uit de kennisbank.')) return;
+    start(async () => { await deleteWebsiteSourceAction(source.id); onDelete(source.id); });
   };
   const toggleCollapse = (key: string) => setCollapsed((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  const allCollapsed = groupKeys.length > 0 && groupKeys.every((k) => collapsed.has(k));
 
   const row = (u: string) => {
     const p = byUrl.get(u);
@@ -102,20 +104,6 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="klant-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🌐 {source?.rootUrl}</div>
-          <div style={{ fontSize: 12, color: 'var(--klant-fg-dim)' }}>
-            {pages.length} pagina&apos;s · {counts.active} actief · {counts.off} uit · {counts.failed} mislukt
-          </div>
-        </div>
-        <button type="button" className="klant-btn" data-variant="danger" onClick={del} disabled={pending} title="Verwijderen" style={{ padding: 6, flexShrink: 0 }}>
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      <SinglePageImport onAdded={onChange} />
-
       {pages.length > 8 && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
@@ -145,9 +133,14 @@ export function ManagedPages({ state, onChange }: { state: WebsiteState; onChang
             : <div>{fLoose.map(row)}</div>
         )}
         {visibleCount === 0 && (
-          <div style={{ padding: '14px 12px', fontSize: 13, color: 'var(--klant-fg-dim)' }}>Geen pagina&apos;s gevonden voor “{query}”.</div>
+          <div style={{ padding: '14px 12px', fontSize: 13, color: 'var(--klant-fg-dim)' }}>Geen pagina&apos;s gevonden voor &ldquo;{query}&rdquo;.</div>
         )}
       </div>
+
+      <button type="button" className="klant-btn" data-variant="ghost" onClick={del} disabled={pending}
+        style={{ alignSelf: 'flex-start', fontSize: 12 }}>
+        Website-bron verwijderen
+      </button>
     </section>
   );
 }

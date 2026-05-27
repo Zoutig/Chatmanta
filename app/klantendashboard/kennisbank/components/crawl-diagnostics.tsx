@@ -1,6 +1,6 @@
 'use client';
 import { AlertTriangle, Info } from 'lucide-react';
-import type { WebsiteState } from '@/lib/v0/server/crawler';
+import type { WebsiteSource } from '@/lib/v0/server/crawler';
 
 /** Mensleesbare labels voor de decision-codes uit de job-verwerker. */
 const DECISION_LABEL: Record<string, string> = {
@@ -29,7 +29,7 @@ export function CrawlDiagnostics({
   pagesCount,
   isCrawling,
 }: {
-  job: WebsiteState['job'];
+  job: WebsiteSource['job'];
   pagesCount: number;
   isCrawling: boolean;
 }) {
