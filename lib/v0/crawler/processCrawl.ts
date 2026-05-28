@@ -13,6 +13,8 @@ import { getSystemJobClient } from '@/lib/supabase/admin';
 import { chunkText, embedTexts } from '@/lib/v0/server/rag';
 import type { CrawledPage } from './firecrawl';
 
+type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
+
 export type IngestCrawlResult = {
   pagesCrawled: number;
   pagesFailed: number;
@@ -20,7 +22,15 @@ export type IngestCrawlResult = {
   chunks: number;
   embedTokens: number;
   costUsd: number;
+  /** Pagina's die binnenkwamen maar bij embedding/chunk-opslag faalden. Per-pagina
+   *  geïsoleerd: deze fouten markeren één pagina 'failed' en breken de crawl niet af. */
+  ingestErrors: string[];
 };
+
+/** Markeert één al-ingevoegde pagina als mislukt zonder de crawl af te breken. */
+async function markPageFailed(sb: Sb, pageId: string, message: string): Promise<void> {
+  await sb.from('website_pages').update({ status: 'failed', error_message: message }).eq('id', pageId);
+}
 
 /** Bepaalt de website_pages-status van één gecrawlde pagina. */
 function pageStatus(page: CrawledPage): 'crawled' | 'failed' | 'excluded' {
@@ -57,62 +67,95 @@ export async function ingestCrawlResults(
     chunks: 0,
     embedTokens: 0,
     costUsd: 0,
+    ingestErrors: [],
   };
   const now = new Date().toISOString();
 
   for (const page of pages) {
     const status = pageStatus(page);
-    const contentHash =
-      status === 'crawled'
-        ? createHash('sha256').update(page.markdown).digest('hex')
-        : null;
 
-    const errorMessage =
-      status === 'failed'
-        ? page.error ?? (page.statusCode != null ? `HTTP ${page.statusCode}` : 'Pagina kon niet worden opgehaald')
-        : null;
+    // Per-pagina geïsoleerd: een fout op één pagina (DB-insert, embedding of
+    // chunk-opslag) markeert ALLEEN die pagina als 'failed' en gaat door met de
+    // rest. Voorheen gooide een enkele slechte pagina, waardoor de hele job
+    // 'failed' werd terwijl eerder ingevoegde pagina's als 'crawled' bleven staan
+    // (inconsistente, half-onbruikbare staat).
+    try {
+      const contentHash =
+        status === 'crawled'
+          ? createHash('sha256').update(page.markdown).digest('hex')
+          : null;
 
-    const { data: inserted, error: pageErr } = await sb
-      .from('website_pages')
-      .insert({
-        knowledge_source_id: knowledgeSourceId,
+      const errorMessage =
+        status === 'failed'
+          ? page.error ?? (page.statusCode != null ? `HTTP ${page.statusCode}` : 'Pagina kon niet worden opgehaald')
+          : null;
+
+      const { data: inserted, error: pageErr } = await sb
+        .from('website_pages')
+        .insert({
+          knowledge_source_id: knowledgeSourceId,
+          organization_id: organizationId,
+          url: page.url || '(onbekend)',
+          title: page.title,
+          content_text: status === 'crawled' ? page.markdown : null,
+          content_hash: contentHash,
+          status,
+          error_message: errorMessage,
+          last_crawled_at: now,
+        })
+        .select('id')
+        .single();
+      if (pageErr) throw new Error(pageErr.message);
+
+      if (status === 'failed') result.pagesFailed++;
+      if (status === 'excluded') result.pagesExcluded++;
+      if (status !== 'crawled') continue;
+
+      const pageId = inserted.id as string;
+      const chunks = chunkText(page.markdown);
+      if (chunks.length === 0) {
+        // Gecrawld maar geen chunkbare content — telt als gecrawld, geen embed nodig.
+        result.pagesCrawled++;
+        continue;
+      }
+
+      // Embedding — bij een fout markeren we DEZE pagina 'failed' en gaan door.
+      let embed: Awaited<ReturnType<typeof embedTexts>>;
+      try {
+        embed = await embedTexts(chunks);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'onbekende fout';
+        await markPageFailed(sb, pageId, `Embedding mislukt: ${msg}`);
+        result.pagesFailed++;
+        result.ingestErrors.push(`${page.url}: embedding — ${msg}`);
+        continue;
+      }
+      result.embedTokens += embed.tokens;
+      result.costUsd += embed.costUsd;
+
+      const rows = chunks.map((content, i) => ({
         organization_id: organizationId,
-        url: page.url || '(onbekend)',
-        title: page.title,
-        content_text: status === 'crawled' ? page.markdown : null,
-        content_hash: contentHash,
-        status,
-        error_message: errorMessage,
-        last_crawled_at: now,
-      })
-      .select('id')
-      .single();
-    if (pageErr) throw new Error(`website_pages insert (${page.url}): ${pageErr.message}`);
-
-    if (status === 'failed') result.pagesFailed++;
-    if (status === 'excluded') result.pagesExcluded++;
-    if (status !== 'crawled') continue;
-
-    result.pagesCrawled++;
-    const pageId = inserted.id as string;
-
-    const chunks = chunkText(page.markdown);
-    if (chunks.length === 0) continue;
-
-    const embed = await embedTexts(chunks);
-    result.embedTokens += embed.tokens;
-    result.costUsd += embed.costUsd;
-
-    const rows = chunks.map((content, i) => ({
-      organization_id: organizationId,
-      website_page_id: pageId,
-      content,
-      embedding: embed.vectors[i],
-      metadata: { chunk_index: i, url: page.url },
-    }));
-    const { error: chunkErr } = await sb.from('document_chunks').insert(rows);
-    if (chunkErr) throw new Error(`document_chunks insert (${page.url}): ${chunkErr.message}`);
-    result.chunks += chunks.length;
+        website_page_id: pageId,
+        content,
+        embedding: embed.vectors[i],
+        metadata: { chunk_index: i, url: page.url },
+      }));
+      const { error: chunkErr } = await sb.from('document_chunks').insert(rows);
+      if (chunkErr) {
+        await markPageFailed(sb, pageId, `Chunk-opslag mislukt: ${chunkErr.message}`);
+        result.pagesFailed++;
+        result.ingestErrors.push(`${page.url}: chunk-opslag — ${chunkErr.message}`);
+        continue;
+      }
+      result.pagesCrawled++;
+      result.chunks += chunks.length;
+    } catch (err) {
+      // website_pages-insert zelf faalde → er is geen rij om te markeren. Tel als
+      // mislukt en ga door; de crawl mag niet om één DB-hapering omvallen.
+      const msg = err instanceof Error ? err.message : 'onbekende fout';
+      result.pagesFailed++;
+      result.ingestErrors.push(`${page.url}: opslag — ${msg}`);
+    }
   }
 
   // Usage-logging: crawl-event (pagina's) + embedding-event (tokens).
@@ -146,7 +189,7 @@ export async function ingestSinglePage(
   knowledgeSourceId: string,
   organizationId: string,
   page: CrawledPage,
-): Promise<{ status: 'crawled' | 'failed' | 'excluded'; pageId: string }> {
+): Promise<{ status: 'crawled' | 'failed' | 'excluded'; pageId: string; error: string | null }> {
   const sb = await getSystemJobClient({ reason: 'crawl_website' });
 
   await sb
@@ -184,7 +227,14 @@ export async function ingestSinglePage(
   if (status === 'crawled') {
     const chunks = chunkText(page.markdown);
     if (chunks.length > 0) {
-      const embed = await embedTexts(chunks);
+      let embed: Awaited<ReturnType<typeof embedTexts>>;
+      try {
+        embed = await embedTexts(chunks);
+      } catch (err) {
+        const msg = `Embedding mislukt: ${err instanceof Error ? err.message : 'onbekende fout'}`;
+        await markPageFailed(sb, pageId, msg);
+        return { status: 'failed', pageId, error: msg };
+      }
       const rows = chunks.map((content, i) => ({
         organization_id: organizationId,
         website_page_id: pageId,
@@ -193,8 +243,12 @@ export async function ingestSinglePage(
         metadata: { chunk_index: i, url: page.url },
       }));
       const { error: chunkErr } = await sb.from('document_chunks').insert(rows);
-      if (chunkErr) throw new Error(`document_chunks insert (${page.url}): ${chunkErr.message}`);
+      if (chunkErr) {
+        const msg = `Chunk-opslag mislukt: ${chunkErr.message}`;
+        await markPageFailed(sb, pageId, msg);
+        return { status: 'failed', pageId, error: msg };
+      }
     }
   }
-  return { status, pageId };
+  return { status, pageId, error: errorMessage };
 }

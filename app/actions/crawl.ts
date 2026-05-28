@@ -229,8 +229,8 @@ export async function scrapeSinglePageAction(rawUrl: string): Promise<ActionResu
     const sourceId = await upsertWebsiteSource(sb, activeOrg.id, url, hostnameOf(url));
     const page = await scrapeOne(url);
     page.url = page.url || url;
-    const { status } = await ingestSinglePage(sourceId, activeOrg.id, page);
-    if (status === 'failed') fail('CRAWL_FAILED', page.error ?? 'Pagina kon niet worden opgehaald.');
+    const { status, error } = await ingestSinglePage(sourceId, activeOrg.id, page);
+    if (status === 'failed') fail('CRAWL_FAILED', error ?? page.error ?? 'Pagina kon niet worden opgehaald.');
     await sb.from('knowledge_sources').update({ status: 'ready' }).eq('id', sourceId);
     revalidatePath(KENNISBANK_PATH);
     return {};

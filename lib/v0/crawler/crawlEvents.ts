@@ -14,6 +14,22 @@ type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
 
 export type CrawlEventType = 'start' | 'poll' | 'ingest' | 'complete' | 'fail';
 
+/**
+ * Beslissings-codes die de job-verwerker in `crawl_events.decision` schrijft.
+ * De kolom is vrije tekst in de DB; hier getypeerd zodat zowel de schrijvers
+ * (processJobs/crawl-actions) als de operator-rollup (lib/v0/server/crawl-health.ts)
+ * één bron-van-waarheid delen. Nieuwe code toevoegen? Vul hem hier aan.
+ */
+export type CrawlDecision =
+  | 'start-failed'
+  | 'no-crawl-id'
+  | 'pending'
+  | 'timeout'
+  | 'firecrawl-failed'
+  | 'rate-limited'
+  | 'ingested'
+  | 'exception';
+
 /** Eén crawl-event-veld-set. organization_id + event_type verplicht; rest optioneel. */
 export type CrawlEventInput = {
   organizationId: string;
@@ -27,7 +43,7 @@ export type CrawlEventInput = {
   dataCount?: number | null;
   hasNext?: boolean | null;
   creditsUsed?: number | null;
-  decision?: string | null;
+  decision?: CrawlDecision | null;
   message?: string | null;
   payload?: Record<string, unknown>;
 };
