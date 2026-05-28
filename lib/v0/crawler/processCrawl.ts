@@ -9,7 +9,12 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import { getSystemJobClient } from '@/lib/supabase/admin';
+// Type-only import: het echte ingest-pad krijgt zijn service-role client van de
+// caller (DI). Zo trekt deze module `@/lib/supabase/admin` → `lib/auth` →
+// `next/navigation` NIET runtime mee, en kan het golden-set eval-script
+// (`scripts/v0-crawl-eval.ts`, draait onder --conditions=react-server) dit
+// échte pad importeren zonder de tsx-runner te laten crashen.
+import type { getSystemJobClient } from '@/lib/supabase/admin';
 import { chunkText, embedTexts } from '@/lib/v0/server/rag';
 import type { CrawledPage } from './firecrawl';
 
@@ -47,12 +52,11 @@ function pageStatus(page: CrawledPage): 'crawled' | 'failed' | 'excluded' {
  * Job- en bron-status worden door de cron-orchestrator gezet, niet hier.
  */
 export async function ingestCrawlResults(
+  sb: Sb,
   knowledgeSourceId: string,
   organizationId: string,
   pages: CrawledPage[],
 ): Promise<IngestCrawlResult> {
-  const sb = await getSystemJobClient({ reason: 'crawl_website' });
-
   // Idempotency: oude pagina's + (via CASCADE) hun chunks weg.
   const { error: delErr } = await sb
     .from('website_pages')
@@ -186,12 +190,11 @@ export async function ingestCrawlResults(
  * URL binnen de bron (idempotent), houdt de rest van de pagina's intact.
  */
 export async function ingestSinglePage(
+  sb: Sb,
   knowledgeSourceId: string,
   organizationId: string,
   page: CrawledPage,
 ): Promise<{ status: 'crawled' | 'failed' | 'excluded'; pageId: string; error: string | null }> {
-  const sb = await getSystemJobClient({ reason: 'crawl_website' });
-
   await sb
     .from('website_pages')
     .delete()

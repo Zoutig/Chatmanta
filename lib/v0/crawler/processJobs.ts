@@ -98,7 +98,7 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
 
       // completed → ingest. Het 'complete'-event bewaart de getrimde pagina-snapshot;
       // bij data_count 0 terwijl total>0/has_next true is dát het zichtbare signaal.
-      const result = await ingestCrawlResults(sourceId, orgId, status.pages);
+      const result = await ingestCrawlResults(sb, sourceId, orgId, status.pages);
       await sb
         .from('processing_jobs')
         .update({ status: 'completed', attempts: attempts + 1, finished_at: now(), updated_at: now(), error_message: null })

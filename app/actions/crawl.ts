@@ -210,7 +210,7 @@ export async function retryPageAction(pageId: string): Promise<ActionResult> {
     const check = await validateCrawlUrl(row.url as string);
     if (!check.allowed) fail('CRAWL_FAILED', check.reason);
     const page = await scrapeOne(row.url as string);
-    await ingestSinglePage(row.knowledge_source_id as string, activeOrg.id, page);
+    await ingestSinglePage(sb, row.knowledge_source_id as string, activeOrg.id, page);
     revalidatePath(KENNISBANK_PATH);
     return {};
   });
@@ -229,7 +229,7 @@ export async function scrapeSinglePageAction(rawUrl: string): Promise<ActionResu
     const sourceId = await upsertWebsiteSource(sb, activeOrg.id, url, hostnameOf(url));
     const page = await scrapeOne(url);
     page.url = page.url || url;
-    const { status, error } = await ingestSinglePage(sourceId, activeOrg.id, page);
+    const { status, error } = await ingestSinglePage(sb, sourceId, activeOrg.id, page);
     if (status === 'failed') fail('CRAWL_FAILED', error ?? page.error ?? 'Pagina kon niet worden opgehaald.');
     await sb.from('knowledge_sources').update({ status: 'ready' }).eq('id', sourceId);
     revalidatePath(KENNISBANK_PATH);
