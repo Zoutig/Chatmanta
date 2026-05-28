@@ -72,7 +72,11 @@ export function WebsiteList({
             </div>
             {crawling && (
               <div style={{ padding: '0 14px 14px' }}>
-                <CrawlProgress completed={ws.job?.completed ?? 0} total={ws.job?.total ?? 0} />
+                <CrawlProgress
+                  completed={ws.job?.completed ?? 0}
+                  total={ws.job?.total ?? 0}
+                  rateLimited={ws.job?.events?.[0]?.decision === 'rate-limited'}
+                />
               </div>
             )}
             {!crawling && (
