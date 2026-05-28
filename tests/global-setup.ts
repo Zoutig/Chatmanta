@@ -47,8 +47,10 @@ export default async function globalSetup(_config: FullConfig) {
   await page.fill('input[name="password"]', password);
   await page.click('button[type="submit"]');
 
-  // Wait for redirect back to home
-  await page.waitForURL(`${baseUrl}/`, { timeout: 15_000 });
+  // Wait for the post-login redirect away from /login. De login-action
+  // redirect naar /home (niet `/`), dus wachten op een exacte `/`-URL liep af
+  // in een timeout — we wachten nu op elke niet-/login pad.
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15_000 });
 
   // Save the auth cookie so every test context can load it
   await context.storageState({ path: 'tests/.auth-state.json' });
