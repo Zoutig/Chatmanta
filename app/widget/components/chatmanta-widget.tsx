@@ -155,6 +155,9 @@ export function ChatMantaWidget({
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Huidige embed-token. Ref i.p.v. state: refresh mag de volgende fetch
+  // beïnvloeden zonder re-render en zonder stale closure in `send`.
+  const embedTokenRef = useRef(embedToken);
 
   // Thread-state. `storeRef` is null tot na hydration zodat SSR niet probeert
   // localStorage te lezen. `activeThreadId` = null betekent "fresh chat" — pas
@@ -306,6 +309,26 @@ export function ChatMantaWidget({
     [],
   );
 
+  // Haal een vers embed-token op (zelfde origin-lock als de chat-route). Wordt
+  // alleen aangeroepen wanneer een chat-request 401/403 geeft — typisch een
+  // verlopen token op een lang-open tabblad. null = niet gelukt → caller toont
+  // alsnog een nette foutmelding.
+  const refreshEmbedToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const res = await fetch(
+        `/api/v0/widget/token?org=${encodeURIComponent(orgSlug)}`,
+        { method: 'GET' },
+      );
+      if (!res.ok) return null;
+      const data = (await res.json()) as { token?: unknown };
+      const token = typeof data.token === 'string' ? data.token : null;
+      if (token) embedTokenRef.current = token;
+      return token;
+    } catch {
+      return null;
+    }
+  }, [orgSlug]);
+
   const send = useCallback(
     async (question: string) => {
       const trimmed = question.trim();
@@ -336,12 +359,13 @@ export function ChatMantaWidget({
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      try {
-        const res = await fetch(`/api/v0/chat?org=${encodeURIComponent(orgSlug)}`, {
+      // POST-helper — herbruikt voor de retry ná een token-refresh.
+      const postChat = (token: string | undefined) =>
+        fetch(`/api/v0/chat?org=${encodeURIComponent(orgSlug)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(embedToken ? { 'x-chatmanta-embed': embedToken } : {}),
+            ...(token ? { 'x-chatmanta-embed': token } : {}),
           },
           body: JSON.stringify({
             question: trimmed,
@@ -351,11 +375,23 @@ export function ChatMantaWidget({
           signal: ctrl.signal,
         });
 
+      try {
+        let res = await postChat(embedTokenRef.current);
+
+        // Het embed-token verloopt na 30 min (zie lib/v0/server/embed-token.ts).
+        // Bij een 401/403 op het embed-pad halen we eenmalig een vers token op
+        // en herhalen we de vraag — zo herstelt een lang-open tabblad zichzelf
+        // i.p.v. een foutmelding te tonen.
+        if ((res.status === 401 || res.status === 403) && embedTokenRef.current) {
+          const fresh = await refreshEmbedToken();
+          if (fresh) res = await postChat(fresh);
+        }
+
         if (!res.ok || !res.body) {
           const status = res.status;
           updateAssistant(setMessages, assistantId, {
             content: status === 401 || status === 403
-              ? 'Even inloggen op de demo-omgeving om verder te chatten.'
+              ? 'Deze chat is even niet beschikbaar. Ververs de pagina en probeer het opnieuw.'
               : 'Er ging iets mis met dit antwoord. Probeer het zo nog eens.',
             error: `HTTP ${status}`,
             streaming: false,
@@ -401,7 +437,7 @@ export function ChatMantaWidget({
         abortRef.current = null;
       }
     },
-    [messages, orgSlug, botVersion, pending, embedToken],
+    [messages, orgSlug, botVersion, pending, refreshEmbedToken],
   );
 
   // Persist messages → thread-store. Triggert na elke setMessages-flush,
