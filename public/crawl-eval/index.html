@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Groene Vingers Hoveniers — startpagina (crawl-eval fixture)</title>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="/crawl-eval/index.html">Home</a>
+        <a href="/crawl-eval/diensten.html">Diensten</a>
+        <a href="/crawl-eval/tarieven.html">Tarieven</a>
+        <!-- Bewust kapotte link: deze pagina bestaat niet (404) -> moet 'failed' worden. -->
+        <a href="/crawl-eval/kapot.html">Oude actie</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Welkom bij Groene Vingers Hoveniers</h1>
+      <p>
+        Dit is een vaste testpagina voor de crawler-regressie-eval van ChatManta
+        (sentinel: <strong>proefpagina-index</strong>). De inhoud verandert nooit,
+        zodat een hercrawl altijd hetzelfde resultaat hoort op te leveren.
+      </p>
+      <p>
+        Groene Vingers is een fictief hoveniersbedrijf uit Utrecht. We ontwerpen,
+        leggen aan en onderhouden tuinen voor particulieren en bedrijven. Van een
+        compact stadstuintje tot een ruime landelijke tuin: we werken met een vast
+        team en duurzame, streekeigen beplanting.
+      </p>
+      <p>
+        Op deze demo-site staan een paar pagina's met stabiele content. De
+        crawler hoort deze pagina als <em>gecrawld</em> te verwerken en er
+        doorzoekbare chunks van te maken. Bekijk onze
+        <a href="/crawl-eval/diensten.html">diensten</a> en
+        <a href="/crawl-eval/tarieven.html">tarieven</a> voor meer.
+      </p>
+    </main>
+    <footer>
+      <p>Groene Vingers Hoveniers · fictief · uitsluitend voor crawl-eval.</p>
+    </footer>
+  </body>
+</html>

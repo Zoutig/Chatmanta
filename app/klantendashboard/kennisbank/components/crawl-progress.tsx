@@ -1,7 +1,16 @@
 'use client';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
-export function CrawlProgress({ completed, total }: { completed: number; total: number }) {
+export function CrawlProgress({
+  completed,
+  total,
+  rateLimited = false,
+}: {
+  completed: number;
+  total: number;
+  /** De bron beperkt ons tempo (Firecrawl 429); we pollen automatisch door. */
+  rateLimited?: boolean;
+}) {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 5;
   return (
     <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -17,6 +26,12 @@ export function CrawlProgress({ completed, total }: { completed: number; total: 
         </span>
         <span style={{ fontSize: 12, color: 'var(--klant-fg-dim)' }}>± 1–3 min</span>
       </div>
+      {rateLimited && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: 'var(--klant-warning, #b45309)' }}>
+          <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+          De website beperkt even het tempo. Geen zorgen — we proberen automatisch verder, dit kan iets langer duren.
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: 'var(--klant-fg-dim)' }}>
         <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
         Houd dit tabblad open tot het klaar is. Sluit je het, dan pauzeert de verwerking en gaat verder zodra je terugkomt.

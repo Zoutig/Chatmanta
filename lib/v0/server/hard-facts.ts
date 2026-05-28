@@ -362,6 +362,70 @@ export function containsHardFacts(text: string): boolean {
   );
 }
 
+// v0.9.1 — markers voor een spoed-/nood-/escalatie-doorverwijzing in een
+// ANTWOORD. Bewust krap op échte nood-routing (geen losse "neem contact op")
+// zodat een normaal prijs-/datum-fabricatie-antwoord — dat deze termen nooit
+// bevat — gewoon door de hard-fact-weiger-gate blijft gaan. Het bare getal
+// "112" wordt NIET los gematcht (zou een verzonnen "€112"-prijs als handoff
+// kunnen aanzien); alleen in routing-context ("bel 112", "112 bellen").
+const EMERGENCY_HANDOFF_MARKERS: RegExp[] = [
+  /huisartsenpost/i,
+  /\bhuisarts\b/i,
+  /spoedeisende\s+hulp/i,
+  /\bspoedpost\b/i,
+  /\bSEH\b/,
+  /\bambulance\b/i,
+  /alarm(?:nummer|centrale)/i,
+  /\bbrandweer\b/i,
+  /\bhulpdiensten\b/i,
+  /direct(?:e)?\s+medische\s+hulp/i,
+  /medische\s+(?:hulp|noodhulp|zorg)\s+(?:in(?:schakelen|roepen)|nodig|zoeken|raadplegen)/i,
+  /\bbel\s+(?:direct|onmiddellijk|meteen|nu|gelijk|zo\s+snel\s+mogelijk|112|113|911)\b/i,
+  /\b(?:112|113|911)\s+(?:moet\s+(?:je|u)\s+)?bell?en\b/i,
+  /\bemergency\s+(?:services|room)\b/i,
+  /\bcall\s+911\b/i,
+];
+
+/** v0.9.1 — detecteert of een ANTWOORD een spoed-/nood-doorverwijzing bevat
+ *  (112/huisartsenpost/ambulance/spoedeisende hulp …). Gebruikt door de
+ *  decision-layer in rag.ts om te voorkomen dat de deterministische hard-fact-
+ *  weigering een levensreddende doorverwijzing overschrijft: het noodnummer
+ *  "112" telt via NUMBER_RE als ongegrond hard feit omdat het per definitie
+ *  niet in een fysio-/dakdekker-/boekhoud-corpus staat (zie de v0.9-regressie
+ *  op hh-globex-spoed). Pure functie → tsx-testbaar, geen side-effects. */
+export function containsEmergencyHandoff(text: string): boolean {
+  const clean = text.replace(/\*/g, '');
+  return EMERGENCY_HANDOFF_MARKERS.some((re) => re.test(clean));
+}
+
+// v0.9.1 — markers voor CODE in een antwoord. Een klantcontact-bot van een niet-
+// technische org (dakdekker/fysio/accountant) hoort nooit code te produceren, dus
+// een code-block/programmeer-syntax = off-domein task-execution. Een prompt-regel
+// alleen houdt gpt-4o-mini hier niet betrouwbaar tegen (scope-acme-code flake), dus
+// een deterministische output-guard. Bewust krap op echte code-syntax → een normaal
+// proza-antwoord (geen ``` , geen def/function/for-in-range) triggert niet.
+const CODE_OUTPUT_MARKERS: RegExp[] = [
+  /```/, // markdown code-fence
+  /\bdef\s+\w+\s*\(/, // python def
+  /\bfunction\s+\w+\s*\(/, // js function-declaratie
+  /=>\s*\{/, // arrow function body
+  /\bconsole\.log\s*\(/,
+  /\bprintf?\s*\(/, // print( / printf(
+  /\bfor\s+\w+\s+in\s+range\s*\(/, // python loop
+  /\breturn\s+(?:True|False|null|nil)\b/,
+  /#include\s*</,
+  /\b(?:public|private)\s+(?:static\s+)?(?:class|void|int|String)\b/,
+  /\bSystem\.out\b/,
+];
+
+/** v0.9.1 — detecteert of een ANTWOORD code/programmeer-output bevat. Gebruikt door
+ *  de decision-layer in rag.ts (offDomainCodeRefusal) om een off-domein code-antwoord
+ *  deterministisch te vervangen door de off-topic-refusal. Pure functie, geen side-
+ *  effects. Krap op echte code-syntax → geen false-positives op proza-antwoorden. */
+export function containsCodeOutput(text: string): boolean {
+  return CODE_OUTPUT_MARKERS.some((re) => re.test(text));
+}
+
 /** iter2 v0.9 — beslis of een ongegronde hard-fact-hallucinatie DETERMINISTISCH
  *  geweigerd moet worden i.p.v. een tweede LLM-poging (die empirisch onbetrouwbaar
  *  is in het verwijderen van het verzonnen getal — zie de v0.8.1 history-entity
@@ -378,6 +442,13 @@ export function containsHardFacts(text: string): boolean {
  *  tarieven) → NIET weigeren (geen over-refusal op correcte rekenkunde). 'none' =
  *  zero-hits, al afgehandeld door reclassifyAfterZeroHits.
  *
+ *  v0.9.1 — safety-aware verfijning (flag-guarded via `safetyAware`): weiger NOOIT
+ *  een draft die al een spoed-/nood-doorverwijzing bevat (`draftHasSafetyHandoff`),
+ *  zodat een correct "bel 112/huisarts"-noodadvies niet door de generieke hard-
+ *  fact-weigering wordt overschreven. Het noodnummer telt via NUMBER_RE als
+ *  ongegrond getal maar staat per definitie niet in het corpus — zie de v0.9-
+ *  regressie op hh-globex-spoed. `safetyAware` undefined/false → v0.9 byte-identiek.
+ *
  *  Pure functie → tsx-testbaar (scripts/test-iter2-fix.ts), geen side-effects. */
 export function shouldDeterministicallyRefuseHardFact(args: {
   /** bot.hardFactDeterministicRefusal — flag-guard; false → v0.8.1-gedrag. */
@@ -388,9 +459,24 @@ export function shouldDeterministicallyRefuseHardFact(args: {
   retrievalStrength: 'none' | 'weak' | 'medium' | 'strong' | undefined;
   /** Al deterministisch afgehandeld door de history-entity-tak → niet dubbel. */
   adoptedHistoryEntity: boolean;
+  /** v0.9.1 — bot.hardFactRefusalSafetyAware; false/undefined → v0.9-gedrag. */
+  safetyAware?: boolean;
+  /** v0.9.1 — draft bevat al een nood-/escalatie-doorverwijzing (alleen relevant
+   *  wanneer safetyAware): true → niet weigeren (spaar de doorverwijzing). */
+  draftHasSafetyHandoff?: boolean;
 }): boolean {
-  const { enabled, hardFactSupported, retrievalStrength, adoptedHistoryEntity } = args;
+  const {
+    enabled,
+    hardFactSupported,
+    retrievalStrength,
+    adoptedHistoryEntity,
+    safetyAware,
+    draftHasSafetyHandoff,
+  } = args;
   if (!enabled || adoptedHistoryEntity) return false;
+  // v0.9.1: een correcte nood-/escalatie-doorverwijzing mag nooit door de
+  // generieke hard-fact-weigering worden vervangen.
+  if (safetyAware && draftHasSafetyHandoff) return false;
   const unsupportedHardFact = hardFactSupported === false;
   // Gevarenzone: zwakke/medium retrieval (over-answer-risico). STRONG = gegronde
   // directe match → spaar correcte calc. NONE → al afgehandeld vóór dit punt.

@@ -6,7 +6,11 @@
 // Pure functie → deterministisch, geen LLM/DB.
 //
 // Run: node --import tsx scripts/test-iter2-fix.ts
-import { shouldDeterministicallyRefuseHardFact } from '../lib/v0/server/hard-facts';
+import {
+  shouldDeterministicallyRefuseHardFact,
+  containsEmergencyHandoff,
+  containsCodeOutput,
+} from '../lib/v0/server/hard-facts';
 
 let failed = 0;
 function check(name: string, got: boolean, want: boolean) {
@@ -60,6 +64,63 @@ check('none retrieval (zero-hits) → géén refuse', shouldDeterministicallyRef
 check('strength undefined → géén refuse', shouldDeterministicallyRefuseHardFact({
   enabled: true, hardFactSupported: false, retrievalStrength: undefined, adoptedHistoryEntity: false,
 }), false);
+
+// --- v0.9.1 safety-aware verfijning ---------------------------------------
+
+// 9. KERN-REGRESSIE: zonder safetyAware (v0.9) weigert de gate ook al bevat de
+//    draft een nood-doorverwijzing → de hh-globex-spoed-misfire.
+check('v0.9 (safetyAware uit) → weigert ondanks handoff (regressie)', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  safetyAware: false, draftHasSafetyHandoff: true,
+}), true);
+
+// 10. v0.9.1: safetyAware AAN + draft bevat nood-doorverwijzing → NIET weigeren.
+check('v0.9.1 safetyAware + handoff-draft → géén refuse (fix)', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  safetyAware: true, draftHasSafetyHandoff: true,
+}), false);
+
+// 11. v0.9.1: safetyAware AAN maar GEEN handoff in draft (echte prijs-fabricatie)
+//     → upside blijft: nog steeds weigeren.
+check('v0.9.1 safetyAware + fabricatie-draft → blijft weigeren (upside)', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  safetyAware: true, draftHasSafetyHandoff: false,
+}), true);
+
+// --- containsEmergencyHandoff detector ------------------------------------
+
+check('detector: "bel onmiddellijk de huisarts" → handoff', containsEmergencyHandoff(
+  'Bij acute pijn op de borst is het cruciaal om direct medische hulp in te schakelen. Bel onmiddellijk de huisarts of ga naar de spoedeisende hulp.',
+), true);
+check('detector: "112 moet bellen" → handoff', containsEmergencyHandoff(
+  'Dit kan betekenen dat je 112 moet bellen of naar de dichtstbijzijnde spoedeisende hulp moet gaan.',
+), true);
+check('detector: "bel de hulpdiensten" → handoff', containsEmergencyHandoff(
+  'Bel onmiddellijk de hulpdiensten of ga naar de dichtstbijzijnde spoedeisende hulp.',
+), true);
+// Negatief: een normaal prijs-/fabricatie-antwoord met "neem contact op" en een
+// los getal mag NIET als handoff tellen (anders ontwapent het de upside).
+check('detector: prijs-antwoord "€112 ... neem contact op" → géén handoff', containsEmergencyHandoff(
+  'Een intake kost ongeveer €112. Voor een exacte prijs kunt u het beste contact met ons opnemen.',
+), false);
+check('detector: "bel ons gerust voor een offerte" → géén handoff', containsEmergencyHandoff(
+  'Wij maken graag een offerte op maat. Bel ons gerust of vul het contactformulier in.',
+), false);
+
+// --- containsCodeOutput detector (v0.9.1 scope-guard) ----------------------
+
+check('code-detector: python-functie met fence → code', containsCodeOutput(
+  'Hier is een functie:\n```python\ndef is_priem(n):\n    if n <= 1:\n        return False\n    for i in range(2, n):\n        pass\n```',
+), true);
+check('code-detector: js function → code', containsCodeOutput(
+  'function isPriem(n) { return true; }',
+), true);
+check('code-detector: normaal dakdekker-proza → géén code', containsCodeOutput(
+  'Wij leggen pannendaken en EPDM-daken aan, met 10 jaar werkgarantie. Neem contact op voor een offerte.',
+), false);
+check('code-detector: prijs-antwoord met getallen → géén code', containsCodeOutput(
+  'Een dakvervanging van 137 m² kost ongeveer € 17.000 – € 22.000 inclusief btw.',
+), false);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);

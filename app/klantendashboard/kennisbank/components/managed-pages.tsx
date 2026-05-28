@@ -11,6 +11,17 @@ import { StatusBadge } from '../../components/status-badge';
 // Zichtbaar vinkje in dark mode: native checkboxes verdwijnen zonder accent-color.
 const checkbox: CSSProperties = { width: 16, height: 16, accentColor: 'var(--klant-accent)', cursor: 'pointer', flexShrink: 0 };
 
+/** Vertaalt de technische per-pagina foutreden naar klant-taal. De rauwe melding
+ *  blijft als tooltip beschikbaar (en staat voluit in het operator-overzicht). */
+function humanizePageError(msg: string): string {
+  if (/HTTP\s*404/i.test(msg)) return 'Pagina niet gevonden (404)';
+  if (/HTTP\s*403/i.test(msg)) return 'Geen toegang tot deze pagina (403)';
+  if (/HTTP\s*5\d\d/i.test(msg)) return 'De pagina gaf een serverfout';
+  if (/^Embedding mislukt/i.test(msg)) return 'Verwerken mislukt — probeer opnieuw';
+  if (/^Chunk-opslag mislukt/i.test(msg)) return 'Opslaan mislukt — probeer opnieuw';
+  return msg;
+}
+
 export function ManagedPages({
   data,
   onChange,
@@ -71,7 +82,7 @@ export function ManagedPages({
             <div style={{ fontSize: 11, color: 'var(--klant-fg-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{secondary}</div>
           )}
           {p.status === 'error' && p.errorMessage && (
-            <div style={{ fontSize: 11, color: 'var(--klant-danger, #dc2626)' }}>⚠ {p.errorMessage}</div>
+            <div title={p.errorMessage} style={{ fontSize: 11, color: 'var(--klant-danger, #dc2626)' }}>⚠ {humanizePageError(p.errorMessage)}</div>
           )}
         </div>
         <StatusBadge status={p.status} kind="webpage" />

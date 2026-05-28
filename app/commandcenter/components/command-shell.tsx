@@ -30,6 +30,7 @@ const NAV: NavItem[] = [
   { href: '/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'live' },
   { href: '/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'live' },
   { href: '/commandcenter/projects', label: 'Projectgebieden', icon: 'folder', status: 'live' },
+  { href: '/commandcenter/crawl-health', label: 'Crawl-health', icon: 'globe', status: 'live' },
 ];
 
 // Accent met fallback: --manta-accent is opt-in (alleen actief onder data-style="glass"),

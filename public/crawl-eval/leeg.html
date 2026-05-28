@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lege pagina — crawl-eval fixture</title>
+  </head>
+  <!--
+    Bewust lege body: geen hoofd-content. Empirisch (eval-run 2026-05-28) laat
+    Firecrawl een contentloze pagina HELEMAAL WEG uit de resultaten i.p.v. 'm met
+    lege markdown terug te geven — dus deze pagina belandt niet in de kennisbank.
+    De eval toetst daarom het invariant "niet als doorzoekbare content opgenomen"
+    (afwezig OF 'excluded' = goed; alleen 'crawled' = fout).
+  -->
+  <body></body>
+</html>

@@ -25,7 +25,11 @@ import {
   renderPersonaTemplate,
   type OrgPersona,
 } from './persona';
-import { shouldDeterministicallyRefuseHardFact } from './hard-facts';
+import {
+  shouldDeterministicallyRefuseHardFact,
+  containsEmergencyHandoff,
+  containsCodeOutput,
+} from './hard-facts';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
 import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
@@ -1376,7 +1380,9 @@ export type StreamEvent =
       response: ChatResponse;
       // v0.8.1: 'history-entity-adoption' = deterministisch weiger-template bij
       // gedetecteerde adoptie van een history-entiteit (geen LLM-poging).
-      reason: 'claim-regenerate' | 'history-entity-adoption';
+      // v0.9.1: 'off-domain-code-refusal' = deterministische scope-guard die een
+      // off-domein code-antwoord vervangt door de off-topic-refusal.
+      reason: 'claim-regenerate' | 'history-entity-adoption' | 'off-domain-code-refusal';
       regeneratedVerifiedRatio: number | null;
     }
   | { kind: 'error'; code: AppErrorCode; retryAfterSec?: number };
@@ -1391,6 +1397,14 @@ export async function* runRagQueryStreaming(input: {
   length?: Length;
   /** v0.4 multi-org: scope retrieval+cache naar deze org. Default DEV_ORG. */
   organizationId?: string;
+  /**
+   * Eval-flag: sla de answer-cache volledig over (geen lookup, geen write).
+   * De answer-cache is per bot_version-STRING; bij een code-wijziging binnen
+   * dezelfde versie (bv. een nieuwe deterministische gate) serveert de cache
+   * anders een stale antwoord van vóór de fix. De Harde-Dimensie-eval zet dit
+   * aan zodat hij ALTIJD het huidige bot-gedrag test, niet een gecachte run.
+   */
+  disableCache?: boolean;
   /**
    * Per-query HyDE-modus override (v0.5 evaluatie-toggle). 'auto' of undefined
    * = volg bot-config. Override wint altijd, ook over bots met useHyDE=false.
@@ -1622,8 +1636,9 @@ export async function* runRagQueryStreaming(input: {
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
   // Cache lookup — embed liep al parallel met preprocess; we awaiten alleen
-  // het resultaat (in de best case is hij al klaar).
-  if (cacheEmbedPromise) {
+  // het resultaat (in de best case is hij al klaar). disableCache (eval) slaat
+  // de lookup over zodat altijd het huidige bot-gedrag wordt getest.
+  if (cacheEmbedPromise && input.disableCache !== true) {
     yield { kind: 'status', phase: 'cache' };
     const stopCache = tMark('cache_lookup_ms');
     const stopEmbedCache = tMark('embedding_ms');
@@ -2584,16 +2599,29 @@ KRITISCHE FORMAT-REGELS:
   // v0.9 (iter2) anti-hallucinatie — DETERMINISTISCH pad voor ongegronde hard-
   // facts. Zelfde les als v0.8.1 history-entity: een tweede LLM-poging die het
   // verzonnen bedrag/datum moet weglaten is empirisch onbetrouwbaar (de bot
-  // produceert het opnieuw). Bij een ONGEGRONDE hard-fact-hallucinatie (conjunctie
-  // hardFactSupported=false ÉN lage claim-confidence — beide grounding-signalen
-  // falen) vervangen we deterministisch door een eerlijk weiger/doorverwijs-
-  // template. De conjunctie spaart gegronde tiered-calc (hoge claim-confidence) →
-  // geen over-refusal op correcte rekenkunde. Geen parallelle gate.
+  // produceert het opnieuw). Bij een ONGEGRONDE hard-fact-hallucinatie
+  // (hardFactSupported=false ÉN retrieval ZWAK/MEDIUM — NIET claim-confidence,
+  // want een fabricatie heeft confidence≈1) vervangen we deterministisch door
+  // een eerlijk weiger/doorverwijs-template. De retrieval-sterkte-conditie spaart
+  // gegronde tiered-calc bij STRONG retrieval → geen over-refusal op correcte
+  // rekenkunde. Geen parallelle gate.
+  //
+  // v0.9.1 safety-aware verfijning: NUMBER_RE telt élk getal ≥2 cijfers als hard
+  // feit, dus een correct "bel 112"-noodadvies telt als ongegrond getal (112
+  // staat per definitie niet in het corpus) → v0.9 overschreef een spoed-
+  // doorverwijzing met de generieke weigering (hh-globex-spoed-regressie). Onder
+  // bot.hardFactRefusalSafetyAware vuurt de gate nooit op een draft die al een
+  // nood-/escalatie-doorverwijzing bevat. Prijs-/datum-fabricaties bevatten deze
+  // termen nooit → de anti-fabricatie-upside van v0.9 blijft volledig intact.
+  const draftHasSafetyHandoff =
+    bot.hardFactRefusalSafetyAware === true && containsEmergencyHandoff(activeAnswerText);
   const deterministicHardFactRefusal = shouldDeterministicallyRefuseHardFact({
     enabled: bot.hardFactDeterministicRefusal === true,
     hardFactSupported,
     retrievalStrength: decision.retrievalStrength,
     adoptedHistoryEntity: unsupportedHistoryEntity,
+    safetyAware: bot.hardFactRefusalSafetyAware === true,
+    draftHasSafetyHandoff,
   });
   if (bot.claimRegenerateEnabled && deterministicHardFactRefusal) {
     activeAnswerText =
@@ -2736,6 +2764,28 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
     }
   }
 
+  // v0.9.1 — deterministische off-domein-code-guard. Een klantcontact-bot van een
+  // niet-technische org hoort nooit code te produceren; een code-block in het
+  // antwoord is per definitie off-scope task-execution. De prompt-instructie alleen
+  // houdt gpt-4o-mini hier niet betrouwbaar tegen (scope-acme-code flake), dus
+  // vervangen we het code-antwoord deterministisch door de bestaande off-topic-
+  // refusal. Laatste answer-mutatie (na regenerate) zodat niets het overschrijft.
+  // Flag-guarded → alleen v0.9.1; geen false-positives voor proza-antwoorden.
+  if (bot.offDomainCodeRefusal === true && containsCodeOutput(activeAnswerText)) {
+    activeAnswerText = `Daar kan ik je helaas niet mee helpen — ik help met vragen rondom ${persona.offTopicScope}. Waar kan ik je mee van dienst zijn?`;
+    activeResponse = {
+      ...activeResponse,
+      answer: activeAnswerText,
+      ...(bot.knowledgeGapLogging ? { gapKind: 'off_topic' as const } : {}),
+    };
+    yield {
+      kind: 'replacement',
+      response: activeResponse,
+      reason: 'off-domain-code-refusal',
+      regeneratedVerifiedRatio: null,
+    };
+  }
+
   // Followups na de answer-done yield — gebruiker ziet antwoord al, followups
   // verschijnen kort daarna in de UI via het followups-done event.
   // V0.5: hard timeout op 5s zodat een trage OpenAI-call niet de finale
@@ -2811,7 +2861,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   // error-log ipv stille catch. We schrijven de COMPLETE response naar de
   // cache (inclusief followups + finale timings), zodat een cache-hit later
   // dezelfde UX levert als een verse RAG-run.
-  if (bot.cacheEnabled && cacheEmbedVector) {
+  if (bot.cacheEnabled && cacheEmbedVector && input.disableCache !== true) {
     const cachedResponse: ChatResponse = {
       ...activeResponse,
       chatInputTokens: activeResponse.chatInputTokens + followUpsInputTokens,

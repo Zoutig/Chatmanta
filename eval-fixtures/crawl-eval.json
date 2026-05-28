@@ -1,0 +1,25 @@
+{
+  "_comment": "Golden-set verwachtingen voor de crawler-regressie-eval. Wordt gedraaid met `npm run v0:crawl-eval` (zie scripts/v0-crawl-eval.ts). De fixture-HTML staat in public/crawl-eval/ en wordt mee-gedeployd, dus crawlbaar op baseUrl. Override de baseUrl met env CRAWL_EVAL_BASE_URL als je de fixtures elders deployt (bv. een preview-URL).",
+  "baseUrl": "https://www.chatmanta.nl/crawl-eval",
+  "evalOrgSlug": "dev-org",
+  "pages": [
+    "index.html",
+    "diensten.html",
+    "tarieven.html",
+    "leeg.html",
+    "kapot.html"
+  ],
+  "expect": {
+    "jobStatus": "completed",
+    "minCrawled": 3,
+    "minFailed": 1,
+    "minChunks": 3,
+    "perPage": [
+      { "url": "index.html", "status": "crawled", "keyword": "proefpagina-index" },
+      { "url": "diensten.html", "status": "crawled", "keyword": "proefpagina-diensten" },
+      { "url": "tarieven.html", "status": "crawled", "keyword": "199" },
+      { "url": "leeg.html", "status": "not-ingested" },
+      { "url": "kapot.html", "status": "failed" }
+    ]
+  }
+}
