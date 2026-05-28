@@ -17,7 +17,7 @@ import { listOnboardingItems } from '@/lib/controlroom/server/onboarding';
 import { getPrivacy } from '@/lib/controlroom/server/privacy';
 import { detectPossiblePii } from '@/lib/controlroom/pii';
 import { formatCostUsd, formatDateNL, formatRelativeNL } from '@/lib/controlroom/format';
-import type { CommercialStatus } from '@/lib/controlroom/types';
+import { MONTHLY_CONVERSATION_LIMITS, usageLimitStatus } from '@/lib/controlroom/usage-limits';
 import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill } from '@/app/klantendashboard/components/ui/pill';
 import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
@@ -45,16 +45,6 @@ const TABS: TabDef[] = [
   { key: 'notities', label: 'Notities' },
 ];
 
-// MD §16.3 — simpele maandelijkse gesprekslimieten (kostencontrole, niet
-// commercieel perfect). internal_test = onbeperkt.
-const MONTHLY_LIMITS: Record<CommercialStatus, number | null> = {
-  trial: 100,
-  active: 500,
-  paused: 500,
-  cancellation: 500,
-  internal_test: null,
-};
-
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="klant-section-title" style={{ marginBottom: 10 }}>{children}</div>;
 }
@@ -76,7 +66,7 @@ function InfoItem({ label, children }: { label: string; children: React.ReactNod
 
 async function OverzichtTab({ slug, klant }: { slug: OrgSlug; klant: ControlRoomKlant }) {
   const settings = await getOrgSettings(slug).catch(() => null);
-  const limit = MONTHLY_LIMITS[klant.commercialStatus];
+  const limit = MONTHLY_CONVERSATION_LIMITS[klant.commercialStatus];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="klant-metrics-grid">
@@ -249,26 +239,11 @@ async function JobsTab({ orgId }: { orgId: string }) {
 
 async function UsageTab({ klant, orgId }: { klant: ControlRoomKlant; orgId: string }) {
   const allTime = await getAllTimeUsage(orgId).catch(() => null);
-  const limit = MONTHLY_LIMITS[klant.commercialStatus];
-  let limitLabel = 'Onbeperkt (intern)';
-  let limitTone: 'ink' | 'warn' | 'danger' | 'success' = 'success';
-  if (limit != null) {
-    const pct = limit > 0 ? klant.conversationsThisMonth / limit : 0;
-    if (pct >= 1) {
-      limitLabel = `Limiet bereikt (${klant.conversationsThisMonth}/${limit})`;
-      limitTone = 'danger';
-    } else if (pct >= 0.8) {
-      limitLabel = `Bijna vol (${klant.conversationsThisMonth}/${limit})`;
-      limitTone = 'warn';
-    } else {
-      limitLabel = `${klant.conversationsThisMonth}/${limit}`;
-      limitTone = 'ink';
-    }
-  }
+  const us = usageLimitStatus(klant.conversationsThisMonth, klant.commercialStatus);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="klant-metrics-grid">
-        <MetricCard label="Gesprekken deze maand" value={klant.conversationsThisMonth} sub={limitLabel} tone={limitTone} />
+        <MetricCard label="Gesprekken deze maand" value={klant.conversationsThisMonth} sub={us.label} tone={us.tone} />
         <MetricCard label="Gesprekken deze week" value={klant.conversationsThisWeek} />
         <MetricCard label="Kosten deze maand" value={formatCostUsd(klant.monthCostUsd)} sub="geschat, USD" />
         <MetricCard label="Fallback %" value={klant.fallbackPct == null ? '—' : `${klant.fallbackPct}%`} />
