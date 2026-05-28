@@ -1,6 +1,6 @@
 'use client';
 import { AlertTriangle, Info } from 'lucide-react';
-import type { WebsiteState } from '@/lib/v0/server/crawler';
+import type { WebsiteSource } from '@/lib/v0/server/crawler';
 
 /** Mensleesbare labels voor de decision-codes uit de job-verwerker. */
 const DECISION_LABEL: Record<string, string> = {
@@ -28,10 +28,12 @@ export function CrawlDiagnostics({
   job,
   pagesCount,
   isCrawling,
+  style,
 }: {
-  job: WebsiteState['job'];
+  job: WebsiteSource['job'];
   pagesCount: number;
   isCrawling: boolean;
+  style?: React.CSSProperties;
 }) {
   if (!job || isCrawling) return null;
 
@@ -51,7 +53,7 @@ export function CrawlDiagnostics({
 
   return (
     <div className="klant-card" data-tone={failed ? 'danger' : undefined}
-      style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+      style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, ...style }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontWeight: 600 }}>
         {failed ? <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
           : <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />}

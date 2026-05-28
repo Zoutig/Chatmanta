@@ -1,9 +1,9 @@
 'use client';
 import { useState, useTransition } from 'react';
-import { scrapeSinglePageAction, refreshWebsiteState } from '@/app/actions/crawl';
-import type { WebsiteState } from '@/lib/v0/server/crawler';
+import { scrapeSinglePageAction, refreshWebsiteSources } from '@/app/actions/crawl';
+import type { WebsiteSource } from '@/lib/v0/server/crawler';
 
-export function SinglePageImport({ onAdded }: { onAdded: (s: WebsiteState) => void }) {
+export function SinglePageImport({ onAdded }: { onAdded: (s: WebsiteSource[]) => void }) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -13,7 +13,7 @@ export function SinglePageImport({ onAdded }: { onAdded: (s: WebsiteState) => vo
     start(async () => {
       const res = await scrapeSinglePageAction(url);
       if (!res.ok) { setError(res.error); return; }
-      setUrl(''); try { onAdded(await refreshWebsiteState()); } catch {}
+      setUrl(''); try { onAdded(await refreshWebsiteSources()); } catch {}
     });
   }
   return (
