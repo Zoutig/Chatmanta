@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lege pagina — crawl-eval fixture</title>
+  </head>
+  <!--
+    Bewust lege body: geen hoofd-content. Firecrawl levert hier (met
+    onlyMainContent) lege markdown op, waardoor de ingest deze pagina als
+    'excluded' classificeert (markdown.trim().length === 0). Verandert deze
+    pagina ooit per ongeluk in 'crawled', dan vangt de eval dat.
+  -->
+  <body></body>
+</html>

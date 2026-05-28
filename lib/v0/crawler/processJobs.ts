@@ -98,13 +98,15 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
 
       // completed → ingest. Het 'complete'-event bewaart de getrimde pagina-snapshot;
       // bij data_count 0 terwijl total>0/has_next true is dát het zichtbare signaal.
-      const result = await ingestCrawlResults(sourceId, orgId, status.pages);
+      const result = await ingestCrawlResults(sb, sourceId, orgId, status.pages);
       await sb
         .from('processing_jobs')
         .update({ status: 'completed', attempts: attempts + 1, finished_at: now(), updated_at: now(), error_message: null })
         .eq('id', jobId);
       await sb.from('knowledge_sources').update({ status: 'ready', updated_at: now() }).eq('id', sourceId);
-      const ingestMsg = `${result.pagesCrawled} gecrawld, ${result.pagesFailed} mislukt, ${result.pagesExcluded} leeg → ${result.chunks} chunks.`;
+      const ingestMsg =
+        `${result.pagesCrawled} gecrawld, ${result.pagesFailed} mislukt, ${result.pagesExcluded} leeg → ${result.chunks} chunks.` +
+        (result.ingestErrors.length > 0 ? ` ${result.ingestErrors.length} pagina(s) faalden bij verwerking.` : '');
       await recordCrawlEvent(sb, {
         ...base, eventType: 'complete', decision: 'ingested', message: ingestMsg,
         payload: buildPagesPayload(status.pages),

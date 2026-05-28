@@ -21,6 +21,7 @@
     "v0:seed-orgs": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-seed-orgs.ts",
     "v0:test-org-isolation": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-test-org-isolation.ts",
     "v0:crawl-debug": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-crawl-debug.ts",
+    "v0:crawl-eval": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-crawl-eval.ts",
     "eval:seed": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-seed.ts",
     "eval:run": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-run.ts",
     "eval:report": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-report.ts",

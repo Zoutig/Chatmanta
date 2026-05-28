@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture-sitemap voor de crawler-eval. Wordt door het eval-script zelf NIET
+  gelezen (dat gebruikt een expliciete URL-lijst uit eval-fixtures/crawl-eval.json
+  voor determinisme). Staat hier voor realisme en voor handmatige mapSite-tests.
+  kapot.html staat bewust in de lijst maar bestaat niet (404).
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.chatmanta.nl/crawl-eval/index.html</loc></url>
+  <url><loc>https://www.chatmanta.nl/crawl-eval/diensten.html</loc></url>
+  <url><loc>https://www.chatmanta.nl/crawl-eval/tarieven.html</loc></url>
+  <url><loc>https://www.chatmanta.nl/crawl-eval/leeg.html</loc></url>
+  <url><loc>https://www.chatmanta.nl/crawl-eval/kapot.html</loc></url>
+</urlset>
