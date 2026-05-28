@@ -6,10 +6,11 @@
     <title>Lege pagina — crawl-eval fixture</title>
   </head>
   <!--
-    Bewust lege body: geen hoofd-content. Firecrawl levert hier (met
-    onlyMainContent) lege markdown op, waardoor de ingest deze pagina als
-    'excluded' classificeert (markdown.trim().length === 0). Verandert deze
-    pagina ooit per ongeluk in 'crawled', dan vangt de eval dat.
+    Bewust lege body: geen hoofd-content. Empirisch (eval-run 2026-05-28) laat
+    Firecrawl een contentloze pagina HELEMAAL WEG uit de resultaten i.p.v. 'm met
+    lege markdown terug te geven — dus deze pagina belandt niet in de kennisbank.
+    De eval toetst daarom het invariant "niet als doorzoekbare content opgenomen"
+    (afwezig OF 'excluded' = goed; alleen 'crawled' = fout).
   -->
   <body></body>
 </html>

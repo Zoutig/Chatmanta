@@ -13,13 +13,12 @@
     "jobStatus": "completed",
     "minCrawled": 3,
     "minFailed": 1,
-    "minExcluded": 1,
     "minChunks": 3,
     "perPage": [
       { "url": "index.html", "status": "crawled", "keyword": "proefpagina-index" },
       { "url": "diensten.html", "status": "crawled", "keyword": "proefpagina-diensten" },
       { "url": "tarieven.html", "status": "crawled", "keyword": "199" },
-      { "url": "leeg.html", "status": "excluded" },
+      { "url": "leeg.html", "status": "not-ingested" },
       { "url": "kapot.html", "status": "failed" }
     ]
   }

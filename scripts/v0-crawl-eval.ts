@@ -31,7 +31,11 @@ import { normalizeHost } from '../lib/v0/crawler/normalizeHost';
 import { KNOWN_ORGS, type OrgSlug } from '../lib/v0/server/active-org';
 
 type PageStatus = 'crawled' | 'failed' | 'excluded';
-type PerPageExpect = { url: string; status: PageStatus; keyword?: string };
+/** 'not-ingested' = mag niet als doorzoekbare content belanden. Afwezig (Firecrawl
+ *  laat een lege pagina wég i.p.v. 'm met lege markdown terug te geven) ÓF status
+ *  'excluded' zijn allebei goed; alleen 'crawled' is fout. */
+type ExpectStatus = PageStatus | 'not-ingested';
+type PerPageExpect = { url: string; status: ExpectStatus; keyword?: string };
 type EvalSpec = {
   baseUrl: string;
   evalOrgSlug: OrgSlug;
@@ -40,7 +44,6 @@ type EvalSpec = {
     jobStatus: string;
     minCrawled: number;
     minFailed: number;
-    minExcluded: number;
     minChunks: number;
     perPage: PerPageExpect[];
   };
@@ -269,12 +272,22 @@ async function main(): Promise<void> {
     mk('Job afgerond (niet afgebroken)', finalStatus === e.jobStatus, `verwacht ${e.jobStatus}, kreeg ${finalStatus}`),
     mk('Genoeg pagina\'s gecrawld', crawled >= e.minCrawled, `${crawled} crawled (>= ${e.minCrawled})`),
     mk('Foutpagina geïsoleerd', failed >= e.minFailed, `${failed} failed (>= ${e.minFailed})`),
-    mk('Lege pagina uitgesloten', excluded >= e.minExcluded, `${excluded} excluded (>= ${e.minExcluded})`),
     mk('Chunks aangemaakt', chunks >= e.minChunks, `${chunks} chunks (>= ${e.minChunks})`),
   ];
 
   for (const exp of e.perPage) {
     const match = pages.find((p) => p.url.endsWith(exp.url) || p.url.includes(exp.url));
+
+    // Lege pagina: mag niet als doorzoekbare content belanden. Firecrawl laat 'm
+    // meestal helemaal weg (afwezig) of we markeren 'm 'excluded' — beide goed.
+    if (exp.status === 'not-ingested') {
+      const ingested = match?.status === 'crawled';
+      checks.push(
+        mk(`${exp.url}: niet als content opgenomen`, !ingested, match ? `status ${match.status}` : 'afwezig (lege pagina weggelaten)'),
+      );
+      continue;
+    }
+
     if (!match) {
       checks.push(mk(`${exp.url}: aanwezig`, false, 'niet in resultaten (Firecrawl liet de URL mogelijk weg)'));
       continue;
