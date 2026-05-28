@@ -1,6 +1,8 @@
 'use client';
 
-import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Trash2, Check, X, ArrowLeft } from 'lucide-react';
+import { bestForegroundOn } from '@/lib/widget/contrast';
 import type { Thread } from '@/lib/widget/thread-types';
 
 export function ThreadDrawer({
@@ -20,6 +22,11 @@ export function ThreadDrawer({
   onNew: () => void;
   onDelete: (id: string) => void;
 }) {
+  // Welk gesprek wacht op verwijder-bevestiging? Inline i.p.v. window.confirm:
+  // die laatste breekt de screenreader-context en oogt onbedoeld als
+  // host-site-dialoog binnen het iframe.
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
   return (
     <div
       role="dialog"
@@ -139,27 +146,65 @@ export function ThreadDrawer({
                   {formatWhen(t.updatedAt)}
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined' && window.confirm('Gesprek verwijderen?')) {
-                    onDelete(t.id);
-                  }
-                }}
-                aria-label="Verwijder gesprek"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 8,
-                  color: '#9ca3af',
-                  borderRadius: 6,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Trash2 size={14} strokeWidth={1.8} />
-              </button>
+              {confirmId === t.id ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDelete(t.id);
+                      setConfirmId(null);
+                    }}
+                    aria-label="Bevestig verwijderen"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 8,
+                      color: '#b91c1c',
+                      borderRadius: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Check size={15} strokeWidth={2.4} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(null)}
+                    aria-label="Annuleer verwijderen"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 8,
+                      color: '#6b7280',
+                      borderRadius: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <X size={15} strokeWidth={2.4} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmId(t.id)}
+                  aria-label="Verwijder gesprek"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 8,
+                    color: '#9ca3af',
+                    borderRadius: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Trash2 size={14} strokeWidth={1.8} />
+                </button>
+              )}
             </div>
           ))
         )}
@@ -205,18 +250,4 @@ function formatWhen(ts: number): string {
   if (diffH < 24) return `${diffH} u geleden`;
   const d = new Date(ts);
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
-}
-
-function isHexDark(hex: string): boolean {
-  const m = hex.match(/^#([0-9a-f]{6})$/i);
-  if (!m) return false;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  return r * 0.299 + g * 0.587 + b * 0.114 < 128;
-}
-
-function bestForegroundOn(hex: string): string {
-  return isHexDark(hex) ? '#ffffff' : '#0a0a0a';
 }
