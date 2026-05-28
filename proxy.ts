@@ -27,7 +27,12 @@ export const config = {
   // login-redirect: ze worden vanaf externe pagina's geladen zonder demo-cookie.
   // De chat-route doet zelf dual-auth (cookie OF embed-token + origin-lock);
   // de ping-route idem. Zie app/api/v0/chat/route.ts.
+  //
+  // /crawl-eval/* zijn statische fixture-pagina's (public/crawl-eval/) voor de
+  // golden-set crawler-eval. Ze MOETEN publiek bereikbaar zijn zodat Firecrawl ze
+  // van buitenaf kan crawlen (anders → login-redirect → 0 bruikbare pagina's).
+  // Bevatten uitsluitend fictieve demo-content, geen klantdata of secrets.
   matcher: [
-    '/((?!login|embed|api/v0/cron|api/v0/chat|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|embed|crawl-eval|api/v0/cron|api/v0/chat|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };
