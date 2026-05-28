@@ -263,6 +263,15 @@ export type WidgetSettings = {
   lastSeenAt: string | null;
   /** Host waar de widget voor het laatst gezien is (uit ?h= van de loader). */
   installOrigin: string | null;
+  /**
+   * Optionele domein-allowlist. Leeg/undefined → de widget laadt op elk domein
+   * (fail-open, backwards-compat). Gevuld → de embed-pagina weigert te laden
+   * (geen token, geen FAB) op een ouderpagina waarvan de host niet in de lijst
+   * staat. Genormaliseerde bare hosts (lowercase, zonder schema/poort, leading
+   * `www.` gestript). Afgedwongen bij token-uitgifte; volledige sluiting
+   * (host-in-token) is V1. Zie lib/v0/server/origin-allowlist.ts.
+   */
+  allowedOrigins?: string[];
 };
 
 // ---------------------------------------------------------------------------

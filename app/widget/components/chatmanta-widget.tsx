@@ -21,6 +21,7 @@ import type { ChatResponse } from '@/lib/v0/server/rag';
 import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { cleanWidgetAnswer, renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
+import { bestForegroundOn } from '@/lib/widget/contrast';
 import { LocalStorageThreadStore } from '@/lib/widget/thread-store';
 import type { Thread } from '@/lib/widget/thread-types';
 import { ThreadDrawer } from './thread-drawer';
@@ -155,6 +156,12 @@ export function ChatMantaWidget({
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Focus-beheer: FAB-knop om focus naar terug te zetten bij sluiten, dialog-
+  // root voor de focus-trap, en een flag zodat de focus-return niet bij de
+  // initiële mount (open=false) afgaat.
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
   // Huidige embed-token. Ref i.p.v. state: refresh mag de volgende fetch
   // beïnvloeden zonder re-render en zonder stale closure in `send`.
   const embedTokenRef = useRef(embedToken);
@@ -202,11 +209,18 @@ export function ChatMantaWidget({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open]);
 
-  // Focus input bij openen.
+  // Focus-beheer rond open/dicht. Bij openen: focus het invoerveld. Bij
+  // sluiten (alleen ná een open-sessie, niet bij de initiële mount): focus
+  // terug naar de FAB-knop zodat toetsenbordgebruikers niet "verdwalen".
   useEffect(() => {
     if (open) {
-      const t = setTimeout(() => inputRef.current?.focus(), 200);
+      wasOpenRef.current = true;
+      const t = setTimeout(() => inputRef.current?.focus(), 120);
       return () => clearTimeout(t);
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      fabRef.current?.focus();
     }
   }, [open]);
 
@@ -273,7 +287,14 @@ export function ChatMantaWidget({
           `/api/v0/feedback?org=${encodeURIComponent(orgSlug)}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              // Embed-token zodat feedback ook op een externe site door de
+              // dual-auth van de feedback-route komt (zelfde model als chat).
+              ...(embedTokenRef.current
+                ? { 'x-chatmanta-embed': embedTokenRef.current }
+                : {}),
+            },
             body: JSON.stringify({
               queryLogId,
               rating,
@@ -329,33 +350,16 @@ export function ChatMantaWidget({
     }
   }, [orgSlug]);
 
-  const send = useCallback(
-    async (question: string) => {
-      const trimmed = question.trim();
-      if (!trimmed || pending) return;
-
-      const userMsg: Message = { role: 'user', content: trimmed, id: makeId() };
-      const assistantId = makeId();
-
-      // History = alles wat we al hadden, gemapt naar {role, content}.
-      // User-msgs gaan altijd mee; assistant-msgs alleen als ze afgerond zijn.
-      const history = messages
-        .filter((m) => m.role === 'user' || (!m.streaming && !m.error))
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-      flushSync(() => {
-        setMessages((prev) => [
-          ...prev,
-          userMsg,
-          { role: 'assistant', content: '', id: assistantId, streaming: true },
-        ]);
-        setPending(true);
-        setInput('');
-      });
-
+  // Kern van het chat-request: fetch + token-refresh-retry + stream-verwerking
+  // voor een bestaande assistant-bubble. Gedeeld door `send` (nieuwe vraag) en
+  // `retry` (mislukt bericht opnieuw). De caller zet `pending` aan en voegt de
+  // bubble toe/reset 'm; runChat zet `pending` in de finally weer uit.
+  const runChat = useCallback(
+    async (
+      question: string,
+      assistantId: string,
+      history: { role: 'user' | 'assistant'; content: string }[],
+    ) => {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
@@ -367,11 +371,7 @@ export function ChatMantaWidget({
             'Content-Type': 'application/json',
             ...(token ? { 'x-chatmanta-embed': token } : {}),
           },
-          body: JSON.stringify({
-            question: trimmed,
-            version: botVersion,
-            history,
-          }),
+          body: JSON.stringify({ question, version: botVersion, history }),
           signal: ctrl.signal,
         });
 
@@ -392,7 +392,7 @@ export function ChatMantaWidget({
           updateAssistant(setMessages, assistantId, {
             content: status === 401 || status === 403
               ? 'Deze chat is even niet beschikbaar. Ververs de pagina en probeer het opnieuw.'
-              : 'Er ging iets mis met dit antwoord. Probeer het zo nog eens.',
+              : 'Er ging iets mis met dit antwoord. Probeer het opnieuw.',
             error: `HTTP ${status}`,
             streaming: false,
           });
@@ -428,7 +428,7 @@ export function ChatMantaWidget({
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;
         updateAssistant(setMessages, assistantId, {
-          content: 'Verbinding viel weg — probeer het zo nog eens.',
+          content: 'Verbinding viel weg — probeer het opnieuw.',
           error: String(err),
           streaming: false,
         });
@@ -437,7 +437,74 @@ export function ChatMantaWidget({
         abortRef.current = null;
       }
     },
-    [messages, orgSlug, botVersion, pending, refreshEmbedToken],
+    [orgSlug, botVersion, refreshEmbedToken],
+  );
+
+  const send = useCallback(
+    async (question: string) => {
+      const trimmed = question.trim();
+      if (!trimmed || pending) return;
+
+      const userMsg: Message = { role: 'user', content: trimmed, id: makeId() };
+      const assistantId = makeId();
+
+      // History = alles wat we al hadden, gemapt naar {role, content}.
+      // User-msgs gaan altijd mee; assistant-msgs alleen als ze afgerond zijn.
+      const history = messages
+        .filter((m) => m.role === 'user' || (!m.streaming && !m.error))
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      flushSync(() => {
+        setMessages((prev) => [
+          ...prev,
+          userMsg,
+          { role: 'assistant', content: '', id: assistantId, streaming: true },
+        ]);
+        setPending(true);
+        setInput('');
+      });
+
+      await runChat(trimmed, assistantId, history);
+    },
+    [messages, pending, runChat],
+  );
+
+  // Opnieuw proberen na een mislukt antwoord. Hergebruikt de bestaande
+  // user→assistant-bubbels (geen dubbele vraag) en bouwt de history op uit de
+  // afgeronde berichten vóór de mislukte beurt, zodat de mislukte poging zelf
+  // niet in de context lekt.
+  const retry = useCallback(
+    async (assistantId: string) => {
+      if (pending) return;
+      const idx = messages.findIndex((m) => m.id === assistantId);
+      if (idx < 0) return;
+      const prevUser =
+        idx > 0 && messages[idx - 1].role === 'user' ? messages[idx - 1] : null;
+      const question = prevUser?.content.trim() ?? '';
+      if (!question) return;
+
+      const cutoff = prevUser ? idx - 1 : idx;
+      const history = messages
+        .slice(0, cutoff)
+        .filter((m) => m.role === 'user' || (!m.streaming && !m.error))
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      flushSync(() => {
+        setMessages((prev) => {
+          const i = prev.findIndex((m) => m.id === assistantId);
+          if (i < 0) return prev;
+          const cur = prev[i];
+          if (cur.role !== 'assistant') return prev;
+          const next = prev.slice();
+          next[i] = { ...cur, content: '', streaming: true, error: undefined };
+          return next;
+        });
+        setPending(true);
+      });
+
+      await runChat(question, assistantId, history);
+    },
+    [messages, pending, runChat],
   );
 
   // Persist messages → thread-store. Triggert na elke setMessages-flush,
@@ -517,9 +584,68 @@ export function ChatMantaWidget({
     [activeThreadId],
   );
 
+  // Toetsenbord-a11y voor het open paneel: Escape sluit (eerst de drawer, dan
+  // het paneel); Tab/Shift+Tab blijft binnen het paneel (focus-trap). De FAB
+  // staat buiten dialogRef en wordt dus niet meegevangen.
+  const onDialogKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        if (drawerOpen) setDrawerOpen(false);
+        else setOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    },
+    [drawerOpen],
+  );
+
+  // Mobiel: het schermtoetsenbord kan het invoerveld afdekken. Scroll het na
+  // de toetsenbord-animatie weer in beeld.
+  const handleInputFocus = useCallback(() => {
+    if (!isMobile) return;
+    setTimeout(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight });
+      inputRef.current?.scrollIntoView({ block: 'nearest' });
+    }, 300);
+  }, [isMobile]);
+
   const showSuggested = !open ? false : messages.length === 0 && !pending;
 
   const showTooltipNow = (tooltipVisible || tooltipHovered) && !open;
+
+  // Beleefde screenreader-tekst, puur afgeleid (geen state/effect). Tijdens
+  // streaming één constante "bezig"-string → geen per-delta-spam; bij afronding
+  // het volledige antwoord → één nette aankondiging. Een live-regio kondigt
+  // alleen wijzigingen ná de eerste render aan, dus een geladen thread spamt niet.
+  const lastMsg = messages[messages.length - 1];
+  const srMsg =
+    lastMsg?.role === 'assistant'
+      ? lastMsg.streaming
+        ? 'Bezig met antwoorden…'
+        : lastMsg.error
+          ? 'Er ging iets mis met het antwoord. Probeer het opnieuw.'
+          : cleanWidgetAnswer(lastMsg.content)
+      : '';
 
   // Klant heeft expliciet gepauzeerd — niets renderen, ook geen FAB. Late-
   // return moet ná alle hooks staan (rules-of-hooks).
@@ -610,6 +736,7 @@ export function ChatMantaWidget({
         </div>
 
         <button
+          ref={fabRef}
           type="button"
           aria-label={open ? 'Sluit chat' : 'Open chat'}
           onClick={() => setOpen((v) => !v)}
@@ -665,8 +792,12 @@ export function ChatMantaWidget({
       {/* Paneel */}
       {open && (
         <div
+          ref={dialogRef}
           role="dialog"
+          aria-modal="true"
           aria-label={`${displayTitle} chat`}
+          tabIndex={-1}
+          onKeyDown={onDialogKeyDown}
           style={
             isMobile
               ? {
@@ -711,6 +842,26 @@ export function ChatMantaWidget({
                 }
           }
         >
+          {/* Verborgen live-regio: kondigt status + afgerond antwoord beleefd
+              aan voor screenreaders, zonder elke streaming-delta voor te lezen. */}
+          <div
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: 'hidden',
+              clip: 'rect(0 0 0 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {srMsg}
+          </div>
+
           {/* Header */}
           <div
             style={{
@@ -814,6 +965,34 @@ export function ChatMantaWidget({
                     {m.streaming && !visible ? <TypingDots /> : renderMarkdownLite(m.content)}
                     {m.streaming && visible ? <Caret /> : null}
                   </BotBubble>
+                  {/* Mislukt antwoord → expliciete retry-affordance i.p.v. de
+                      bezoeker laten herformuleren. Hergebruikt dezelfde beurt. */}
+                  {!m.streaming && m.error && (
+                    <button
+                      type="button"
+                      onClick={() => void retry(m.id)}
+                      disabled={pending}
+                      style={{
+                        alignSelf: 'flex-start',
+                        marginTop: 4,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 8,
+                        padding: '5px 10px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: '#b91c1c',
+                        cursor: pending ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <RetryIcon />
+                      Opnieuw proberen
+                    </button>
+                  )}
                   {/* Feedback-knoppen: alleen op afgeronde, niet-fouten messages
                       met een queryLogId (= meta-event al binnen). Welkomstbubble
                       zit niet in `messages`-array en wordt dus automatisch
@@ -894,6 +1073,7 @@ export function ChatMantaWidget({
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={handleInputFocus}
               placeholder="Stel je vraag…"
               disabled={pending}
               style={{
@@ -1290,23 +1470,19 @@ function SendIcon() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Color utilities — gedupliceerd uit fake-site.tsx voor zelfstandigheid.
-// ---------------------------------------------------------------------------
-function isHexDark(hex: string): boolean {
-  const m = hex.match(/^#([0-9a-f]{6})$/i);
-  if (!m) return false;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+function RetryIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
 }
 
-function bestForegroundOn(hex: string): string {
-  return isHexDark(hex) ? '#ffffff' : '#0a0a0a';
-}
-
+// ---------------------------------------------------------------------------
+// Color utilities. `bestForegroundOn` komt uit lib/widget/contrast.ts (gedeeld
+// met thread-drawer + feedback-buttons); `withAlpha` blijft lokaal.
+// ---------------------------------------------------------------------------
 function withAlpha(hex: string, alpha: number): string {
   const m = hex.match(/^#([0-9a-f]{6})$/i);
   if (!m) return hex;

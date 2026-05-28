@@ -23,10 +23,10 @@ export const config = {
   // Vercel-cron-route. Die laatste heeft geen login-cookie (Vercel roept 'm
   // server-side aan) en beveiligt zichzelf via CRON_SECRET in de route-handler —
   // zou anders naar /login omgeleid worden en nooit draaien.
-  // /embed/* en de publieke API-paden (chat + widget-ping) gaan NIET door de
-  // login-redirect: ze worden vanaf externe pagina's geladen zonder demo-cookie.
-  // De chat-route doet zelf dual-auth (cookie OF embed-token + origin-lock);
-  // de ping-route idem. Zie app/api/v0/chat/route.ts.
+  // /embed/* en de publieke API-paden (chat + feedback + widget-ping/token) gaan
+  // NIET door de login-redirect: ze worden vanaf externe pagina's geladen zonder
+  // demo-cookie. Die routes doen zelf dual-auth (cookie OF embed-token +
+  // origin-lock). Zie app/api/v0/chat/route.ts en app/api/v0/feedback/route.ts.
   //
   // /crawl-eval/* zijn statische fixture-pagina's (public/crawl-eval/) voor de
   // golden-set crawler-eval. Ze MOETEN publiek bereikbaar zijn zodat Firecrawl ze
@@ -35,6 +35,6 @@ export const config = {
   // Segment-geankerd (`crawl-eval(?:/|$)`) zodat ALLEEN het exacte pad-segment de
   // gate omzeilt — niet een toekomstig /crawl-evaluation o.i.d. (Codex-review).
   matcher: [
-    '/((?!login|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };

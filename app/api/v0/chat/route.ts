@@ -19,7 +19,7 @@ import { resolveBot } from '@/lib/v0/server/bots';
 import { logQuery, logBlockedQuery, type HydeMeta } from '@/lib/v0/server/log';
 import { normalizeStyle } from '@/lib/v0/style';
 import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
-import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
+import { getClientIp, getRateLimiter, getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
 import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import {
@@ -56,13 +56,18 @@ function isWidgetRequest(req: Request): boolean {
 // Dual-auth voor het publieke chat-pad. Geldig als óf het V0-demo-cookie klopt
 // (ingelogde admin/test/widget-demo paden — geen regressie), óf een geldig
 // embed-token + same-origin. Anders 401. Rate-limit draait al ervóór.
-function isChatAuthorized(req: Request): boolean {
+// True als de request het geldige V0-demo-cookie draagt (ingelogde admin/test/
+// /widget-demo). Onderscheidt het admin-pad van het publieke embed-pad — dat
+// laatste authoriseert via embed-token en krijgt strengere injection-handling.
+function isCookieAuthed(req: Request): boolean {
   const cookie = req.headers
     .get('cookie')
     ?.match(new RegExp(`(?:^|;\\s*)${AUTH_COOKIE.name}=([^;]+)`))?.[1];
-  if (verifyAuthCookieValue(cookie ? decodeURIComponent(cookie) : undefined)) {
-    return true;
-  }
+  return verifyAuthCookieValue(cookie ? decodeURIComponent(cookie) : undefined);
+}
+
+function isChatAuthorized(req: Request): boolean {
+  if (isCookieAuthed(req)) return true;
 
   // Token moet bij de gevraagde org horen.
   const orgSlug = resolveOrgSlugFromId(getActiveOrgId(req));
@@ -87,6 +92,11 @@ export const runtime = 'nodejs';
 // timeout is 10s op Hobby — te kort voor v0.3 streaming. 60s is het Hobby
 // max; ruim voor onze worst case (~10s).
 export const maxDuration = 60;
+
+// Defense-in-depth payload-grens. De finale semantische cap zit in rag.ts
+// (1000 tekens, nette INPUT_INVALID); deze ruime grens weert alleen
+// abuse-payloads (bv. megabytes tekst) vóór enig werk gedaan wordt.
+const MAX_QUESTION_CHARS = 8000;
 
 type Body = {
   question?: unknown;
@@ -185,6 +195,13 @@ export async function POST(req: Request) {
       headers: { 'X-Request-Id': requestId },
     });
   }
+  if (question.length > MAX_QUESTION_CHARS) {
+    const err = new AppError('INPUT_INVALID', { message: 'question too long' });
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status,
+      headers: { 'X-Request-Id': requestId },
+    });
+  }
   // HyDE-modus override (v0.5 evaluatie-toggle). Onbekende waarde of niet
   // gestuurd → 'auto' (= volg bot-versie config).
   const hydeModeRequested: HydeModeRequest = isHydeModeRequest(body.hydeMode)
@@ -200,7 +217,11 @@ export async function POST(req: Request) {
   // 'log-only' mode (default): we registreren de match en gaan door.
   // 'block' mode: we wijzen de query af met INJECTION_BLOCKED_MESSAGE.
   const injection = detectInjection(question);
-  const injectionMode = getInjectionMode();
+  // Publiek embed-pad (geen demo-cookie) blokkeert injection altijd; de admin-
+  // testtool (cookie) volgt de env-modus (default log-only), zodat het tunen van
+  // patterns niet gehinderd wordt door false-positives terwijl externe bezoekers
+  // wél beschermd zijn.
+  const injectionMode = isCookieAuthed(req) ? getInjectionMode() : 'block';
 
   if (injection.detected && injectionMode === 'block') {
     const patternName = injection.pattern?.name ?? 'unknown';
@@ -256,6 +277,27 @@ export async function POST(req: Request) {
   }
 
   const organizationId = getActiveOrgId(req);
+
+  // v0 security gate #3 — per-org rate-limit op het publieke pad. Vangt misbruik
+  // af dat over meerdere IP's roteert (de per-IP gate bovenaan ziet dat niet).
+  // Admin/test-pad (cookie) slaan we over. Draait ná de injection-block zodat
+  // goedkope geblokkeerde requests de org-bucket niet vullen.
+  if (!isCookieAuthed(req)) {
+    const orgRl = await getOrgRateLimiter().check(`org:${organizationId}`);
+    if (!orgRl.allowed) {
+      const err = new AppError('RATE_LIMIT', { retryAfterSec: orgRl.retryAfterSec });
+      return NextResponse.json(toWire(err, requestId), {
+        status: err.status,
+        headers: {
+          'Retry-After': String(orgRl.retryAfterSec),
+          'X-RateLimit-Limit': String(orgRl.limit),
+          'X-RateLimit-Remaining': '0',
+          'X-Request-Id': requestId,
+        },
+      });
+    }
+  }
+
   // Eén v0_org_settings-read voor zowel manual Q&A fast-path als de
   // chatbot-prompt-overrides (tone of voice, fallbackMessage, may-mention
   // toggles, extraInstructions, etc.). Bij DB-fout valt getOrgSettings al

@@ -10,6 +10,8 @@
 // State leeft op het Message-object (parent ChatMantaWidget) zodat refresh
 // na een streaming-delta of nieuwe message de feedback-status niet wist.
 
+import { bestForegroundOn } from '@/lib/widget/contrast';
+
 export type FeedbackState =
   | 'idle'
   | 'comment-open'
@@ -160,7 +162,7 @@ export function FeedbackButtons({
               disabled={submitting}
               style={{
                 background: accentColor,
-                color: '#ffffff',
+                color: bestForegroundOn(accentColor),
                 border: 'none',
                 borderRadius: 6,
                 padding: '5px 12px',

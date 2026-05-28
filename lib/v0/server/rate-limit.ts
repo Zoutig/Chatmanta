@@ -24,6 +24,10 @@ import { Redis } from '@upstash/redis';
 
 const DEFAULT_MAX_REQUESTS_PER_MIN = 30;
 const DEFAULT_MUTATION_MAX_PER_MIN = 10;
+// Per-org bucket: ruimer dan per-IP (één org heeft legitiem meerdere bezoekers
+// vanaf verschillende IP's), maar laag genoeg om een gescript misbruik dat over
+// IP's roteert af te knijpen op kosten. Override via ORG_RATE_LIMIT_PER_MIN.
+const DEFAULT_ORG_MAX_PER_MIN = 120;
 
 export type RateLimitVerdict = {
   allowed: boolean;
@@ -124,6 +128,7 @@ export class UpstashRateLimiter implements RateLimiter {
 // worden (handig in tests).
 let _chatInstance: RateLimiter | null = null;
 let _mutationInstance: RateLimiter | null = null;
+let _orgInstance: RateLimiter | null = null;
 let _upstashWarned = false;
 
 function readEnvLimit(envName: string, fallback: number): number {
@@ -183,6 +188,22 @@ export function getMutationRateLimiter(): RateLimiter {
     prefix: '@chatmanta/rl-mutation',
   });
   return _mutationInstance;
+}
+
+/**
+ * Per-org limiter voor het publieke chat-pad — een tweede begrenzing náást de
+ * per-IP limiter. Vangt het misbruik-scenario af waarbij een gescraped token
+ * over veel IP's wordt ingezet: de IP-bucket ziet dat niet, de org-bucket wel.
+ * Sleutel: `org:<organizationId>`. Ruimer dan per-IP omdat één org legitiem
+ * veel bezoekers heeft.
+ */
+export function getOrgRateLimiter(): RateLimiter {
+  if (_orgInstance) return _orgInstance;
+  _orgInstance = buildLimiter({
+    limit: readEnvLimit('ORG_RATE_LIMIT_PER_MIN', DEFAULT_ORG_MAX_PER_MIN),
+    prefix: '@chatmanta/rl-org',
+  });
+  return _orgInstance;
 }
 
 /**
