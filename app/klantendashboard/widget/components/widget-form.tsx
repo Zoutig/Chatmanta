@@ -17,6 +17,7 @@ import {
 import { StatusBadge } from '../../components/status-badge';
 import { BubblePreview, MarkPreview } from '../../components/widget-logo';
 import { saveWidgetSettingsAction, checkWidgetInstallationAction } from '../../actions';
+import { parseAllowedOrigins } from '@/lib/widget/origin-allowlist';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { PresetColorPicker } from './preset-color-picker';
@@ -43,6 +44,9 @@ export function WidgetForm({
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Vrije-tekst-concept voor de domein-allowlist (één host per regel). Apart van
+  // `w` zodat we niet per toetsaanslag persisten; opslaan normaliseert + ontdubbelt.
+  const [originsDraft, setOriginsDraft] = useState((initial.allowedOrigins ?? []).join('\n'));
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +96,13 @@ export function WidgetForm({
   function save() {
     // Sla de volledige client-state op (= alle ongesaveerde uiterlijk-velden).
     persist(w);
+  }
+
+  /** Normaliseer + ontdubbel het allowlist-concept en persisteer het. */
+  function saveOrigins() {
+    const parsed = parseAllowedOrigins(originsDraft);
+    setOriginsDraft(parsed.join('\n'));
+    persist({ allowedOrigins: parsed });
   }
 
   function handleLogoUpload(file: File) {
@@ -649,6 +660,56 @@ export function WidgetForm({
           >
             <ExternalLink size={14} strokeWidth={1.8} /> Open demo-pagina
           </a>
+        </div>
+
+        {/* Domein-allowlist. Leeg = werkt overal (fail-open). Met een lijst
+            laadt de widget alleen op de opgegeven domeinen. */}
+        <div style={{ marginTop: 18, borderTop: '1px solid #eaecef', paddingTop: 14 }}>
+          <label
+            htmlFor="widget-allowed-origins"
+            style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}
+          >
+            Toegestane domeinen
+          </label>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px', lineHeight: 1.5 }}>
+            Eén domein per regel. Laat leeg om de widget op elk domein te laten
+            werken. Met een lijst verschijnt de widget alléén op deze domeinen.
+          </p>
+          <textarea
+            id="widget-allowed-origins"
+            value={originsDraft}
+            onChange={(e) => {
+              setOriginsDraft(e.target.value);
+              setSaved(false);
+            }}
+            placeholder={'jouwbedrijf.nl\nwww.jouwbedrijf.nl'}
+            rows={3}
+            style={{
+              width: '100%',
+              resize: 'vertical',
+              minHeight: 64,
+              padding: '8px 10px',
+              border: '1px solid #d1d5db',
+              borderRadius: 8,
+              fontSize: 13,
+              fontFamily: 'inherit',
+              color: '#0e1014',
+              background: '#ffffff',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={saveOrigins}
+              className="klant-btn"
+              data-variant="primary"
+              disabled={pending}
+            >
+              Domeinen opslaan
+            </button>
+          </div>
         </div>
       </Collapsible>
     </div>

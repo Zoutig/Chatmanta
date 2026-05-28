@@ -287,7 +287,14 @@ export function ChatMantaWidget({
           `/api/v0/feedback?org=${encodeURIComponent(orgSlug)}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              // Embed-token zodat feedback ook op een externe site door de
+              // dual-auth van de feedback-route komt (zelfde model als chat).
+              ...(embedTokenRef.current
+                ? { 'x-chatmanta-embed': embedTokenRef.current }
+                : {}),
+            },
             body: JSON.stringify({
               queryLogId,
               rating,

@@ -15,12 +15,39 @@ import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
-import { getActiveOrgId } from '@/lib/v0/server/active-org';
+import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
+import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
+import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
 
 export const runtime = 'nodejs';
 
 const COMMENT_MAX = 2000;
+
+// Dual-auth, identiek aan de chat-route: geldig met óf het V0-demo-cookie
+// (admin/test), óf een geldig embed-token + same-origin (publieke widget).
+// Nodig sinds /api/v0/feedback uit de wachtwoord-gate is gehaald (proxy.ts)
+// zodat 👍/👎 ook in een externe embed werkt i.p.v. stil te falen.
+function isFeedbackAuthorized(req: Request): boolean {
+  const cookie = req.headers
+    .get('cookie')
+    ?.match(new RegExp(`(?:^|;\\s*)${AUTH_COOKIE.name}=([^;]+)`))?.[1];
+  if (verifyAuthCookieValue(cookie ? decodeURIComponent(cookie) : undefined)) {
+    return true;
+  }
+  const orgSlug = resolveOrgSlugFromId(getActiveOrgId(req));
+  if (!orgSlug) return false;
+  const token = req.headers.get('x-chatmanta-embed');
+  if (!verifyEmbedToken(token, orgSlug)) return false;
+  const host = req.headers.get('host');
+  const originHdr = req.headers.get('origin') ?? req.headers.get('referer');
+  if (!host || !originHdr) return false;
+  try {
+    return new URL(originHdr).host === host;
+  } catch {
+    return false;
+  }
+}
 
 type Body = {
   queryLogId?: unknown;
@@ -60,6 +87,14 @@ export async function POST(req: Request) {
         'Retry-After': String(rl.retryAfterSec),
         'X-Request-Id': requestId,
       },
+    });
+  }
+
+  if (!isFeedbackAuthorized(req)) {
+    const err = new AppError('AUTH_REQUIRED');
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status, // 401
+      headers: { 'X-Request-Id': requestId },
     });
   }
 
