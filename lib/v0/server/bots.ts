@@ -271,17 +271,30 @@ export type BotConfig = {
   historyEntityVerification?: boolean;
   /**
    * v0.9 (iter2): deterministisch hard-fact-weiger-template. Wanneer de bot een
-   * hard feit (bedrag/datum/aantal) noemt dat NIET in de bronnen staat ÉN het
-   * antwoord ongegrond is (lage claim-confidence), vervang het antwoord
-   * deterministisch door een eerlijk weiger/doorverwijs-template i.p.v. de
-   * (empirisch onbetrouwbare) tweede LLM-poging. Adresseert de dominante
-   * out_of_corpus_overanswer-faalmodus. De conjunctie (beide grounding-signalen
-   * falen) spaart gegronde tiered-calc — geen over-refusal. Consolidatie in de
-   * bestaande regenerate-laag; geen parallelle gate, geen prompt-only fix.
-   * Vereist bot.claimRegenerateEnabled + bot.adaptiveHardFactVerification.
-   * Default false/undefined → identiek aan v0.8.1 (append-only).
+   * hard feit (bedrag/datum/aantal) noemt dat NIET in de bronnen staat ÉN de
+   * retrieval ZWAK/MEDIUM was, vervang het antwoord deterministisch door een
+   * eerlijk weiger/doorverwijs-template i.p.v. de (empirisch onbetrouwbare)
+   * tweede LLM-poging. Adresseert de dominante out_of_corpus_overanswer-
+   * faalmodus. De retrieval-sterkte-conditie (NIET claim-confidence — een
+   * fabricatie heeft confidence≈1) spaart gegronde tiered-calc bij STRONG
+   * retrieval → geen over-refusal. Consolidatie in de bestaande regenerate-laag;
+   * geen parallelle gate, geen prompt-only fix. Vereist bot.claimRegenerateEnabled
+   * + bot.adaptiveHardFactVerification. Default false/undefined → identiek aan
+   * v0.8.1 (append-only).
    */
   hardFactDeterministicRefusal?: boolean;
+  /**
+   * v0.9.1: safety-aware verfijning van hardFactDeterministicRefusal. De weiger-
+   * gate vuurt NIET wanneer de draft al een spoed-/nood-doorverwijzing bevat
+   * (112/huisartsenpost/ambulance/spoedeisende hulp). Reden: NUMBER_RE extraheert
+   * élk getal ≥2 cijfers als hard feit, dus een correct "bel 112"-noodadvies telt
+   * als ongegrond getal (112 staat per definitie niet in een fysio-/dakdekker-
+   * corpus) → de generieke weigering overschreef in v0.9 een levensreddende
+   * doorverwijzing (hh-globex-spoed-regressie). Prijs-/datum-fabricaties bevatten
+   * deze termen nooit → de anti-fabricatie-upside van v0.9 blijft intact. Default
+   * false/undefined → v0.9 byte-identiek (append-only).
+   */
+  hardFactRefusalSafetyAware?: boolean;
   /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
@@ -1038,6 +1051,27 @@ const V0_9: BotConfig = {
   hardFactDeterministicRefusal: true,
 };
 
+// v0.9.1 — safety-regressie-fix op v0.9. De Harde-Dimensie-eval (PR #119) vond
+// dat v0.9's deterministische hard-fact-weigering een medische noodvraag
+// ("acute pijn op de borst, kan amper ademen") beantwoordde met de generieke
+// "ik kan geen exacte bedragen/cijfers vinden"-weigering i.p.v. het correcte
+// "bel direct 112/huisarts"-advies: NUMBER_RE telt het noodnummer 112 als
+// ongegrond hard feit (staat niet in het fysio-corpus) → de weiger-gate
+// overschreef de doorverwijzing (hh-globex-spoed-regressie, 96% i.p.v. 100%).
+// v0.9.1 zet hardFactRefusalSafetyAware aan: de weiger-gate vuurt nooit op een
+// draft die al een spoed-/nood-doorverwijzing bevat. Chirurgische fix — de
+// retrieval-sterkte-gating en de anti-fabricatie-upside van v0.9 (prijs/datum-
+// fabricaties bevatten deze termen nooit) blijven volledig behouden. Geen
+// parallelle gate, geen prompt-only fix. v0.9 byte-identiek + append-only.
+const V0_9_1: BotConfig = {
+  ...V0_9,
+  version: 'v0.9.1',
+  label: 'v0.9.1 — safety-aware hard-fact-weigering',
+  description:
+    'v0.9 plus hardFactRefusalSafetyAware: de deterministische hard-fact-weigering vervangt nooit een antwoord dat al een spoed-/nood-doorverwijzing bevat (112/huisarts/spoedeisende hulp). Repareert de hh-globex-spoed-regressie waarbij het noodnummer 112 als ongegrond hard feit werd geweigerd. De retrieval-sterkte-gating en de anti-fabricatie-upside van v0.9 blijven ongewijzigd. v0.9 byte-identiek.',
+  hardFactRefusalSafetyAware: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1053,6 +1087,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_7_3.version]: V0_7_3,
   [V0_8_1.version]: V0_8_1,
   [V0_9.version]: V0_9,
+  [V0_9_1.version]: V0_9_1,
 };
 
 /**
@@ -1095,6 +1130,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_7_3.version,
   V0_8_1.version,
   V0_9.version,
+  V0_9_1.version,
 ];
 
 /**

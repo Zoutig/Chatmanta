@@ -25,7 +25,7 @@ import {
   renderPersonaTemplate,
   type OrgPersona,
 } from './persona';
-import { shouldDeterministicallyRefuseHardFact } from './hard-facts';
+import { shouldDeterministicallyRefuseHardFact, containsEmergencyHandoff } from './hard-facts';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
 import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
@@ -2584,16 +2584,29 @@ KRITISCHE FORMAT-REGELS:
   // v0.9 (iter2) anti-hallucinatie — DETERMINISTISCH pad voor ongegronde hard-
   // facts. Zelfde les als v0.8.1 history-entity: een tweede LLM-poging die het
   // verzonnen bedrag/datum moet weglaten is empirisch onbetrouwbaar (de bot
-  // produceert het opnieuw). Bij een ONGEGRONDE hard-fact-hallucinatie (conjunctie
-  // hardFactSupported=false ÉN lage claim-confidence — beide grounding-signalen
-  // falen) vervangen we deterministisch door een eerlijk weiger/doorverwijs-
-  // template. De conjunctie spaart gegronde tiered-calc (hoge claim-confidence) →
-  // geen over-refusal op correcte rekenkunde. Geen parallelle gate.
+  // produceert het opnieuw). Bij een ONGEGRONDE hard-fact-hallucinatie
+  // (hardFactSupported=false ÉN retrieval ZWAK/MEDIUM — NIET claim-confidence,
+  // want een fabricatie heeft confidence≈1) vervangen we deterministisch door
+  // een eerlijk weiger/doorverwijs-template. De retrieval-sterkte-conditie spaart
+  // gegronde tiered-calc bij STRONG retrieval → geen over-refusal op correcte
+  // rekenkunde. Geen parallelle gate.
+  //
+  // v0.9.1 safety-aware verfijning: NUMBER_RE telt élk getal ≥2 cijfers als hard
+  // feit, dus een correct "bel 112"-noodadvies telt als ongegrond getal (112
+  // staat per definitie niet in het corpus) → v0.9 overschreef een spoed-
+  // doorverwijzing met de generieke weigering (hh-globex-spoed-regressie). Onder
+  // bot.hardFactRefusalSafetyAware vuurt de gate nooit op een draft die al een
+  // nood-/escalatie-doorverwijzing bevat. Prijs-/datum-fabricaties bevatten deze
+  // termen nooit → de anti-fabricatie-upside van v0.9 blijft volledig intact.
+  const draftHasSafetyHandoff =
+    bot.hardFactRefusalSafetyAware === true && containsEmergencyHandoff(activeAnswerText);
   const deterministicHardFactRefusal = shouldDeterministicallyRefuseHardFact({
     enabled: bot.hardFactDeterministicRefusal === true,
     hardFactSupported,
     retrievalStrength: decision.retrievalStrength,
     adoptedHistoryEntity: unsupportedHistoryEntity,
+    safetyAware: bot.hardFactRefusalSafetyAware === true,
+    draftHasSafetyHandoff,
   });
   if (bot.claimRegenerateEnabled && deterministicHardFactRefusal) {
     activeAnswerText =
