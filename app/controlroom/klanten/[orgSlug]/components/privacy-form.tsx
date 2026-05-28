@@ -42,13 +42,18 @@ export function PrivacyForm({ orgSlug, privacy }: { orgSlug: string; privacy: Pr
   const [privacyText, setPrivacyText] = useState(privacy.privacyTextShared);
   const [subproc, setSubproc] = useState(privacy.subprocessorInfoShared);
 
+  // Clamp naar de DB-CHECK-ranges zodat een leeggemaakt veld (Number('')=0)
+  // niet de hele save laat falen op een ruwe constraint-error.
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : lo));
+
   function save() {
     setError(null);
     setSaved(false);
     const patch: PrivacySettingsPatch = {
-      chatRetentionDays: chatDays,
-      issueRetentionDays: issueDays,
-      metadataRetentionMonths: metaMonths,
+      chatRetentionDays: clamp(chatDays, 1, 365),
+      issueRetentionDays: clamp(issueDays, 1, 730),
+      metadataRetentionMonths: clamp(metaMonths, 1, 60),
       fullConversationLogging: fullLogging,
       piiRedactionEnabled: pii,
       processorAgreementSigned: dpa,

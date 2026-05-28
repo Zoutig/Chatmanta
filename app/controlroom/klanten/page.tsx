@@ -41,7 +41,7 @@ export default async function KlantenlijstPage() {
                 <th>Health</th>
                 <th>Widget</th>
                 <th>Onboarding</th>
-                <th>Gesprekken 7d</th>
+                <th>Gesprekken (wk)</th>
                 <th>Fallback</th>
                 <th>Laatste activiteit</th>
                 <th>Kosten/mnd</th>

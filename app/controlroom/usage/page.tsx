@@ -45,7 +45,7 @@ export default async function UsagePage() {
             <thead>
               <tr>
                 <th>Klant</th>
-                <th>Gesprekken 7d</th>
+                <th>Gesprekken (wk)</th>
                 <th>Gesprekken mnd</th>
                 <th>Limiet</th>
                 <th>Fallback</th>
