@@ -9,6 +9,7 @@
 import {
   shouldDeterministicallyRefuseHardFact,
   containsEmergencyHandoff,
+  containsCodeOutput,
 } from '../lib/v0/server/hard-facts';
 
 let failed = 0;
@@ -104,6 +105,21 @@ check('detector: prijs-antwoord "€112 ... neem contact op" → géén handoff'
 ), false);
 check('detector: "bel ons gerust voor een offerte" → géén handoff', containsEmergencyHandoff(
   'Wij maken graag een offerte op maat. Bel ons gerust of vul het contactformulier in.',
+), false);
+
+// --- containsCodeOutput detector (v0.9.1 scope-guard) ----------------------
+
+check('code-detector: python-functie met fence → code', containsCodeOutput(
+  'Hier is een functie:\n```python\ndef is_priem(n):\n    if n <= 1:\n        return False\n    for i in range(2, n):\n        pass\n```',
+), true);
+check('code-detector: js function → code', containsCodeOutput(
+  'function isPriem(n) { return true; }',
+), true);
+check('code-detector: normaal dakdekker-proza → géén code', containsCodeOutput(
+  'Wij leggen pannendaken en EPDM-daken aan, met 10 jaar werkgarantie. Neem contact op voor een offerte.',
+), false);
+check('code-detector: prijs-antwoord met getallen → géén code', containsCodeOutput(
+  'Een dakvervanging van 137 m² kost ongeveer € 17.000 – € 22.000 inclusief btw.',
 ), false);
 
 if (failed > 0) {

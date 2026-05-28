@@ -398,6 +398,34 @@ export function containsEmergencyHandoff(text: string): boolean {
   return EMERGENCY_HANDOFF_MARKERS.some((re) => re.test(clean));
 }
 
+// v0.9.1 — markers voor CODE in een antwoord. Een klantcontact-bot van een niet-
+// technische org (dakdekker/fysio/accountant) hoort nooit code te produceren, dus
+// een code-block/programmeer-syntax = off-domein task-execution. Een prompt-regel
+// alleen houdt gpt-4o-mini hier niet betrouwbaar tegen (scope-acme-code flake), dus
+// een deterministische output-guard. Bewust krap op echte code-syntax → een normaal
+// proza-antwoord (geen ``` , geen def/function/for-in-range) triggert niet.
+const CODE_OUTPUT_MARKERS: RegExp[] = [
+  /```/, // markdown code-fence
+  /\bdef\s+\w+\s*\(/, // python def
+  /\bfunction\s+\w+\s*\(/, // js function-declaratie
+  /=>\s*\{/, // arrow function body
+  /\bconsole\.log\s*\(/,
+  /\bprintf?\s*\(/, // print( / printf(
+  /\bfor\s+\w+\s+in\s+range\s*\(/, // python loop
+  /\breturn\s+(?:True|False|null|nil)\b/,
+  /#include\s*</,
+  /\b(?:public|private)\s+(?:static\s+)?(?:class|void|int|String)\b/,
+  /\bSystem\.out\b/,
+];
+
+/** v0.9.1 — detecteert of een ANTWOORD code/programmeer-output bevat. Gebruikt door
+ *  de decision-layer in rag.ts (offDomainCodeRefusal) om een off-domein code-antwoord
+ *  deterministisch te vervangen door de off-topic-refusal. Pure functie, geen side-
+ *  effects. Krap op echte code-syntax → geen false-positives op proza-antwoorden. */
+export function containsCodeOutput(text: string): boolean {
+  return CODE_OUTPUT_MARKERS.some((re) => re.test(text));
+}
+
 /** iter2 v0.9 — beslis of een ongegronde hard-fact-hallucinatie DETERMINISTISCH
  *  geweigerd moet worden i.p.v. een tweede LLM-poging (die empirisch onbetrouwbaar
  *  is in het verwijderen van het verzonnen getal — zie de v0.8.1 history-entity

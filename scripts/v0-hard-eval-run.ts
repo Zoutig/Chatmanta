@@ -95,6 +95,10 @@ async function runBotOnce(args: {
       bot: args.bot,
       history: args.history && args.history.length > 0 ? args.history : undefined,
       organizationId: args.orgId,
+      // Cache uit: de answer-cache is per bot_version-STRING; bij een code-fix
+      // binnen dezelfde versie zou een gecacht (stale) antwoord van vóór de fix
+      // worden geserveerd. De eval moet altijd het HUIDIGE bot-gedrag testen.
+      disableCache: true,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         response = ev.response;
