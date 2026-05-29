@@ -102,6 +102,25 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByText('Opgeslagen').first()).toBeVisible({ timeout: 15_000 });
   });
 
+  test('bronnen: SourcesManager rendert met document-toevoegen', async ({ page }) => {
+    await page.goto('/admindashboard/klanten/acme-corp?tab=bronnen');
+    await expect(page.getByText('Websites', { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: /Document toevoegen/ })).toBeVisible();
+  });
+
+  test('bronnen: website deactiveren → heractiveren (retrieval-toggle)', async ({ page }) => {
+    // demo-nieuw heeft een actieve website-bron (acme/globex/initech draaien op docs/Q&A).
+    await page.goto('/admindashboard/klanten/demo-nieuw?tab=bronnen');
+    const deact = page.getByRole('button', { name: 'Inactief zetten' }).first();
+    test.skip((await deact.count()) === 0, 'geen actieve website-bron voor demo-nieuw');
+    await deact.click();
+    // Na deactiveren verschijnt de heractiveer-knop (disabled_at gezet + pagina's included=false).
+    await expect(page.getByRole('button', { name: 'Heractiveren' }).first()).toBeVisible({ timeout: 15_000 });
+    // Herstel zodat de demo-bron weer actief is voor de bot.
+    await page.getByRole('button', { name: 'Heractiveren' }).first().click();
+    await expect(page.getByRole('button', { name: 'Inactief zetten' }).first()).toBeVisible({ timeout: 15_000 });
+  });
+
   test('profiel-edit persisteert', async ({ page }) => {
     await page.goto('/admindashboard/klanten/globex-inc');
     const sel = page.locator('select').first(); // commerciële status

@@ -29,6 +29,7 @@ import { ProfileEditor } from './components/profile-editor';
 import { NotesEditor } from './components/notes-editor';
 import { PrivacyForm } from './components/privacy-form';
 import { OnboardingChecklist } from './components/onboarding-checklist';
+import { SourcesManager } from './components/sources-manager';
 import { SettingsForm } from '@/app/klantendashboard/instellingen/components/settings-form';
 import { WidgetForm } from '@/app/klantendashboard/widget/components/widget-form';
 import {
@@ -160,49 +161,13 @@ async function BronnenTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) {
   ]);
   const qa = settings?.qa ?? [];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card>
-        <SectionTitle>Websites</SectionTitle>
-        {sources.length === 0 ? (
-          <EmptyInline text="Geen website-bronnen." />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {sources.map((s) => (
-              <div key={s.source.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                <span style={{ flex: 1 }}>{s.source.host ?? s.source.rootUrl ?? '(onbekend)'}</span>
-                <span style={{ color: 'var(--klant-muted)', fontSize: 12 }}>{s.pages.filter((p) => p.status === 'active').length} pagina&apos;s</span>
-                <Pill tone={s.source.status === 'failed' ? 'danger' : s.source.status === 'ready' ? 'success' : 'info'} dot>{s.source.status}</Pill>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <SectionTitle>Documenten</SectionTitle>
-        {docs.length === 0 ? (
-          <EmptyInline text="Geen documenten." />
-        ) : (
-          <table className="klant-table">
-            <thead><tr><th>Bestand</th><th>Status</th><th>Chunks</th></tr></thead>
-            <tbody>
-              {docs.map((d) => (
-                <tr key={d.id}>
-                  <td style={{ fontSize: 13 }}>{d.filename}</td>
-                  <td><StatusBadge kind="document" status={d.status === 'ready' ? 'ready' : d.status === 'failed' ? 'error' : 'processing'} /></td>
-                  <td style={{ fontSize: 13 }}>{d.chunkCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
-
-      <Card>
-        <SectionTitle>Handmatige Q&amp;A</SectionTitle>
-        {qa.length === 0 ? <EmptyInline text="Geen handmatige Q&A." /> : <EmptyInline text={`${qa.filter((q) => q.active).length} actieve van ${qa.length} Q&A-items.`} />}
-      </Card>
-    </div>
+    <SourcesManager
+      orgSlug={slug}
+      sources={sources}
+      docs={docs}
+      qaActive={qa.filter((q) => q.active).length}
+      qaTotal={qa.length}
+    />
   );
 }
 
