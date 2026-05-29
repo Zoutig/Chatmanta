@@ -100,14 +100,17 @@ async function setErrorStatus(id: string, status: ErrorStatus): Promise<ActionRe
   });
 }
 
-export function resolveErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
+// 'use server' vereist dat ELKE export een async function is — vandaar async
+// wrappers (geen plain `export function` die een promise teruggeeft; die wordt
+// door de server-action-transform gedropt → "export not found" op de client).
+export async function resolveErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
   return setErrorStatus(id, 'resolved');
 }
 
-export function ignoreErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
+export async function ignoreErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
   return setErrorStatus(id, 'ignored');
 }
 
-export function reopenErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
+export async function reopenErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
   return setErrorStatus(id, 'open');
 }
