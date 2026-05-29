@@ -8,6 +8,7 @@ import { getControlRoomKlanten } from '@/lib/controlroom/server/overview';
 import { ONBOARDING_PHASE_LABELS } from '@/lib/controlroom/types';
 import { formatCostUsd, formatRelativeNL } from '@/lib/controlroom/format';
 import { CommercialBadge, HealthBadge, TechnicalBadge } from '../components/badges';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export default async function KlantenlijstPage() {
             klant voor het volledige detail.
           </p>
         </div>
+        <ReloadButton />
       </header>
 
       <Card padded={false}>

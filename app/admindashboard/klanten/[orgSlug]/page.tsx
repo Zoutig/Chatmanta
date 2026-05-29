@@ -26,6 +26,7 @@ import { TabsNav, type TabDef } from '@/app/klantendashboard/components/tabs';
 import { MetricCard } from '../../components/metric-card';
 import { CopyButton } from '../../components/copy-button';
 import { CommercialBadge, HealthBadge, TechnicalBadge } from '../../components/badges';
+import { ReloadButton } from '../../components/reload-button';
 import { ProfileEditor } from './components/profile-editor';
 import { NotesEditor } from './components/notes-editor';
 import { PrivacyForm } from './components/privacy-form';
@@ -364,6 +365,7 @@ export default async function KlantDetailPage({
             <CommercialBadge status={klant.commercialStatus} />
             <TechnicalBadge status={klant.technicalStatus} />
             <HealthBadge status={klant.health} />
+            <ReloadButton />
           </>
         }
       />

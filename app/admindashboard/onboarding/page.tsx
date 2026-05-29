@@ -8,6 +8,7 @@ import { Pill } from '@/app/klantendashboard/components/ui/pill';
 import { getControlRoomKlanten } from '@/lib/controlroom/server/overview';
 import { listOnboardingItems } from '@/lib/controlroom/server/onboarding';
 import { ONBOARDING_PHASE_LABELS } from '@/lib/controlroom/types';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ export default async function OnboardingOverviewPage() {
             volgende actie.
           </p>
         </div>
+        <ReloadButton />
       </header>
 
       <Card padded={false}>

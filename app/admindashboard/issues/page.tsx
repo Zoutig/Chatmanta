@@ -6,6 +6,7 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { getControlRoomKlanten } from '@/lib/controlroom/server/overview';
 import { buildIssues, type ControlRoomIssue, type IssueSeverity } from '@/lib/controlroom/server/issues';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,7 @@ export default async function IssuesPage() {
             technische status). Geen aparte error-tabel — dit is een live afleiding.
           </p>
         </div>
+        <ReloadButton />
       </header>
 
       {issues.length === 0 ? (

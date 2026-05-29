@@ -8,6 +8,7 @@ import { getControlRoomKlanten } from '@/lib/controlroom/server/overview';
 import { usageLimitStatus, type UsageLimitTone } from '@/lib/controlroom/usage-limits';
 import { formatCostUsd } from '@/lib/controlroom/format';
 import { MetricCard } from '../components/metric-card';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,7 @@ export default async function UsagePage() {
           <h1 className="klant-page-title">Usage &amp; Kosten</h1>
           <p className="klant-page-sub">Verbruik en geschatte kosten per klant deze maand, met limietstatus.</p>
         </div>
+        <ReloadButton />
       </header>
 
       <div className="klant-metrics-grid" style={{ marginBottom: 20 }}>
