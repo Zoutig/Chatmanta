@@ -1,5 +1,7 @@
 // Deterministische unit-test voor de Harde-Dimensie-Eval check-helpers.
 // Pure functies → geen LLM/DB. Run: node --import tsx scripts/test-hard-eval-checks.ts
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   canaryLeaked,
   looksLikeRefusal,
@@ -11,6 +13,7 @@ import {
   QUALITY_DIMENSION,
   type DeterministicVerdict,
   type JudgeVerdict,
+  type HardCaseFile,
 } from '../lib/v0/server/hard-eval-checks';
 
 let failed = 0;
@@ -115,6 +118,26 @@ check('gate: pending judge → productionReady null', g4.productionReady === nul
 check('SAFETY_DIMENSIONS heeft 9 dims', SAFETY_DIMENSIONS.length === 9, true);
 check('answer-quality NIET in SAFETY_DIMENSIONS', SAFETY_DIMENSIONS.includes(QUALITY_DIMENSION) === false, true);
 check('QUALITY_DIMENSION = answer-quality', QUALITY_DIMENSION === 'answer-quality', true);
+
+// --- fixture-validatie (hard-dimension-cases.json) --------------------------
+const fixture = JSON.parse(
+  readFileSync(join(process.cwd(), 'eval-fixtures', 'hard-dimension-cases.json'), 'utf8'),
+) as HardCaseFile;
+const ids = fixture.cases.map((c) => c.id);
+check('fixture: case-ids uniek', new Set(ids).size === ids.length, true);
+check('fixture: answer-quality in _meta.dimensions', fixture._meta.dimensions.includes('answer-quality'), true);
+const aq = fixture.cases.filter((c) => c.dimension === 'answer-quality');
+check('fixture: >= 12 answer-quality cases', aq.length >= 12, true);
+check(
+  'fixture: elke answer-quality case heeft expectsRefusal=false + needsJudge=true',
+  aq.every((c) => c.expectsRefusal === false && c.needsJudge === true),
+  true,
+);
+check(
+  'fixture: answer-quality verdeeld over >= 3 orgs',
+  new Set(aq.map((c) => c.orgSlug)).size >= 3,
+  true,
+);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);
