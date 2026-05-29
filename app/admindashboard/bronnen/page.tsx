@@ -1,20 +1,9 @@
-import { Library } from 'lucide-react';
-import { ComingSoon } from '../components/coming-soon';
+// Admin Dashboard — globale "Bronnen" is verwijderd uit de navigatie: bronnen
+// zijn voortaan alléén per klant toegankelijk (klantdetail → tab Bronnen).
+// Deze route blijft bestaan als redirect zodat oude bookmarks/links niet 404'en.
 
-export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
 
-export default function BronnenPage() {
-  return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">Bronnen</h1>
-          <p className="klant-page-sub">
-            Alle ingeladen content per klant: websites, documenten en Q&amp;A met status.
-          </p>
-        </div>
-      </header>
-      <ComingSoon title="Bronnen-overzicht volgt in Stap 2" icon={<Library size={24} strokeWidth={1.6} />} />
-    </>
-  );
+export default function BronnenRedirect() {
+  redirect('/admindashboard/klanten');
 }

@@ -28,7 +28,7 @@ export type CrawlEventLite = {
 };
 
 export type WebsiteSource = {
-  source: { id: string; rootUrl: string | null; host: string | null; status: SourceStatus };
+  source: { id: string; rootUrl: string | null; host: string | null; status: SourceStatus; disabledAt: string | null };
   job: {
     status: CrawlJobStatus;
     error: string | null;
@@ -53,7 +53,7 @@ export async function getWebsiteSources(organizationId: string): Promise<Website
 
   const { data: sources } = await sb
     .from('knowledge_sources')
-    .select('id, root_url, normalized_host, status')
+    .select('id, root_url, normalized_host, status, disabled_at')
     .eq('organization_id', organizationId)
     .eq('type', 'website')
     .is('deleted_at', null)
@@ -139,6 +139,7 @@ export async function getWebsiteSources(organizationId: string): Promise<Website
         rootUrl: (s.root_url as string | null) ?? null,
         host: (s.normalized_host as string | null) ?? null,
         status: s.status as SourceStatus,
+        disabledAt: (s.disabled_at as string | null) ?? null,
       },
       job: lj
         ? { status: lj.status as CrawlJobStatus, error: lj.error, completed: counted?.completed ?? 0, total: counted?.total ?? 0, events }

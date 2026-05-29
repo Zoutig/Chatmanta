@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Check, Save } from 'lucide-react';
+import { Check, RotateCcw, Save } from 'lucide-react';
 import { saveChatbotSettingsAction } from '../../actions';
+import type { ActionResult } from '@/lib/errors/action';
 import type {
   AnswerLength,
   ChatbotSettings,
@@ -10,6 +11,12 @@ import type {
   SourceStrictness,
   ToneOfVoice,
 } from '@/lib/v0/klantendashboard/types';
+
+/** Save-action: standaard de cookie-gebonden klantendashboard-action; het admin-
+ *  dashboard injecteert een variant die op de route-param-org schrijft. */
+type SaveChatbotAction = (
+  patch: Partial<ChatbotSettings>,
+) => Promise<ActionResult<{ chatbot: ChatbotSettings }>>;
 
 const TONE_OPTIONS: { value: ToneOfVoice; label: string; help: string }[] = [
   { value: 'professional', label: 'Professioneel', help: 'Zakelijk, formeel, gebruikt "u"-vorm.' },
@@ -27,14 +34,32 @@ const LANG_LABEL: Record<Language, string> = {
   es: 'Spaans',
 };
 
-export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
+export function SettingsForm({
+  initial,
+  action = saveChatbotSettingsAction,
+  showReset = false,
+}: {
+  initial: ChatbotSettings;
+  action?: SaveChatbotAction;
+  showReset?: boolean;
+}) {
   const [s, setS] = useState<ChatbotSettings>(initial);
+  // baseline = laatst opgeslagen staat; "Terugzetten" herstelt hiernaartoe.
+  const [baseline, setBaseline] = useState<ChatbotSettings>(initial);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const dirty = JSON.stringify(s) !== JSON.stringify(baseline);
+
   function update<K extends keyof ChatbotSettings>(key: K, value: ChatbotSettings[K]) {
     setS((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+    setError(null);
+  }
+
+  function reset() {
+    setS(baseline);
     setSaved(false);
     setError(null);
   }
@@ -43,9 +68,10 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
     setSaved(false);
     setError(null);
     startTransition(async () => {
-      const res = await saveChatbotSettingsAction(s);
+      const res = await action(s);
       if (res.ok) {
         setS(res.chatbot);
+        setBaseline(res.chatbot);
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       } else {
@@ -339,6 +365,17 @@ export function SettingsForm({ initial }: { initial: ChatbotSettings }) {
           >
             <Check size={14} /> Opgeslagen
           </span>
+        )}
+        {showReset && (
+          <button
+            type="button"
+            className="klant-btn"
+            data-variant="ghost"
+            onClick={reset}
+            disabled={pending || !dirty}
+          >
+            <RotateCcw size={14} strokeWidth={1.8} /> Terugzetten
+          </button>
         )}
         <button
           type="submit"

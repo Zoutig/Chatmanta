@@ -29,6 +29,7 @@ import {
 import { commitTurn, findRecentThreadByVisitor } from '@/lib/v0/server/threads';
 import {
   readVisitorId,
+  readVisitorIdFromHeader,
   newVisitorId,
   serializeVisitorCookie,
 } from '@/lib/v0/server/visitor';
@@ -40,16 +41,22 @@ import type { ErrorSeverity, ErrorSurface } from '@/lib/observability/sink';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
 import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
 
-// Widget-detectie via referer-header. /widget/<slug> is in V0 het enige
-// publieke chat-pad; testtool zit op /klantendashboard/test en doet z'n
-// eigen commitTurnAction client-side. Externe-embed scenario's komen pas
-// met V1 + widget-script en vragen om een explicietere signal (header /
-// origin-check); voor V0 is de referer-sniff voldoende.
+// Widget-detectie via referer-header. Twee publieke chat-paden:
+//   /widget/<slug>  — de demo-rotatie op onze eigen omgeving
+//   /embed/<slug>   — de iframe van public/widget.js op een externe site
+// Beide moeten server-side een v0_threads-rij krijgen (commitTurn) zodat het
+// gesprek in klanten-/admindashboard verschijnt. De testtool zit op
+// /klantendashboard/test en commit zelf client-side → bewust géén match hier
+// (anders dubbele rijen). Als extra zekerheid telt ook een aanwezig embed-token
+// (alleen de embed-client stuurt dat) als widget-signaal voor het geval de
+// referer door een strikte Referrer-Policy gestript is.
 function isWidgetRequest(req: Request): boolean {
+  if (req.headers.get('x-chatmanta-embed')) return true;
   const referer = req.headers.get('referer');
   if (!referer) return false;
   try {
-    return new URL(referer).pathname.startsWith('/widget/');
+    const path = new URL(referer).pathname;
+    return path.startsWith('/widget/') || path.startsWith('/embed/');
   } catch {
     return false;
   }
@@ -168,9 +175,17 @@ export async function POST(req: Request) {
   // Testtool-calls krijgen geen visitor-cookie en geen extra thread-write
   // (zou anders dubbele rijen geven naast de bestaande client-side commit).
   const isWidget = isWidgetRequest(req);
-  // Lazy-set: lees bestaande cookie of genereer nieuwe; in beide gevallen
-  // sturen we 'm terug zodat browsers zonder cookie hem alsnog krijgen.
-  const visitorId = isWidget ? (readVisitorId(req) ?? newVisitorId()) : null;
+  // Visitor-id voor thread-grouping. Voorkeursvolgorde:
+  //   1. expliciete x-chatmanta-visitor header (cookie-onafhankelijk; werkt in
+  //      een third-party iframe waar de Lax-cookie geblokkeerd is)
+  //   2. de v0_widget_visitor cookie (eigen omgeving / first-party)
+  //   3. een verse id
+  // De cookie sturen we altijd terug zodat first-party browsers hem alsnog
+  // krijgen; in third-party context negeert de browser hem en draagt de header
+  // de grouping.
+  const visitorId = isWidget
+    ? (readVisitorIdFromHeader(req) ?? readVisitorId(req) ?? newVisitorId())
+    : null;
   const visitorCookieHeader = visitorId ? serializeVisitorCookie(visitorId) : null;
 
   // v0.4 security gate #1 — rate limit per IP. Faalt door als bucket overstroomt.

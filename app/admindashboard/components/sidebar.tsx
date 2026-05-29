@@ -7,8 +7,6 @@ import {
   LayoutDashboard,
   Building2,
   ClipboardList,
-  MessagesSquare,
-  Library,
   Workflow,
   AlertTriangle,
   BarChart3,
@@ -96,12 +94,6 @@ export function ControlRoomSidebar() {
         </NavItem>
         <NavItem href="/admindashboard/onboarding" label="Onboarding">
           <ClipboardList size={17} strokeWidth={1.7} />
-        </NavItem>
-        <NavItem href="/admindashboard/gesprekken" label="Gesprekken">
-          <MessagesSquare size={17} strokeWidth={1.7} />
-        </NavItem>
-        <NavItem href="/admindashboard/bronnen" label="Bronnen">
-          <Library size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/admindashboard/jobs" label="Crawls & Jobs">
           <Workflow size={17} strokeWidth={1.7} />

@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ChatManta is een website-chatbot SaaS van Jorion Solutions. Knowledge-bot voor MKB op basis van RAG over websitecontent + documenten.
 
-**Status (mei 2026):** V0 draait als actief RAG-leerplatform — multi-org sandbox met fake demo-data, eval-pipeline, parent chunks, HyDE, hybrid search, claim-verifications, latency-profiling, cache-telemetry. 14 migrations live (`0001_core_tenancy` t/m `0014_v0_hyde_mode_logging`). V1 (Supabase Auth + productie-multi-tenancy) is nog niet gestart — nieuwe features landen als nieuwe V0 bot-versie tenzij Sebastiaan expliciet zegt "we starten V1".
+**Status (mei 2026):** V0 draait als actief RAG-leerplatform — multi-org sandbox met fake demo-data, eval-pipeline, parent chunks, HyDE, hybrid search, claim-verifications, latency-profiling, cache-telemetry, plus een geshipte Firecrawl-website-crawler met dashboard én een embeddable widget (beide in V0-vorm, live op prod). 37 migrations live (`0001_core_tenancy` t/m `0037_v0_multi_website`). V1 (Supabase Auth + productie-multi-tenancy) is nog niet gestart — nieuwe features landen als nieuwe V0 bot-versie tenzij Sebastiaan expliciet zegt "we starten V1".
 
 ## Hoe je met dit project werkt
 
@@ -43,7 +43,7 @@ Deze keuzes zijn gemaakt en zou je niet zelf moeten heroverwegen. Wijken hiervan
 - **Geen secrets in `NEXT_PUBLIC_*`** of in client components.
 - **Anti-hallucinatie boven volledigheid**: similarity threshold + fallback-pad zonder LLM-call bij geen relevante chunks.
 
-> **⚠️ V0 sandbox-disclaimer.** V0 (`/api/v0/*`, `lib/v0/*`, `app/actions/*` met `v0_active_org` cookie) draait op één gedeeld `V0_DEMO_PASSWORD` zonder per-user identiteit. De `v0_active_org` cookie en `?org=<slug>` query-param worden zonder authorisatie geaccepteerd — een ingelogde V0-bezoeker kan vrij switchen tussen alle KNOWN_ORGS en zo data lezen/schrijven/verwijderen via de service-role wrappers. Dit is bewust voor RAG-tuning met fake demo-data. **STOP NOOIT echte klantdata in een V0 org.** V1 Phase 1 (Supabase Auth + `organization_members` membership-check) vervangt dit model en activeert SA-1 voor productie.
+> **⚠️ V0 sandbox-disclaimer.** V0 (`/api/v0/*`, `lib/v0/*`, `app/actions/*` met `v0_active_org` cookie) draait op één gedeeld `V0_DEMO_PASSWORD` zonder per-user identiteit. De `v0_active_org` cookie en `?org=<slug>` query-param worden zonder authorisatie geaccepteerd — een ingelogde V0-bezoeker kan vrij switchen tussen alle KNOWN_ORGS en zo data lezen/schrijven/verwijderen via de service-role wrappers. Dit is bewust voor RAG-tuning met fake demo-data. **STOP NOOIT echte klantdata in een V0 org.** **Uitzondering sinds PR #105/#118:** de embeddable-widget-routes `/embed/[slug]`, `/api/v0/chat`, `/api/v0/widget/ping`, `/api/v0/widget/token` en `/widget.js` vallen *buiten* deze `V0_DEMO_PASSWORD`-gate — ze draaien op externe sites zonder demo-login en worden in plaats daarvan beschermd door een kortlevend HMAC embed-token (fail-closed, env `EMBED_TOKEN_SECRET`) + origin-lock + per-IP rate-limit. Ook die routes serveren alléén sandbox-orgs met fake data. V1 Phase 1 (Supabase Auth + `organization_members` membership-check) vervangt dit model en activeert SA-1 voor productie.
 
 ## Wat WEL aan jouw oordeel is
 
@@ -76,8 +76,9 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 
 - Anthropic Claude Haiku 4.5 als primair, met OpenAI als technische fallback in `callLLM()`-laag (niet klant-zichtbaar)
 - Migratie-grens: nieuwe LLM-laag in `lib/ai/llm.ts` met provider-abstractie (`MODEL_COSTS` voor EUR-billing; V0 gebruikt naast deze tabel een eigen `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`)
-- Firecrawl — Phase 5 (website crawler, max 50 pagina's per crawl)
 - Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
+
+> ⚠️ **Firecrawl is geen V1-plan meer — al geshipt in V0.** De website-crawler (max 50 pagina's/crawl) draait live in V0-vorm: `lib/v0/crawler/`, dashboard in de Kennisbank, migraties 0032/0035/0036/0037, PR #95/#107/#120. Stond hier ooit als "Phase 5 (gepland)". De V1-hardening (auth, per-user multi-tenancy) komt nog.
 
 **Bekende valkuilen in de stack:**
 - **Tailwind v4 PostCSS-pipeline**: nieuwe properties op bestaande selectors in `app/globals.css` worden soms silent gedropt. Bypass: inline `style={{...}}` of een lokaal `<style>`-tag in het component dat de property nodig heeft.
@@ -111,6 +112,8 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 6. Widget publieke laag
 7. Hardening & Security V1 Core
 8. Polish & Go-live
+
+> **Noot (mei 2026):** Fase 5 (Website Crawler) en Fase 6 (Widget publieke laag) hebben al een **werkende V0-implementatie** in main — Firecrawl-crawler + dashboard en een embeddable widget. De fase-volgorde hieronder beschrijft de V1-bouwlijn (auth, productie-multi-tenancy, origin-allowlist), niet de V0-realiteit; die V1-hardening van deze twee fases volgt nog.
 
 Bouw geen vooruit-werk uit een latere fase. Definition of Done van vorige fase moet aantoonbaar afgevinkt zijn vóór volgende fase. Bij twijfel of iets in de huidige fase past: vraag.
 

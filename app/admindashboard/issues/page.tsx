@@ -18,6 +18,7 @@ import {
 import { ALL_ORG_SLUGS, KNOWN_ORGS, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
 import type { ErrorGroup, ErrorSeverity, ErrorStatus, ErrorSurface } from '@/lib/observability/sink';
 import { formatRelativeNL } from '@/lib/controlroom/format';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,6 +164,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
             signalen. Klik een fout voor de volledige context + “Kopieer voor Claude Code”.
           </p>
         </div>
+        <ReloadButton />
       </header>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

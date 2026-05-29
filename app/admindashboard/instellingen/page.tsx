@@ -7,6 +7,7 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill } from '@/app/klantendashboard/components/ui/pill';
 import { PRIVACY_DEFAULTS } from '@/lib/controlroom/types';
 import { MONTHLY_CONVERSATION_LIMITS } from '@/lib/controlroom/usage-limits';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,7 @@ export default function InstellingenPage() {
             keys wijzigen vereist code + versiebeheer.
           </p>
         </div>
+        <ReloadButton />
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
@@ -73,6 +75,7 @@ export default function InstellingenPage() {
           <div className="klant-section-title" style={{ marginBottom: 8 }}>Crawler &amp; omgeving</div>
           <Row label="Crawler" value="Firecrawl" />
           <Row label="Max pagina's per crawl" value="50" />
+          <Row label="Firecrawl-creditlimiet (maand)" value={Number(process.env.FIRECRAWL_MONTHLY_CREDIT_LIMIT) || 1000} />
           <Row label="Environment" value={env} />
         </Card>
 

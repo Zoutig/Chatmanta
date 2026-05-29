@@ -4,7 +4,6 @@
 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getProfile } from '@/lib/controlroom/server/profiles';
 import { getOrgSignals, type ControlRoomKlant } from '@/lib/controlroom/server/signals';
@@ -24,17 +23,26 @@ import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { TabsNav, type TabDef } from '@/app/klantendashboard/components/tabs';
 import { MetricCard } from '../../components/metric-card';
-import { CopyButton } from '../../components/copy-button';
 import { CommercialBadge, HealthBadge, TechnicalBadge } from '../../components/badges';
+import { ReloadButton } from '../../components/reload-button';
 import { ProfileEditor } from './components/profile-editor';
 import { NotesEditor } from './components/notes-editor';
 import { PrivacyForm } from './components/privacy-form';
 import { OnboardingChecklist } from './components/onboarding-checklist';
+import { SourcesManager } from './components/sources-manager';
+import { SettingsForm } from '@/app/klantendashboard/instellingen/components/settings-form';
+import { WidgetForm } from '@/app/klantendashboard/widget/components/widget-form';
+import {
+  adminSaveChatbotSettingsAction,
+  adminSaveWidgetSettingsAction,
+  adminCheckWidgetInstallationAction,
+} from '@/app/actions/controlroom';
 
 export const dynamic = 'force-dynamic';
 
 const TABS: TabDef[] = [
   { key: 'overzicht', label: 'Overzicht' },
+  { key: 'botinstellingen', label: 'Botinstellingen' },
   { key: 'gesprekken', label: 'Gesprekken' },
   { key: 'bronnen', label: 'Bronnen' },
   { key: 'jobs', label: 'Crawls & Jobs' },
@@ -65,7 +73,6 @@ function InfoItem({ label, children }: { label: string; children: React.ReactNod
 // ───────────────────────── Tabs ─────────────────────────
 
 async function OverzichtTab({ slug, klant }: { slug: OrgSlug; klant: ControlRoomKlant }) {
-  const settings = await getOrgSettings(slug).catch(() => null);
   const limit = MONTHLY_CONVERSATION_LIMITS[klant.commercialStatus];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -95,21 +102,10 @@ async function OverzichtTab({ slug, klant }: { slug: OrgSlug; klant: ControlRoom
         <ProfileEditor orgSlug={slug} profile={klant.profile} />
       </Card>
 
-      {settings ? (
-        <Card>
-          <SectionTitle>Bot-instellingen (read-only)</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <InfoItem label="Botnaam">{settings.chatbot.chatbotName || '—'}</InfoItem>
-            <InfoItem label="Tone of voice">{settings.chatbot.toneOfVoice}</InfoItem>
-            <InfoItem label="Taal">{settings.chatbot.primaryLanguage}</InfoItem>
-            <InfoItem label="Welkomstbericht">{settings.chatbot.welcomeMessage || '—'}</InfoItem>
-            <InfoItem label="Fallbackbericht">{settings.chatbot.fallbackMessage || '—'}</InfoItem>
-          </div>
-          <p className="klant-hint" style={{ marginTop: 10 }}>
-            Bewerken gebeurt in het klantendashboard van de org zelf — hier alleen ter controle.
-          </p>
-        </Card>
-      ) : null}
+      <Card>
+        <SectionTitle>Bot &amp; widget</SectionTitle>
+        <EmptyInline text="Bot- en widgetinstellingen van deze klant bewerk je in de tabs Botinstellingen en Widget." />
+      </Card>
     </div>
   );
 }
@@ -128,16 +124,26 @@ async function GesprekkenTab({ slug }: { slug: OrgSlug }) {
               <th>Berichten</th>
               <th>Status</th>
               <th>Privacy</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {convos.map((c) => (
               <tr key={c.id}>
                 <td style={{ fontSize: 12.5, color: 'var(--klant-muted)', whiteSpace: 'nowrap' }}>{formatRelativeNL(c.lastActivityAt)}</td>
-                <td style={{ fontSize: 13, maxWidth: 420 }}>{c.firstQuestion}</td>
+                <td style={{ fontSize: 13, maxWidth: 420 }}>
+                  <Link href={`/admindashboard/klanten/${slug}/gesprek/${c.id}`} style={{ color: 'var(--klant-ink)', textDecoration: 'none', fontWeight: 500 }}>
+                    {c.firstQuestion}
+                  </Link>
+                </td>
                 <td style={{ fontSize: 13 }}>{c.messageCount}</td>
                 <td><StatusBadge kind="conversation" status={c.status} /></td>
                 <td>{detectPossiblePii(c.firstQuestion) ? <Pill tone="warn" dot>Mogelijk PII</Pill> : <span style={{ color: 'var(--klant-faint)', fontSize: 12 }}>—</span>}</td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <Link href={`/admindashboard/klanten/${slug}/gesprek/${c.id}`} className="klant-btn" data-variant="ghost" style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}>
+                    Bekijk →
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -155,49 +161,13 @@ async function BronnenTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) {
   ]);
   const qa = settings?.qa ?? [];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card>
-        <SectionTitle>Websites</SectionTitle>
-        {sources.length === 0 ? (
-          <EmptyInline text="Geen website-bronnen." />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {sources.map((s) => (
-              <div key={s.source.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                <span style={{ flex: 1 }}>{s.source.host ?? s.source.rootUrl ?? '(onbekend)'}</span>
-                <span style={{ color: 'var(--klant-muted)', fontSize: 12 }}>{s.pages.filter((p) => p.status === 'active').length} pagina&apos;s</span>
-                <Pill tone={s.source.status === 'failed' ? 'danger' : s.source.status === 'ready' ? 'success' : 'info'} dot>{s.source.status}</Pill>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <SectionTitle>Documenten</SectionTitle>
-        {docs.length === 0 ? (
-          <EmptyInline text="Geen documenten." />
-        ) : (
-          <table className="klant-table">
-            <thead><tr><th>Bestand</th><th>Status</th><th>Chunks</th></tr></thead>
-            <tbody>
-              {docs.map((d) => (
-                <tr key={d.id}>
-                  <td style={{ fontSize: 13 }}>{d.filename}</td>
-                  <td><StatusBadge kind="document" status={d.status === 'ready' ? 'ready' : d.status === 'failed' ? 'error' : 'processing'} /></td>
-                  <td style={{ fontSize: 13 }}>{d.chunkCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
-
-      <Card>
-        <SectionTitle>Handmatige Q&amp;A</SectionTitle>
-        {qa.length === 0 ? <EmptyInline text="Geen handmatige Q&A." /> : <EmptyInline text={`${qa.filter((q) => q.active).length} actieve van ${qa.length} Q&A-items.`} />}
-      </Card>
-    </div>
+    <SourcesManager
+      orgSlug={slug}
+      sources={sources}
+      docs={docs}
+      qaActive={qa.filter((q) => q.active).length}
+      qaTotal={qa.length}
+    />
   );
 }
 
@@ -262,47 +232,41 @@ async function UsageTab({ klant, orgId }: { klant: ControlRoomKlant; orgId: stri
   );
 }
 
-async function WidgetTab({ slug, klant }: { slug: OrgSlug; klant: ControlRoomKlant }) {
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'www.chatmanta.nl';
-  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
-  const origin = `${proto}://${host}`;
-  const embed = `<script src="${origin}/widget.js" data-org="${slug}" defer></script>`;
+async function BotinstellingenTab({ slug }: { slug: OrgSlug }) {
   const settings = await getOrgSettings(slug).catch(() => null);
-  const w = settings?.widget;
+  if (!settings) return <Card><EmptyInline text="Kon de botinstellingen niet laden." /></Card>;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card>
-        <SectionTitle>Status</SectionTitle>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <StatusBadge kind="widget" status={klant.widgetStatus} />
-          {w?.lastSeenAt ? <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>Laatst gezien: {formatRelativeNL(w.lastSeenAt)}</span> : null}
-          {w?.installOrigin ? <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>Origin: {w.installOrigin}</span> : null}
-        </div>
-      </Card>
-      <Card>
-        <SectionTitle>Embedcode</SectionTitle>
-        <pre
-          style={{
-            background: 'var(--klant-surface-muted)',
-            border: '1px solid var(--klant-border)',
-            borderRadius: 'var(--klant-r-md)',
-            padding: 12,
-            fontSize: 12.5,
-            fontFamily: 'var(--klant-font-mono)',
-            overflowX: 'auto',
-            margin: '0 0 12px',
-          }}
-        >
-          {embed}
-        </pre>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <CopyButton text={embed} label="Kopieer embedcode" />
-          <Link href={`${origin}/embed/${slug}`} target="_blank" className="klant-btn">
-            Open widget-preview
-          </Link>
-        </div>
-      </Card>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <p className="klant-hint" style={{ margin: 0 }}>
+        Wijzigingen gelden direct voor de live bot én het klantendashboard van deze klant.
+      </p>
+      <SettingsForm
+        initial={settings.chatbot}
+        action={adminSaveChatbotSettingsAction.bind(null, slug)}
+        showReset
+      />
+    </div>
+  );
+}
+
+async function WidgetTab({ slug }: { slug: OrgSlug }) {
+  const settings = await getOrgSettings(slug).catch(() => null);
+  if (!settings) return <Card><EmptyInline text="Kon de widgetinstellingen niet laden." /></Card>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <p className="klant-hint" style={{ margin: 0 }}>
+        Embedcode, uiterlijk, live-status en toegestane domeinen — wijzigingen gelden direct voor deze klant.
+      </p>
+      <WidgetForm
+        initial={settings.widget}
+        chatbotName={settings.chatbot.chatbotName}
+        welcomeMessage={settings.chatbot.welcomeMessage}
+        orgSlug={slug}
+        action={adminSaveWidgetSettingsAction.bind(null, slug)}
+        checkAction={adminCheckWidgetInstallationAction.bind(null, slug)}
+        demoHref={`/embed/${slug}`}
+        showReset
+      />
     </div>
   );
 }
@@ -364,6 +328,7 @@ export default async function KlantDetailPage({
             <CommercialBadge status={klant.commercialStatus} />
             <TechnicalBadge status={klant.technicalStatus} />
             <HealthBadge status={klant.health} />
+            <ReloadButton />
           </>
         }
       />
@@ -382,11 +347,12 @@ export default async function KlantDetailPage({
       <TabsNav tabs={TABS} active={tab} basePath={`/admindashboard/klanten/${slug}`} />
 
       {tab === 'overzicht' && <OverzichtTab slug={slug} klant={klant} />}
+      {tab === 'botinstellingen' && <BotinstellingenTab slug={slug} />}
       {tab === 'gesprekken' && <GesprekkenTab slug={slug} />}
       {tab === 'bronnen' && <BronnenTab slug={slug} orgId={orgId} />}
       {tab === 'jobs' && <JobsTab orgId={orgId} />}
       {tab === 'usage' && <UsageTab klant={klant} orgId={orgId} />}
-      {tab === 'widget' && <WidgetTab slug={slug} klant={klant} />}
+      {tab === 'widget' && <WidgetTab slug={slug} />}
       {tab === 'onboarding' && <OnboardingTab slug={slug} orgId={orgId} />}
       {tab === 'privacy' && <PrivacyTab slug={slug} orgId={orgId} />}
       {tab === 'notities' && (
