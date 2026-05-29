@@ -72,6 +72,9 @@ type QueryLogRow = {
   rerank_ms: number | null;
   generation_ms: number | null;
   total_ms: number | null;
+  // v0 production TTFT (migration 0041). Tijd tot de eerste answer-delta.
+  // NULL voor smalltalk/fallback/cache-hit (geen streaming) en legacy rijen.
+  first_token_ms: number | null;
   phase_timings_ms: unknown | null;
   // v0.4 injection telemetry (migration 0011). False/NULL voor reguliere
   // queries; true + pattern naam voor verdachte input.
@@ -227,6 +230,9 @@ export async function logQuery(
     const rerankMs = typeof t?.rerank_ms === 'number' ? t.rerank_ms : null;
     const generationMs = typeof t?.generation_ms === 'number' ? t.generation_ms : null;
     const totalMs = typeof t?.total_ms === 'number' ? t.total_ms : null;
+    // v0 TTFT (migration 0041). rag.ts zet first_token_ms in phaseTimingsMs op
+    // de streamende antwoord-paden; smalltalk/cache-hit laten 'm undefined → null.
+    const firstTokenMs = typeof t?.first_token_ms === 'number' ? t.first_token_ms : null;
     const hydeMs = typeof t?.hyde_ms === 'number' ? t.hyde_ms : null;
     // V0.5 latency-budget telemetry: extras.latencyBudgetExceeded zit als
     // broer-veld náást phaseTimingsMs op extras. Mergen we in de jsonb mee,
@@ -290,6 +296,7 @@ export async function logQuery(
             rerank_ms: null,
             generation_ms: null,
             total_ms: null,
+            first_token_ms: null,
             phase_timings_ms: null,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
@@ -340,6 +347,7 @@ export async function logQuery(
             rerank_ms: rerankMs,
             generation_ms: generationMs,
             total_ms: totalMs,
+            first_token_ms: firstTokenMs,
             phase_timings_ms: phaseTimings,
             injection_detected: injection?.detected ?? false,
             injection_pattern: injection?.pattern ?? null,
@@ -441,6 +449,7 @@ export async function logBlockedQuery(input: {
       rerank_ms: null,
       generation_ms: null,
       total_ms: null,
+      first_token_ms: null,
       phase_timings_ms: null,
       injection_detected: true,
       injection_pattern: input.injectionPattern,

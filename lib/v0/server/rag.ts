@@ -1497,6 +1497,19 @@ export async function* runRagQueryStreaming(input: {
       timings[key] = ((timings[key] as number | undefined) ?? 0) + dt;
     };
   };
+  // V0 TTFT (time-to-first-token): tijd vanaf pipeline-start tot de eerste
+  // zichtbare answer-delta. Eén keer ge-set op het eerste content-event van een
+  // streamend antwoord-pad (main RAG + general-knowledge). Blijft null bij
+  // smalltalk/fallback/cache-hit — daar streamt geen antwoord. Wordt in de
+  // phaseTimingsMs van de antwoord-paden meegestuurd en door logQuery
+  // gepromoveerd tot de query_log.first_token_ms-kolom (was tot nu toe alleen
+  // door de eval-runner ge-set, nooit op het productiepad).
+  let firstTokenAtMs: number | null = null;
+  const markFirstToken = () => {
+    if (firstTokenAtMs === null) {
+      firstTokenAtMs = Math.round(performance.now() - tPipelineStart);
+    }
+  };
   // V0.5 latency-budgeting: bij bot.latencyBudgetEnabled wordt elke optionele
   // fase pas uitgevoerd als de cumulative elapsed onder bot.latencyBudgetMs
   // zit. Skipped fases worden gelogd in `skippedPhases` (komt mee in extras).
@@ -1960,6 +1973,8 @@ KRITISCHE FORMAT-REGELS:
         const finalAnswer = GENERAL_OPENING + core + GENERAL_CLOSING;
         // Eén delta met het volledige antwoord — geen streaming voor GENERAL,
         // maar UI-contract (answer-start → delta(s) → answer-done) blijft intact.
+        // TTFT = moment dat dit content-event verschijnt (≈ total_ms hier).
+        markFirstToken();
         yield { kind: 'answer-delta', text: finalAnswer };
         const genAccText = finalAnswer;
 
@@ -1968,6 +1983,7 @@ KRITISCHE FORMAT-REGELS:
           retrieval_ms: timings.retrieval_ms ?? 0,
           generation_ms: timings.generation_ms ?? 0,
           total_ms: Math.round(performance.now() - tPipelineStart),
+          ...(firstTokenAtMs !== null ? { first_token_ms: firstTokenAtMs } : {}),
           ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
           ...(timings.cache_lookup_ms !== undefined
             ? { cache_lookup_ms: timings.cache_lookup_ms }
@@ -2221,6 +2237,7 @@ KRITISCHE FORMAT-REGELS:
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {
+        markFirstToken();
         accText += delta;
         yield { kind: 'answer-delta', text: delta };
       }
@@ -2429,6 +2446,7 @@ KRITISCHE FORMAT-REGELS:
     retrieval_ms: timings.retrieval_ms ?? 0,
     generation_ms: timings.generation_ms ?? 0,
     total_ms: Math.round(performance.now() - tPipelineStart),
+    ...(firstTokenAtMs !== null ? { first_token_ms: firstTokenAtMs } : {}),
     ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
     ...(timings.cache_lookup_ms !== undefined
       ? { cache_lookup_ms: timings.cache_lookup_ms }

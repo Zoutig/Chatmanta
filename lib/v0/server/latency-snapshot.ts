@@ -38,6 +38,11 @@ export type LatencyAggregate = {
   p50TotalMs: number | null;
   p95TotalMs: number | null;
   p99TotalMs: number | null;
+  // TTFT (time-to-first-token, migration 0041). Alléén gevuld op streamende
+  // antwoord-paden — cache-hit/smalltalk/fallback hebben NULL en vallen
+  // automatisch buiten deze percentielen (cache-miss worst case = wat we tunen).
+  p50FirstTokenMs: number | null;
+  p95FirstTokenMs: number | null;
   p50EmbeddingMs: number | null;
   p95EmbeddingMs: number | null;
   p50RetrievalMs: number | null;
@@ -87,6 +92,7 @@ function aggregateFromRows(
     rerank_ms: number | null;
     generation_ms: number | null;
     total_ms: number | null;
+    first_token_ms: number | null;
   }>,
 ): LatencyAggregate[] {
   const byVersion = new Map<string, typeof rows>();
@@ -115,12 +121,18 @@ function aggregateFromRows(
       .map((r) => r.generation_ms)
       .filter((n): n is number => n !== null)
       .sort((a, b) => a - b);
+    const ftt = vRows
+      .map((r) => r.first_token_ms)
+      .filter((n): n is number => n !== null)
+      .sort((a, b) => a - b);
     out.push({
       botVersion: version,
       n: vRows.length,
       p50TotalMs: percentile(totals, 0.5),
       p95TotalMs: percentile(totals, 0.95),
       p99TotalMs: percentile(totals, 0.99),
+      p50FirstTokenMs: percentile(ftt, 0.5),
+      p95FirstTokenMs: percentile(ftt, 0.95),
       p50EmbeddingMs: percentile(embed, 0.5),
       p95EmbeddingMs: percentile(embed, 0.95),
       p50RetrievalMs: percentile(retr, 0.5),
@@ -154,7 +166,9 @@ export async function getLatencySnapshot(
   const aggPromise = (async (): Promise<LatencyAggregate[]> => {
     let q = client
       .from('query_log')
-      .select('bot_version, embedding_ms, retrieval_ms, rerank_ms, generation_ms, total_ms')
+      .select(
+        'bot_version, embedding_ms, retrieval_ms, rerank_ms, generation_ms, total_ms, first_token_ms',
+      )
       .eq('organization_id', organizationId)
       .not('total_ms', 'is', null);
     if (since) q = q.gte('created_at', since);
@@ -168,6 +182,7 @@ export async function getLatencySnapshot(
         rerank_ms: r.rerank_ms as number | null,
         generation_ms: r.generation_ms as number | null,
         total_ms: r.total_ms as number | null,
+        first_token_ms: r.first_token_ms as number | null,
       })),
     );
   })();
