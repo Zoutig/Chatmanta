@@ -7,7 +7,7 @@
 
 import { Fragment, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, Play, RefreshCw, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, Play, RefreshCw, RotateCcw } from 'lucide-react';
 import { adminProcessOpenCrawlsAction, adminRerunCrawlAction } from '@/app/actions/admin-crawl';
 
 type EventRow = {
@@ -130,7 +130,8 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <button type="button" className="klant-btn" data-variant="primary" disabled={pending}
-          onClick={() => run('process', () => adminProcessOpenCrawlsAction())} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          onClick={() => run('process', () => adminProcessOpenCrawlsAction())} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          title="Peilt alle nog lopende crawls (status: in afwachting of bezig) bij Firecrawl. Afgeronde crawls worden opgehaald en aan de kennisbank toegevoegd; vastgelopen crawls worden als mislukt gemarkeerd. Voltooide en mislukte crawls blijven ongemoeid — er wordt geen nieuwe crawl gestart.">
           <Play size={14} strokeWidth={1.8} style={busy === 'process' ? { animation: 'org-spin 0.9s linear infinite' } : undefined} />
           {busy === 'process' ? 'Verwerken…' : 'Verwerk openstaande crawls'}
         </button>
@@ -150,6 +151,14 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
         </select>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Zoek bron/url…" style={{ ...selectStyle, minWidth: 160 }} aria-label="Zoek bron of url" />
       </div>
+
+      {/* Uitleg bij de actieknop (taak 4) */}
+      <p className="klant-hint" style={{ margin: 0, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <Info size={13} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          <strong>Verwerk openstaande crawls</strong> peilt elke crawl die nog loopt (status <em>in afwachting</em> of <em>bezig</em>) bij Firecrawl: afgeronde crawls worden opgehaald en aan de kennisbank toegevoegd, en crawls die te lang stilstaan worden als mislukt gemarkeerd. Voltooide en mislukte crawls blijven ongemoeid en er wordt géén nieuwe crawl gestart (dus geen extra Firecrawl-credits). Normaal verwerkt de cron dit automatisch — deze knop forceert het nu meteen.
+        </span>
+      </p>
 
       {filtered.length === 0 ? (
         <div className="klant-empty">
@@ -246,7 +255,7 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
 
       <p className="klant-hint" style={{ margin: 0 }}>
         <RefreshCw size={12} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} />
-        Crawl-fouten en fallbacks staan hier (niet onder Issues). &quot;Verwerk openstaande crawls&quot; pollt Firecrawl en ingest afgeronde crawls; &quot;Opnieuw proberen&quot; start een verse crawl (kost Firecrawl-credits).
+        Crawl-fouten en fallbacks staan hier (niet onder Issues). &quot;Opnieuw proberen&quot; start een verse crawl en kost Firecrawl-credits.
       </p>
     </div>
   );
