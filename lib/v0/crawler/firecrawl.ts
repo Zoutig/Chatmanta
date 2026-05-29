@@ -70,6 +70,74 @@ function getClient(): Firecrawl {
   return client;
 }
 
+export type FirecrawlAccountUsage = {
+  remainingCredits: number;
+  planCredits: number | null;
+  /** Verbruik in de huidige kalendermaand (uit het historiek-endpoint), of null. */
+  usedThisPeriod: number | null;
+  billingPeriodStart: string | null;
+  billingPeriodEnd: string | null;
+};
+
+/** Reject na `ms` i.p.v. eeuwig hangen op een trage API-call. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('firecrawl-timeout')), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+/**
+ * Live credit-verbruik van het Firecrawl-account (read-only — het uitlezen kost
+ * géén credits). Bron-van-waarheid voor het overview-creditcijfer.
+ *
+ * "Verbruikt deze maand" komt uit het historiek-endpoint (per kalendermaand een
+ * `creditsUsed`), NIET uit `plan − remaining`: dat laatste klopt niet zodra er
+ * top-up/coupon-credits zijn — remaining kan dan plan overschrijden (bij dit account
+ * is remaining 1104 op een plan van 1000). Faalt safe (null) als de key ontbreekt of
+ * de API traag/onbereikbaar is, zodat de afgeleide schatting kan invallen.
+ */
+export async function getFirecrawlAccountUsage(
+  timeoutMs = 5000,
+): Promise<FirecrawlAccountUsage | null> {
+  try {
+    const client = getClient();
+    const [usage, historical] = await Promise.all([
+      withTimeout(client.getCreditUsage(), timeoutMs),
+      withTimeout(client.getCreditUsageHistorical(), timeoutMs).catch(() => null),
+    ]);
+
+    // Huidige kalendermaand-periode → creditsUsed = verbruikt deze maand.
+    let usedThisPeriod: number | null = null;
+    const periods = historical?.periods ?? [];
+    if (periods.length > 0) {
+      const now = Date.now();
+      const current =
+        periods.find((p) => {
+          const s = p.startDate ? new Date(p.startDate).getTime() : null;
+          const e = p.endDate ? new Date(p.endDate).getTime() : null;
+          return s != null && e != null && now >= s && now < e;
+        }) ?? periods[periods.length - 1];
+      if (current && typeof current.creditsUsed === 'number') {
+        usedThisPeriod = Math.max(0, current.creditsUsed);
+      }
+    }
+
+    return {
+      remainingCredits: usage.remainingCredits,
+      planCredits: usage.planCredits ?? null,
+      usedThisPeriod,
+      billingPeriodStart: usage.billingPeriodStart ?? null,
+      billingPeriodEnd: usage.billingPeriodEnd ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Normaliseert één Firecrawl Document naar onze CrawledPage-shape. */
 function toCrawledPage(doc: FirecrawlDocument): CrawledPage {
   const meta = doc.metadata ?? {};
