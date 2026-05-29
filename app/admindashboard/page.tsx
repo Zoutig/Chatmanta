@@ -110,7 +110,11 @@ export default async function ControlRoomOverviewPage() {
         <MetricCard
           label="Firecrawl-credits"
           value={`${credits.used} / ${credits.limit}`}
-          sub={`${credits.pct}% deze maand`}
+          sub={
+            credits.source === 'firecrawl'
+              ? `${credits.pct}% • live${credits.remaining != null ? ` · ${credits.remaining} resterend` : ''}`
+              : `${credits.pct}% • schatting (logs)`
+          }
           tone={credits.tone}
         />
       </div>
