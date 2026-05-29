@@ -11,6 +11,7 @@ import {
   Pause,
   Play,
   RefreshCw,
+  RotateCcw,
   Upload,
   X,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { BubblePreview, MarkPreview } from '../../components/widget-logo';
 import { saveWidgetSettingsAction, checkWidgetInstallationAction } from '../../actions';
 import { parseAllowedOrigins } from '@/lib/widget/origin-allowlist';
 import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
+import type { ActionResult } from '@/lib/errors/action';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { PresetColorPicker } from './preset-color-picker';
 
@@ -28,18 +30,42 @@ const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+
 
 type Section = 'install' | 'design' | 'preview' | 'status';
 
+// Save-/check-actions: standaard de cookie-gebonden klantendashboard-actions;
+// het admin-dashboard injecteert varianten die op de route-param-org werken.
+type SaveWidgetAction = (
+  patch: Partial<WidgetSettings>,
+) => Promise<ActionResult<{ widget: WidgetSettings }>>;
+type CheckWidgetAction = () => Promise<
+  ActionResult<{
+    isInstalled: boolean;
+    lastSeenAt: string | null;
+    installOrigin: string | null;
+    lastCheckedAt: string;
+  }>
+>;
+
 export function WidgetForm({
   initial,
   chatbotName,
   welcomeMessage,
   orgSlug,
+  action = saveWidgetSettingsAction,
+  checkAction = checkWidgetInstallationAction,
+  demoHref = '/widget',
+  showReset = false,
 }: {
   initial: WidgetSettings;
   chatbotName: string;
   welcomeMessage: string;
   orgSlug: string;
+  action?: SaveWidgetAction;
+  checkAction?: CheckWidgetAction;
+  demoHref?: string;
+  showReset?: boolean;
 }) {
   const [w, setW] = useState<WidgetSettings>(initial);
+  // baseline = laatst opgeslagen staat; "Terugzetten" herstelt de uiterlijk-velden hiernaartoe.
+  const [baseline, setBaseline] = useState<WidgetSettings>(initial);
   const [openSection, setOpenSection] = useState<Section>('install');
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -82,9 +108,10 @@ export function WidgetForm({
     setSaved(false);
     setError(null);
     startTransition(async () => {
-      const res = await saveWidgetSettingsAction(patch);
+      const res = await action(patch);
       if (res.ok) {
         setW(res.widget);
+        setBaseline(res.widget);
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       } else {
@@ -547,6 +574,22 @@ export function WidgetForm({
               <Check size={14} /> Opgeslagen
             </span>
           )}
+          {showReset && (
+            <button
+              type="button"
+              onClick={() => {
+                setW(baseline);
+                setOriginsDraft((baseline.allowedOrigins ?? []).join('\n'));
+                setSaved(false);
+                setError(null);
+              }}
+              className="klant-btn"
+              data-variant="ghost"
+              disabled={pending}
+            >
+              <RotateCcw size={14} strokeWidth={1.8} /> Terugzetten
+            </button>
+          )}
           <button
             type="button"
             onClick={save}
@@ -632,7 +675,7 @@ export function WidgetForm({
             type="button"
             onClick={() =>
               startTransition(async () => {
-                const res = await checkWidgetInstallationAction();
+                const res = await checkAction();
                 if (res.ok) {
                   setW((prev) => ({
                     ...prev,
@@ -652,7 +695,7 @@ export function WidgetForm({
             <RefreshCw size={14} strokeWidth={1.8} /> Installatie testen
           </button>
           <a
-            href="/widget"
+            href={demoHref}
             target="_blank"
             rel="noopener noreferrer"
             className="klant-btn"

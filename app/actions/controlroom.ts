@@ -13,10 +13,16 @@ import { revalidatePath } from 'next/cache';
 import {
   KNOWN_ORGS,
   resolveOrgIdFromSlug,
+  type OrgSlug,
 } from '@/lib/v0/server/active-org';
 import { upsertProfile } from '@/lib/controlroom/server/profiles';
 import { updateOnboardingItem } from '@/lib/controlroom/server/onboarding';
 import { upsertPrivacy } from '@/lib/controlroom/server/privacy';
+import {
+  saveChatbotSettings,
+  saveWidgetSettings,
+  getOrgSettings,
+} from '@/lib/v0/klantendashboard/server/settings';
 import type {
   AdminOrgProfile,
   AdminOrgProfilePatch,
@@ -25,6 +31,7 @@ import type {
   PrivacySettings,
   PrivacySettingsPatch,
 } from '@/lib/controlroom/types';
+import type { ChatbotSettings, WidgetSettings } from '@/lib/v0/klantendashboard/types';
 import { requireV0Auth } from './_auth';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 
@@ -83,5 +90,75 @@ export async function updatePrivacyAction(
     const privacy = await upsertPrivacy(orgId, patch);
     revalidate(orgSlug);
     return { privacy };
+  });
+}
+
+// ───────────────────────── Bot- + widgetinstellingen (taak 1) ─────────────
+// Admin bewerkt de bot/widget-config van een klant via de route-param-org i.p.v.
+// de active-org cookie. We hergebruiken de bestaande save-backends (die nemen de
+// orgSlug al expliciet) en revalideren naast /admindashboard óók /klantendashboard
+// + /widget, zodat het klantendashboard van de org én de live widget/demo de
+// wijziging meteen tonen. requireKnownOrgId valideert de slug vóór elke write.
+
+const WIDGET_INSTALL_FRESHNESS_SEC = Number(process.env.WIDGET_INSTALL_FRESHNESS_SEC) || 604800;
+
+export async function adminSaveChatbotSettingsAction(
+  orgSlug: string,
+  patch: Partial<ChatbotSettings>,
+): Promise<ActionResult<{ chatbot: ChatbotSettings }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    const chatbot = await saveChatbotSettings(orgSlug as OrgSlug, patch);
+    revalidate(orgSlug);
+    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/widget', 'layout');
+    return { chatbot };
+  });
+}
+
+export async function adminSaveWidgetSettingsAction(
+  orgSlug: string,
+  patch: Partial<WidgetSettings>,
+): Promise<ActionResult<{ widget: WidgetSettings }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    const widget = await saveWidgetSettings(orgSlug as OrgSlug, patch);
+    revalidate(orgSlug);
+    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/widget', 'layout');
+    return { widget };
+  });
+}
+
+export async function adminCheckWidgetInstallationAction(
+  orgSlug: string,
+): Promise<
+  ActionResult<{
+    isInstalled: boolean;
+    lastSeenAt: string | null;
+    installOrigin: string | null;
+    lastCheckedAt: string;
+  }>
+> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    const slug = orgSlug as OrgSlug;
+    const settings = await getOrgSettings(slug);
+    const w = settings.widget;
+    const seenMs = w.lastSeenAt ? Date.parse(w.lastSeenAt) : NaN;
+    const installed =
+      Number.isFinite(seenMs) && Date.now() - seenMs < WIDGET_INSTALL_FRESHNESS_SEC * 1000;
+    const lastCheckedAt = new Date().toISOString();
+    await saveWidgetSettings(slug, { isInstalled: installed, lastCheckedAt });
+    revalidate(orgSlug);
+    return {
+      isInstalled: installed,
+      lastSeenAt: w.lastSeenAt,
+      installOrigin: w.installOrigin,
+      lastCheckedAt,
+    };
   });
 }

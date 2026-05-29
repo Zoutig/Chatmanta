@@ -16,7 +16,7 @@ const NAV = [
   '/admindashboard/instellingen',
 ];
 
-const DETAIL_TABS = ['gesprekken', 'bronnen', 'jobs', 'usage', 'widget', 'onboarding', 'privacy', 'notities'];
+const DETAIL_TABS = ['botinstellingen', 'gesprekken', 'bronnen', 'jobs', 'usage', 'widget', 'onboarding', 'privacy', 'notities'];
 
 test.describe('Admin Dashboard', () => {
   test('overview rendert met kaarten', async ({ page }) => {
@@ -81,6 +81,25 @@ test.describe('Admin Dashboard', () => {
   test('gesprek-detail: onbekend gesprek → not-found', async ({ page }) => {
     await page.goto('/admindashboard/klanten/acme-corp/gesprek/00000000-0000-0000-0000-000000000000');
     await expect(page.getByRole('heading', { name: 'Gesprek' })).toHaveCount(0);
+  });
+
+  test('botinstellingen: opslaan persisteert via de bound admin-action', async ({ page }) => {
+    await page.goto('/admindashboard/klanten/globex-inc?tab=botinstellingen');
+    const toggle = page.getByRole('button', { name: 'Mag chatbot prijzen noemen?' });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    const before = await toggle.getAttribute('aria-pressed');
+    await toggle.click();
+    await page.getByRole('button', { name: /Instellingen opslaan/ }).click();
+    await expect(page.getByText('Opgeslagen').first()).toBeVisible({ timeout: 15_000 });
+    await page.reload();
+    const after = await page
+      .getByRole('button', { name: 'Mag chatbot prijzen noemen?' })
+      .getAttribute('aria-pressed');
+    expect(after).not.toBe(before);
+    // herstel naar de oorspronkelijke waarde zodat de demo-seed intact blijft
+    await page.getByRole('button', { name: 'Mag chatbot prijzen noemen?' }).click();
+    await page.getByRole('button', { name: /Instellingen opslaan/ }).click();
+    await expect(page.getByText('Opgeslagen').first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('profiel-edit persisteert', async ({ page }) => {
