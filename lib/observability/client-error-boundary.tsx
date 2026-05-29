@@ -14,6 +14,9 @@ type Props = {
   surface: 'widget' | 'dashboard';
   fallback?: ReactNode;
   children: ReactNode;
+  /** Widget: doorgegeven zodat een render-crash met embed-token kan rapporteren. */
+  orgSlug?: string;
+  embedToken?: string;
 };
 
 type State = { hasError: boolean };
@@ -31,6 +34,8 @@ export class ClientErrorBoundary extends Component<Props, State> {
       message: error.message || 'render error',
       stack: error.stack ?? info.componentStack ?? undefined,
       code: 'CLIENT_JS',
+      orgSlug: this.props.orgSlug,
+      embedToken: this.props.embedToken,
     });
   }
 

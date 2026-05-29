@@ -123,10 +123,11 @@ export async function runRetentionCleanup(
 // ── Issues-tab: prune van admin_error_groups ───────────────────────────────
 // Eén globale pass (default issue_retention_days). Bewust GEEN per-org loop:
 // veel fout-groepen hebben organization_id NULL (server-action-fouten,
-// system/cron) waar geen per-org setting bij hoort. Verwijderd worden: groepen
-// ouder dan de cutoff die NIET meer 'open' zijn (resolved/ignored) OF severity
-// 'info' (routine-ruis). Open error/warning blijven staan — die vragen aandacht.
-// Fingerprint-grouping begrenst het volume al sterk, dus dit is licht.
+// system/cron) waar geen per-org setting bij hoort. Verwijderd worden: AFGEHANDELDE
+// groepen (resolved/ignored) ouder dan de cutoff. OPEN groepen blijven staan — ook
+// open 'info' (een actief-terugkerend abuse-patroon zoals INJECTION_BLOCKED/
+// AUTH_REQUIRED mag niet stilletjes verdwijnen); hun aantal is al begrensd door de
+// fingerprint-grouping + cardinaliteits-cap. (Review round 1.)
 
 export type ErrorRetentionResult = {
   retentionDays: number;
@@ -141,16 +142,15 @@ export async function runErrorGroupRetention(
   const apply = opts.apply === true;
   const retentionDays = PRIVACY_DEFAULTS.issueRetentionDays;
   const cutoff = cutoffIso(retentionDays);
-  const eligible = 'status.neq.open,severity.eq.info';
 
   const { count } = await sb()
     .from('admin_error_groups')
     .select('id', { count: 'exact', head: true })
     .lt('last_seen_at', cutoff)
-    .or(eligible);
+    .neq('status', 'open');
 
   if (apply) {
-    await sb().from('admin_error_groups').delete().lt('last_seen_at', cutoff).or(eligible);
+    await sb().from('admin_error_groups').delete().lt('last_seen_at', cutoff).neq('status', 'open');
   }
 
   return { retentionDays, cutoffIso: cutoff, candidates: count ?? 0, applied: apply };

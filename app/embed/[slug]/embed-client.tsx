@@ -21,11 +21,12 @@ export function EmbedClient(props: Props) {
     }).catch(() => {
       // best-effort
     });
-  }, [props.embedToken]);
+  }, [props.embedToken, props.orgSlug]);
 
   // Vang niet-React widget-crashes (event-handlers, async, promise-rejections);
   // render-fouten worden door de ClientErrorBoundary hieronder gevangen.
   useEffect(() => {
+    const trust = { orgSlug: props.orgSlug, embedToken: props.embedToken } as const;
     const onError = (e: ErrorEvent) =>
       reportClientError({
         surface: 'widget',
@@ -33,6 +34,7 @@ export function EmbedClient(props: Props) {
         stack: e.error instanceof Error ? e.error.stack : undefined,
         url: e.filename || undefined,
         code: 'CLIENT_JS',
+        ...trust,
       });
     const onRejection = (e: PromiseRejectionEvent) => {
       const r: unknown = e.reason;
@@ -41,6 +43,7 @@ export function EmbedClient(props: Props) {
         message: r instanceof Error ? r.message : String(r ?? 'unhandled rejection'),
         stack: r instanceof Error ? r.stack : undefined,
         code: 'CLIENT_JS',
+        ...trust,
       });
     };
     window.addEventListener('error', onError);
@@ -49,10 +52,10 @@ export function EmbedClient(props: Props) {
       window.removeEventListener('error', onError);
       window.removeEventListener('unhandledrejection', onRejection);
     };
-  }, []);
+  }, [props.embedToken, props.orgSlug]);
 
   return (
-    <ClientErrorBoundary surface="widget">
+    <ClientErrorBoundary surface="widget" orgSlug={props.orgSlug} embedToken={props.embedToken}>
       <ChatMantaWidget {...props} embedded parentOrigin="*" />
     </ClientErrorBoundary>
   );

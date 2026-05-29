@@ -10,6 +10,10 @@ export type ClientErrorReport = {
   url?: string;
   code?: string;
   digest?: string;
+  /** Widget-trust: origin-locked embed-token + org-slug (in de body — sendBeacon
+   *  kan geen custom headers zetten). Zonder dit → server tagt het als info/null-org. */
+  orgSlug?: string;
+  embedToken?: string;
 };
 
 const ENDPOINT = '/api/v0/client-error';
@@ -25,6 +29,8 @@ export function reportClientError(report: ClientErrorReport): void {
       code: report.code,
       digest: report.digest,
       userAgent: navigator?.userAgent,
+      orgSlug: report.orgSlug,
+      embedToken: report.embedToken,
     });
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
       navigator.sendBeacon(ENDPOINT, new Blob([payload], { type: 'application/json' }));

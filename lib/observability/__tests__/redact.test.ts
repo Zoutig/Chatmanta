@@ -19,3 +19,11 @@ test('redactPii-output triggert de pii-detector niet meer (geen drift t.o.v. pii
     assert.equal(detectPossiblePii(redactPii(s)), false, `nog steeds PII na redactie: "${s}"`);
   }
 });
+
+test('redactPii maskeert PII in een stack-/breadcrumb-achtige string (review r1)', () => {
+  const stack = 'Error: mail jan@firma.nl mislukt\n    at handleClick (widget-shell.tsx:42:13)';
+  const out = redactPii(stack);
+  assert.doesNotMatch(out, /jan@firma\.nl/);
+  assert.match(out, /\[email\]/);
+  assert.match(out, /at handleClick/); // niet-PII blijft staan
+});

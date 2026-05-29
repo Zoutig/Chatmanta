@@ -54,8 +54,10 @@ type Row = {
 function buildRow(input: CaptureInput): Row {
   const err = input.error;
   const rawStack = err instanceof Error ? err.stack : input.context?.stack;
-  const stack = rawStack ? rawStack.slice(0, STACK_CAP) : undefined;
-  const topFrame = input.context?.topFrame ?? topFrameOf(rawStack);
+  // PII-redactie vóór opslag: een Error.stack begint met de message-regel, dus
+  // stack/topFrame/breadcrumbs kunnen óók PII bevatten (review round 1, HIGH).
+  const stack = rawStack ? redactPii(rawStack).slice(0, STACK_CAP) : undefined;
+  const topFrame = redactPii(input.context?.topFrame ?? topFrameOf(rawStack)) || undefined;
   const rawMessage = input.message ?? (err instanceof Error ? err.message : undefined);
   const message = rawMessage ? redactPii(rawMessage).slice(0, MESSAGE_CAP) : null;
   const severity: ErrorSeverity = input.severity ?? severityForCode(input.code);
@@ -64,7 +66,8 @@ function buildRow(input: CaptureInput): Row {
   // Server-side redactie aan deze trust-boundary (AVG, beslissing #4).
   const context: ErrorContext = { ...input.context };
   context.stack = stack;
-  context.topFrame = topFrame || undefined;
+  context.topFrame = topFrame;
+  context.breadcrumbs = input.context?.breadcrumbs?.map((b) => redactPii(b));
   context.commit = context.commit ?? commitSha();
   context.env = context.env ?? process.env.NODE_ENV;
   const rawInput = input.inputRaw ?? context.inputRedacted;
@@ -90,17 +93,30 @@ async function doCapture(input: CaptureInput): Promise<void> {
   // unieke stacks zou anders de tabel vullen. Boven de cap → één overflow-bucket
   // per surface (count++ blijft de volume-indicator).
   if (input.enforceCap) {
-    const res = await sb()
+    const open = await sb()
       .from('admin_error_groups')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'open');
-    if ((res.count ?? 0) >= CARDINALITY_CAP) {
-      row = {
-        ...row,
-        code: 'OVERFLOW',
-        title: `Overflow-bucket (cardinaliteits-cap ${CARDINALITY_CAP} bereikt)`,
-        fingerprint: computeFingerprint({ surface: input.surface, code: 'OVERFLOW', organizationId: null }),
-      };
+    if ((open.count ?? 0) >= CARDINALITY_CAP) {
+      // Alleen NIEUWE fingerprints naar de overflow-bucket; al-bestaande groepen
+      // blijven gewoon optellen (anders stopt een lopende fout met tellen en
+      // wordt hij prune-eligible). Review round 1.
+      const existing = await sb()
+        .from('admin_error_groups')
+        .select('id', { count: 'exact', head: true })
+        .eq('fingerprint', row.fingerprint);
+      if ((existing.count ?? 0) === 0) {
+        // Neutrale per-surface volume-bucket — geen org/severity-attributie.
+        row = {
+          ...row,
+          code: 'OVERFLOW',
+          severity: 'info',
+          orgId: null,
+          message: null,
+          title: `Overflow-bucket (cardinaliteits-cap ${CARDINALITY_CAP} bereikt)`,
+          fingerprint: computeFingerprint({ surface: input.surface, code: 'OVERFLOW', organizationId: null }),
+        };
+      }
     }
   }
 
