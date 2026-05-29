@@ -20,8 +20,20 @@ import { revalidatePath } from 'next/cache';
 import { KNOWN_ORGS, resolveOrgIdFromSlug } from '@/lib/v0/server/active-org';
 import { getSystemJobClient } from '@/lib/supabase/admin';
 import { ingestText, deleteDoc } from '@/lib/v0/server/rag';
+import { mapSite, startBatchScrape, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v0/crawler/firecrawl';
+import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
+import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
+import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { requireV0Auth } from './_auth';
+
+/** Houd alleen publieke, SSRF-veilige http(s)-URLs over (parallel gevalideerd). */
+async function filterPublicUrls(urls: string[]): Promise<string[]> {
+  const checks = await Promise.all(
+    urls.map(async (u) => ((await validateCrawlUrl(u)).allowed ? u : null)),
+  );
+  return checks.filter((u): u is string => u !== null);
+}
 
 /** Valideer de org-slug tegen KNOWN_ORGS en geef de stabiele UUID terug. */
 function requireKnownOrgId(slug: string): string {
@@ -145,5 +157,129 @@ export async function adminDeleteDocAction(orgSlug: string, docId: string): Prom
     await deleteDoc(docId, orgId);
     revalidate(orgSlug);
     return {};
+  });
+}
+
+// ───────────────────────── Crawl & Jobs (taak 5) ──────────────────────────
+
+/** Valideer dat een org-UUID bij een bekende V0-org hoort (defense-in-depth). */
+function assertKnownOrgId(orgId: string) {
+  const known = Object.values(KNOWN_ORGS).some((o) => o.id === orgId);
+  if (!known) fail('NOT_FOUND', `unknown organization_id: ${orgId}`);
+}
+
+/**
+ * Herstart een gefaalde/oude crawl-job. Hergebruikt de bestaande pagina-URLs van
+ * de bron (of ontdekt opnieuw via de root als er nog geen pagina's zijn) en zet een
+ * verse batch-scrape + processing_job op. Ingest gebeurt daarna via "Verwerk
+ * openstaande crawls" of de cron-pinger. BETAALDE Firecrawl-call — bewust admin-actie.
+ */
+export async function adminRerunCrawlAction(jobId: string): Promise<ActionResult> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const sb = await getSystemJobClient({ reason: 'admin_rerun_crawl' });
+    const { data: job } = await sb
+      .from('processing_jobs')
+      .select('organization_id, target_id')
+      .eq('id', jobId)
+      .eq('job_type', 'crawl_website')
+      .maybeSingle();
+    if (!job) fail('NOT_FOUND', 'Job niet gevonden.');
+    const orgId = job.organization_id as string;
+    assertKnownOrgId(orgId);
+    const sourceId = job.target_id as string;
+
+    const { data: src } = await sb
+      .from('knowledge_sources')
+      .select('root_url, normalized_host')
+      .eq('id', sourceId)
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!src) fail('NOT_FOUND', 'Bron niet gevonden of verwijderd.');
+    const root =
+      (src.root_url as string | null) ??
+      (src.normalized_host ? `https://${src.normalized_host as string}` : null);
+
+    // URLs: bestaande pagina's hergebruiken; anders opnieuw ontdekken via de root.
+    const { data: pages } = await sb
+      .from('website_pages')
+      .select('url')
+      .eq('knowledge_source_id', sourceId)
+      .eq('organization_id', orgId)
+      .is('deleted_at', null);
+    let urls = (pages ?? []).map((p) => p.url as string);
+    if (urls.length === 0) {
+      if (!root) fail('CRAWL_FAILED', 'Geen pagina-URLs en geen root-URL om opnieuw te crawlen.');
+      const rootCheck = await validateCrawlUrl(root);
+      if (!rootCheck.allowed) fail('CRAWL_FAILED', rootCheck.reason);
+      urls = [root, ...(await mapSite(root, MAX_DISCOVER_PAGES))];
+    }
+    const safe = (await filterPublicUrls(urls)).slice(0, MAX_CRAWL_PAGES);
+    if (safe.length === 0) fail('CRAWL_FAILED', 'Geen geldige pagina’s om te crawlen.');
+
+    const now = new Date().toISOString();
+    await sb.from('knowledge_sources').update({ status: 'crawling', updated_at: now }).eq('id', sourceId).eq('organization_id', orgId);
+
+    let crawlId: string;
+    let invalidURLs: string[] = [];
+    try {
+      ({ crawlId, invalidURLs } = await startBatchScrape(safe));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
+      await sb.from('knowledge_sources').update({ status: 'failed' }).eq('id', sourceId).eq('organization_id', orgId);
+      await recordCrawlEvent(sb, {
+        organizationId: orgId, eventType: 'fail', knowledgeSourceId: sourceId,
+        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length, rerun: true },
+      });
+      fail('CRAWL_FAILED', msg);
+    }
+
+    const { data: newJob, error: jobErr } = await sb
+      .from('processing_jobs')
+      .insert({
+        organization_id: orgId, job_type: 'crawl_website', target_type: 'knowledge_source',
+        target_id: sourceId, status: 'pending', external_job_id: crawlId, started_at: now,
+      })
+      .select('id')
+      .single();
+    if (jobErr) throw new Error(`processing_jobs insert: ${jobErr.message}`);
+
+    await recordCrawlEvent(sb, {
+      organizationId: orgId, eventType: 'start', processingJobId: newJob.id as string,
+      knowledgeSourceId: sourceId, externalJobId: crawlId,
+      message: `Opnieuw gestart via admin voor ${safe.length} pagina's${invalidURLs.length ? `, ${invalidURLs.length} geweigerd door Firecrawl` : ''}.`,
+      payload: { requestedUrls: safe.length, rerun: true },
+    });
+
+    revalidatePath('/admindashboard', 'layout');
+    return {};
+  });
+}
+
+/**
+ * Verwerk openstaande crawl-jobs (cross-org) — dezelfde motor als de cron, maar
+ * admin-getriggerd. Pollt Firecrawl + ingest afgeronde crawls. Geeft het aantal
+ * verwerkte jobs terug.
+ */
+export async function adminProcessOpenCrawlsAction(): Promise<ActionResult<{ processed: number }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const sb = await getSystemJobClient({ reason: 'admin_process_open_crawls' });
+    const { data: jobs, error } = await sb
+      .from('processing_jobs')
+      .select('id, organization_id, target_id, external_job_id, attempts')
+      .eq('job_type', 'crawl_website')
+      .in('status', ['pending', 'processing'])
+      .order('created_at', { ascending: true })
+      .limit(JOBS_PER_TICK);
+    if (error) throw error;
+    let processed = 0;
+    if (jobs && jobs.length > 0) {
+      const summary = await processCrawlJobs(sb, jobs as OpenJob[]);
+      processed = summary.length;
+    }
+    revalidatePath('/admindashboard', 'layout');
+    return { processed };
   });
 }

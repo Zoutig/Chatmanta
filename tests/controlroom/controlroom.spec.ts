@@ -121,6 +121,15 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: 'Inactief zetten' }).first()).toBeVisible({ timeout: 15_000 });
   });
 
+  test('crawl & jobs: operationeel overzicht rendert', async ({ page }) => {
+    await page.goto('/admindashboard/jobs');
+    await expect(page.getByRole('heading', { name: 'Crawls & Jobs' })).toBeVisible({ timeout: 15_000 });
+    // De operator-knop om openstaande crawls te verwerken hoort er te zijn.
+    await expect(page.getByRole('button', { name: /Verwerk openstaande crawls/ })).toBeVisible();
+    // Rollup-metric aanwezig.
+    await expect(page.getByText('Slagingspercentage').first()).toBeVisible();
+  });
+
   test('profiel-edit persisteert', async ({ page }) => {
     await page.goto('/admindashboard/klanten/globex-inc');
     const sel = page.locator('select').first(); // commerciële status

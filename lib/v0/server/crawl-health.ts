@@ -43,6 +43,19 @@ export const CATEGORY_LABEL: Record<CrawlHealthCategory, string> = {
   failed: 'Mislukt',
 };
 
+/** Aanbevolen actie per eindcategorie — voedt de "wat nu?"-kolom in het admin-overzicht. */
+export const RECOMMENDED_FIX: Record<CrawlHealthCategory, string> = {
+  success: 'Geen actie nodig.',
+  running: 'Crawl loopt nog — verwerk de openstaande jobs of wacht op de volgende poll.',
+  'rate-limited': 'Firecrawl rate-limit. Wacht even en verwerk opnieuw; meestal lost het zich vanzelf op.',
+  timeout: 'Crawl te groot/traag. Probeer opnieuw met minder pagina’s of splits de site.',
+  'firecrawl-failed': 'Firecrawl gaf een fout. Check of de site bereikbaar is (geen login/robots-block) en probeer opnieuw.',
+  'start-failed': 'Crawl kon niet starten — controleer de URL (publiek, geldig schema) en probeer opnieuw.',
+  'no-crawl-id': 'Firecrawl gaf geen job-ID terug. Probeer de crawl opnieuw te starten.',
+  exception: 'Onverwachte fout in de verwerker. Bekijk de events; probeer opnieuw of meld het.',
+  failed: 'Crawl mislukt zonder specifieke reden. Bekijk de events en probeer opnieuw.',
+};
+
 /** Leesbare labels voor de per-poll beslissingen in de drill-in-tabel. */
 export const DECISION_LABEL: Record<string, string> = {
   'start-failed': 'Starten mislukt',
@@ -90,6 +103,7 @@ export type CrawlHealthEvent = {
   total: number | null;
   dataCount: number | null;
   hasNext: boolean | null;
+  creditsUsed: number | null;
   message: string | null;
   createdAt: string;
 };
@@ -109,6 +123,10 @@ export type CrawlHealthRow = {
   pagesFailed: number;
   pagesExcluded: number;
   durationMs: number | null;
+  /** Poll-/retry-pogingen op deze job (processing_jobs.attempts). */
+  attempts: number;
+  /** Firecrawl-credits voor deze job (max gerapporteerd over de polls; null = onbekend). */
+  creditsUsed: number | null;
   createdAt: string;
   errorMessage: string | null;
   events: CrawlHealthEvent[];
@@ -143,7 +161,7 @@ export async function getCrawlHealth(): Promise<CrawlHealth> {
 
   const { data: jobRows } = await sb
     .from('processing_jobs')
-    .select('id, organization_id, target_id, status, error_message, external_job_id, started_at, finished_at, created_at')
+    .select('id, organization_id, target_id, status, error_message, external_job_id, attempts, started_at, finished_at, created_at')
     .eq('job_type', 'crawl_website')
     .order('created_at', { ascending: false })
     .limit(RECENT_LIMIT);
@@ -159,7 +177,7 @@ export async function getCrawlHealth(): Promise<CrawlHealth> {
     sb.from('knowledge_sources').select('id, root_url, normalized_host').in('id', sourceIds),
     sb
       .from('crawl_events')
-      .select('processing_job_id, event_type, decision, firecrawl_status, completed, total, data_count, has_next, message, created_at')
+      .select('processing_job_id, event_type, decision, firecrawl_status, completed, total, data_count, has_next, credits_used, message, created_at')
       .in('processing_job_id', jobIds)
       .order('created_at', { ascending: false }),
     sb
@@ -191,6 +209,7 @@ export async function getCrawlHealth(): Promise<CrawlHealth> {
       total: (e.total as number | null) ?? null,
       dataCount: (e.data_count as number | null) ?? null,
       hasNext: (e.has_next as boolean | null) ?? null,
+      creditsUsed: (e.credits_used as number | null) ?? null,
       message: (e.message as string | null) ?? null,
       createdAt: (e.created_at as string | null) ?? '',
     });
@@ -221,6 +240,9 @@ export async function getCrawlHealth(): Promise<CrawlHealth> {
     const finished = j.finished_at as string | null;
     const durationMs =
       started && finished ? new Date(finished).getTime() - new Date(started).getTime() : null;
+    // creditsUsed is cumulatief per job over de polls → de hoogste niet-null waarde.
+    const creditVals = events.map((e) => e.creditsUsed).filter((c): c is number => c != null);
+    const creditsUsed = creditVals.length > 0 ? Math.max(...creditVals) : null;
 
     return {
       jobId: jid,
@@ -236,6 +258,8 @@ export async function getCrawlHealth(): Promise<CrawlHealth> {
       pagesFailed: pc.failed,
       pagesExcluded: pc.excluded,
       durationMs: durationMs != null && durationMs >= 0 ? durationMs : null,
+      attempts: (j.attempts as number | null) ?? 0,
+      creditsUsed,
       createdAt: (j.created_at as string | null) ?? '',
       errorMessage: (j.error_message as string | null) ?? null,
       events,
