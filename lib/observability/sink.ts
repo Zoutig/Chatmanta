@@ -40,6 +40,8 @@ export type ErrorEvent = {
   title?: string;
   message?: string;
   organizationId?: string | null;
+  /** Ruwe Error om stack/topFrame uit te halen — niet als zodanig opgeslagen. */
+  error?: unknown;
   context?: ErrorContext;
 };
 

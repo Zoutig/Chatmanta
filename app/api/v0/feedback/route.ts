@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
+import { captureError } from '@/lib/v0/server/error-capture';
 import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
@@ -195,6 +196,14 @@ export async function POST(req: Request) {
   } catch (err) {
     const appErr = toAppError(err);
     console.error('[feedback]', requestId, appErr.code, appErr.message, appErr.cause ?? '');
+    captureError({
+      surface: 'api',
+      code: appErr.code,
+      message: appErr.message,
+      error: appErr.cause ?? appErr,
+      organizationId,
+      context: { requestId, route: '/api/v0/feedback' },
+    });
     return NextResponse.json(toWire(appErr, requestId), {
       status: appErr.status,
       headers: { 'X-Request-Id': requestId },
