@@ -9,6 +9,7 @@ import {
   getControlRoomKlanten,
 } from '@/lib/controlroom/server/overview';
 import type { ControlRoomKlant } from '@/lib/controlroom/server/signals';
+import { getMonthlyFirecrawlCredits } from '@/lib/controlroom/server/credits';
 import { formatCostUsd, formatRelativeNL } from '@/lib/controlroom/format';
 import { MetricCard } from './components/metric-card';
 import { HealthBadge } from './components/badges';
@@ -68,7 +69,7 @@ function ListCard({
 }
 
 export default async function ControlRoomOverviewPage() {
-  const klanten = await getControlRoomKlanten();
+  const [klanten, credits] = await Promise.all([getControlRoomKlanten(), getMonthlyFirecrawlCredits()]);
   const s = buildOverviewSummary(klanten);
 
   return (
@@ -106,6 +107,12 @@ export default async function ControlRoomOverviewPage() {
         />
         <MetricCard label="Gesprekken (deze week)" value={s.conversationsThisWeek} sub={`${s.conversationsThisMonth} deze maand`} />
         <MetricCard label="Kosten (deze maand)" value={formatCostUsd(s.monthCostUsd)} sub="geschat, USD" />
+        <MetricCard
+          label="Firecrawl-credits"
+          value={`${credits.used} / ${credits.limit}`}
+          sub={`${credits.pct}% deze maand`}
+          tone={credits.tone}
+        />
       </div>
 
       {/* Aandacht nodig — volle breedte */}

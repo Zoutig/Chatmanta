@@ -130,6 +130,13 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByText('Slagingspercentage').first()).toBeVisible();
   });
 
+  test('overview toont Firecrawl-credits van deze maand', async ({ page }) => {
+    await page.goto('/admindashboard');
+    await expect(page.getByText('Firecrawl-credits').first()).toBeVisible({ timeout: 15_000 });
+    // Waarde-formaat "X / 1000" hoort er te staan.
+    await expect(page.getByText(/\/\s*\d+/).first()).toBeVisible();
+  });
+
   test('profiel-edit persisteert', async ({ page }) => {
     await page.goto('/admindashboard/klanten/globex-inc');
     const sel = page.locator('select').first(); // commerciële status

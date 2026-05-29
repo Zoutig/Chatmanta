@@ -75,6 +75,7 @@ export default function InstellingenPage() {
           <div className="klant-section-title" style={{ marginBottom: 8 }}>Crawler &amp; omgeving</div>
           <Row label="Crawler" value="Firecrawl" />
           <Row label="Max pagina's per crawl" value="50" />
+          <Row label="Firecrawl-creditlimiet (maand)" value={Number(process.env.FIRECRAWL_MONTHLY_CREDIT_LIMIT) || 1000} />
           <Row label="Environment" value={env} />
         </Card>
 

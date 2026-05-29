@@ -18,6 +18,7 @@
 // Firecrawl's map-cache.
 
 import Firecrawl, { type Document as FirecrawlDocument, type MapOptions } from '@mendable/firecrawl-js';
+import { logFirecrawlCredits } from './credit-log';
 
 /** Harde bovengrens per crawl (= aantal pagina's dat we daadwerkelijk scrapen).
  *  Voorkomt explosieve Firecrawl-kosten (blueprint sectie 14). */
@@ -105,6 +106,9 @@ export async function mapSite(url: string, limit: number = MAX_DISCOVER_PAGES): 
   ]);
 
   const mapUrls = mapResult.ok ? mapResult.urls : [];
+  // De map()-call kost ~1 credit (ongeacht aantal URLs). Sitemap-fetches loggen
+  // apart in readSitemapUrls. Fail-safe — breekt de discovery nooit.
+  if (mapResult.ok) await logFirecrawlCredits('map', 1);
   const merged = Array.from(new Set([...mapUrls, ...sitemapUrls]));
   if (merged.length === 0 && !mapResult.ok) throw mapResult.err;
   return merged.slice(0, limit);
@@ -113,6 +117,7 @@ export async function mapSite(url: string, limit: number = MAX_DISCOVER_PAGES): 
 /** Synchrone scrape van één pagina (C1: losse import). maxAge=0 → altijd vers. */
 export async function scrapeOne(url: string): Promise<CrawledPage> {
   const doc = await getClient().scrape(url, { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS });
+  await logFirecrawlCredits('scrape', 1);
   return toCrawledPage(doc);
 }
 
@@ -184,6 +189,8 @@ async function fetchSitemapLocs(sitemapUrl: string): Promise<string[]> {
       onlyMainContent: false,
     });
     const xml = (doc as { rawHtml?: string }).rawHtml ?? '';
+    // Elke sitemap-fetch is een Firecrawl-scrape (~1 credit). Fail-safe.
+    await logFirecrawlCredits('sitemap', 1);
     return Array.from(xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)).map((m) => m[1]);
   } catch {
     return []; // geen sitemap / niet-bereikbaar / niet-XML → gewoon geen bron
