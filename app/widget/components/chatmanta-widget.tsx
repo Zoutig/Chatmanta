@@ -23,6 +23,7 @@ import { formatAccentText } from '@/lib/widget/format-accent';
 import { cleanWidgetAnswer, renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { bestForegroundOn } from '@/lib/widget/contrast';
 import { LocalStorageThreadStore } from '@/lib/widget/thread-store';
+import { getOrCreateVisitorId } from '@/lib/widget/visitor-id';
 import type { Thread } from '@/lib/widget/thread-types';
 import { ThreadDrawer } from './thread-drawer';
 
@@ -129,6 +130,9 @@ export function ChatMantaWidget({
   // Side-aware positioning voor tooltip. FAB/panel-positie wordt verderop
   // berekend met safe-area-inset + mobile-fullscreen-detectie.
   const tooltipSideStyle = position === 'bottom-left' ? { left: 0 } : { right: 0 };
+  // Het pijltje wijst naar de FAB → bij links-onder aan de linkerkant, bij
+  // rechts-onder aan de rechterkant (zelfde patroon als fabSideStyle hieronder).
+  const tooltipArrowStyle = position === 'bottom-left' ? { left: 22 } : { right: 22 };
   const displayTitle = headerTitle?.trim() || companyName;
   // Tooltip-tekst: klant-input (kan `*woord*`-accenten bevatten) of de
   // oude default met accent op het laatste deel — zelfde parser zodat de
@@ -165,6 +169,9 @@ export function ChatMantaWidget({
   // Huidige embed-token. Ref i.p.v. state: refresh mag de volgende fetch
   // beïnvloeden zonder re-render en zonder stale closure in `send`.
   const embedTokenRef = useRef(embedToken);
+  // Stabiele, cookie-onafhankelijke visitor-id voor thread-grouping op externe
+  // sites (zie lib/widget/visitor-id.ts). Lazy-geïnit in postChat — client-only.
+  const visitorIdRef = useRef<string | null>(null);
 
   // Thread-state. `storeRef` is null tot na hydration zodat SSR niet probeert
   // localStorage te lezen. `activeThreadId` = null betekent "fresh chat" — pas
@@ -177,12 +184,34 @@ export function ChatMantaWidget({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Embedded: de iframe-viewport (~420px) zegt niets over het échte scherm.
+    // De loader (public/widget.js) draait in de hostpagina, kent de hostbreedte
+    // en stuurt 'm via postMessage. Init uit ?m=1 (anti-flits), daarna updates
+    // via 'chatmanta:host'. We posten 'chatmanta:ready' zodat de loader meteen
+    // de status terugstuurt (sluit de race met onze listener).
+    if (embedded) {
+      setIsMobile(new URLSearchParams(window.location.search).get('m') === '1');
+      const onMsg = (e: MessageEvent) => {
+        if (e.source !== window.parent) return;
+        const d = e.data as { type?: string; mobile?: unknown } | null;
+        if (!d || d.type !== 'chatmanta:host') return;
+        setIsMobile(Boolean(d.mobile));
+      };
+      window.addEventListener('message', onMsg);
+      try {
+        window.parent.postMessage({ type: 'chatmanta:ready' }, parentOrigin);
+      } catch {
+        // parent niet bereikbaar — init uit ?m=1 blijft staan
+      }
+      return () => window.removeEventListener('message', onMsg);
+    }
+    // Niet-embedded (eigen /widget-omgeving): de eigen viewport klopt wél.
     const mq = window.matchMedia('(max-width: 639px)');
     const apply = () => setIsMobile(mq.matches);
     apply();
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
-  }, []);
+  }, [embedded, parentOrigin]);
 
   // Init thread-store na hydration. localStorage is alleen client-side
   // beschikbaar — vandaar de useEffect-guard. Bij eerste mount:
@@ -363,6 +392,12 @@ export function ChatMantaWidget({
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
+      // Stabiele visitor-id voor server-side thread-grouping. Lazy-geïnit zodat
+      // localStorage pas client-side geraakt wordt. Cookie-onafhankelijk → werkt
+      // ook in een third-party iframe waar de Lax-cookie geblokkeerd is.
+      const visitorId =
+        visitorIdRef.current ?? (visitorIdRef.current = getOrCreateVisitorId());
+
       // POST-helper — herbruikt voor de retry ná een token-refresh.
       const postChat = (token: string | undefined) =>
         fetch(`/api/v0/chat?org=${encodeURIComponent(orgSlug)}`, {
@@ -370,6 +405,7 @@ export function ChatMantaWidget({
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { 'x-chatmanta-embed': token } : {}),
+            ...(visitorId ? { 'x-chatmanta-visitor': visitorId } : {}),
           },
           body: JSON.stringify({ question, version: botVersion, history }),
           signal: ctrl.signal,
@@ -725,7 +761,7 @@ export function ChatMantaWidget({
             aria-hidden="true"
             style={{
               position: 'absolute',
-              right: 22,
+              ...tooltipArrowStyle,
               bottom: -4,
               width: 8,
               height: 8,
