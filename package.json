@@ -38,6 +38,8 @@
     "cc:backfill-prs": "node scripts/cc/backfill-prs.mjs",
     "cc:clean-slate": "node scripts/cc/clean-slate.mjs",
     "cc:seed-v0-milestones": "node scripts/cc/seed-v0-milestones.mjs",
+    "controlroom:retention": "node --env-file=.env.local --conditions=react-server --import tsx scripts/controlroom-retention.ts",
+    "controlroom:seed": "node --env-file=.env.local --conditions=react-server --import tsx scripts/controlroom-seed.ts",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "migrate:status": "node --env-file=.env.local scripts/migrate.mjs status",
     "migrate:bootstrap": "node --env-file=.env.local scripts/migrate.mjs bootstrap",
