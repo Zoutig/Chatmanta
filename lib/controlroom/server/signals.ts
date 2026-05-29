@@ -142,7 +142,6 @@ export async function getOrgSignals(
     signals,
     technicalStatus,
     profile.commercialStatus,
-    profile.onboardingPhase,
   );
 
   return {
