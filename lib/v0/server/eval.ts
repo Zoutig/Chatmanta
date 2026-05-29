@@ -926,9 +926,12 @@ export async function runEvalRow(args: {
     }
   }
 
-  // V0.7 eval-v2: merge first_token_ms in stage_timings_ms. Doen we hier
-  // (en niet in rag.ts) zodat productie-query-pad geen extra meting krijgt
-  // — TTFT is een eval-only metric voor nu.
+  // V0.7 eval-v2: merge first_token_ms in stage_timings_ms. De eval-runner meet
+  // TTFT consumer-side (eerste content-event) en overschrijft bewust de waarde
+  // die rag.ts sinds migratie 0041 óók in phaseTimingsMs zet — zo blijft de
+  // eval-meetlat identiek aan eerdere runs (in-generator vs consumer-side
+  // scheelt enkele ms). Productie gebruikt de rag.ts-waarde via logQuery →
+  // query_log.first_token_ms; TTFT is dus niet langer eval-only.
   if (phaseTimings && firstTokenMs !== null) {
     phaseTimings = { ...phaseTimings, first_token_ms: firstTokenMs };
   }
