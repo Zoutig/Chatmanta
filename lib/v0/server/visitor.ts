@@ -10,6 +10,11 @@
 import 'server-only';
 
 const COOKIE_NAME = 'v0_widget_visitor';
+// Header die de widget-client expliciet meestuurt. Cookie-onafhankelijk pad:
+// op externe sites draait de widget in een third-party iframe waar de Lax-cookie
+// hierboven door de browser geblokkeerd wordt — dan groepeert de server op deze
+// header i.p.v. de cookie (zie lib/widget/visitor-id.ts voor de client-kant).
+const HEADER_NAME = 'x-chatmanta-visitor';
 const MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 dagen
 
 const UUID_V4_RE =
@@ -32,6 +37,18 @@ export function readVisitorId(req: Request): string | null {
     if (UUID_V4_RE.test(value)) return value;
     return null; // gemanipuleerd of legacy format → behandel als afwezig
   }
+  return null;
+}
+
+/**
+ * Leest de expliciete visitor-id uit de `x-chatmanta-visitor` header. De
+ * widget-client stuurt deze mee zodat grouping ook werkt wanneer de cookie
+ * geblokkeerd is (third-party iframe op een externe site). Ongeldig/afwezig
+ * → null; de caller valt dan terug op de cookie of een nieuwe id.
+ */
+export function readVisitorIdFromHeader(req: Request): string | null {
+  const value = req.headers.get(HEADER_NAME)?.trim();
+  if (value && UUID_V4_RE.test(value)) return value;
   return null;
 }
 
