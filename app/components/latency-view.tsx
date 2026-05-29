@@ -122,6 +122,15 @@ function Aggregates({ aggregates }: { aggregates: LatencyAggregate[] }) {
             <span>{fmt(a.p50TotalMs)}</span>
             <span>{fmt(a.p95TotalMs)}</span>
 
+            <span
+              className="latency-card-grid-label"
+              title="time-to-first-token — tijd tot het eerste antwoord-woord. De gevoelde snelheid. Alleen streamende antwoorden (cache-hits tellen niet mee)."
+            >
+              ttft
+            </span>
+            <span style={{ fontWeight: 600 }}>{fmt(a.p50FirstTokenMs)}</span>
+            <span style={{ fontWeight: 600 }}>{fmt(a.p95FirstTokenMs)}</span>
+
             <span className="latency-card-grid-label">embed</span>
             <span>{fmt(a.p50EmbeddingMs)}</span>
             <span>{fmt(a.p95EmbeddingMs)}</span>
