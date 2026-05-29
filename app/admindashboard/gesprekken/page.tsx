@@ -1,20 +1,9 @@
-import { MessagesSquare } from 'lucide-react';
-import { ComingSoon } from '../components/coming-soon';
+// Admin Dashboard — globale "Gesprekken" is verwijderd uit de navigatie: gesprekken
+// zijn voortaan alléén per klant toegankelijk (klantdetail → tab Gesprekken).
+// Deze route blijft bestaan als redirect zodat oude bookmarks/links niet 404'en.
 
-export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
 
-export default function GesprekkenPage() {
-  return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">Gesprekken</h1>
-          <p className="klant-page-sub">
-            Gesprekken over alle klanten, gefilterd op fallback, feedback en mogelijke PII.
-          </p>
-        </div>
-      </header>
-      <ComingSoon title="Gesprekken-overzicht volgt in Stap 2" icon={<MessagesSquare size={24} strokeWidth={1.6} />} />
-    </>
-  );
+export default function GesprekkenRedirect() {
+  redirect('/admindashboard/klanten');
 }

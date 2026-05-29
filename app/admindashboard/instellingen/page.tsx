@@ -7,6 +7,7 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill } from '@/app/klantendashboard/components/ui/pill';
 import { PRIVACY_DEFAULTS } from '@/lib/controlroom/types';
 import { MONTHLY_CONVERSATION_LIMITS } from '@/lib/controlroom/usage-limits';
+import { ReloadButton } from '../components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,7 @@ export default function InstellingenPage() {
             keys wijzigen vereist code + versiebeheer.
           </p>
         </div>
+        <ReloadButton />
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>

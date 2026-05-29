@@ -10,8 +10,6 @@ const NAV = [
   '/admindashboard',
   '/admindashboard/klanten',
   '/admindashboard/onboarding',
-  '/admindashboard/gesprekken',
-  '/admindashboard/bronnen',
   '/admindashboard/jobs',
   '/admindashboard/issues',
   '/admindashboard/usage',
@@ -48,6 +46,25 @@ test.describe('Admin Dashboard', () => {
     await page.goto('/admindashboard/klanten/bestaat-niet');
     // notFound() vuurt vóór de detail-render → de tab-balk bestaat niet.
     await expect(page.locator('.klant-tabs')).toHaveCount(0);
+  });
+
+  test('globale Gesprekken/Bronnen staan niet meer in de nav', async ({ page }) => {
+    await page.goto('/admindashboard');
+    // Gesprekken + bronnen zijn voortaan alléén per klant bereikbaar.
+    await expect(page.locator('a[href="/admindashboard/gesprekken"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/admindashboard/bronnen"]')).toHaveCount(0);
+  });
+
+  test('oude globale routes redirecten naar de klantenlijst', async ({ page }) => {
+    await page.goto('/admindashboard/gesprekken');
+    await expect(page).toHaveURL(/\/admindashboard\/klanten$/);
+    await page.goto('/admindashboard/bronnen');
+    await expect(page).toHaveURL(/\/admindashboard\/klanten$/);
+  });
+
+  test('herlaadknop aanwezig op overview', async ({ page }) => {
+    await page.goto('/admindashboard');
+    await expect(page.getByRole('button', { name: 'Herlaad' }).first()).toBeVisible();
   });
 
   test('profiel-edit persisteert', async ({ page }) => {

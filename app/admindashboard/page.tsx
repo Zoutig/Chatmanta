@@ -12,6 +12,7 @@ import type { ControlRoomKlant } from '@/lib/controlroom/server/signals';
 import { formatCostUsd, formatRelativeNL } from '@/lib/controlroom/format';
 import { MetricCard } from './components/metric-card';
 import { HealthBadge } from './components/badges';
+import { ReloadButton } from './components/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,9 +81,12 @@ export default async function ControlRoomOverviewPage() {
             orgs in één oogopslag.
           </p>
         </div>
-        <Link href="/admindashboard/klanten" className="klant-btn" data-variant="primary">
-          Alle klanten →
-        </Link>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          <ReloadButton />
+          <Link href="/admindashboard/klanten" className="klant-btn" data-variant="primary">
+            Alle klanten →
+          </Link>
+        </div>
       </header>
 
       {/* Kaart-cijfers */}
