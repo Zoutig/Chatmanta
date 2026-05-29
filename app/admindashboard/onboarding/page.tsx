@@ -1,4 +1,4 @@
-// Control Room — Onboarding-overzicht (MD §10.6). Alle klanten in onboarding:
+// Admin Dashboard — Onboarding-overzicht (MD §10.6). Alle klanten in onboarding:
 // fase, eigenaar, voortgang, geblokkeerde stappen en volgende actie. Linkt naar
 // de Onboarding-tab van de klant.
 
@@ -55,7 +55,7 @@ export default async function OnboardingOverviewPage() {
               {rows.map(({ k, total, done, blocked }) => (
                 <tr key={k.slug}>
                   <td>
-                    <Link href={`/controlroom/klanten/${k.slug}?tab=onboarding`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
+                    <Link href={`/admindashboard/klanten/${k.slug}?tab=onboarding`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
                       {k.name}
                     </Link>
                   </td>

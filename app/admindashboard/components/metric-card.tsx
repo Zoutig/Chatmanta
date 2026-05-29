@@ -1,4 +1,4 @@
-// Control Room — kleine stat-kaart voor de Overview-kaartenrij.
+// Admin Dashboard — kleine stat-kaart voor de Overview-kaartenrij.
 // Server-component, leunt op de klant-design tokens + Card-primitive.
 
 import type { ReactNode } from 'react';

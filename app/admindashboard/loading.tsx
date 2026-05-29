@@ -1,4 +1,4 @@
-// Control Room — segment-loading fallback. De cross-org fan-out duurt ~enkele
+// Admin Dashboard — segment-loading fallback. De cross-org fan-out duurt ~enkele
 // seconden; toon een rustige laad-staat i.p.v. een lege flits.
 
 export default function Loading() {
@@ -11,7 +11,7 @@ export default function Loading() {
         ))}
       </div>
       <div style={{ height: 160, borderRadius: 'var(--klant-r-lg)', background: 'var(--klant-surface-muted)', border: '1px solid var(--klant-border)' }} />
-      <p style={{ fontSize: 13, color: 'var(--klant-dim)', textAlign: 'center' }}>Control Room laden…</p>
+      <p style={{ fontSize: 13, color: 'var(--klant-dim)', textAlign: 'center' }}>Admin Dashboard laden…</p>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// Control Room — placeholder voor secties die in een volgende stap landen.
+// Admin Dashboard — placeholder voor secties die in een volgende stap landen.
 // Voorkomt dode nav-links: de route bestaat en toont een nette lege staat.
 
 import type { ReactNode } from 'react';
@@ -17,7 +17,7 @@ export function ComingSoon({
       {icon ? <div className="klant-empty-icon">{icon}</div> : null}
       <p className="klant-empty-title">{title}</p>
       <p className="klant-empty-sub">
-        {sub ?? 'Dit onderdeel wordt in een volgende stap van de Control Room gebouwd.'}
+        {sub ?? 'Dit onderdeel wordt in een volgende stap van de Admin Dashboard gebouwd.'}
       </p>
     </div>
   );

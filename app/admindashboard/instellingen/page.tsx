@@ -1,4 +1,4 @@
-// Control Room — Globale instellingen (MD §19). READ-ONLY. Toont technische
+// Admin Dashboard — Globale instellingen (MD §19). READ-ONLY. Toont technische
 // basisconfiguratie. NOOIT secrets/keys/system-prompts — alleen aanwezigheid
 // van keys (✓/✗), nooit de waarde. Wijzigen van model/keys vereist code +
 // versiebeheer (bewust niet hier bewerkbaar).
