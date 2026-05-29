@@ -12,9 +12,9 @@
 // filter (0035) buiten de retrieval, maar blijft bestaan en is heractiveerbaar.
 // Verwijderen is de harde delete (CASCADE → pages → chunks).
 //
-// "Bron toevoegen via crawl" hoort bij de crawl-machinerie (discover → batch-scrape
-// → poll/ingest) en landt in de Crawl & Jobs-uitbouw (PR5); hier doen we documenten
-// (platte tekst) + het beheer van bestaande bronnen.
+// Documenten (platte tekst), beheer van bestaande bronnen (inactief/verwijderen/
+// per-pagina), én een nieuwe website crawlen (discover → batch-scrape → job; ingest
+// via "Verwerk openstaande crawls" op /jobs of de cron-pinger).
 
 import { revalidatePath } from 'next/cache';
 import { KNOWN_ORGS, resolveOrgIdFromSlug } from '@/lib/v0/server/active-org';
@@ -24,8 +24,11 @@ import { mapSite, startBatchScrape, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '
 import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
 import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
+import { normalizeHost } from '@/lib/v0/crawler/normalizeHost';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { requireV0Auth } from './_auth';
+
+type SbClient = Awaited<ReturnType<typeof getSystemJobClient>>;
 
 /** Houd alleen publieke, SSRF-veilige http(s)-URLs over (parallel gevalideerd). */
 async function filterPublicUrls(urls: string[]): Promise<string[]> {
@@ -33,6 +36,65 @@ async function filterPublicUrls(urls: string[]): Promise<string[]> {
     urls.map(async (u) => ((await validateCrawlUrl(u)).allowed ? u : null)),
   );
   return checks.filter((u): u is string => u !== null);
+}
+
+/** Zorgt dat een kale invoer ("jouwsite.nl") een geldig http(s)-schema krijgt. */
+function normalizeUrl(input: string): string {
+  const t = input.trim();
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+/** Hergebruikt of maakt de website-bron van de org voor dit domein; zet status
+ *  'crawling' (+ clear disabled_at). Match op normalized_host (uniek per org, index
+ *  0037). Spiegelt de private helper in app/actions/crawl.ts (V0: duplicate is ok). */
+async function upsertWebsiteSource(sb: SbClient, orgId: string, rootUrl: string, name: string): Promise<string> {
+  const host = normalizeHost(rootUrl);
+  const now = new Date().toISOString();
+  const findExisting = async () => {
+    const { data } = await sb
+      .from('knowledge_sources')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('type', 'website')
+      .eq('normalized_host', host)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    return data?.id as string | undefined;
+  };
+  const existingId = host ? await findExisting() : undefined;
+  if (existingId) {
+    const { error } = await sb
+      .from('knowledge_sources')
+      .update({ root_url: rootUrl, name, status: 'crawling', disabled_at: null, updated_at: now })
+      .eq('id', existingId)
+      .eq('organization_id', orgId);
+    if (error) throw new Error(`knowledge_sources update: ${error.message}`);
+    return existingId;
+  }
+  const { data: created, error } = await sb
+    .from('knowledge_sources')
+    .insert({ organization_id: orgId, type: 'website', name, root_url: rootUrl, normalized_host: host, status: 'crawling' })
+    .select('id')
+    .single();
+  if (error) {
+    if ((error as { code?: string }).code === '23505' && host) {
+      const raced = await findExisting();
+      if (raced) {
+        await sb.from('knowledge_sources').update({ root_url: rootUrl, name, status: 'crawling', disabled_at: null, updated_at: now }).eq('id', raced).eq('organization_id', orgId);
+        return raced;
+      }
+    }
+    throw new Error(`knowledge_sources insert: ${error.message}`);
+  }
+  return created.id as string;
 }
 
 /** Valideer de org-slug tegen KNOWN_ORGS en geef de stabiele UUID terug. */
@@ -281,5 +343,65 @@ export async function adminProcessOpenCrawlsAction(): Promise<ActionResult<{ pro
     }
     revalidatePath('/admindashboard', 'layout');
     return { processed };
+  });
+}
+
+/**
+ * Voeg een nieuwe website-bron toe en start direct een crawl: discover (mapSite +
+ * sitemap) → publieke URLs (SSRF-gevalideerd, gecapt op MAX_CRAWL_PAGES) → batch-scrape
+ * → processing_job(pending). Ingest gebeurt via "Verwerk openstaande crawls" (/jobs)
+ * of de cron-pinger. BETAALDE Firecrawl-call — bewust admin-getriggerd.
+ */
+export async function adminStartCrawlAction(
+  orgSlug: string,
+  rawUrl: string,
+): Promise<ActionResult<{ discovered: number }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const orgId = requireKnownOrgId(orgSlug);
+    const root = normalizeUrl(rawUrl);
+    const rootCheck = await validateCrawlUrl(root);
+    if (!rootCheck.allowed) fail('CRAWL_FAILED', rootCheck.reason);
+
+    const discovered = await mapSite(root, MAX_DISCOVER_PAGES);
+    const safe = (await filterPublicUrls([root, ...discovered])).slice(0, MAX_CRAWL_PAGES);
+    if (safe.length === 0) fail('CRAWL_FAILED', 'Geen geldige pagina’s gevonden om te crawlen.');
+
+    const sb = await getSystemJobClient({ reason: 'admin_start_crawl' });
+    const sourceId = await upsertWebsiteSource(sb, orgId, root, hostnameOf(root));
+
+    let crawlId: string;
+    let invalidURLs: string[] = [];
+    try {
+      ({ crawlId, invalidURLs } = await startBatchScrape(safe));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
+      await sb.from('knowledge_sources').update({ status: 'failed' }).eq('id', sourceId).eq('organization_id', orgId);
+      await recordCrawlEvent(sb, {
+        organizationId: orgId, eventType: 'fail', knowledgeSourceId: sourceId,
+        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length },
+      });
+      fail('CRAWL_FAILED', msg);
+    }
+
+    const { data: job, error: jobErr } = await sb
+      .from('processing_jobs')
+      .insert({
+        organization_id: orgId, job_type: 'crawl_website', target_type: 'knowledge_source',
+        target_id: sourceId, status: 'pending', external_job_id: crawlId, started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (jobErr) throw new Error(`processing_jobs insert: ${jobErr.message}`);
+
+    await recordCrawlEvent(sb, {
+      organizationId: orgId, eventType: 'start', processingJobId: job.id as string,
+      knowledgeSourceId: sourceId, externalJobId: crawlId,
+      message: `Crawl gestart via admin voor ${safe.length} pagina's${invalidURLs.length ? `, ${invalidURLs.length} geweigerd door Firecrawl` : ''}.`,
+      payload: { requestedUrls: safe.length },
+    });
+
+    revalidate(orgSlug);
+    return { discovered: safe.length };
   });
 }

@@ -6,7 +6,7 @@
 //
 // Onderscheid: "Inactief" (disabled_at, bot gebruikt de bron niet, heractiveerbaar)
 // vs "Verwijderd" (harde delete, met bevestiging). Per-pagina include-toggle = fijnmazig
-// bewerken. Nieuwe website toevoegen (crawl) komt in de Crawl & Jobs-tab (PR5).
+// bewerken. Een nieuwe website crawlen kan onderaan de Websites-sectie.
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import {
   adminSetWebsiteSourceActiveAction,
   adminSetPageIncludedAction,
   adminDeleteWebsiteSourceAction,
+  adminStartCrawlAction,
   adminAddDocTextAction,
   adminDeleteDocAction,
 } from '@/app/actions/admin-crawl';
@@ -86,6 +87,7 @@ export function SourcesManager({
   const [error, setError] = useState<string | null>(null);
   const [docName, setDocName] = useState('');
   const [docText, setDocText] = useState('');
+  const [newUrl, setNewUrl] = useState('');
 
   function run(key: string, fn: () => Promise<{ ok: boolean; error?: string }>, onOk?: () => void) {
     setError(null);
@@ -118,7 +120,7 @@ export function SourcesManager({
         </div>
         {sources.length === 0 ? (
           <p style={{ fontSize: 13.5, color: 'var(--klant-dim)', margin: 0 }}>
-            Geen website-bronnen. Een nieuwe website toevoegen (crawl) doe je via de tab Crawls &amp; Jobs.
+            Nog geen website-bronnen. Voeg er hieronder één toe.
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -214,6 +216,30 @@ export function SourcesManager({
             })}
           </div>
         )}
+
+        {/* Nieuwe website crawlen */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: sources.length > 0 ? '1px solid var(--klant-border)' : 'none', paddingTop: sources.length > 0 ? 12 : 0 }}>
+          <input
+            className="klant-input"
+            placeholder="example.nl — nieuwe website crawlen"
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            style={{ flex: 1, minWidth: 200 }}
+          />
+          <button
+            type="button"
+            className="klant-btn"
+            data-variant="primary"
+            disabled={pending || newUrl.trim().length === 0}
+            onClick={() => run('add-site', () => adminStartCrawlAction(orgSlug, newUrl), () => setNewUrl(''))}
+          >
+            <Globe size={14} strokeWidth={1.8} /> {busy === 'add-site' ? 'Crawlen…' : 'Crawlen'}
+          </button>
+        </div>
+        <p className="klant-hint" style={{ margin: 0 }}>
+          Start een crawl van een nieuwe website; de pagina&apos;s worden daarna verwerkt via &quot;Verwerk
+          openstaande crawls&quot; (tab Crawls &amp; Jobs) of de cron.
+        </p>
       </div>
 
       {/* ── Documenten ─────────────────────────────────────────── */}

@@ -106,6 +106,8 @@ test.describe('Admin Dashboard', () => {
     await page.goto('/admindashboard/klanten/acme-corp?tab=bronnen');
     await expect(page.getByText('Websites', { exact: false }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: /Document toevoegen/ })).toBeVisible();
+    // Nieuwe-website-crawlen-knop hoort er ook te zijn (taak 2: bronnen toevoegen).
+    await expect(page.getByRole('button', { name: /^Crawlen/ })).toBeVisible();
   });
 
   test('bronnen: website deactiveren → heractiveren (retrieval-toggle)', async ({ page }) => {
