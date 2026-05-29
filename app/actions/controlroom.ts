@@ -1,6 +1,6 @@
 'use server';
 
-// Control Room (Admin Dashboard V0) — server actions voor de admin-overlay.
+// Admin Dashboard (Admin Dashboard V0) — server actions voor de admin-overlay.
 //
 // Auth: requireV0Auth() vóór elke service-role-call (defense-in-depth boven
 // proxy.ts), exact zoals app/actions/commandcenter.ts. Daarnaast valideren we
@@ -40,10 +40,10 @@ function requireKnownOrgId(slug: string): string {
 }
 
 function revalidate(slug?: string) {
-  // 'layout' herrendert de hele /controlroom-segmenttree (overview, lijst,
+  // 'layout' herrendert de hele /admindashboard-segmenttree (overview, lijst,
   // detail-tabs) zodat een statuswijziging overal meteen zichtbaar is.
-  revalidatePath('/controlroom', 'layout');
-  if (slug) revalidatePath(`/controlroom/klanten/${slug}`);
+  revalidatePath('/admindashboard', 'layout');
+  if (slug) revalidatePath(`/admindashboard/klanten/${slug}`);
 }
 
 export async function updateProfileAction(

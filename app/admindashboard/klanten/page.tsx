@@ -1,4 +1,4 @@
-// Control Room — Klantenlijst (MD §7). Volledige tabel over alle tenant-orgs,
+// Admin Dashboard — Klantenlijst (MD §7). Volledige tabel over alle tenant-orgs,
 // gesorteerd op health (rood eerst). Elke rij linkt naar de klantdetailpagina.
 
 import Link from 'next/link';
@@ -52,7 +52,7 @@ export default async function KlantenlijstPage() {
                 <tr key={k.slug}>
                   <td>
                     <Link
-                      href={`/controlroom/klanten/${k.slug}`}
+                      href={`/admindashboard/klanten/${k.slug}`}
                       style={{ textDecoration: 'none', color: 'var(--klant-ink)' }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 13.5 }}>{k.name}</div>

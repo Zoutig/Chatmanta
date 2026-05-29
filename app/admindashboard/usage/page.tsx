@@ -1,4 +1,4 @@
-// Control Room — Usage & Kosten (MD §16). Cross-org verbruik + geschatte kosten
+// Admin Dashboard — Usage & Kosten (MD §16). Cross-org verbruik + geschatte kosten
 // + maandlimiet-status. Leest dezelfde getControlRoomKlanten-aggregatie.
 
 import Link from 'next/link';
@@ -58,7 +58,7 @@ export default async function UsagePage() {
                 return (
                   <tr key={k.slug}>
                     <td>
-                      <Link href={`/controlroom/klanten/${k.slug}?tab=usage`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
+                      <Link href={`/admindashboard/klanten/${k.slug}?tab=usage`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
                         {k.name}
                       </Link>
                     </td>

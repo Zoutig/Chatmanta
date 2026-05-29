@@ -1,4 +1,4 @@
-// Control Room — sidebar. Server-component die de herbruikbare NavItem
+// Admin Dashboard — sidebar. Server-component die de herbruikbare NavItem
 // (client) rendert. Eigen nav-vocabulaire, maar exact het klantendashboard
 // design (klant-sidebar + klant-nav-item).
 
@@ -22,7 +22,7 @@ export function ControlRoomSidebar() {
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
       {/* Brand */}
       <Link
-        href="/controlroom"
+        href="/admindashboard"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -82,37 +82,37 @@ export function ControlRoomSidebar() {
               marginTop: 1,
             }}
           >
-            Control Room
+            Admin Dashboard
           </span>
         </div>
       </Link>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, marginTop: 6 }}>
-        <NavItem href="/controlroom" label="Overview" exact>
+        <NavItem href="/admindashboard" label="Overview" exact>
           <LayoutDashboard size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/klanten" label="Klanten">
+        <NavItem href="/admindashboard/klanten" label="Klanten">
           <Building2 size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/onboarding" label="Onboarding">
+        <NavItem href="/admindashboard/onboarding" label="Onboarding">
           <ClipboardList size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/gesprekken" label="Gesprekken">
+        <NavItem href="/admindashboard/gesprekken" label="Gesprekken">
           <MessagesSquare size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/bronnen" label="Bronnen">
+        <NavItem href="/admindashboard/bronnen" label="Bronnen">
           <Library size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/jobs" label="Crawls & Jobs">
+        <NavItem href="/admindashboard/jobs" label="Crawls & Jobs">
           <Workflow size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/issues" label="Issues">
+        <NavItem href="/admindashboard/issues" label="Issues">
           <AlertTriangle size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/usage" label="Usage & Kosten">
+        <NavItem href="/admindashboard/usage" label="Usage & Kosten">
           <BarChart3 size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/controlroom/instellingen" label="Instellingen">
+        <NavItem href="/admindashboard/instellingen" label="Instellingen">
           <Settings2 size={17} strokeWidth={1.7} />
         </NavItem>
       </nav>

@@ -1,4 +1,4 @@
-// Control Room — klantdetail (MD §9). Centrale plek: header met status-badges +
+// Admin Dashboard — klantdetail (MD §9). Centrale plek: header met status-badges +
 // acties, tab-navigatie (?tab=), en per tab data uit bestaande modules + de
 // admin-overlay. Org komt uit de route-param (niet de active-org cookie).
 
@@ -357,7 +357,7 @@ export default async function KlantDetailPage({
   return (
     <>
       <PageHead
-        eyebrow={`Control Room · ${slug}`}
+        eyebrow={`Admin Dashboard · ${slug}`}
         title={klant.name}
         actions={
           <>
@@ -379,7 +379,7 @@ export default async function KlantDetailPage({
         </div>
       </Card>
 
-      <TabsNav tabs={TABS} active={tab} basePath={`/controlroom/klanten/${slug}`} />
+      <TabsNav tabs={TABS} active={tab} basePath={`/admindashboard/klanten/${slug}`} />
 
       {tab === 'overzicht' && <OverzichtTab slug={slug} klant={klant} />}
       {tab === 'gesprekken' && <GesprekkenTab slug={slug} />}

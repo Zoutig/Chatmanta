@@ -1,4 +1,4 @@
-// Control Room — Issues (MD §15). Afgeleide faalsignalen over alle orgs,
+// Admin Dashboard — Issues (MD §15). Afgeleide faalsignalen over alle orgs,
 // gegroepeerd op severity, elk gelinkt naar de relevante klantdetail-tab.
 
 import Link from 'next/link';
@@ -23,7 +23,7 @@ const SEVERITY_LABEL: Record<IssueSeverity, string> = {
 function IssueRow({ issue }: { issue: ControlRoomIssue }) {
   return (
     <Link
-      href={`/controlroom/klanten/${issue.orgSlug}?tab=${issue.tab}`}
+      href={`/admindashboard/klanten/${issue.orgSlug}?tab=${issue.tab}`}
       className="klant-convo-row"
       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--klant-r-md)', textDecoration: 'none', color: 'var(--klant-ink)' }}
     >

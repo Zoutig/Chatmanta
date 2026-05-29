@@ -128,6 +128,14 @@ export default function HomePage() {
             />
             <HubCard
               variant="primary"
+              iconName="flag"
+              title="Admin Dashboard"
+              description="Interne control room: testklanten beheren, monitoren en debuggen."
+              href="/admindashboard"
+              cta="Open admin dashboard"
+            />
+            <HubCard
+              variant="primary"
               iconName="monitor"
               title="Klantendashboard v0"
               description="Beheer je chatbot, bronnen, widget en gesprekken."

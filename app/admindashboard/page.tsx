@@ -1,4 +1,4 @@
-// Control Room — Overview (MD §6). Cross-org control-room startscherm:
+// Admin Dashboard — Overview (MD §6). Cross-org control-room startscherm:
 // kaart-cijfers + aandachtslijsten, alles afgeleid uit bestaande data + de
 // admin-overlay. Linkt door naar de klantdetailpagina's.
 
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 function KlantLine({ k, meta }: { k: ControlRoomKlant; meta?: string }) {
   return (
     <Link
-      href={`/controlroom/klanten/${k.slug}`}
+      href={`/admindashboard/klanten/${k.slug}`}
       className="klant-convo-row"
       style={{
         display: 'flex',
@@ -80,7 +80,7 @@ export default async function ControlRoomOverviewPage() {
             orgs in één oogopslag.
           </p>
         </div>
-        <Link href="/controlroom/klanten" className="klant-btn" data-variant="primary">
+        <Link href="/admindashboard/klanten" className="klant-btn" data-variant="primary">
           Alle klanten →
         </Link>
       </header>

@@ -1,4 +1,4 @@
-// Control Room — status-badges (commercieel / technisch / health).
+// Admin Dashboard — status-badges (commercieel / technisch / health).
 // Dunne wrappers rond de bestaande Pill-primitive (klantendashboard design).
 
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
