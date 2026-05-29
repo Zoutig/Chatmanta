@@ -35,7 +35,7 @@ export function buildIssues(klanten: ControlRoomKlant[]): ControlRoomIssue[] {
     if ((k.commercialStatus === 'active' || k.commercialStatus === 'trial') && k.widgetStatus !== 'active') {
       issues.push({ ...base, severity: 'warning', title: 'Widget niet live', detail: k.widgetStatus === 'detected' ? 'Widget gevonden maar nog niet actief.' : 'Widget nog niet geplaatst, terwijl de klant commercieel actief/trial is.', tab: 'widget' });
     }
-    if (k.fallbackPct != null && k.fallbackPct > HIGH_FALLBACK_PCT) {
+    if (k.fallbackPct != null && k.fallbackPct >= HIGH_FALLBACK_PCT) {
       issues.push({ ...base, severity: 'warning', title: `Hoog fallback-percentage (${k.fallbackPct}%)`, detail: 'De bot kan veel vragen niet beantwoorden — bronnen/kennis aanvullen.', tab: 'gesprekken' });
     }
     if (k.technicalStatus === 'disabled' && k.commercialStatus === 'active') {

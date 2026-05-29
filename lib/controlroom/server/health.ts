@@ -9,7 +9,6 @@ import type { CrawlJobStatus } from '@/lib/v0/server/crawler';
 import type {
   CommercialStatus,
   HealthStatus,
-  OnboardingPhase,
   TechnicalStatus,
 } from '../types';
 
@@ -26,8 +25,8 @@ export type OrgSignals = {
   conversationsThisWeek: number;
 };
 
-/** Boven dit fallback-% rekenen we een bot als "veel fallback" → degraded. */
-export const HIGH_FALLBACK_PCT = 40;
+/** Vanaf dit fallback-% (inclusief) rekenen we een bot als "veel fallback" → degraded. */
+export const HIGH_FALLBACK_PCT = 10;
 
 /**
  * Technische botstatus afgeleid uit signalen (MD §8.2). Volgorde = prioriteit:
@@ -40,7 +39,7 @@ export function deriveTechnicalStatus(
   if (override) return override;
   if (s.crawlAnyFailed && !s.hasActiveSources) return 'error';
   if (s.crawlAnyFailed && s.hasActiveSources) return 'degraded';
-  if (s.fallbackPct != null && s.fallbackPct > HIGH_FALLBACK_PCT) return 'degraded';
+  if (s.fallbackPct != null && s.fallbackPct >= HIGH_FALLBACK_PCT) return 'degraded';
   if (s.widgetStatus === 'active' && s.hasActiveSources) return 'live';
   if (s.hasActiveSources) return 'ready_for_testing';
   return 'setup';
@@ -57,7 +56,6 @@ export function deriveHealth(
   s: OrgSignals,
   technicalStatus: TechnicalStatus,
   commercialStatus: CommercialStatus,
-  onboardingPhase: OnboardingPhase,
 ): HealthResult {
   // ── Rood ──────────────────────────────────────────────────────────────
   const red: string[] = [];
@@ -78,14 +76,12 @@ export function deriveHealth(
   if (technicalStatus === 'degraded') orange.push('Werkt deels');
   if (s.crawlAnyFailed) orange.push('Laatste crawl gefaald');
   if (s.widgetStatus === 'detected') orange.push('Widget gevonden maar nog niet actief');
-  if (s.fallbackPct != null && s.fallbackPct > HIGH_FALLBACK_PCT) {
+  if (s.fallbackPct != null && s.fallbackPct >= HIGH_FALLBACK_PCT) {
     orange.push('Hoog fallback-percentage');
   }
-  // Onboarding telt alleen voor commerciële klanten, niet voor de interne
-  // sandbox-orgs (internal_test) die bewust geen onboarding doorlopen.
-  if (onboardingPhase !== 'completed' && commercialStatus !== 'internal_test') {
-    orange.push('Onboarding nog niet afgerond');
-  }
+  // Onboarding-voortgang telt bewust NIET mee in health — dat is een
+  // commerciële/operationele indicator (zie de Onboarding-tab), geen signaal
+  // over de technische gezondheid van de bot.
   if (orange.length > 0) return { status: 'orange', reasons: orange };
 
   // ── Groen ─────────────────────────────────────────────────────────────
