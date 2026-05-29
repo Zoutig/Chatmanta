@@ -160,13 +160,58 @@ function CitedText({
   );
 }
 
-/** Mini-markdown: **bold** en `code` inline. */
+// Alleen http(s) wordt een klikbare link (XSS-veiligheid). Spiegelt
+// isSafeHttpUrl in lib/widget/render-markdown-lite.tsx.
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** Mini-markdown: **bold**, `code` en [tekst](url)-links inline. */
 function RichText({ text, baseKey }: { text: string; baseKey: number }) {
   const out: React.ReactNode[] = [];
   let buf = '';
   let i = 0;
   let k = 0;
+  const flush = () => {
+    if (buf) {
+      out.push(<span key={`${baseKey}-${k++}`}>{buf}</span>);
+      buf = '';
+    }
+  };
   while (i < text.length) {
+    // [tekst](url) — bron-link. CitedText heeft numerieke [n]-citaties al
+    // weggesplitst, dus een label hier is altijd niet-numeriek (echte link).
+    if (text[i] === '[') {
+      const closeBracket = text.indexOf(']', i + 1);
+      if (closeBracket !== -1 && text[closeBracket + 1] === '(') {
+        const closeParen = text.indexOf(')', closeBracket + 2);
+        if (closeParen !== -1) {
+          const label = text.slice(i + 1, closeBracket);
+          const url = text.slice(closeBracket + 2, closeParen);
+          if (label && url && !/\s/.test(url) && isSafeHttpUrl(url)) {
+            flush();
+            out.push(
+              <a
+                key={`${baseKey}-${k++}`}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--accent)', textDecoration: 'underline' }}
+              >
+                {label}
+              </a>,
+            );
+            i = closeParen + 1;
+            continue;
+          }
+        }
+      }
+    }
     if (text.slice(i, i + 2) === '**') {
       const end = text.indexOf('**', i + 2);
       if (end !== -1) {

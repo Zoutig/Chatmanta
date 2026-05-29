@@ -105,3 +105,33 @@ test('mixed: heading-bold + bullets + paragraph', () => {
   assert.match(out, /<li[^>]*>Ma-vr: 9-17u<\/li>/);
   assert.match(out, /Bel voor afspraken\./);
 });
+
+test('[tekst](https://…) rendert als veilige <a> (nieuw tabblad, noopener)', () => {
+  const out = html('Zie onze [over ons](https://example.com/over-ons).');
+  assert.match(out, /<a[^>]*href="https:\/\/example\.com\/over-ons"/);
+  assert.match(out, /target="_blank"/);
+  assert.match(out, /rel="noopener noreferrer"/);
+  assert.match(out, />over ons<\/a>/);
+});
+
+test('javascript:-link wordt nooit een <a> — alleen label-tekst', () => {
+  const out = html('Klik [hier](javascript:stealCookies) maar.');
+  assert.doesNotMatch(out, /<a[^>]*href/);
+  assert.match(out, /Klik hier maar\./);
+});
+
+test('link werkt binnen een bullet', () => {
+  const out = html('- Lees meer op [de site](https://example.com)');
+  assert.match(out, /<li[^>]*>Lees meer op <a[^>]*href="https:\/\/example\.com"[^>]*>de site<\/a><\/li>/);
+});
+
+test('bold en link in dezelfde regel', () => {
+  const out = html('**Tip**: bezoek [ons portfolio](https://example.com/portfolio).');
+  assert.match(out, /<strong>Tip<\/strong>/);
+  assert.match(out, /<a[^>]*href="https:\/\/example\.com\/portfolio"[^>]*>ons portfolio<\/a>/);
+});
+
+test('[n]-citatie-strip breekt een link met niet-numeriek label niet', () => {
+  const out = html('Meer info: [Diensten](https://example.com/diensten).');
+  assert.match(out, /<a[^>]*href="https:\/\/example\.com\/diensten"[^>]*>Diensten<\/a>/);
+});
