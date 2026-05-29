@@ -128,8 +128,23 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Crawls & Jobs' })).toBeVisible({ timeout: 15_000 });
     // De operator-knop om openstaande crawls te verwerken hoort er te zijn.
     await expect(page.getByRole('button', { name: /Verwerk openstaande crawls/ })).toBeVisible();
+    // De uitleg bij die knop (taak 4) hoort zichtbaar te zijn.
+    await expect(page.getByText(/peilt elke crawl die nog loopt/)).toBeVisible();
     // Rollup-metric aanwezig.
     await expect(page.getByText('Slagingspercentage').first()).toBeVisible();
+  });
+
+  test('klant crawl-tab: org-gescoped, zonder cross-org procesknop (taak 2)', async ({ page }) => {
+    // De per-klant Crawls&Jobs-tab hergebruikt JobsClient org-gefilterd (alle crawls,
+    // niet alleen de laatste job per bron). demo-nieuw heeft echte crawls.
+    await page.goto('/admindashboard/klanten/demo-nieuw?tab=jobs');
+    await expect(page.locator('.klant-tabs')).toBeVisible({ timeout: 15_000 });
+    // De cross-org "Verwerk openstaande crawls"-knop hoort hier NIET te staan (hideProcessButton).
+    await expect(page.getByRole('button', { name: /Verwerk openstaande crawls/ })).toHaveCount(0);
+    // Er is óf een crawl-tabel (uitklapbare rijen) óf een lege staat — beide acceptabel.
+    const hasTable = await page.locator('table.klant-table').count();
+    const hasEmpty = await page.getByText('Nog geen crawls voor deze klant').count();
+    expect(hasTable + hasEmpty).toBeGreaterThan(0);
   });
 
   test('overview toont Firecrawl-credits van deze maand', async ({ page }) => {

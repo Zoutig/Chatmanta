@@ -9,6 +9,7 @@ import { getProfile } from '@/lib/controlroom/server/profiles';
 import { getOrgSignals, type ControlRoomKlant } from '@/lib/controlroom/server/signals';
 import { listConversations } from '@/lib/v0/klantendashboard/server/conversations';
 import { getWebsiteSources } from '@/lib/v0/server/crawler';
+import { getCrawlHealth } from '@/lib/v0/server/crawl-health';
 import { listDocs } from '@/lib/v0/server/rag';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { getAllTimeUsage } from '@/lib/v0/server/log';
@@ -30,6 +31,8 @@ import { NotesEditor } from './components/notes-editor';
 import { PrivacyForm } from './components/privacy-form';
 import { OnboardingChecklist } from './components/onboarding-checklist';
 import { SourcesManager } from './components/sources-manager';
+import { JobsClient } from '../../jobs/jobs-client';
+import { buildJobRows } from '../../jobs/build-rows';
 import { SettingsForm } from '@/app/klantendashboard/instellingen/components/settings-form';
 import { WidgetForm } from '@/app/klantendashboard/widget/components/widget-form';
 import {
@@ -172,39 +175,14 @@ async function BronnenTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) {
 }
 
 async function JobsTab({ orgId }: { orgId: string }) {
-  const sources = await getWebsiteSources(orgId).catch(() => []);
-  const withJobs = sources.filter((s) => s.job);
-  if (withJobs.length === 0) return <Card><EmptyInline text="Geen crawl-/verwerkingsjobs gevonden." /></Card>;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {withJobs.map((s) => (
-        <Card key={s.source.id}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <span style={{ flex: 1, fontWeight: 600, fontSize: 13.5 }}>{s.source.host ?? s.source.rootUrl}</span>
-            <Pill tone={s.job!.status === 'failed' ? 'danger' : s.job!.status === 'completed' ? 'success' : 'info'} dot>{s.job!.status}</Pill>
-            <span style={{ fontSize: 12, color: 'var(--klant-muted)' }}>{s.job!.completed}/{s.job!.total}</span>
-          </div>
-          {s.job!.error ? <p style={{ fontSize: 12.5, color: 'var(--klant-danger)', margin: '0 0 8px' }}>{s.job!.error}</p> : null}
-          {s.job!.events.length > 0 ? (
-            <table className="klant-table">
-              <thead><tr><th>Event</th><th>Firecrawl</th><th>Voortgang</th><th>Beslissing</th><th>Wanneer</th></tr></thead>
-              <tbody>
-                {s.job!.events.map((e, i) => (
-                  <tr key={i}>
-                    <td style={{ fontSize: 12.5 }}>{e.eventType}</td>
-                    <td style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>{e.firecrawlStatus ?? '—'}</td>
-                    <td style={{ fontSize: 12.5 }}>{e.total != null ? `${e.completed ?? 0}/${e.total}` : '—'}</td>
-                    <td style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>{e.decision ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--klant-dim)', whiteSpace: 'nowrap' }}>{formatRelativeNL(e.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : null}
-        </Card>
-      ))}
-    </div>
-  );
+  // Alle crawl-jobs van deze klant (gefaald + geslaagd), org-gefilterd. Hergebruikt
+  // de globale JobsClient: uitklapbare rijen met status/URL/timestamps/credits/events
+  // + aanbevolen fix. Limit 1000 = effectief "alles" op V0-schaal. De cross-org
+  // procesknop is verborgen (die verwerkt álle orgs) en het klant-filter is overbodig.
+  const health = await getCrawlHealth({ orgId, limit: 1000 });
+  const rows = buildJobRows(health);
+  if (rows.length === 0) return <Card><EmptyInline text="Nog geen crawls voor deze klant." /></Card>;
+  return <JobsClient rows={rows} hideOrgFilter hideProcessButton />;
 }
 
 async function UsageTab({ klant, orgId }: { klant: ControlRoomKlant; orgId: string }) {

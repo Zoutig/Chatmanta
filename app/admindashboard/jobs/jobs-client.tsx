@@ -41,6 +41,9 @@ export type JobRow = {
   attempts: number;
   creditsUsed: number | null;
   createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  externalJobId: string | null;
   errorMessage: string | null;
   events: EventRow[];
 };
@@ -70,7 +73,17 @@ function fmtWhen(iso: string): string {
   return new Date(iso).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-export function JobsClient({ rows }: { rows: JobRow[] }) {
+export function JobsClient({
+  rows,
+  hideOrgFilter = false,
+  hideProcessButton = false,
+}: {
+  rows: JobRow[];
+  /** Verberg het klant-filter (per-klant weergave toont maar één org). */
+  hideOrgFilter?: boolean;
+  /** Verberg de cross-org "Verwerk openstaande crawls"-knop (die verwerkt álle orgs). */
+  hideProcessButton?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
@@ -129,17 +142,21 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
 
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" className="klant-btn" data-variant="primary" disabled={pending}
-          onClick={() => run('process', () => adminProcessOpenCrawlsAction())} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          title="Peilt alle nog lopende crawls (status: in afwachting of bezig) bij Firecrawl. Afgeronde crawls worden opgehaald en aan de kennisbank toegevoegd; vastgelopen crawls worden als mislukt gemarkeerd. Voltooide en mislukte crawls blijven ongemoeid — er wordt geen nieuwe crawl gestart.">
-          <Play size={14} strokeWidth={1.8} style={busy === 'process' ? { animation: 'org-spin 0.9s linear infinite' } : undefined} />
-          {busy === 'process' ? 'Verwerken…' : 'Verwerk openstaande crawls'}
-        </button>
+        {!hideProcessButton && (
+          <button type="button" className="klant-btn" data-variant="primary" disabled={pending}
+            onClick={() => run('process', () => adminProcessOpenCrawlsAction())} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            title="Peilt alle nog lopende crawls (status: in afwachting of bezig) bij Firecrawl. Afgeronde crawls worden opgehaald en aan de kennisbank toegevoegd; vastgelopen crawls worden als mislukt gemarkeerd. Voltooide en mislukte crawls blijven ongemoeid — er wordt geen nieuwe crawl gestart.">
+            <Play size={14} strokeWidth={1.8} style={busy === 'process' ? { animation: 'org-spin 0.9s linear infinite' } : undefined} />
+            {busy === 'process' ? 'Verwerken…' : 'Verwerk openstaande crawls'}
+          </button>
+        )}
         <div style={{ flex: 1 }} />
-        <select value={org} onChange={(e) => setOrg(e.target.value)} style={selectStyle} aria-label="Filter op klant">
-          <option value="all">Alle klanten</option>
-          {orgs.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        {!hideOrgFilter && (
+          <select value={org} onChange={(e) => setOrg(e.target.value)} style={selectStyle} aria-label="Filter op klant">
+            <option value="all">Alle klanten</option>
+            {orgs.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
         <select value={cat} onChange={(e) => setCat(e.target.value)} style={selectStyle} aria-label="Filter op status">
           <option value="all">Alle statussen</option>
           {cats.map(([c, label]) => <option key={c} value={c}>{label}</option>)}
@@ -152,13 +169,15 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Zoek bron/url…" style={{ ...selectStyle, minWidth: 160 }} aria-label="Zoek bron of url" />
       </div>
 
-      {/* Uitleg bij de actieknop (taak 4) */}
-      <p className="klant-hint" style={{ margin: 0, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <Info size={13} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
-        <span>
-          <strong>Verwerk openstaande crawls</strong> peilt elke crawl die nog loopt (status <em>in afwachting</em> of <em>bezig</em>) bij Firecrawl: afgeronde crawls worden opgehaald en aan de kennisbank toegevoegd, en crawls die te lang stilstaan worden als mislukt gemarkeerd. Voltooide en mislukte crawls blijven ongemoeid en er wordt géén nieuwe crawl gestart (dus geen extra Firecrawl-credits). Normaal verwerkt de cron dit automatisch — deze knop forceert het nu meteen.
-        </span>
-      </p>
+      {/* Uitleg bij de actieknop (taak 4) — alleen relevant waar de knop staat */}
+      {!hideProcessButton && (
+        <p className="klant-hint" style={{ margin: 0, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          <Info size={13} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <strong>Verwerk openstaande crawls</strong> peilt elke crawl die nog loopt (status <em>in afwachting</em> of <em>bezig</em>) bij Firecrawl: afgeronde crawls worden opgehaald en aan de kennisbank toegevoegd, en crawls die te lang stilstaan worden als mislukt gemarkeerd. Voltooide en mislukte crawls blijven ongemoeid en er wordt géén nieuwe crawl gestart (dus geen extra Firecrawl-credits). Normaal verwerkt de cron dit automatisch — deze knop forceert het nu meteen.
+          </span>
+        </p>
+      )}
 
       {filtered.length === 0 ? (
         <div className="klant-empty">
@@ -207,11 +226,21 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
                           <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {r.errorMessage && <div style={{ fontSize: 12.5, color: 'var(--klant-danger)' }}>Fout: {r.errorMessage}</div>}
                             <div style={{ fontSize: 12.5 }}><strong>Aanbevolen actie:</strong> {r.recommendedFix}</div>
+                            {r.rootUrl && (
+                              <div style={{ fontSize: 12.5, wordBreak: 'break-all' }}>
+                                URL:{' '}
+                                <a href={r.rootUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--klant-accent, #2563eb)' }}>{r.rootUrl}</a>
+                              </div>
+                            )}
                             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--klant-muted)' }}>
                               <span>Pogingen: {r.attempts}</span>
                               <span>Pagina&apos;s ok/fout/uitgesloten: {r.pagesOk}/{r.pagesFailed}/{r.pagesExcluded}</span>
                               <span>Voortgang: {r.completed}/{r.total}</span>
                               <span>Credits: {r.creditsUsed ?? 'onbekend'}</span>
+                              <span>Gestart: {r.startedAt ? fmtWhen(r.startedAt) : '—'}</span>
+                              <span>Voltooid: {r.finishedAt ? fmtWhen(r.finishedAt) : '—'}</span>
+                              <span>Aangemaakt: {fmtWhen(r.createdAt)}</span>
+                              {r.externalJobId ? <span>Firecrawl-ID: {r.externalJobId}</span> : null}
                             </div>
                             {r.events.length > 0 && (
                               <div style={{ overflowX: 'auto' }}>

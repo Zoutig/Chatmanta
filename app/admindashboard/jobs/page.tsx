@@ -5,54 +5,18 @@
 //
 // Crawl-fouten/fallbacks horen HIER, niet onder Issues (taak 8-scheiding).
 
-import {
-  getCrawlHealth,
-  CATEGORY_LABEL,
-  RECOMMENDED_FIX,
-  DECISION_LABEL,
-} from '@/lib/v0/server/crawl-health';
+import { getCrawlHealth } from '@/lib/v0/server/crawl-health';
 import { MetricCard } from '../components/metric-card';
 import { ReloadButton } from '../components/reload-button';
-import { JobsClient, type JobRow } from './jobs-client';
+import { JobsClient } from './jobs-client';
+import { buildJobRows } from './build-rows';
 
 export const dynamic = 'force-dynamic';
 
 export default async function JobsPage() {
   const health = await getCrawlHealth();
 
-  const rows: JobRow[] = health.recent.map((r) => ({
-    jobId: r.jobId,
-    orgId: r.orgId,
-    orgName: r.orgName,
-    host: r.host,
-    rootUrl: r.rootUrl,
-    jobStatus: r.jobStatus,
-    category: r.category,
-    categoryLabel: CATEGORY_LABEL[r.category],
-    recommendedFix: RECOMMENDED_FIX[r.category],
-    completed: r.completed,
-    total: r.total,
-    pagesOk: r.pagesOk,
-    pagesFailed: r.pagesFailed,
-    pagesExcluded: r.pagesExcluded,
-    durationMs: r.durationMs,
-    attempts: r.attempts,
-    creditsUsed: r.creditsUsed,
-    createdAt: r.createdAt,
-    errorMessage: r.errorMessage,
-    events: r.events.map((e) => ({
-      eventType: e.eventType,
-      decision: e.decision,
-      decisionLabel: e.decision ? (DECISION_LABEL[e.decision] ?? e.decision) : null,
-      firecrawlStatus: e.firecrawlStatus,
-      completed: e.completed,
-      total: e.total,
-      dataCount: e.dataCount,
-      creditsUsed: e.creditsUsed,
-      message: e.message,
-      createdAt: e.createdAt,
-    })),
-  }));
+  const rows = buildJobRows(health);
 
   const failed = rows.filter((r) => r.jobStatus === 'failed').length;
   const totalCredits = rows.reduce((a, r) => a + (r.creditsUsed ?? 0), 0);

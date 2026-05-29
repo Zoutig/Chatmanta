@@ -128,6 +128,10 @@ export type CrawlHealthRow = {
   /** Firecrawl-credits voor deze job (max gerapporteerd over de polls; null = onbekend). */
   creditsUsed: number | null;
   createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** Firecrawl batch-/job-ID (external_job_id) — handig voor support/diagnose. */
+  externalJobId: string | null;
   errorMessage: string | null;
   events: CrawlHealthEvent[];
 };
@@ -156,15 +160,20 @@ function orgName(orgId: string): string {
  * Laatste crawl-jobs over alle orgs met terminale diagnostiek + pagina-tellingen.
  * Bulk-queries (jobs / sources / events / pages), in JS geassembleerd — geen N+1.
  */
-export async function getCrawlHealth(): Promise<CrawlHealth> {
+export async function getCrawlHealth(
+  opts: { orgId?: string; limit?: number } = {},
+): Promise<CrawlHealth> {
   const sb = await getSystemJobClient({ reason: 'crawl_health_overview' });
+  const limit = opts.limit ?? RECENT_LIMIT;
 
-  const { data: jobRows } = await sb
+  let jobQuery = sb
     .from('processing_jobs')
     .select('id, organization_id, target_id, status, error_message, external_job_id, attempts, started_at, finished_at, created_at')
-    .eq('job_type', 'crawl_website')
+    .eq('job_type', 'crawl_website');
+  if (opts.orgId) jobQuery = jobQuery.eq('organization_id', opts.orgId);
+  const { data: jobRows } = await jobQuery
     .order('created_at', { ascending: false })
-    .limit(RECENT_LIMIT);
+    .limit(limit);
 
   if (!jobRows || jobRows.length === 0) {
     return { totalCrawls: 0, terminalCrawls: 0, successRate: null, rollup: [], recent: [] };
@@ -261,6 +270,9 @@ export async function getCrawlHealth(): Promise<CrawlHealth> {
       attempts: (j.attempts as number | null) ?? 0,
       creditsUsed,
       createdAt: (j.created_at as string | null) ?? '',
+      startedAt: started,
+      finishedAt: finished,
+      externalJobId: (j.external_job_id as string | null) ?? null,
       errorMessage: (j.error_message as string | null) ?? null,
       events,
     };
