@@ -76,6 +76,7 @@ export default async function GesprekDetailPage({
       />
 
       <section
+        className="klant-stack-narrow"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',

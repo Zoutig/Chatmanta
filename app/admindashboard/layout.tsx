@@ -8,6 +8,7 @@
 import '../klantendashboard/klant.css';
 import type { Metadata } from 'next';
 import { ControlRoomSidebar } from './components/sidebar';
+import { ControlRoomTopbar } from './components/topbar';
 
 export const metadata: Metadata = {
   title: 'ChatManta · Admin Dashboard',
@@ -20,24 +21,7 @@ export default function ControlRoomLayout({ children }: { children: React.ReactN
   return (
     <div data-klant-scope className="klant-shell">
       <ControlRoomSidebar />
-      <header className="klant-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span
-            style={{
-              fontFamily: 'var(--klant-font-display)',
-              fontWeight: 600,
-              fontSize: 14,
-              color: 'var(--klant-ink)',
-            }}
-          >
-            Admin Dashboard
-          </span>
-          {/* Eerlijke disclaimer: V0 is gedeeld-wachtwoord, geen per-user authz. */}
-          <span className="klant-status" data-tone="warning">
-            Interne tooling
-          </span>
-        </div>
-      </header>
+      <ControlRoomTopbar />
       <main className="klant-main">{children}</main>
     </div>
   );

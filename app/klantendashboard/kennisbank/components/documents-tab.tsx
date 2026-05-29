@@ -175,6 +175,7 @@ export function DocumentsTab({ initialDocs }: { initialDocs: DocumentSummary[] }
         </div>
       ) : (
         <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="table-scroll">
           <table className="klant-table">
             <thead>
               <tr>
@@ -259,6 +260,7 @@ export function DocumentsTab({ initialDocs }: { initialDocs: DocumentSummary[] }
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </section>

@@ -66,7 +66,13 @@ export function PageHead({
         )}
       </div>
       {actions && (
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>{actions}</div>
+        // flexShrink:1 + minWidth:0: op smal scherm wrapt het actie-blok naar een
+        // eigen regel en krimpt het tot de viewport, zodat de knoppen onderling
+        // wrappen i.p.v. de primaire CTA buiten beeld af te knippen. Op desktop is
+        // er ruimte zat, dus daar verandert er niets.
+        <div style={{ display: 'flex', gap: 8, flexShrink: 1, minWidth: 0, flexWrap: 'wrap' }}>
+          {actions}
+        </div>
       )}
     </div>
   );

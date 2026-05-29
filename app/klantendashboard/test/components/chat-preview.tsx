@@ -220,6 +220,7 @@ export function ChatPreview({
 
   return (
     <div
+      className="klant-stack-narrow"
       style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',

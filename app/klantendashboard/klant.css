@@ -623,6 +623,20 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
   border-bottom-color: var(--klant-accent);
 }
 
+/* Tab-rij scrollt horizontaal als 'ie niet past (smal scherm) i.p.v. de laatste
+   tab af te knippen. Scrollbar verborgen → de tab-rij blijft een nette strip. */
+.klant-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.klant-tabs::-webkit-scrollbar {
+  display: none;
+}
+.klant-tab {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
  * UI-primitives (Quiet-Light/Aurora). Hover/focus kan inline niet — daarom
  * als classes; de component zet data-variant / data-size. Zie components/ui/.
@@ -763,31 +777,80 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
 /* Mobile */
 @media (max-width: 900px) {
   .klant-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: var(--klant-topbar-h) auto 1fr;
+    /* minmax(0, 1fr) i.p.v. 1fr: een grid-item heeft default min-width:auto,
+       waardoor een brede tabel de kolom (en daarmee de hele pagina) zou
+       oprekken voorbij de viewport. minmax(0,…) laat de kolom krimpen zodat
+       interne overflow-x:auto-wrappers daadwerkelijk gaan scrollen. */
+    grid-template-columns: minmax(0, 1fr);
+    /* 2 rijen: topbar + main. De sidebar wordt een off-canvas drawer
+       (position:fixed, buiten de grid-flow) over de hele ≤900 range. */
+    grid-template-rows: var(--klant-topbar-h) 1fr;
   }
-  .klant-sidebar {
-    grid-row: 2;
+  /* Topbar hoort in de enige kolom (rij 1). Zonder deze reset blijft de
+     desktop-waarde grid-column:2 staan → de topbar belandt in een impliciete
+     2e kolom buiten beeld op tablet/splitscreen/mobile (hamburger weg). */
+  .klant-topbar {
+    grid-row: 1;
     grid-column: 1;
-    position: relative;
-    height: auto;
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 10px 14px;
-    border-right: none;
-    border-bottom: 1px solid var(--klant-border);
+  }
+  /* Sidebar als off-canvas drawer over de HELE ≤900 range (telefoon én
+     splitscreen). De hamburger in de topbar opent 'm; de .drawer-backdrop dekt
+     de rest af. Vervangt de oude horizontale scroll-bar, die op splitscreen een
+     rommelig hoog blok werd met de nav verticaal weggedrukt. De ≤640-regels
+     hieronder verfijnen dit verder voor telefoons (compacte topbar etc.). */
+  [data-klant-scope] .klant-sidebar {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(86vw, 320px);
+    height: 100dvh;
+    z-index: 1000;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.4);
+    padding: 18px 14px;
+    border-right: 1px solid var(--klant-border);
+    border-bottom: none;
+  }
+  [data-klant-scope][data-klant-drawer-open='true'] .klant-sidebar {
+    transform: translateX(0);
   }
   .klant-main {
-    grid-row: 3;
+    grid-row: 2;
     grid-column: 1;
+    /* min-width:0 hoort bij de minmax(0,1fr) hierboven: laat brede inhoud
+       (tabellen) binnen een scroll-wrapper blijven i.p.v. de pagina te rekken. */
+    min-width: 0;
     padding: 20px 16px 48px;
   }
-  .klant-nav-item {
-    flex-shrink: 0;
-    white-space: nowrap;
+  /* Hamburger zichtbaar over de hele ≤900 range. Met [data-klant-scope]-prefix
+     (specificiteit 0,2,0) zodat deze de losse default-regel
+     `.klant-topbar-hamburger{display:none}` verslaat ongeacht bronvolgorde. */
+  [data-klant-scope] .klant-topbar-hamburger {
+    display: inline-flex;
+  }
+  /* Voorkom horizontale overflow op smalle schermen. */
+  [data-klant-scope] {
+    overflow-x: hidden;
   }
   .klant-page-title {
     font-size: 22px;
+  }
+}
+
+/* Twee-koloms split-views (chat + meta, detail + zijpaneel) stapelen op smal
+   scherm. De containers zetten hun kolommen inline (minmax(0,1.4fr) …); een
+   stylesheet-regel met !important wint van die inline-waarde. Drempel 760px:
+   bredere splitscreens houden de 2 kolommen, telefoons + halve schermen niet. */
+@media (max-width: 760px) {
+  .klant-stack-narrow {
+    grid-template-columns: 1fr !important;
   }
 }
 

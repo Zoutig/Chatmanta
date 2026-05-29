@@ -96,7 +96,7 @@ export default async function AdminGesprekDetailPage({
         </div>
       </Card>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 20 }}>
+      <section className="klant-stack-narrow" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 20 }}>
         {/* Transcript */}
         <Card padded={false}>
           {detail.messages.length === 0 ? (
