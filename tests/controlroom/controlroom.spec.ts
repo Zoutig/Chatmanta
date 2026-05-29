@@ -67,6 +67,22 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: 'Herlaad' }).first()).toBeVisible();
   });
 
+  test('gesprek-detail opent vanuit de klant-gesprekkentab', async ({ page }) => {
+    await page.goto('/admindashboard/klanten/acme-corp?tab=gesprekken');
+    const open = page.getByRole('link', { name: /Bekijk/ }).first();
+    test.skip((await open.count()) === 0, 'geen gesprekken in de laatste 30 dagen voor acme-corp');
+    await open.click();
+    await expect(page.getByRole('heading', { name: 'Gesprek' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('link', { name: /Terug naar gesprekken/ })).toBeVisible();
+    // org-scoping: het detail zit onder de klant-slug in de URL
+    await expect(page).toHaveURL(/\/admindashboard\/klanten\/acme-corp\/gesprek\//);
+  });
+
+  test('gesprek-detail: onbekend gesprek → not-found', async ({ page }) => {
+    await page.goto('/admindashboard/klanten/acme-corp/gesprek/00000000-0000-0000-0000-000000000000');
+    await expect(page.getByRole('heading', { name: 'Gesprek' })).toHaveCount(0);
+  });
+
   test('profiel-edit persisteert', async ({ page }) => {
     await page.goto('/admindashboard/klanten/globex-inc');
     const sel = page.locator('select').first(); // commerciële status

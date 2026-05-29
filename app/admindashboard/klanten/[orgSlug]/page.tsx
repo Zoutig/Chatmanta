@@ -129,16 +129,26 @@ async function GesprekkenTab({ slug }: { slug: OrgSlug }) {
               <th>Berichten</th>
               <th>Status</th>
               <th>Privacy</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {convos.map((c) => (
               <tr key={c.id}>
                 <td style={{ fontSize: 12.5, color: 'var(--klant-muted)', whiteSpace: 'nowrap' }}>{formatRelativeNL(c.lastActivityAt)}</td>
-                <td style={{ fontSize: 13, maxWidth: 420 }}>{c.firstQuestion}</td>
+                <td style={{ fontSize: 13, maxWidth: 420 }}>
+                  <Link href={`/admindashboard/klanten/${slug}/gesprek/${c.id}`} style={{ color: 'var(--klant-ink)', textDecoration: 'none', fontWeight: 500 }}>
+                    {c.firstQuestion}
+                  </Link>
+                </td>
                 <td style={{ fontSize: 13 }}>{c.messageCount}</td>
                 <td><StatusBadge kind="conversation" status={c.status} /></td>
                 <td>{detectPossiblePii(c.firstQuestion) ? <Pill tone="warn" dot>Mogelijk PII</Pill> : <span style={{ color: 'var(--klant-faint)', fontSize: 12 }}>—</span>}</td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <Link href={`/admindashboard/klanten/${slug}/gesprek/${c.id}`} className="klant-btn" data-variant="ghost" style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}>
+                    Bekijk →
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
