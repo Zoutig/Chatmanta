@@ -910,6 +910,13 @@ export type ChatSource = {
    * parent_chunk_id) — UI laat dan geen Sectie-badge zien.
    */
   parentIndex?: number | null;
+  /**
+   * v0.9.1 bron-links — echte URL van de gecrawlde pagina (website_pages.url),
+   * NULL voor document-chunks. Wordt mee-gecachet zodat een cache-hit de
+   * sanitizer-allowlist kan reconstrueren (oude cache-rijen zonder dit veld →
+   * lege allowlist → eventuele verzonnen links worden alsnog gestript).
+   */
+  url?: string | null;
 };
 
 export type ChatRewriteInfo = {
@@ -1164,6 +1171,7 @@ function toSource(c: RetrievedChunk): ChatSource {
     contentExcerpt,
     ...(parentExcerpt !== undefined ? { parentExcerpt } : {}),
     parentIndex: c.parent_index ?? null,
+    ...(c.source_url ? { url: c.source_url } : {}),
   };
 }
 
@@ -1675,17 +1683,27 @@ export async function* runRagQueryStreaming(input: {
           ? { cache_lookup_ms: timings.cache_lookup_ms }
           : {}),
       };
+      // v0.9.1 bron-links: schoon ook cache-hits. Oude cache-rijen (van vóór de
+      // fix) kunnen verzonnen [tekst](url)-links bevatten die de renderer nu
+      // klikbaar zou maken. Sanitize tegen de mee-gecachte bron-URLs; oude rijen
+      // zonder url-veld → lege allowlist → alle links naar platte tekst.
+      let cacheServed = cached;
+      if (bot.sourceLinksEnabled && cached.kind === 'answer') {
+        const cacheAllowed = buildAllowedUrlSet((cached.sources ?? []).map((s) => s.url));
+        const cleaned = sanitizeSourceLinks(cached.answer, cacheAllowed);
+        if (cleaned !== cached.answer) cacheServed = { ...cached, answer: cleaned };
+      }
       const baseEnriched =
-        cached.kind === 'answer'
+        cacheServed.kind === 'answer'
           ? {
-              ...cached,
+              ...cacheServed,
               extras: {
-                ...(cached.extras ?? {}),
+                ...(cacheServed.extras ?? {}),
                 fromCache: true,
                 phaseTimingsMs: cacheHitTimings,
               },
             }
-          : cached;
+          : cacheServed;
       const enriched: ChatResponse = { ...baseEnriched, tone, length, generalKnowledgeActual: null };
       yield {
         kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',

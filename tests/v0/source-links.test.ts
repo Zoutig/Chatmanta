@@ -55,6 +55,19 @@ test('numerieke [n]-citaties blijven onaangeroerd (geen link-syntax)', () => {
   assert.equal(out, 'Dit klopt [1] en dat ook [2].');
 });
 
+test('markdown-link met titel: verzonnen → label, toegestaan → canoniek (zonder titel)', () => {
+  const allowed = buildAllowedUrlSet([REAL]);
+  const fake = 'https://v0-demo1-website.vercel.app/diensten/corporate';
+  assert.equal(
+    sanitizeSourceLinks(`Zie [Diensten](${fake} "Onze diensten").`, allowed),
+    'Zie Diensten.',
+  );
+  assert.equal(
+    sanitizeSourceLinks(`Zie [over ons](${REAL} "Over ons").`, allowed),
+    `Zie [over ons](${REAL}).`, // titel weggestript → renderer-vriendelijk
+  );
+});
+
 test('lege allowlist → alle links naar platte tekst', () => {
   const out = sanitizeSourceLinks(`[A](${REAL}) en [B](https://x.nl/y).`, new Set());
   assert.equal(out, 'A en B.');

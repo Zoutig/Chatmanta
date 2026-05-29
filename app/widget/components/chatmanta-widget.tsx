@@ -998,7 +998,7 @@ export function ChatMantaWidget({
                   style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
                 >
                   <BotBubble color={c.header}>
-                    {m.streaming && !visible ? <TypingDots /> : renderMarkdownLite(m.content, c.header)}
+                    {m.streaming && !visible ? <TypingDots /> : renderMarkdownLite(m.content, c.header, !m.streaming)}
                     {m.streaming && visible ? <Caret /> : null}
                   </BotBubble>
                   {/* Mislukt antwoord → expliciete retry-affordance i.p.v. de

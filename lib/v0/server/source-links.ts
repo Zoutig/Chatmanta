@@ -46,21 +46,22 @@ export function buildAllowedUrlSet(urls: Array<string | null | undefined>): Set<
   return set;
 }
 
-// [label](url) — label = niet-`]`, url = niet-spatie/niet-`)`. Markdown-title
-// (`[l](u "t")`) wordt niet ondersteund (model produceert die niet); een spatie
-// in de url-positie stopt de match, dus zo'n vorm valt buiten en blijft tekst.
-// Bekende beperking: een URL die zélf een `)` bevat (bv. `/wiki/Foo_(bar)`) wordt
-// op de eerste `)` afgekapt. Crawled marketing-URLs zijn in de praktijk paren-vrij;
-// het ergste geval is een cosmetische losse `)` of een gemiste match — nooit een
-// security-issue (niet-http(s) wordt sowieso geweigerd, en de renderers weigeren
-// niet-http(s) nogmaals).
-const MD_LINK_RE = /\[([^\]]+)\]\(\s*([^)\s]+?)\s*\)/g;
+// [label](url) of [label](url "titel") — label = niet-`]`, url = niet-spatie/
+// niet-`)`, met optionele markdown-title die we negeren. Bekende beperking: een
+// URL die zélf een `)` bevat (bv. `/wiki/Foo_(bar)`) wordt op de eerste `)`
+// afgekapt. Crawled marketing-URLs zijn in de praktijk paren-vrij; het ergste
+// geval is een cosmetische losse `)` of een gemiste match — nooit een security-
+// issue (niet-http(s) wordt geweigerd, en de renderers weigeren niet-http(s)
+// nogmaals). Lineaire quantifiers → geen catastrophic backtracking (ReDoS-vrij).
+const MD_LINK_RE = /\[([^\]]+)\]\(\s*([^)\s]+?)(?:\s+"[^"]*")?\s*\)/g;
 
 /**
  * Strijk elke markdown-link waarvan de (genormaliseerde) URL niet in `allowedUrls`
- * zit terug naar zijn label-tekst. Toegestane http(s)-links blijven onaangeroerd.
- * Geen links of lege allowlist met links → de links verdwijnen (kale label-tekst),
- * wat de gewenste anti-hallucinatie-uitkomst is wanneer de feature actief is.
+ * zit terug naar zijn label-tekst. Toegestane http(s)-links worden hergeschreven
+ * naar de canonieke `[label](url)`-vorm (een eventuele markdown-title valt weg),
+ * zodat de lichte renderers ze betrouwbaar als link herkennen. Geen links of lege
+ * allowlist → de links verdwijnen (kale label-tekst), de gewenste anti-
+ * hallucinatie-uitkomst wanneer de feature actief is.
  */
 export function sanitizeSourceLinks(text: string, allowedUrls: Set<string>): string {
   if (!text.includes('](')) return text; // snelle uitweg — geen link-syntax

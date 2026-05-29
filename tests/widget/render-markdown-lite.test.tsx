@@ -135,3 +135,15 @@ test('[n]-citatie-strip breekt een link met niet-numeriek label niet', () => {
   const out = html('Meer info: [Diensten](https://example.com/diensten).');
   assert.match(out, /<a[^>]*href="https:\/\/example\.com\/diensten"[^>]*>Diensten<\/a>/);
 });
+
+test('tijdens streaming (linkify=false) blijft een link kale label-tekst', () => {
+  const out = renderToStaticMarkup(
+    renderMarkdownLite(
+      'Zie [over ons](https://example.com/over-ons).',
+      undefined,
+      false,
+    ) as React.ReactElement,
+  );
+  assert.doesNotMatch(out, /<a[^>]*href/);
+  assert.match(out, /Zie over ons\./);
+});

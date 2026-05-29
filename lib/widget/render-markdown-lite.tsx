@@ -49,7 +49,15 @@ export function cleanWidgetAnswer(text: string): string {
   return s.trim();
 }
 
-export function renderMarkdownLite(text: string, linkColor?: string): ReactNode {
+// `linkify`: zet op false tijdens het streamen. De rauwe deltas zijn dan nog
+// niet door de server-sanitizer gehaald, dus een (mogelijk verzonnen) link mag
+// nog niet klikbaar worden — hij rendert als kale label-tekst tot het
+// answer-done event de geschoonde tekst levert. Voorkomt een klikbare-404-flits.
+export function renderMarkdownLite(
+  text: string,
+  linkColor?: string,
+  linkify = true,
+): ReactNode {
   const clean = cleanWidgetAnswer(text);
 
   const lines = clean.split('\n');
@@ -87,7 +95,7 @@ export function renderMarkdownLite(text: string, linkColor?: string): ReactNode 
         >
           {items.map((it, idx) => (
             <li key={idx} style={{ marginBottom: 2 }}>
-              {renderInline(it, linkColor)}
+              {renderInline(it, linkColor, linkify)}
             </li>
           ))}
         </ul>,
@@ -96,7 +104,7 @@ export function renderMarkdownLite(text: string, linkColor?: string): ReactNode 
     }
 
     // Plain line — render with inline **bold** + links
-    blocks.push(<span key={key++}>{renderInline(line, linkColor)}</span>);
+    blocks.push(<span key={key++}>{renderInline(line, linkColor, linkify)}</span>);
     // Separate consecutive plain lines with a soft <br>
     if (i + 1 < lines.length && lines[i + 1].trim() && !/^[-*]\s+/.test(lines[i + 1])) {
       blocks.push(<br key={key++} />);
@@ -123,7 +131,7 @@ function isSafeHttpUrl(url: string): boolean {
 // terug op de kale label-tekst.
 const INLINE_RE = /(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
 
-function renderInline(text: string, linkColor?: string): ReactNode {
+function renderInline(text: string, linkColor?: string, linkify = true): ReactNode {
   const parts: ReactNode[] = [];
   let last = 0;
   let k = 0;
@@ -137,7 +145,9 @@ function renderInline(text: string, linkColor?: string): ReactNode {
       const close = token.indexOf('](');
       const label = token.slice(1, close);
       const url = token.slice(close + 2, -1);
-      if (isSafeHttpUrl(url)) {
+      // Alleen klikbaar als linkify (= niet mid-stream) én veilig http(s).
+      // Anders kale label-tekst (tijdens streaming, of bij onveilige URL).
+      if (linkify && isSafeHttpUrl(url)) {
         parts.push(
           <a
             key={k++}
