@@ -16,6 +16,7 @@
 import 'server-only';
 
 import { listKnownOrgs } from '@/lib/v0/server/active-org';
+import { PRIVACY_DEFAULTS } from '../types';
 import { sb } from './db';
 import { getPrivacy } from './privacy';
 
@@ -117,4 +118,40 @@ export async function runRetentionCleanup(
     results.push(await processOrg(o.slug, o.id, o.name, apply));
   }
   return results;
+}
+
+// ── Issues-tab: prune van admin_error_groups ───────────────────────────────
+// Eén globale pass (default issue_retention_days). Bewust GEEN per-org loop:
+// veel fout-groepen hebben organization_id NULL (server-action-fouten,
+// system/cron) waar geen per-org setting bij hoort. Verwijderd worden: groepen
+// ouder dan de cutoff die NIET meer 'open' zijn (resolved/ignored) OF severity
+// 'info' (routine-ruis). Open error/warning blijven staan — die vragen aandacht.
+// Fingerprint-grouping begrenst het volume al sterk, dus dit is licht.
+
+export type ErrorRetentionResult = {
+  retentionDays: number;
+  cutoffIso: string;
+  candidates: number;
+  applied: boolean;
+};
+
+export async function runErrorGroupRetention(
+  opts: { apply?: boolean } = {},
+): Promise<ErrorRetentionResult> {
+  const apply = opts.apply === true;
+  const retentionDays = PRIVACY_DEFAULTS.issueRetentionDays;
+  const cutoff = cutoffIso(retentionDays);
+  const eligible = 'status.neq.open,severity.eq.info';
+
+  const { count } = await sb()
+    .from('admin_error_groups')
+    .select('id', { count: 'exact', head: true })
+    .lt('last_seen_at', cutoff)
+    .or(eligible);
+
+  if (apply) {
+    await sb().from('admin_error_groups').delete().lt('last_seen_at', cutoff).or(eligible);
+  }
+
+  return { retentionDays, cutoffIso: cutoff, candidates: count ?? 0, applied: apply };
 }

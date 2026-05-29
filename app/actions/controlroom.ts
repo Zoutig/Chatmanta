@@ -17,6 +17,8 @@ import {
 import { upsertProfile } from '@/lib/controlroom/server/profiles';
 import { updateOnboardingItem } from '@/lib/controlroom/server/onboarding';
 import { upsertPrivacy } from '@/lib/controlroom/server/privacy';
+import { setErrorGroupStatus } from '@/lib/controlroom/server/errors';
+import type { ErrorStatus } from '@/lib/observability/sink';
 import type {
   AdminOrgProfile,
   AdminOrgProfilePatch,
@@ -84,4 +86,28 @@ export async function updatePrivacyAction(
     revalidate(orgSlug);
     return { privacy };
   });
+}
+
+// ── Issues-tab: status van een gelogde fout-groep (admin_error_groups) ──
+// Geen org-slug nodig (de groep is op id); requireV0Auth() is de poort. revalidate()
+// herrendert de hele /admindashboard-tree zodat de Issues-lijst + detail meelopen.
+async function setErrorStatus(id: string, status: ErrorStatus): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    await setErrorGroupStatus(id, status);
+    revalidate();
+    return { id };
+  });
+}
+
+export function resolveErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
+  return setErrorStatus(id, 'resolved');
+}
+
+export function ignoreErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
+  return setErrorStatus(id, 'ignored');
+}
+
+export function reopenErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
+  return setErrorStatus(id, 'open');
 }
