@@ -7,6 +7,8 @@
 
 import { useEffect } from 'react';
 
+import { reportClientError } from '@/lib/observability/report-client-error';
+
 export default function GlobalError({
   error,
   reset,
@@ -16,6 +18,13 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('[app/error.tsx]', error);
+    reportClientError({
+      surface: 'dashboard',
+      message: error.message || 'render error',
+      stack: error.stack,
+      digest: error.digest,
+      code: 'CLIENT_JS',
+    });
   }, [error]);
 
   return (

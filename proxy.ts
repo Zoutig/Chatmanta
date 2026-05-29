@@ -35,6 +35,6 @@ export const config = {
   // Segment-geankerd (`crawl-eval(?:/|$)`) zodat ALLEEN het exacte pad-segment de
   // gate omzeilt — niet een toekomstig /crawl-evaluation o.i.d. (Codex-review).
   matcher: [
-    '/((?!login|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };

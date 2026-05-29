@@ -129,6 +129,7 @@ export class UpstashRateLimiter implements RateLimiter {
 let _chatInstance: RateLimiter | null = null;
 let _mutationInstance: RateLimiter | null = null;
 let _orgInstance: RateLimiter | null = null;
+let _clientErrorInstance: RateLimiter | null = null;
 let _upstashWarned = false;
 
 function readEnvLimit(envName: string, fallback: number): number {
@@ -204,6 +205,23 @@ export function getOrgRateLimiter(): RateLimiter {
     prefix: '@chatmanta/rl-org',
   });
   return _orgInstance;
+}
+
+/**
+ * Dedicated limiter voor het publieke /api/v0/client-error ingest-endpoint.
+ * Eigen (lage) bucket zodat een crashende/loopende pagina of een scripted abuser
+ * niet het chat-bucket leegtrekt. Default 20/min/IP, override via
+ * CLIENT_ERROR_RATE_LIMIT_PER_MIN. (Géén per-org bucket: de org daar is een
+ * niet-geauthenticeerde, spoofbare hint — de IP-limit + cardinaliteits-cap +
+ * altijd-204 + retention zijn de echte controls.)
+ */
+export function getClientErrorRateLimiter(): RateLimiter {
+  if (_clientErrorInstance) return _clientErrorInstance;
+  _clientErrorInstance = buildLimiter({
+    limit: readEnvLimit('CLIENT_ERROR_RATE_LIMIT_PER_MIN', 20),
+    prefix: '@chatmanta/rl-clienterr',
+  });
+  return _clientErrorInstance;
 }
 
 /**
