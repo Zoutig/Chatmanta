@@ -2220,7 +2220,7 @@ KRITISCHE FORMAT-REGELS:
   // de prompt blijft byte-identiek aan voorheen (geen eval-regressie).
   const sourceLinksIntro =
     linkEnabled && providedUrls.length > 0
-      ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Als je naar zo\'n pagina verwijst, mag je dat als markdown-link opnemen — [korte omschrijving](URL) — maar UITSLUITEND met exact een van de gegeven Bron-URLs, letterlijk overgenomen. Verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
+      ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Als je naar zo\'n pagina verwijst, mag je dat als markdown-link opnemen — [korte omschrijving](URL) — maar UITSLUITEND met exact een van de gegeven Bron-URLs, letterlijk overgenomen. Verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
       : '';
   const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
