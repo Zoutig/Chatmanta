@@ -23,6 +23,9 @@ export type OrgSignals = {
   fallbackPct: number | null;
   conversationsThisMonth: number;
   conversationsThisWeek: number;
+  /** Open error-severity fout-groepen in de laatste 24u (admin_error_groups).
+   *  Optioneel → default 0, zodat bestaande callers/tests niet breken. */
+  recentCriticalErrorCount?: number;
 };
 
 /** Vanaf dit fallback-% (inclusief) rekenen we een bot als "veel fallback" → degraded. */
@@ -78,6 +81,10 @@ export function deriveHealth(
   if (s.widgetStatus === 'detected') orange.push('Widget gevonden maar nog niet actief');
   if (s.fallbackPct != null && s.fallbackPct >= HIGH_FALLBACK_PCT) {
     orange.push('Hoog fallback-percentage');
+  }
+  const recentErrors = s.recentCriticalErrorCount ?? 0;
+  if (recentErrors > 0) {
+    orange.push(`${recentErrors} recente fout${recentErrors === 1 ? '' : 'en'} gelogd (24u)`);
   }
   // Onboarding-voortgang telt bewust NIET mee in health — dat is een
   // commerciële/operationele indicator (zie de Onboarding-tab), geen signaal

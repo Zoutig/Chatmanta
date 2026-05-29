@@ -16,6 +16,7 @@
 import 'server-only';
 
 import { listKnownOrgs } from '@/lib/v0/server/active-org';
+import { PRIVACY_DEFAULTS } from '../types';
 import { sb } from './db';
 import { getPrivacy } from './privacy';
 
@@ -117,4 +118,40 @@ export async function runRetentionCleanup(
     results.push(await processOrg(o.slug, o.id, o.name, apply));
   }
   return results;
+}
+
+// ── Issues-tab: prune van admin_error_groups ───────────────────────────────
+// Eén globale pass (default issue_retention_days). Bewust GEEN per-org loop:
+// veel fout-groepen hebben organization_id NULL (server-action-fouten,
+// system/cron) waar geen per-org setting bij hoort. Verwijderd worden: AFGEHANDELDE
+// groepen (resolved/ignored) ouder dan de cutoff. OPEN groepen blijven staan — ook
+// open 'info' (een actief-terugkerend abuse-patroon zoals INJECTION_BLOCKED/
+// AUTH_REQUIRED mag niet stilletjes verdwijnen); hun aantal is al begrensd door de
+// fingerprint-grouping + cardinaliteits-cap. (Review round 1.)
+
+export type ErrorRetentionResult = {
+  retentionDays: number;
+  cutoffIso: string;
+  candidates: number;
+  applied: boolean;
+};
+
+export async function runErrorGroupRetention(
+  opts: { apply?: boolean } = {},
+): Promise<ErrorRetentionResult> {
+  const apply = opts.apply === true;
+  const retentionDays = PRIVACY_DEFAULTS.issueRetentionDays;
+  const cutoff = cutoffIso(retentionDays);
+
+  const { count } = await sb()
+    .from('admin_error_groups')
+    .select('id', { count: 'exact', head: true })
+    .lt('last_seen_at', cutoff)
+    .neq('status', 'open');
+
+  if (apply) {
+    await sb().from('admin_error_groups').delete().lt('last_seen_at', cutoff).neq('status', 'open');
+  }
+
+  return { retentionDays, cutoffIso: cutoff, candidates: count ?? 0, applied: apply };
 }

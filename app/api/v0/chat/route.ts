@@ -36,6 +36,8 @@ import {
 import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
+import { captureError } from '@/lib/v0/server/error-capture';
+import type { ErrorSeverity, ErrorSurface } from '@/lib/observability/sink';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
 import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
 
@@ -143,6 +145,32 @@ export async function POST(req: Request) {
   // krijgt — feedback kan zo betrouwbaar gekoppeld worden.
   const queryLogId = crypto.randomUUID();
 
+  // Centrale fout-capture voor dit request → admin_error_groups (fire-and-forget,
+  // never-throws). surface default 'chatbot'; severity wordt afgeleid van code
+  // tenzij expliciet meegegeven; org valt terug op getActiveOrgId(req).
+  const capture = (
+    code: string,
+    extra: {
+      severity?: ErrorSeverity;
+      surface?: ErrorSurface;
+      error?: unknown;
+      message?: string;
+      organizationId?: string | null;
+      inputRaw?: string;
+      botVersion?: string;
+    } = {},
+  ) =>
+    captureError({
+      surface: extra.surface ?? 'chatbot',
+      severity: extra.severity,
+      code,
+      message: extra.message,
+      error: extra.error,
+      organizationId: extra.organizationId ?? getActiveOrgId(req),
+      inputRaw: extra.inputRaw,
+      context: { requestId, route: '/api/v0/chat', botVersion: extra.botVersion },
+    });
+
   // Widget-pad? Bepaalt of we visitor-grouping + server-side commitTurn doen.
   // Testtool-calls krijgen geen visitor-cookie en geen extra thread-write
   // (zou anders dubbele rijen geven naast de bestaande client-side commit).
@@ -165,6 +193,7 @@ export async function POST(req: Request) {
   const rl = await getRateLimiter().check(ip);
   if (!rl.allowed) {
     const err = new AppError('RATE_LIMIT', { retryAfterSec: rl.retryAfterSec });
+    capture('RATE_LIMIT', { message: 'IP rate limit' });
     return NextResponse.json(toWire(err, requestId), {
       status: err.status,
       headers: {
@@ -179,6 +208,7 @@ export async function POST(req: Request) {
 
   if (!isChatAuthorized(req)) {
     const err = new AppError('AUTH_REQUIRED');
+    capture('AUTH_REQUIRED', { message: 'chat auth required' });
     return NextResponse.json(toWire(err, requestId), {
       status: err.status, // 401
       headers: { 'X-Request-Id': requestId },
@@ -190,6 +220,7 @@ export async function POST(req: Request) {
     body = (await req.json()) as Body;
   } catch {
     const err = new AppError('INPUT_INVALID', { message: 'invalid JSON body' });
+    capture('INPUT_INVALID', { message: 'invalid JSON body' });
     return NextResponse.json(toWire(err, requestId), {
       status: err.status,
       headers: { 'X-Request-Id': requestId },
@@ -205,6 +236,7 @@ export async function POST(req: Request) {
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
   if (!question.trim()) {
     const err = new AppError('INPUT_INVALID', { message: 'question is required' });
+    capture('INPUT_INVALID', { message: 'question is required' });
     return NextResponse.json(toWire(err, requestId), {
       status: err.status,
       headers: { 'X-Request-Id': requestId },
@@ -212,6 +244,7 @@ export async function POST(req: Request) {
   }
   if (question.length > MAX_QUESTION_CHARS) {
     const err = new AppError('INPUT_INVALID', { message: 'question too long' });
+    capture('INPUT_INVALID', { message: 'question too long' });
     return NextResponse.json(toWire(err, requestId), {
       status: err.status,
       headers: { 'X-Request-Id': requestId },
@@ -240,6 +273,11 @@ export async function POST(req: Request) {
 
   if (injection.detected && injectionMode === 'block') {
     const patternName = injection.pattern?.name ?? 'unknown';
+    capture('INJECTION_BLOCKED', {
+      message: `injection geblokkeerd: ${patternName}`,
+      inputRaw: question,
+      botVersion: bot.version,
+    });
     // Post-response log via after() — voorkomt dat de blocked-telemetrie
     // verdampt op serverless wanneer de response al weg is.
     after(async () => {
@@ -260,6 +298,12 @@ export async function POST(req: Request) {
           requestId,
           err instanceof Error ? err.message : err,
         );
+        capture('INTERNAL', {
+          surface: 'system',
+          severity: 'warning',
+          error: err,
+          message: 'logBlockedQuery faalde',
+        });
       }
     });
 
@@ -301,6 +345,7 @@ export async function POST(req: Request) {
     const orgRl = await getOrgRateLimiter().check(`org:${organizationId}`);
     if (!orgRl.allowed) {
       const err = new AppError('RATE_LIMIT', { retryAfterSec: orgRl.retryAfterSec });
+      capture('RATE_LIMIT', { message: 'org rate limit', organizationId });
       return NextResponse.json(toWire(err, requestId), {
         status: err.status,
         headers: {
@@ -413,6 +458,13 @@ export async function POST(req: Request) {
         const appErr = toAppError(err);
         // Server-log de volledige technische context; client krijgt alleen code.
         console.error('[chat stream]', requestId, appErr.code, appErr.message, appErr.cause ?? '');
+        capture(appErr.code, {
+          error: appErr.cause ?? appErr,
+          message: appErr.message,
+          organizationId,
+          inputRaw: question,
+          botVersion: bot.version,
+        });
         controller.enqueue(
           encoder.encode(
             JSON.stringify({
@@ -456,6 +508,13 @@ export async function POST(req: Request) {
               requestId,
               err instanceof Error ? err.message : err,
             );
+            capture('INTERNAL', {
+              surface: 'system',
+              severity: 'warning',
+              error: err,
+              message: 'logQuery faalde',
+              organizationId,
+            });
           }
         });
 
@@ -487,6 +546,13 @@ export async function POST(req: Request) {
                 requestId,
                 err instanceof Error ? err.message : err,
               );
+              capture('INTERNAL', {
+                surface: 'system',
+                severity: 'warning',
+                error: err,
+                message: 'commitTurn faalde',
+                organizationId,
+              });
             }
           });
         }

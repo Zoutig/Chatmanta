@@ -19,6 +19,7 @@ import type {
   TechnicalStatus,
 } from '../types';
 import { deriveHealth, deriveTechnicalStatus, type OrgSignals } from './health';
+import { countRecentCriticalErrors } from './errors';
 import {
   daysAgoIso,
   getDocumentCount,
@@ -92,18 +93,29 @@ export async function getOrgSignals(
   const orgId = KNOWN_ORGS[slug].id;
   const monthIso = startOfMonthIso();
 
-  const [settings, websiteSources, docCount, threadsMonth, threadsWeek, qlMonth, fb30, monthCostUsd, lastActivityAt] =
-    await Promise.all([
-      getOrgSettings(slug).catch(() => null),
-      getWebsiteSources(orgId).catch(() => []),
-      getDocumentCount(orgId).catch(() => 0),
-      getThreadCount(orgId, monthIso).catch(() => 0),
-      getThreadCount(orgId, startOfWeekIso(0)).catch(() => 0),
-      getQueryLogStats(orgId, monthIso).catch(() => ({ total: 0, fallback: 0 })),
-      getQueryLogStats(orgId, daysAgoIso(30)).catch(() => ({ total: 0, fallback: 0 })),
-      getMonthlyCostUsd(orgId).catch(() => 0),
-      getLastActivityAt(orgId).catch(() => null),
-    ]);
+  const [
+    settings,
+    websiteSources,
+    docCount,
+    threadsMonth,
+    threadsWeek,
+    qlMonth,
+    fb30,
+    monthCostUsd,
+    lastActivityAt,
+    recentErrorCount,
+  ] = await Promise.all([
+    getOrgSettings(slug).catch(() => null),
+    getWebsiteSources(orgId).catch(() => []),
+    getDocumentCount(orgId).catch(() => 0),
+    getThreadCount(orgId, monthIso).catch(() => 0),
+    getThreadCount(orgId, startOfWeekIso(0)).catch(() => 0),
+    getQueryLogStats(orgId, monthIso).catch(() => ({ total: 0, fallback: 0 })),
+    getQueryLogStats(orgId, daysAgoIso(30)).catch(() => ({ total: 0, fallback: 0 })),
+    getMonthlyCostUsd(orgId).catch(() => 0),
+    getLastActivityAt(orgId).catch(() => null),
+    countRecentCriticalErrors(orgId).catch(() => 0),
+  ]);
 
   const widget = settings?.widget;
   const widgetStatus: WidgetStatus = widget?.isActive
@@ -135,6 +147,7 @@ export async function getOrgSignals(
     fallbackPct,
     conversationsThisMonth: threadsMonth,
     conversationsThisWeek: threadsWeek,
+    recentCriticalErrorCount: recentErrorCount,
   };
 
   const technicalStatus = deriveTechnicalStatus(signals, profile.technicalStatusOverride);

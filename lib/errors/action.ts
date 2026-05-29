@@ -1,4 +1,6 @@
 import { AppError, toAppError, type AppErrorCode } from './app-error';
+import { newRequestId } from './request-id';
+import { getSink, severityForCode, type ErrorSurface } from '@/lib/observability/sink';
 
 // Uniform return-pattern voor alle server actions.
 //
@@ -19,6 +21,17 @@ export type ActionFail = {
   error: string;
   code: AppErrorCode;
   retryAfterSec?: number;
+  /** Correlatie-ID (chm_…) — server-actions hadden dit voorheen niet; nu
+   *  gedeeld met de gelogde fout-groep zodat de UI/Copy-knop het kan tonen. */
+  requestId?: string;
+};
+
+/** Optionele tagging zodat een gevangen server-action-fout in de juiste surface
+ *  en met org-context in admin_error_groups belandt. */
+export type ActionMeta = {
+  surface?: ErrorSurface;
+  route?: string;
+  organizationId?: string | null;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -28,20 +41,36 @@ export type ActionResult<T extends Record<string, unknown> = {}> =
 
 export async function actionTry<T extends Record<string, unknown>>(
   fn: () => Promise<T> | T,
+  meta?: ActionMeta,
 ): Promise<ActionResult<T>> {
   try {
     const data = await fn();
     return { ok: true, ...data };
   } catch (err) {
     const appErr = toAppError(err);
+    const requestId = newRequestId();
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[actionTry]', appErr.code, appErr.message, appErr.cause ?? '');
     }
+    // Capture via de observability-sink (NIET een directe import van de admin/v0-
+    // laag — dat zou een layering-inversie zijn; eslint bewaakt dat). In prod was
+    // dit voorheen volledig stil; nu belandt elke server-action-fout in
+    // admin_error_groups, correleerbaar via requestId.
+    getSink().capture({
+      surface: meta?.surface ?? 'dashboard',
+      severity: severityForCode(appErr.code),
+      code: appErr.code,
+      message: appErr.message,
+      error: appErr.cause ?? appErr,
+      organizationId: meta?.organizationId ?? null,
+      context: { requestId, route: meta?.route },
+    });
     return {
       ok: false,
       error: appErr.message,
       code: appErr.code,
       retryAfterSec: appErr.retryAfterSec,
+      requestId,
     };
   }
 }

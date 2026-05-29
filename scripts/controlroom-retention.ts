@@ -6,7 +6,10 @@
 // Bewust handmatig, niet op cron (V0-beslissing). Zie
 // lib/controlroom/server/retention.ts voor de semantiek.
 
-import { runRetentionCleanup } from '../lib/controlroom/server/retention';
+import {
+  runErrorGroupRetention,
+  runRetentionCleanup,
+} from '../lib/controlroom/server/retention';
 
 async function main() {
   const apply = process.argv.includes('--apply');
@@ -21,8 +24,16 @@ async function main() {
   const totalQl = results.reduce((a, r) => a + r.queryLogCandidates, 0);
   const totalMsg = results.reduce((a, r) => a + r.messageCandidates, 0);
   console.log(`\nTotaal kandidaten: ${totalQl} query_log-rijen, ${totalMsg} berichten.`);
-  if (!apply && totalQl + totalMsg > 0) {
-    console.log('Draai met `-- --apply` om deze inhoud te anonimiseren (metadata blijft behouden).');
+
+  // Issues-tab: prune van oude/afgehandelde fout-groepen (globaal, incl. null-org).
+  const err = await runErrorGroupRetention({ apply });
+  console.log(
+    `\nFout-groepen (admin_error_groups): retentie=${err.retentionDays}d  cutoff=${err.cutoffIso.slice(0, 10)}  ` +
+      `kandidaten=${err.candidates}  ${err.applied ? '→ verwijderd' : '(dry-run)'}`,
+  );
+
+  if (!apply && totalQl + totalMsg + err.candidates > 0) {
+    console.log('\nDraai met `-- --apply` om inhoud te anonimiseren en oude fout-groepen te verwijderen.');
   }
   console.log('');
 }
