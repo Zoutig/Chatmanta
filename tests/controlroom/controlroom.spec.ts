@@ -195,14 +195,23 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByText(/\/\s*\d+/).first()).toBeVisible();
   });
 
-  test('usage: schatting + echte OpenAI-kosten (taak 5)', async ({ page }) => {
+  test('usage: klant-chatbot-kosten primair + account-totaal apart', async ({ page }) => {
     await page.goto('/admindashboard/usage');
     await expect(page.getByRole('heading', { name: /Usage/ })).toBeVisible({ timeout: 15_000 });
-    // De token-schatting staat er altijd.
-    await expect(page.getByText('Kosten (schatting, deze maand)')).toBeVisible();
-    // Met OPENAI_ADMIN_KEY in .env.local hoort de echte-kosten-kaart (Costs-API) er te zijn.
-    // Specifiek de metric-kaart-label (niet de <strong> in de uitleg-hint).
-    await expect(page.getByText('OpenAI-kosten (echt, deze maand)')).toBeVisible({ timeout: 15_000 });
+    // De klant-chatbot-kosten (query_log, evals niet meegerekend) zijn de hoofdmetric.
+    await expect(page.getByText('Kosten klant-chatbots (deze maand)')).toBeVisible();
+    // Met OPENAI_ADMIN_KEY in .env.local hoort het account-totaal er apart te staan,
+    // expliciet gelabeld als incl. evals/dev (niet alleen klant-chatbots).
+    await expect(page.getByText('Totaal OpenAI-account (deze maand)')).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('overview toont de verbruik-grafiek (klant-chatbots per dag)', async ({ page }) => {
+    await page.goto('/admindashboard');
+    await expect(page.getByText('Klant-chatbot-verbruik per dag (deze maand)')).toBeVisible({ timeout: 15_000 });
+    // Of een staafgrafiek (totaal-regel) óf de lege staat — beide acceptabel.
+    const hasTotal = await page.getByText(/Totaal deze maand:/).count();
+    const hasEmpty = await page.getByText('Nog geen verbruik deze maand').count();
+    expect(hasTotal + hasEmpty).toBeGreaterThan(0);
   });
 
   test('profiel-edit persisteert', async ({ page }) => {
