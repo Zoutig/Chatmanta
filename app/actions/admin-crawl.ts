@@ -20,6 +20,7 @@ import { revalidatePath } from 'next/cache';
 import { KNOWN_ORGS, resolveOrgIdFromSlug } from '@/lib/v0/server/active-org';
 import { getSystemJobClient } from '@/lib/supabase/admin';
 import { ingestText, deleteDoc } from '@/lib/v0/server/rag';
+import { extractDocText, isAllowedDocExt } from '@/lib/v0/server/doc-parse';
 import { mapSite, startBatchScrape, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v0/crawler/firecrawl';
 import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
 import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
@@ -108,6 +109,32 @@ function requireKnownOrgId(slug: string): string {
 function revalidate(slug: string) {
   revalidatePath('/admindashboard', 'layout');
   revalidatePath(`/admindashboard/klanten/${slug}`);
+}
+
+/** Bovengrens voor een geüpload document (10 MB). */
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Reconstrueert leesbare tekst uit opgeslagen chunks (het origineel wordt in V0 niet
+ * bewaard). chunkText laat opeenvolgende chunks ~200 tekens overlappen; we knippen de
+ * grootste suffix-die-ook-prefix-is weg zodat de weergave niet dubbelt.
+ */
+function reconstructFromChunks(chunks: string[]): string {
+  if (chunks.length === 0) return '';
+  let out = chunks[0];
+  for (let i = 1; i < chunks.length; i++) {
+    const next = chunks[i];
+    const max = Math.min(out.length, next.length, 500);
+    let overlap = 0;
+    for (let k = max; k > 20; k--) {
+      if (out.slice(out.length - k) === next.slice(0, k)) {
+        overlap = k;
+        break;
+      }
+    }
+    out += next.slice(overlap);
+  }
+  return out;
 }
 
 /**
@@ -219,6 +246,99 @@ export async function adminDeleteDocAction(orgSlug: string, docId: string): Prom
     await deleteDoc(docId, orgId);
     revalidate(orgSlug);
     return {};
+  });
+}
+
+/**
+ * Upload een echt document (PDF/DOCX/TXT/MD): extraheer de tekst en ingest 'm (chunk +
+ * embed) net als een geplakt tekstdocument. Org uit de route-param. Consistent met de
+ * klantendashboard-kennisbank-bestandstypes, maar dit is het eerste pad dat de upload
+ * écht verwerkt (de klant-UI was tot nu toe een mock).
+ */
+export async function adminUploadDocAction(
+  orgSlug: string,
+  formData: FormData,
+): Promise<ActionResult<{ docId: string; chunks: number; filename: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const orgId = requireKnownOrgId(orgSlug);
+
+    const file = formData.get('file');
+    if (!(file instanceof File) || file.size === 0) fail('INPUT_INVALID', 'Geen bestand ontvangen.');
+    if (file.size > MAX_UPLOAD_BYTES) {
+      fail('INGEST_TOO_LARGE', `Bestand te groot (max ${MAX_UPLOAD_BYTES / 1024 / 1024} MB).`);
+    }
+    const filename = (file.name || 'document').trim();
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+    if (!isAllowedDocExt(ext)) fail('INGEST_TYPE', 'Alleen PDF, DOCX, TXT of MD worden ondersteund.');
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const text = await extractDocText(buffer, ext);
+    if (!text.trim()) {
+      fail('INGEST_READ_FAILED', 'Geen tekst gevonden in het bestand (gescande PDF zonder tekstlaag?).');
+    }
+
+    const res = await ingestText({ filename, text, organizationId: orgId });
+    revalidate(orgSlug);
+    return { docId: res.docId, chunks: res.chunks, filename };
+  });
+}
+
+/** Lees de inhoud van een document terug (gereconstrueerd uit de opgeslagen chunks). */
+export async function adminGetDocContentAction(
+  orgSlug: string,
+  docId: string,
+): Promise<ActionResult<{ filename: string; text: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const orgId = requireKnownOrgId(orgSlug);
+    const sb = await getSystemJobClient({ reason: 'admin_view_doc' });
+    const { data: doc } = await sb
+      .from('documents')
+      .select('filename')
+      .eq('id', docId)
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!doc) fail('NOT_FOUND', 'Document niet gevonden.');
+    const { data: rows, error } = await sb
+      .from('document_chunks')
+      .select('content, metadata')
+      .eq('document_id', docId)
+      .eq('organization_id', orgId);
+    if (error) throw new Error(`document_chunks read: ${error.message}`);
+    const ordered = (rows ?? [])
+      .map((r) => ({
+        idx: Number((r.metadata as { chunk_index?: number } | null)?.chunk_index ?? 0),
+        content: (r.content as string) ?? '',
+      }))
+      .sort((a, b) => a.idx - b.idx);
+    return { filename: doc.filename as string, text: reconstructFromChunks(ordered.map((o) => o.content)) };
+  });
+}
+
+/** Lees de gecrawlde inhoud van één website-pagina terug (content_text). */
+export async function adminGetPageContentAction(
+  orgSlug: string,
+  pageId: string,
+): Promise<ActionResult<{ title: string; url: string; text: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const orgId = requireKnownOrgId(orgSlug);
+    const sb = await getSystemJobClient({ reason: 'admin_view_page' });
+    const { data: pg } = await sb
+      .from('website_pages')
+      .select('title, url, content_text')
+      .eq('id', pageId)
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!pg) fail('NOT_FOUND', 'Pagina niet gevonden.');
+    return {
+      title: (pg.title as string | null) ?? '',
+      url: pg.url as string,
+      text: (pg.content_text as string | null) ?? '',
+    };
   });
 }
 

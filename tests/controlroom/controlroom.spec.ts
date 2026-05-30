@@ -110,6 +110,47 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: /^Crawlen/ })).toBeVisible();
   });
 
+  test('bronnen: bestand-upload knop + inhoud bekijken (taak 1)', async ({ page }) => {
+    await page.goto('/admindashboard/klanten/acme-corp?tab=bronnen');
+    // De echte file-upload-knop hoort er te zijn.
+    await expect(page.getByRole('button', { name: /Bestand uploaden/ })).toBeVisible({ timeout: 15_000 });
+    // Een bestaande bron is "aanklikbaar" om de inhoud te bekijken (doc of pagina).
+    const bekijk = page.getByRole('button', { name: /Bekijken/ }).first();
+    test.skip((await bekijk.count()) === 0, 'geen documenten/pagina’s om te bekijken voor acme-corp');
+    await bekijk.click();
+    // De inhoud-modal opent (dialog) en is weer te sluiten.
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Sluiten' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('bronnen: echt .txt uploaden → bekijken → opruimen (taak 1)', async ({ page }) => {
+    await page.goto('/admindashboard/klanten/demo-nieuw?tab=bronnen');
+    await expect(page.getByRole('button', { name: /Bestand uploaden/ })).toBeVisible({ timeout: 15_000 });
+
+    const fname = `e2e-upload-${Date.now()}.txt`;
+    await page.locator('input[type="file"]').setInputFiles({
+      name: fname,
+      mimeType: 'text/plain',
+      buffer: Buffer.from('E2E upload probe — deze tekst is geextraheerd en geindexeerd.'),
+    });
+
+    // Na parse + ingest (embedding) + refresh verschijnt het document in de lijst.
+    const docLabel = page.getByText(fname, { exact: true });
+    await expect(docLabel).toBeVisible({ timeout: 30_000 });
+    const row = docLabel.locator('xpath=ancestor::div[1]');
+
+    // Bekijken toont de gereconstrueerde inhoud uit de chunks.
+    await row.getByRole('button', { name: /Bekijken/ }).click();
+    await expect(page.getByRole('dialog')).toContainText('E2E upload probe', { timeout: 15_000 });
+    await page.getByRole('button', { name: 'Sluiten' }).click();
+
+    // Opruimen zodat demo-nieuw schoon blijft.
+    await row.getByRole('button', { name: 'Document verwijderen' }).click();
+    await row.getByRole('button', { name: 'Ja' }).click();
+    await expect(page.getByText(fname, { exact: true })).toHaveCount(0, { timeout: 15_000 });
+  });
+
   test('bronnen: website deactiveren → heractiveren (retrieval-toggle)', async ({ page }) => {
     // demo-nieuw heeft een actieve website-bron (acme/globex/initech draaien op docs/Q&A).
     await page.goto('/admindashboard/klanten/demo-nieuw?tab=bronnen');

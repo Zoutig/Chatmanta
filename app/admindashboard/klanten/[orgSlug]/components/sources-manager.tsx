@@ -8,9 +8,9 @@
 // vs "Verwijderd" (harde delete, met bevestiging). Per-pagina include-toggle = fijnmazig
 // bewerken. Een nieuwe website crawlen kan onderaan de Websites-sectie.
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, FileText, Globe, Plus, Power, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, FileText, Globe, Plus, Power, RotateCcw, Trash2, Upload, X } from 'lucide-react';
 import { formatRelativeNL } from '@/lib/controlroom/format';
 import {
   adminSetWebsiteSourceActiveAction,
@@ -18,7 +18,10 @@ import {
   adminDeleteWebsiteSourceAction,
   adminStartCrawlAction,
   adminAddDocTextAction,
+  adminUploadDocAction,
   adminDeleteDocAction,
+  adminGetDocContentAction,
+  adminGetPageContentAction,
 } from '@/app/actions/admin-crawl';
 
 type PageRow = {
@@ -88,6 +91,8 @@ export function SourcesManager({
   const [docName, setDocName] = useState('');
   const [docText, setDocText] = useState('');
   const [newUrl, setNewUrl] = useState('');
+  const [view, setView] = useState<{ title: string; text: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function run(key: string, fn: () => Promise<{ ok: boolean; error?: string }>, onOk?: () => void) {
     setError(null);
@@ -102,6 +107,42 @@ export function SourcesManager({
       } else {
         setError(res.error ?? 'Er ging iets mis.');
       }
+    });
+  }
+
+  function viewDoc(d: DocRow) {
+    setError(null);
+    setBusy(`view-doc-${d.id}`);
+    start(async () => {
+      const res = await adminGetDocContentAction(orgSlug, d.id);
+      setBusy(null);
+      if (res.ok) setView({ title: d.filename, text: res.text || '(leeg)' });
+      else setError(res.error ?? 'Kon de documentinhoud niet laden.');
+    });
+  }
+
+  function viewPage(p: PageRow) {
+    setError(null);
+    setBusy(`view-pg-${p.id}`);
+    start(async () => {
+      const res = await adminGetPageContentAction(orgSlug, p.id);
+      setBusy(null);
+      if (res.ok) setView({ title: res.title || res.url, text: res.text || '(geen tekst opgeslagen voor deze pagina)' });
+      else setError(res.error ?? 'Kon de pagina-inhoud niet laden.');
+    });
+  }
+
+  function uploadFile(file: File) {
+    setError(null);
+    setBusy('upload-doc');
+    const fd = new FormData();
+    fd.append('file', file);
+    start(async () => {
+      const res = await adminUploadDocAction(orgSlug, fd);
+      setBusy(null);
+      if (fileRef.current) fileRef.current.value = '';
+      if (res.ok) router.refresh();
+      else setError(res.error ?? 'Upload mislukt.');
     });
   }
 
@@ -197,6 +238,13 @@ export function SourcesManager({
                             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: p.status === 'error' ? 'var(--klant-danger)' : 'var(--klant-ink)' }} title={p.url}>
                               {p.title || p.url}
                             </span>
+                            {p.status !== 'error' && (
+                              <button type="button" className="klant-btn" data-variant="ghost" disabled={pending}
+                                onClick={() => viewPage(p)} title="Inhoud bekijken"
+                                style={{ fontSize: 11.5, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <Eye size={12} strokeWidth={1.8} /> {busy === `view-pg-${p.id}` ? '…' : 'Bekijken'}
+                              </button>
+                            )}
                             {p.status === 'error' ? (
                               <Badge tone="danger">fout</Badge>
                             ) : (
@@ -258,6 +306,11 @@ export function SourcesManager({
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.filename}</span>
                   <Badge tone={d.status === 'ready' ? 'success' : d.status === 'failed' ? 'danger' : 'warn'}>{d.status}</Badge>
                   <span style={{ fontSize: 12, color: 'var(--klant-muted)' }}>{d.chunkCount} chunks</span>
+                  <button type="button" className="klant-btn" data-variant="ghost" disabled={pending}
+                    onClick={() => viewDoc(d)} title="Inhoud bekijken"
+                    style={{ fontSize: 12, padding: '4px 9px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={13} strokeWidth={1.8} /> {busy === `view-doc-${d.id}` ? '…' : 'Bekijken'}
+                  </button>
                   {confirmDel ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <button type="button" className="klant-btn" data-variant="danger" disabled={pending}
@@ -270,6 +323,7 @@ export function SourcesManager({
                     </span>
                   ) : (
                     <button type="button" className="klant-btn" data-variant="ghost" disabled={pending}
+                      aria-label="Document verwijderen" title="Verwijderen"
                       onClick={() => setConfirm(`del-doc-${d.id}`)} style={{ fontSize: 12, padding: '4px 9px', color: 'var(--klant-danger)' }}>
                       <Trash2 size={13} strokeWidth={1.8} />
                     </button>
@@ -280,8 +334,39 @@ export function SourcesManager({
           </div>
         )}
 
-        {/* Document toevoegen via tekst */}
+        {/* Bestand uploaden (echte file-upload, taak 1) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: docs.length > 0 ? '1px solid var(--klant-border)' : 'none', paddingTop: docs.length > 0 ? 12 : 0 }}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.docx,.txt,.md"
+            disabled={pending}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadFile(f);
+            }}
+            style={{ display: 'none' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="klant-btn"
+              data-variant="primary"
+              disabled={pending}
+              onClick={() => fileRef.current?.click()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Upload size={14} strokeWidth={1.8} /> {busy === 'upload-doc' ? 'Uploaden…' : 'Bestand uploaden'}
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--klant-muted)' }}>
+              PDF, DOCX, TXT of MD (max 10 MB) — de tekst wordt geëxtraheerd en geïndexeerd.
+            </span>
+          </div>
+        </div>
+
+        {/* … of document toevoegen via geplakte tekst */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--klant-border)', paddingTop: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--klant-dim)' }}>… of plak losse tekst:</span>
           <input
             className="klant-input"
             placeholder="Documentnaam (bv. Tarieven 2026)"
@@ -325,6 +410,33 @@ export function SourcesManager({
           {qaTotal === 0 ? 'Geen handmatige Q&A.' : `${qaActive} actieve van ${qaTotal} Q&A-items.`} Q&amp;A-items bewerk je in de kennisbank van de klant zelf.
         </p>
       </div>
+
+      {/* Inhoud-bekijken modal (taak 1) — bron openen "als een tekstbestand" */}
+      {view && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Inhoud: ${view.title}`}
+          onClick={() => setView(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 1000 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--klant-surface, #fff)', color: 'var(--klant-ink)', borderRadius: 'var(--klant-r-lg, 12px)', maxWidth: 820, width: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--klant-border)' }}>
+              <FileText size={15} strokeWidth={1.8} />
+              <span style={{ flex: 1, fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{view.title}</span>
+              <button type="button" onClick={() => setView(null)} aria-label="Sluiten" className="klant-btn" data-variant="ghost" style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <pre style={{ margin: 0, padding: '14px 16px', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12.5, lineHeight: 1.55, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+              {view.text}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
