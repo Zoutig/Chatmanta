@@ -46,14 +46,15 @@ export function buildAllowedUrlSet(urls: Array<string | null | undefined>): Set<
   return set;
 }
 
-// [label](url) of [label](url "titel") — label = niet-`]`, url = niet-spatie/
-// niet-`)`, met optionele markdown-title die we negeren. Bekende beperking: een
-// URL die zélf een `)` bevat (bv. `/wiki/Foo_(bar)`) wordt op de eerste `)`
-// afgekapt. Crawled marketing-URLs zijn in de praktijk paren-vrij; het ergste
-// geval is een cosmetische losse `)` of een gemiste match — nooit een security-
-// issue (niet-http(s) wordt geweigerd, en de renderers weigeren niet-http(s)
-// nogmaals). Lineaire quantifiers → geen catastrophic backtracking (ReDoS-vrij).
-const MD_LINK_RE = /\[([^\]]+)\]\(\s*([^)\s]+?)(?:\s+"[^"]*")?\s*\)/g;
+// [label](url) of [label](url "titel") / [label](url 'titel') — label = niet-`]`,
+// url = niet-spatie/niet-`)`, met optionele markdown-title (double- óf single-
+// quoted) die we negeren. Bekende beperking: een URL die zélf een `)` bevat
+// (bv. `/wiki/Foo_(bar)`) wordt op de eerste `)` afgekapt. Crawled marketing-URLs
+// zijn in de praktijk paren-vrij; het ergste geval is een cosmetische losse `)`
+// of een gemiste match — nooit een security-issue (niet-http(s) wordt geweigerd,
+// en de renderers weigeren niet-http(s) nogmaals). Lineaire quantifiers → geen
+// catastrophic backtracking (ReDoS-vrij).
+const MD_LINK_RE = /\[([^\]]+)\]\(\s*([^)\s]+?)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g;
 
 /**
  * Strijk elke markdown-link waarvan de (genormaliseerde) URL niet in `allowedUrls`
@@ -70,4 +71,19 @@ export function sanitizeSourceLinks(text: string, allowedUrls: Set<string>): str
     if (n && allowedUrls.has(n)) return `[${label}](${url})`;
     return label;
   });
+}
+
+/**
+ * Reduceer elke markdown-link `[label](url)` tot zijn kale `label`. Bedoeld om de
+ * bron-link-URLs uit een antwoord te halen vóór hard-fact-/claim-verificatie:
+ * die URLs komen uit `website_pages.url` (metadata, NIET uit chunk-content), dus
+ * de hard-fact-verifier zou ze anders als "ongegronde URL-feiten" markeren en het
+ * hele antwoord ten onrechte naar het weiger-template trekken. De links zijn al
+ * door `sanitizeSourceLinks` gegarandeerd echt; ze hoeven niet als feit
+ * geverifieerd te worden. Proza-feiten (prijzen/datums/getallen) blijven in de
+ * label-tekst behouden en worden dus nog steeds geverifieerd.
+ */
+export function stripMarkdownLinks(text: string): string {
+  if (!text.includes('](')) return text;
+  return text.replace(MD_LINK_RE, (_full, label: string) => label);
 }

@@ -30,7 +30,7 @@ import {
   containsEmergencyHandoff,
   containsCodeOutput,
 } from './hard-facts';
-import { buildAllowedUrlSet, sanitizeSourceLinks } from './source-links';
+import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from './source-links';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
 import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
@@ -2236,7 +2236,7 @@ KRITISCHE FORMAT-REGELS:
   // de prompt blijft byte-identiek aan voorheen (geen eval-regressie).
   const sourceLinksIntro =
     linkEnabled && providedUrls.length > 0
-      ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Als je naar zo\'n pagina verwijst, mag je dat als markdown-link opnemen — [korte omschrijving](URL) — maar UITSLUITEND met exact een van de gegeven Bron-URLs, letterlijk overgenomen. Verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
+      ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Beantwoord de vraag ALTIJD eerst zelf — geef een kort, op de CONTEXT gebaseerd antwoord (enkele zinnen die samenvatten wat je weet). Gebruik links NOOIT als vervanging van een antwoord: antwoord dus niet met alleen "ik heb geen informatie, kijk op deze links" wanneer de context wél iets relevants bevat. Sluit je antwoord daarna — als er een relevante Bron-URL is — af met een korte doorverwijzing voor wie meer wil lezen: één of enkele markdown-links [korte omschrijving](URL). Gebruik UITSLUITEND exact een van de gegeven Bron-URLs, letterlijk overgenomen — verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
       : '';
   const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
@@ -2424,7 +2424,16 @@ KRITISCHE FORMAT-REGELS:
         text: c.parent_content ?? c.content,
       }));
       const result = await verifyClaims({
-        answerText: finalAnswerText,
+        // v0.9.1 bron-links: reduceer markdown-links tot hun label vóór verify.
+        // De bron-link-URLs zijn al sanitizer-gevalideerd en zitten in metadata
+        // (niet in chunk-content), dus de hard-fact-verifier zou ze anders als
+        // ongegronde "url:"-feiten flaggen en het hele antwoord deterministisch
+        // weigeren. Proza-feiten (prijs/datum/getal) blijven in de label-tekst.
+        // Zelfde gate als sanitizer/prompt (linkEnabled && allowedUrls.size > 0):
+        // op paden zonder echte Bron-URL draait de strip niet → de URL-anti-
+        // hallucinatie buiten de bron-link-case blijft byte-identiek.
+        answerText:
+          linkEnabled && allowedUrls.size > 0 ? stripMarkdownLinks(finalAnswerText) : finalAnswerText,
         chunks: chunkInputs,
         threshold: bot.claimVerificationThreshold,
         hardFactCheck: bot.adaptiveHardFactVerification === true,
@@ -2764,7 +2773,10 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           text: c.parent_content ?? c.content,
         }));
         const verifyResult2 = await verifyClaims({
-          answerText: activeAnswerText,
+          // Zie verify hierboven: bron-link-URLs uit de tekst halen vóór verify
+          // (zelfde gate als sanitizer → byte-identiek buiten de bron-link-case).
+          answerText:
+            linkEnabled && allowedUrls.size > 0 ? stripMarkdownLinks(activeAnswerText) : activeAnswerText,
           chunks: chunkInputs2,
           threshold: bot.claimVerificationThreshold,
           hardFactCheck: bot.adaptiveHardFactVerification === true,

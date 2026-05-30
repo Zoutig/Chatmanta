@@ -5,6 +5,7 @@ import {
   normalizeUrl,
   buildAllowedUrlSet,
   sanitizeSourceLinks,
+  stripMarkdownLinks,
 } from '../../lib/v0/server/source-links';
 
 const REAL = 'https://v0-demo1-website.vercel.app/over-ons';
@@ -86,4 +87,57 @@ test('mix: toegestaan behouden, verzonnen gestript, in één tekst', () => {
     allowed,
   );
   assert.equal(out, `Meer op [over ons](${REAL}) en projecten.`);
+});
+
+// --- stripMarkdownLinks: bron-link-URLs uit verify-input halen --------------
+
+test('stripMarkdownLinks reduceert link tot label, omringende tekst blijft', () => {
+  assert.equal(
+    stripMarkdownLinks(`Bekijk [Onze Diensten](${REAL}) voor meer.`),
+    'Bekijk Onze Diensten voor meer.',
+  );
+});
+
+test('stripMarkdownLinks verwijdert óók de URL bij een link-met-titel', () => {
+  assert.equal(
+    stripMarkdownLinks(`Zie [info](${REAL} "Titel").`),
+    'Zie info.',
+  );
+});
+
+test('stripMarkdownLinks behoudt proza-feiten (prijs/getal in label of tekst)', () => {
+  // Het hele punt: de URL (geen content-feit) verdwijnt, maar een prijs in de
+  // proza-tekst blijft staan en wordt dus nog steeds hard-fact-geverifieerd.
+  assert.equal(
+    stripMarkdownLinks(`Een pakket kost €50 per persoon. Zie [prijzen](${REAL}).`),
+    'Een pakket kost €50 per persoon. Zie prijzen.',
+  );
+});
+
+test('stripMarkdownLinks laat [n]-citaties en linkloze tekst ongemoeid', () => {
+  assert.equal(stripMarkdownLinks('Dit klopt [1] en dat ook [2].'), 'Dit klopt [1] en dat ook [2].');
+  const s = 'Gewoon een antwoord zonder enige link.';
+  assert.equal(stripMarkdownLinks(s), s);
+});
+
+test('stripMarkdownLinks verwerkt meerdere links in één tekst', () => {
+  const other = 'https://v0-demo1-website.vercel.app/team';
+  assert.equal(
+    stripMarkdownLinks(`Zie [diensten](${REAL}) en [team](${other}).`),
+    'Zie diensten en team.',
+  );
+});
+
+test('single-quoted titel wordt óók herkend (sanitize + strip)', () => {
+  const allowed = buildAllowedUrlSet([REAL]);
+  // sanitizeSourceLinks: toegestaan → canoniek zonder titel.
+  assert.equal(
+    sanitizeSourceLinks(`Zie [over ons](${REAL} 'Over ons').`, allowed),
+    `Zie [over ons](${REAL}).`,
+  );
+  // stripMarkdownLinks: URL (+ single-quoted titel) helemaal weg, label blijft.
+  assert.equal(
+    stripMarkdownLinks(`Zie [over ons](${REAL} 'Over ons').`),
+    'Zie over ons.',
+  );
 });
