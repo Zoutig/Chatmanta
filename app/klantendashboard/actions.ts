@@ -8,8 +8,16 @@
 // + bij widget-changes ook '/widget' zodat de demo-pagina meteen herrendert.
 
 import { revalidatePath } from 'next/cache';
-import { actionTry, type ActionResult } from '@/lib/errors/action';
+import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
+import { requireV0Auth } from '@/app/actions/_auth';
+import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
+import {
+  createFeedback,
+  uploadAttachment,
+  setFeedbackAttachment,
+} from '@/lib/controlroom/server/feedback';
+import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
 import {
   saveWidgetSettings,
   getOrgSettings,
@@ -172,5 +180,58 @@ export async function addQAFromTopQuestionAction(
     const qa = await upsertQAItem(activeOrg.slug, item);
     revalidatePath('/klantendashboard', 'layout');
     return { qa };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Feedback / meldingen (migratie 0043). De klant dient een melding in; de
+// operator beheert hem in het Admin Dashboard. Defense-in-depth: requireV0Auth
+// + mutation-rate-limit + org server-side uit de cookie (nooit client-payload).
+// De bijlage wordt server-side gevalideerd (type/size) vóór upload.
+// ---------------------------------------------------------------------------
+export async function submitFeedbackAction(
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+
+    const activeOrg = await getActiveOrgFromCookies();
+    const parsed = parseFeedbackForm(formData);
+
+    // Bijlage: valideer vóór insert zodat een ongeldig bestand de hele submit
+    // weigert (geen melding-met-kapotte-bijlage).
+    const raw = formData.get('attachment');
+    const file = raw instanceof File && raw.size > 0 ? raw : null;
+    if (file) assertValidAttachment(file);
+
+    const item = await createFeedback({
+      organizationId: activeOrg.id,
+      source: 'klantendashboard',
+      type: parsed.type,
+      urgency: parsed.urgency,
+      description: parsed.description,
+      submitterName: parsed.submitterName,
+      submitterEmail: parsed.submitterEmail,
+      chatId: parsed.chatId,
+      question: parsed.question,
+      privacyAcceptedAt: parsed.privacyAccepted ? new Date().toISOString() : null,
+    });
+
+    if (file) {
+      // Soft-fail: de melding is al opgeslagen. Een mislukte upload (netwerk)
+      // mag de submit niet alsnog laten falen — log en ga door.
+      try {
+        const { path, name } = await uploadAttachment(activeOrg.id, item.id, file);
+        await setFeedbackAttachment(item.id, path, name);
+      } catch (e) {
+        console.error('[submitFeedbackAction] bijlage-upload faalde', (e as Error).message);
+      }
+    }
+
+    // Laat de operator-inbox (Admin Dashboard) de nieuwe melding meteen zien.
+    revalidatePath('/admindashboard', 'layout');
+    return { id: item.id };
   });
 }
