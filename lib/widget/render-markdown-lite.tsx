@@ -49,7 +49,15 @@ export function cleanWidgetAnswer(text: string): string {
   return s.trim();
 }
 
-export function renderMarkdownLite(text: string): ReactNode {
+// `linkify`: zet op false tijdens het streamen. De rauwe deltas zijn dan nog
+// niet door de server-sanitizer gehaald, dus een (mogelijk verzonnen) link mag
+// nog niet klikbaar worden — hij rendert als kale label-tekst tot het
+// answer-done event de geschoonde tekst levert. Voorkomt een klikbare-404-flits.
+export function renderMarkdownLite(
+  text: string,
+  linkColor?: string,
+  linkify = true,
+): ReactNode {
   const clean = cleanWidgetAnswer(text);
 
   const lines = clean.split('\n');
@@ -87,7 +95,7 @@ export function renderMarkdownLite(text: string): ReactNode {
         >
           {items.map((it, idx) => (
             <li key={idx} style={{ marginBottom: 2 }}>
-              {renderInlineBold(it)}
+              {renderInline(it, linkColor, linkify)}
             </li>
           ))}
         </ul>,
@@ -95,8 +103,8 @@ export function renderMarkdownLite(text: string): ReactNode {
       continue;
     }
 
-    // Plain line — render with inline **bold**
-    blocks.push(<span key={key++}>{renderInlineBold(line)}</span>);
+    // Plain line — render with inline **bold** + links
+    blocks.push(<span key={key++}>{renderInline(line, linkColor, linkify)}</span>);
     // Separate consecutive plain lines with a soft <br>
     if (i + 1 < lines.length && lines[i + 1].trim() && !/^[-*]\s+/.test(lines[i + 1])) {
       blocks.push(<br key={key++} />);
@@ -107,16 +115,58 @@ export function renderMarkdownLite(text: string): ReactNode {
   return <>{blocks}</>;
 }
 
-function renderInlineBold(text: string): ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  // Strings render directly without a wrapper tag — keeps <li>X</li> clean
-  // instead of <li><span>X</span></li>. Empty strings (from split) are skipped.
-  return parts
-    .filter((p) => p.length > 0)
-    .map((p, i) => {
-      if (p.startsWith('**') && p.endsWith('**')) {
-        return <strong key={i}>{p.slice(2, -2)}</strong>;
+// Alleen http(s) wordt een klikbare <a> — javascript:/data:/mailto: e.d. nooit
+// (XSS-veiligheid). Tweede verdedigingslinie naast de server-side sanitizer.
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// Inline-parser: **bold** én [tekst](url). Eén regex die beide tokens matcht;
+// tussenliggende tekst blijft platte string. Een onveilige/niet-http URL valt
+// terug op de kale label-tekst.
+const INLINE_RE = /(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
+
+function renderInline(text: string, linkColor?: string, linkify = true): ReactNode {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  let k = 0;
+  let m: RegExpExecArray | null;
+  while ((m = INLINE_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const token = m[0];
+    if (token.startsWith('**')) {
+      parts.push(<strong key={k++}>{token.slice(2, -2)}</strong>);
+    } else {
+      const close = token.indexOf('](');
+      const label = token.slice(1, close);
+      const url = token.slice(close + 2, -1);
+      // Alleen klikbaar als linkify (= niet mid-stream) én veilig http(s).
+      // Anders kale label-tekst (tijdens streaming, of bij onveilige URL).
+      if (linkify && isSafeHttpUrl(url)) {
+        parts.push(
+          <a
+            key={k++}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: linkColor ?? 'inherit', textDecoration: 'underline', fontWeight: 500 }}
+          >
+            {label}
+          </a>,
+        );
+      } else {
+        parts.push(label);
       }
-      return p;
-    });
+    }
+    last = m.index + token.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  // Strings render directly zonder wrapper — houdt <li>X</li> schoon. Lege
+  // strings (uit slicing) overslaan.
+  return parts.filter((p) => p !== '');
 }

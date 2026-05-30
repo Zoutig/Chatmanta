@@ -30,6 +30,7 @@ import {
   containsEmergencyHandoff,
   containsCodeOutput,
 } from './hard-facts';
+import { buildAllowedUrlSet, sanitizeSourceLinks } from './source-links';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
 import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
@@ -792,6 +793,11 @@ type RawChunk = {
   parent_content?: string | null;
   /** v0.6 — parent_chunks.parent_index (0-indexed). NULL als geen parent. UI displayt als parent_index + 1. */
   parent_index?: number | null;
+  /** v0.9.1 bron-links — wp.url van de gecrawlde pagina. NULL voor document-chunks
+      of wanneer de RPC de kolom niet teruggeeft (legacy match_chunks). */
+  source_url?: string | null;
+  /** v0.9.1 bron-links — wp.title van de gecrawlde pagina (NULL voor document-chunks). */
+  source_title?: string | null;
 };
 
 export type RetrievedChunk = RawChunk & { filename: string | null };
@@ -904,6 +910,13 @@ export type ChatSource = {
    * parent_chunk_id) — UI laat dan geen Sectie-badge zien.
    */
   parentIndex?: number | null;
+  /**
+   * v0.9.1 bron-links — echte URL van de gecrawlde pagina (website_pages.url),
+   * NULL voor document-chunks. Wordt mee-gecachet zodat een cache-hit de
+   * sanitizer-allowlist kan reconstrueren (oude cache-rijen zonder dit veld →
+   * lege allowlist → eventuele verzonnen links worden alsnog gestript).
+   */
+  url?: string | null;
 };
 
 export type ChatRewriteInfo = {
@@ -1158,6 +1171,7 @@ function toSource(c: RetrievedChunk): ChatSource {
     contentExcerpt,
     ...(parentExcerpt !== undefined ? { parentExcerpt } : {}),
     parentIndex: c.parent_index ?? null,
+    ...(c.source_url ? { url: c.source_url } : {}),
   };
 }
 
@@ -1682,17 +1696,27 @@ export async function* runRagQueryStreaming(input: {
           ? { cache_lookup_ms: timings.cache_lookup_ms }
           : {}),
       };
+      // v0.9.1 bron-links: schoon ook cache-hits. Oude cache-rijen (van vóór de
+      // fix) kunnen verzonnen [tekst](url)-links bevatten die de renderer nu
+      // klikbaar zou maken. Sanitize tegen de mee-gecachte bron-URLs; oude rijen
+      // zonder url-veld → lege allowlist → alle links naar platte tekst.
+      let cacheServed = cached;
+      if (bot.sourceLinksEnabled && cached.kind === 'answer') {
+        const cacheAllowed = buildAllowedUrlSet((cached.sources ?? []).map((s) => s.url));
+        const cleaned = sanitizeSourceLinks(cached.answer, cacheAllowed);
+        if (cleaned !== cached.answer) cacheServed = { ...cached, answer: cleaned };
+      }
       const baseEnriched =
-        cached.kind === 'answer'
+        cacheServed.kind === 'answer'
           ? {
-              ...cached,
+              ...cacheServed,
               extras: {
-                ...(cached.extras ?? {}),
+                ...(cacheServed.extras ?? {}),
                 fromCache: true,
                 phaseTimingsMs: cacheHitTimings,
               },
             }
-          : cached;
+          : cacheServed;
       const enriched: ChatResponse = { ...baseEnriched, tone, length, generalKnowledgeActual: null };
       yield {
         kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',
@@ -2175,21 +2199,31 @@ KRITISCHE FORMAT-REGELS:
   let used = 0;
   let anyParentSwap = false;
   let usedMatchedSpan = false;
+  // v0.9.1 bron-links: bij sourceLinksEnabled krijgt elke website-chunk een
+  // `Bron-URL`-regel mee zodat de LLM exact die URL kan citeren. We verzamelen
+  // de URLs van de chunks die daadwerkelijk in de context belanden — die set is
+  // de allowlist voor de sanitizer (alles daarbuiten = verzonnen → gestript).
+  const linkEnabled = bot.sourceLinksEnabled === true;
+  const providedUrls: string[] = [];
   for (const c of final) {
     const hasParent = typeof c.parent_content === 'string' && c.parent_content.length > 0;
     if (hasParent) anyParentSwap = true;
+    const header = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
+    const urlLine = linkEnabled && c.source_url ? `\nBron-URL: ${c.source_url}` : '';
     let block: string;
     if (bot.matchedSpanContext && hasParent) {
-      block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\nMATCHED_SPAN:\n${c.content}\n\nSURROUNDING_CONTEXT:\n${c.parent_content}\n\n`;
+      block = `${header}${urlLine}\nMATCHED_SPAN:\n${c.content}\n\nSURROUNDING_CONTEXT:\n${c.parent_content}\n\n`;
       usedMatchedSpan = true;
     } else {
       const text = c.parent_content ?? c.content;
-      block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${text}\n\n`;
+      block = `${header}${urlLine}\n${text}\n\n`;
     }
     if (context.length + block.length > V0_RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
     context += block;
+    if (linkEnabled && c.source_url) providedUrls.push(c.source_url);
     used++;
   }
+  const allowedUrls = buildAllowedUrlSet(providedUrls);
   // V0.6.1 — kort inline-prefix dat de LLM uitlegt hoe matched-span/surrounding
   // context te gebruiken. Alleen als minstens één chunk in matched-span format
   // gerenderd is. Op andere versies / chunks zonder parent: leeg, dus user-
@@ -2197,7 +2231,14 @@ KRITISCHE FORMAT-REGELS:
   const matchedSpanIntro = usedMatchedSpan
     ? 'Bronnen-format: elke source bevat een MATCHED_SPAN (het exacte fragment dat met de vraag matchte) en SURROUNDING_CONTEXT (bredere passage). Baseer feitelijke claims primair op de MATCHED_SPAN — gebruik SURROUNDING_CONTEXT alleen voor nuance en begrip.\n\n'
     : '';
-  const userPrompt = `${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
+  // v0.9.1 bron-links: alleen tonen als minstens één bron een Bron-URL heeft.
+  // Document-only orgs / DEV_ORG eval krijgen geen URL → deze intro is leeg →
+  // de prompt blijft byte-identiek aan voorheen (geen eval-regressie).
+  const sourceLinksIntro =
+    linkEnabled && providedUrls.length > 0
+      ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Als je naar zo\'n pagina verwijst, mag je dat als markdown-link opnemen — [korte omschrijving](URL) — maar UITSLUITEND met exact een van de gegeven Bron-URLs, letterlijk overgenomen. Verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
+      : '';
+  const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
@@ -2331,6 +2372,14 @@ KRITISCHE FORMAT-REGELS:
       }
       stopCascade();
     }
+  }
+
+  // v0.9.1 bron-links: strijk elke markdown-link met een niet-aangeleverde of
+  // niet-http(s) URL terug naar platte tekst. Gated op allowedUrls.size>0 zodat
+  // document-only orgs / DEV_ORG eval (geen Bron-URL) byte-identiek blijven.
+  // Vóór claim-verify zodat die de geschoonde tekst beoordeelt.
+  if (linkEnabled && allowedUrls.size > 0) {
+    finalAnswerText = sanitizeSourceLinks(finalAnswerText, allowedUrls);
   }
 
   // v0.4 claim verification — split antwoord in claims, embed-vergelijk met
@@ -2703,6 +2752,10 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       regenerateCost = stricter.costUsd;
       const reparsedRegen = parseV03Output(stricter.text);
       activeAnswerText = reparsedRegen.answer || stricter.text.trim();
+      // Bron-links ook op de regenerate-poging afdwingen (zelfde gate).
+      if (linkEnabled && allowedUrls.size > 0) {
+        activeAnswerText = sanitizeSourceLinks(activeAnswerText, allowedUrls);
+      }
 
       try {
         const { verifyClaims } = await import('./claims');

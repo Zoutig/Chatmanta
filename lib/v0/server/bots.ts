@@ -305,6 +305,19 @@ export type BotConfig = {
    */
   offDomainCodeRefusal?: boolean;
   /**
+   * v0.9.1: echte bron-links. Wanneer aan, krijgt de answer-LLM per gecrawlde
+   * website-bron de echte `website_pages.url` (+ titel) mee én de instructie
+   * om UITSLUITEND naar die URLs te linken — nooit een URL/pad te verzinnen.
+   * Een server-side sanitizer strijkt daarna elke link met een niet-aangeleverde
+   * of niet-http(s) URL terug naar platte tekst (de harde anti-hallucinatie-
+   * garantie). Beide effecten zijn inert wanneer de context géén bron-URL bevat
+   * (document-only orgs, DEV_ORG eval) → byte-identiek aan voorheen.
+   *
+   * STANDAARD AAN vanaf v0.9.1 (besluit 2026-05-29); nieuwe versies erven dit
+   * via de spread-idioom en houden het aan tenzij expliciet uitgezet.
+   */
+  sourceLinksEnabled?: boolean;
+  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
@@ -1092,6 +1105,10 @@ const V0_9_1: BotConfig = {
   systemPrompt: V0_9.systemPrompt + V0_9_1_SCOPE_BLOCK,
   hardFactRefusalSafetyAware: true,
   offDomainCodeRefusal: true,
+  // Echte bron-links — model krijgt echte website-URLs + "verzin nooit"-regel,
+  // server-side sanitizer dwingt het af. Inert zonder bron-URLs in de context
+  // (DEV_ORG eval byte-identiek). Besluit Sebastiaan 2026-05-29.
+  sourceLinksEnabled: true,
 };
 
 // ---------------------------------------------------------------------------
