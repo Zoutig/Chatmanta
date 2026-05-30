@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { getControlRoomKlanten } from '@/lib/controlroom/server/overview';
+import { getOpenAiCostsThisMonth } from '@/lib/controlroom/server/openai-costs';
 import { usageLimitStatus, type UsageLimitTone } from '@/lib/controlroom/usage-limits';
 import { formatCostUsd } from '@/lib/controlroom/format';
 import { MetricCard } from '../components/metric-card';
@@ -20,7 +21,10 @@ const TONE_TO_PILL: Record<UsageLimitTone, PillTone> = {
 };
 
 export default async function UsagePage() {
-  const klanten = await getControlRoomKlanten();
+  const [klanten, realCost] = await Promise.all([
+    getControlRoomKlanten(),
+    getOpenAiCostsThisMonth(),
+  ]);
   const totalMonth = klanten.reduce((a, k) => a + k.conversationsThisMonth, 0);
   const totalWeek = klanten.reduce((a, k) => a + k.conversationsThisWeek, 0);
   const totalCost = klanten.reduce((a, k) => a + k.monthCostUsd, 0);
@@ -38,7 +42,18 @@ export default async function UsagePage() {
       <div className="klant-metrics-grid" style={{ marginBottom: 20 }}>
         <MetricCard label="Gesprekken (deze week)" value={totalWeek} />
         <MetricCard label="Gesprekken (deze maand)" value={totalMonth} />
-        <MetricCard label="Kosten (deze maand)" value={formatCostUsd(totalCost)} sub="geschat, USD" />
+        {realCost.available ? (
+          <MetricCard
+            label="OpenAI-kosten (echt, deze maand)"
+            value={formatCostUsd(realCost.amountUsd)}
+            sub="OpenAI Costs-API · account-breed"
+          />
+        ) : null}
+        <MetricCard
+          label="Kosten (schatting, deze maand)"
+          value={formatCostUsd(totalCost)}
+          sub="tokens × modelprijs"
+        />
       </div>
 
       <Card padded={false}>
@@ -77,7 +92,21 @@ export default async function UsagePage() {
         </div>
       </Card>
       <p className="klant-hint" style={{ marginTop: 12 }}>
-        Kosten zijn een schatting uit query_log (USD). Facturatie/billing valt buiten V0.
+        {realCost.available ? (
+          <>
+            <strong>OpenAI-kosten (echt)</strong> komt rechtstreeks uit de OpenAI Costs-API — het
+            gefactureerde bedrag over het hele account (alle projecten/orgs samen, doorgaans enkele
+            uren vertraagd). De per-klant kolom <em>Kosten/mnd</em> en de <em>schatting</em> zijn
+            token × modelprijs uit query_log: bruikbaar voor de verdeling per klant, maar niet
+            OpenAI&apos;s gefactureerde bedrag.
+          </>
+        ) : (
+          <>
+            Kosten per klant zijn een <strong>schatting</strong> (tokens × modelprijs) uit query_log.
+            Echte OpenAI-kosten vereisen een org-admin-key (<code>OPENAI_ADMIN_KEY</code>) — die
+            ontbreekt of is nu onbereikbaar.
+          </>
+        )}
       </p>
     </>
   );
