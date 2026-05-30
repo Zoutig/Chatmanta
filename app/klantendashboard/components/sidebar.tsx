@@ -7,6 +7,7 @@ import {
   Code2,
   MessagesSquare,
   CircleUserRound,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { NavItem } from './nav-item';
 import { OrgSwitcher } from './org-switcher';
@@ -116,6 +117,9 @@ export function Sidebar({
         </NavItem>
         <NavItem href="/klantendashboard/account" label="Account">
           <CircleUserRound size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/klantendashboard/feedback" label="Feedback">
+          <MessageSquarePlus size={17} strokeWidth={1.7} />
         </NavItem>
       </nav>
 

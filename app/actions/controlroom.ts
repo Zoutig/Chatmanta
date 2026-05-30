@@ -19,6 +19,8 @@ import { upsertProfile } from '@/lib/controlroom/server/profiles';
 import { updateOnboardingItem } from '@/lib/controlroom/server/onboarding';
 import { upsertPrivacy } from '@/lib/controlroom/server/privacy';
 import { setErrorGroupStatus } from '@/lib/controlroom/server/errors';
+import { setFeedbackStatus, deleteFeedback } from '@/lib/controlroom/server/feedback';
+import { FEEDBACK_STATUSES, type FeedbackStatus } from '@/lib/controlroom/types';
 import type { ErrorStatus } from '@/lib/observability/sink';
 import {
   saveChatbotSettings,
@@ -120,6 +122,35 @@ export async function ignoreErrorGroupAction(id: string): Promise<ActionResult<{
 
 export async function reopenErrorGroupAction(id: string): Promise<ActionResult<{ id: string }>> {
   return setErrorStatus(id, 'open');
+}
+
+// ── Feedback-tab: status van een klant-melding (admin_feedback) ──
+// Geen org-slug nodig (de melding is op id); requireV0Auth() is de poort.
+// De status wordt server-side tegen FEEDBACK_STATUSES gevalideerd; setFeedbackStatus
+// schrijft een status_change-event voor de historie. revalidate() herrendert de
+// hele /admindashboard-tree zodat lijst + detail meelopen.
+export async function setFeedbackStatusAction(
+  id: string,
+  status: FeedbackStatus,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    if (!(FEEDBACK_STATUSES as readonly string[]).includes(status)) {
+      fail('INPUT_INVALID', `ongeldige status: ${status}`);
+    }
+    await setFeedbackStatus(id, status);
+    revalidate();
+    return { id };
+  });
+}
+
+export async function deleteFeedbackAction(id: string): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    await deleteFeedback(id);
+    revalidate();
+    return { id };
+  });
 }
 
 // ───────────────────────── Bot- + widgetinstellingen (taak 1) ─────────────

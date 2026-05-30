@@ -9,13 +9,17 @@ import {
   ClipboardList,
   Workflow,
   AlertTriangle,
+  Inbox,
   BarChart3,
   Settings2,
   ArrowLeft,
 } from 'lucide-react';
 import { NavItem } from '@/app/klantendashboard/components/nav-item';
+import { getFeedbackSummary } from '@/lib/controlroom/server/feedback';
 
-export function ControlRoomSidebar() {
+export async function ControlRoomSidebar() {
+  // Cheap head-count voor de badge: open = nieuw + in_behandeling. Faalt stil → 0.
+  const feedback = await getFeedbackSummary().catch(() => ({ open: 0, nieuw: 0 }));
   return (
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
       {/* Brand */}
@@ -100,6 +104,9 @@ export function ControlRoomSidebar() {
         </NavItem>
         <NavItem href="/admindashboard/issues" label="Issues">
           <AlertTriangle size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/admindashboard/feedback" label="Feedback" badge={feedback.open}>
+          <Inbox size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/admindashboard/usage" label="Usage & Kosten">
           <BarChart3 size={17} strokeWidth={1.7} />
