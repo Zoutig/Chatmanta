@@ -16,6 +16,7 @@
     "v0:chat": "node --env-file=.env.local scripts/v0-chat.mjs",
     "v0:list": "node --env-file=.env.local scripts/v0-list-docs.mjs",
     "v0:reset": "node --env-file=.env.local scripts/v0-reset.mjs",
+    "v0:clear-cache": "node --env-file=.env.local scripts/v0-clear-org-cache.mjs",
     "v0:tune": "node --env-file=.env.local scripts/v0-tune-threshold.mjs",
     "v0:snapshot": "node --env-file=.env.local scripts/v0-snapshot.mjs",
     "v0:reingest-parents": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-reingest-parents.ts",

@@ -71,3 +71,18 @@ export function sanitizeSourceLinks(text: string, allowedUrls: Set<string>): str
     return label;
   });
 }
+
+/**
+ * Reduceer elke markdown-link `[label](url)` tot zijn kale `label`. Bedoeld om de
+ * bron-link-URLs uit een antwoord te halen vóór hard-fact-/claim-verificatie:
+ * die URLs komen uit `website_pages.url` (metadata, NIET uit chunk-content), dus
+ * de hard-fact-verifier zou ze anders als "ongegronde URL-feiten" markeren en het
+ * hele antwoord ten onrechte naar het weiger-template trekken. De links zijn al
+ * door `sanitizeSourceLinks` gegarandeerd echt; ze hoeven niet als feit
+ * geverifieerd te worden. Proza-feiten (prijzen/datums/getallen) blijven in de
+ * label-tekst behouden en worden dus nog steeds geverifieerd.
+ */
+export function stripMarkdownLinks(text: string): string {
+  if (!text.includes('](')) return text;
+  return text.replace(MD_LINK_RE, (_full, label: string) => label);
+}
