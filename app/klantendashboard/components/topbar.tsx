@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bell, ChevronRight, ExternalLink, Menu, SlidersHorizontal } from 'lucide-react';
@@ -48,6 +48,18 @@ export function Topbar({
       document.body.dataset.klantDrawerOpen = open ? 'true' : 'false';
     }
   };
+
+  // Sluit de drawer zodra je naar een andere sectie navigeert. Zonder dit blijft
+  // de off-canvas drawer open staan over de nieuwe pagina heen.
+  useEffect(() => {
+    setDrawerOpen(false);
+    if (typeof document !== 'undefined') {
+      document
+        .querySelector('[data-klant-scope]')
+        ?.setAttribute('data-klant-drawer-open', 'false');
+      document.body.dataset.klantDrawerOpen = 'false';
+    }
+  }, [pathname]);
 
   const openTweaks = () => {
     if (typeof window !== 'undefined') {

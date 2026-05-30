@@ -108,6 +108,7 @@ export function TopQuestionsTab({
       )}
 
       <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-scroll">
         <table className="klant-table">
           <thead>
             <tr>
@@ -169,6 +170,7 @@ export function TopQuestionsTab({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {drafting && (
