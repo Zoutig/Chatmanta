@@ -46,14 +46,15 @@ export function buildAllowedUrlSet(urls: Array<string | null | undefined>): Set<
   return set;
 }
 
-// [label](url) of [label](url "titel") — label = niet-`]`, url = niet-spatie/
-// niet-`)`, met optionele markdown-title die we negeren. Bekende beperking: een
-// URL die zélf een `)` bevat (bv. `/wiki/Foo_(bar)`) wordt op de eerste `)`
-// afgekapt. Crawled marketing-URLs zijn in de praktijk paren-vrij; het ergste
-// geval is een cosmetische losse `)` of een gemiste match — nooit een security-
-// issue (niet-http(s) wordt geweigerd, en de renderers weigeren niet-http(s)
-// nogmaals). Lineaire quantifiers → geen catastrophic backtracking (ReDoS-vrij).
-const MD_LINK_RE = /\[([^\]]+)\]\(\s*([^)\s]+?)(?:\s+"[^"]*")?\s*\)/g;
+// [label](url) of [label](url "titel") / [label](url 'titel') — label = niet-`]`,
+// url = niet-spatie/niet-`)`, met optionele markdown-title (double- óf single-
+// quoted) die we negeren. Bekende beperking: een URL die zélf een `)` bevat
+// (bv. `/wiki/Foo_(bar)`) wordt op de eerste `)` afgekapt. Crawled marketing-URLs
+// zijn in de praktijk paren-vrij; het ergste geval is een cosmetische losse `)`
+// of een gemiste match — nooit een security-issue (niet-http(s) wordt geweigerd,
+// en de renderers weigeren niet-http(s) nogmaals). Lineaire quantifiers → geen
+// catastrophic backtracking (ReDoS-vrij).
+const MD_LINK_RE = /\[([^\]]+)\]\(\s*([^)\s]+?)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g;
 
 /**
  * Strijk elke markdown-link waarvan de (genormaliseerde) URL niet in `allowedUrls`

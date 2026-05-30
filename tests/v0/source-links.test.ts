@@ -127,3 +127,17 @@ test('stripMarkdownLinks verwerkt meerdere links in één tekst', () => {
     'Zie diensten en team.',
   );
 });
+
+test('single-quoted titel wordt óók herkend (sanitize + strip)', () => {
+  const allowed = buildAllowedUrlSet([REAL]);
+  // sanitizeSourceLinks: toegestaan → canoniek zonder titel.
+  assert.equal(
+    sanitizeSourceLinks(`Zie [over ons](${REAL} 'Over ons').`, allowed),
+    `Zie [over ons](${REAL}).`,
+  );
+  // stripMarkdownLinks: URL (+ single-quoted titel) helemaal weg, label blijft.
+  assert.equal(
+    stripMarkdownLinks(`Zie [over ons](${REAL} 'Over ons').`),
+    'Zie over ons.',
+  );
+});

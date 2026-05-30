@@ -2429,7 +2429,11 @@ KRITISCHE FORMAT-REGELS:
         // (niet in chunk-content), dus de hard-fact-verifier zou ze anders als
         // ongegronde "url:"-feiten flaggen en het hele antwoord deterministisch
         // weigeren. Proza-feiten (prijs/datum/getal) blijven in de label-tekst.
-        answerText: bot.sourceLinksEnabled ? stripMarkdownLinks(finalAnswerText) : finalAnswerText,
+        // Zelfde gate als sanitizer/prompt (linkEnabled && allowedUrls.size > 0):
+        // op paden zonder echte Bron-URL draait de strip niet → de URL-anti-
+        // hallucinatie buiten de bron-link-case blijft byte-identiek.
+        answerText:
+          linkEnabled && allowedUrls.size > 0 ? stripMarkdownLinks(finalAnswerText) : finalAnswerText,
         chunks: chunkInputs,
         threshold: bot.claimVerificationThreshold,
         hardFactCheck: bot.adaptiveHardFactVerification === true,
@@ -2769,8 +2773,10 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           text: c.parent_content ?? c.content,
         }));
         const verifyResult2 = await verifyClaims({
-          // Zie verify hierboven: bron-link-URLs uit de tekst halen vóór verify.
-          answerText: bot.sourceLinksEnabled ? stripMarkdownLinks(activeAnswerText) : activeAnswerText,
+          // Zie verify hierboven: bron-link-URLs uit de tekst halen vóór verify
+          // (zelfde gate als sanitizer → byte-identiek buiten de bron-link-case).
+          answerText:
+            linkEnabled && allowedUrls.size > 0 ? stripMarkdownLinks(activeAnswerText) : activeAnswerText,
           chunks: chunkInputs2,
           threshold: bot.claimVerificationThreshold,
           hardFactCheck: bot.adaptiveHardFactVerification === true,
