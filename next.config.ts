@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/widget/**": ["./scripts/fixtures/sandbox-orgs/**/*.md"],
   },
+  // Documentparsers (admin-upload, taak 1): pdf-parse trekt pdfjs + dynamische
+  // requires mee die een bundler breken; mammoth is zwaar. Op de server laten
+  // requiren i.p.v. bundelen.
+  serverExternalPackages: ["pdf-parse", "mammoth"],
 };
 
 export default nextConfig;
