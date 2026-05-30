@@ -10,8 +10,10 @@ import {
 } from '@/lib/controlroom/server/overview';
 import type { ControlRoomKlant } from '@/lib/controlroom/server/signals';
 import { getMonthlyFirecrawlCredits } from '@/lib/controlroom/server/credits';
+import { getDailyCostThisMonth } from '@/lib/controlroom/server/usage';
 import { formatCostUsd, formatRelativeNL } from '@/lib/controlroom/format';
 import { MetricCard } from './components/metric-card';
+import { DailyCostChart } from './components/daily-cost-chart';
 import { HealthBadge } from './components/badges';
 import { ReloadButton } from './components/reload-button';
 
@@ -69,7 +71,11 @@ function ListCard({
 }
 
 export default async function ControlRoomOverviewPage() {
-  const [klanten, credits] = await Promise.all([getControlRoomKlanten(), getMonthlyFirecrawlCredits()]);
+  const [klanten, credits, dailyCost] = await Promise.all([
+    getControlRoomKlanten(),
+    getMonthlyFirecrawlCredits(),
+    getDailyCostThisMonth(),
+  ]);
   const s = buildOverviewSummary(klanten);
 
   return (
@@ -106,7 +112,7 @@ export default async function ControlRoomOverviewPage() {
           sub={`${s.crawlsRunning} bezig`}
         />
         <MetricCard label="Gesprekken (deze week)" value={s.conversationsThisWeek} sub={`${s.conversationsThisMonth} deze maand`} />
-        <MetricCard label="Kosten (deze maand)" value={formatCostUsd(s.monthCostUsd)} sub="geschat, USD" />
+        <MetricCard label="Kosten klant-chatbots (deze maand)" value={formatCostUsd(s.monthCostUsd)} sub="USD · evals niet meegerekend" />
         <MetricCard
           label="Firecrawl-credits"
           value={`${credits.used} / ${credits.limit}`}
@@ -116,6 +122,25 @@ export default async function ControlRoomOverviewPage() {
               : `${credits.pct}% • schatting (logs)`
           }
           tone={credits.tone}
+        />
+      </div>
+
+      {/* Verbruik-grafiek — klant-chatbots per dag */}
+      <div style={{ marginBottom: 16 }}>
+        <DailyCostChart
+          points={dailyCost.points}
+          totalUsd={dailyCost.totalUsd}
+          footnote={
+            <>
+              Dagelijkse kosten van de klant-chatbots (embedding + rewrite/HyDE + rerank + antwoord +
+              follow-ups), berekend uit de token-telling per gesprek in query_log. Eval-/judge-kosten
+              tellen hier niet mee. Voor het totale OpenAI-accountbedrag (incl. evals &amp; dev) zie{' '}
+              <Link href="/admindashboard/usage" style={{ color: 'var(--klant-accent)' }}>
+                Usage &amp; Kosten
+              </Link>
+              .
+            </>
+          }
         />
       </div>
 

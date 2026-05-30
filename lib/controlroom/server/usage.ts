@@ -115,6 +115,60 @@ export async function getMonthlyCostUsd(organizationId: string): Promise<number>
   }
 }
 
+export type DailyCostPoint = { date: string; dayLabel: string; costUsd: number };
+
+/** Lokale YYYY-MM-DD sleutel (zelfde tijdzone als de start-helpers hierboven). */
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Dagelijks klant-chatbot-verbruik (USD) over de huidige kalendermaand, over álle
+ * orgs samen. Bron = query_log.cost_usd, dat ALLEEN op het live /api/v0/chat-pad
+ * wordt geschreven (volledige pipeline: embedding + rewrite/HyDE + decompositie +
+ * rerank + antwoord + follow-ups). Eval-/judge-kosten staan in eval_runs, NIET in
+ * query_log — dit is dus zuiver klant-chatbot-verbruik, evals niet meegerekend.
+ *
+ * Eén gerichte read (geen 5-orgs fan-out): dag-buckets dag 1 t/m vandaag, lege
+ * dagen op 0 zodat de grafiek de hele maand-tot-nu toont. Fail-safe → lege reeks.
+ */
+export async function getDailyCostThisMonth(): Promise<{ points: DailyCostPoint[]; totalUsd: number }> {
+  const start = new Date();
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+
+  const points: DailyCostPoint[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const cursor = new Date(start); cursor <= today; cursor.setDate(cursor.getDate() + 1)) {
+    const key = dateKey(cursor);
+    indexByKey.set(key, points.length);
+    points.push({ date: key, dayLabel: String(cursor.getDate()), costUsd: 0 });
+  }
+
+  try {
+    const { data, error } = await sb()
+      .from('query_log')
+      .select('created_at, cost_usd')
+      .gte('created_at', start.toISOString())
+      .limit(MAX_COST_ROWS);
+    if (error || !data) return { points, totalUsd: 0 };
+    let total = 0;
+    for (const r of data) {
+      const cost = Number(r.cost_usd) || 0;
+      total += cost;
+      const i = indexByKey.get(dateKey(new Date(r.created_at as string)));
+      if (i != null) points[i].costUsd += cost;
+    }
+    return { points, totalUsd: total };
+  } catch {
+    return { points, totalUsd: 0 };
+  }
+}
+
 /** ISO-timestamp van de laatste query_log-rij voor een org, of null. */
 export async function getLastActivityAt(organizationId: string): Promise<string | null> {
   try {

@@ -34,7 +34,7 @@ export default async function UsagePage() {
       <header className="klant-page-header">
         <div>
           <h1 className="klant-page-title">Usage &amp; Kosten</h1>
-          <p className="klant-page-sub">Verbruik en geschatte kosten per klant deze maand, met limietstatus.</p>
+          <p className="klant-page-sub">Klant-chatbot-verbruik en kosten per klant deze maand, met limietstatus.</p>
         </div>
         <ReloadButton />
       </header>
@@ -42,18 +42,19 @@ export default async function UsagePage() {
       <div className="klant-metrics-grid" style={{ marginBottom: 20 }}>
         <MetricCard label="Gesprekken (deze week)" value={totalWeek} />
         <MetricCard label="Gesprekken (deze maand)" value={totalMonth} />
+        <MetricCard
+          label="Kosten klant-chatbots (deze maand)"
+          value={formatCostUsd(totalCost)}
+          sub="token-telling per gesprek × modelprijs · evals niet meegerekend"
+        />
         {realCost.available ? (
           <MetricCard
-            label="OpenAI-kosten (echt, deze maand)"
+            label="Totaal OpenAI-account (deze maand)"
             value={formatCostUsd(realCost.amountUsd)}
-            sub="OpenAI Costs-API · account-breed"
+            tone="info"
+            sub="incl. evals, dev & embeddings · niet alleen klant-chatbots"
           />
         ) : null}
-        <MetricCard
-          label="Kosten (schatting, deze maand)"
-          value={formatCostUsd(totalCost)}
-          sub="tokens × modelprijs"
-        />
       </div>
 
       <Card padded={false}>
@@ -92,19 +93,24 @@ export default async function UsagePage() {
         </div>
       </Card>
       <p className="klant-hint" style={{ marginTop: 12 }}>
+        <strong>Kosten klant-chatbots</strong> (de kaart hierboven en de kolom <em>Kosten/mnd</em>) komt
+        uit <code>query_log</code>: de token-telling per gesprek × de modelprijs, opgeteld over de
+        volledige chat-pipeline (embedding + rewrite/HyDE + rerank + antwoord + follow-ups). Dit wordt
+        alléén op het live chat-pad geschreven, dus <strong>eval-/judge-runs tellen hier niet mee</strong> —
+        precies het klant-verbruik dat je wilt zien, en bruikbaar voor de verdeling per klant.
         {realCost.available ? (
           <>
-            <strong>OpenAI-kosten (echt)</strong> komt rechtstreeks uit de OpenAI Costs-API — het
-            gefactureerde bedrag over het hele account (alle projecten/orgs samen, doorgaans enkele
-            uren vertraagd). De per-klant kolom <em>Kosten/mnd</em> en de <em>schatting</em> zijn
-            token × modelprijs uit query_log: bruikbaar voor de verdeling per klant, maar niet
-            OpenAI&apos;s gefactureerde bedrag.
+            {' '}Het <strong>Totaal OpenAI-account</strong> komt uit de OpenAI Costs-API: het gefactureerde
+            bedrag over het hele account (alle projecten samen, incl. evals, dev/test en embeddings buiten
+            het chat-pad, doorgaans enkele uren vertraagd). Het is dus hoger dan en niet vergelijkbaar met
+            het klant-chatbot-verbruik.
           </>
         ) : (
           <>
-            Kosten per klant zijn een <strong>schatting</strong> (tokens × modelprijs) uit query_log.
-            Echte OpenAI-kosten vereisen een org-admin-key (<code>OPENAI_ADMIN_KEY</code>) — die
-            ontbreekt of is nu onbereikbaar.
+            {' '}Het totale OpenAI-accountbedrag (incl. evals &amp; dev) vereist een org-admin-key
+            (<code>OPENAI_ADMIN_KEY</code> + <code>OPENAI_ORG_ID</code>) — die ontbreekt hier of is nu
+            onbereikbaar. Op productie moet de key in de Vercel-omgevingsvariabelen staan, niet alleen
+            lokaal.
           </>
         )}
       </p>
