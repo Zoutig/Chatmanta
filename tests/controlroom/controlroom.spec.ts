@@ -154,6 +154,16 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByText(/\/\s*\d+/).first()).toBeVisible();
   });
 
+  test('usage: schatting + echte OpenAI-kosten (taak 5)', async ({ page }) => {
+    await page.goto('/admindashboard/usage');
+    await expect(page.getByRole('heading', { name: /Usage/ })).toBeVisible({ timeout: 15_000 });
+    // De token-schatting staat er altijd.
+    await expect(page.getByText('Kosten (schatting, deze maand)')).toBeVisible();
+    // Met OPENAI_ADMIN_KEY in .env.local hoort de echte-kosten-kaart (Costs-API) er te zijn.
+    // Specifiek de metric-kaart-label (niet de <strong> in de uitleg-hint).
+    await expect(page.getByText('OpenAI-kosten (echt, deze maand)')).toBeVisible({ timeout: 15_000 });
+  });
+
   test('profiel-edit persisteert', async ({ page }) => {
     await page.goto('/admindashboard/klanten/globex-inc');
     const sel = page.locator('select').first(); // commerciële status
