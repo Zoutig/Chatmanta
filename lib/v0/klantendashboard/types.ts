@@ -159,6 +159,7 @@ export type TestAnswerDetails = {
 
 export type ToneOfVoice =
   | 'professional'
+  | 'personal'
   | 'friendly'
   | 'concise'
   | 'enthusiastic'

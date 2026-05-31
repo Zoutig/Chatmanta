@@ -27,6 +27,8 @@ const TONE_INSTRUCTION: Record<Tone, string> = {
     'Antwoord in een warme, vriendelijke toon (klantcontact-stijl). Gebruik je/jij — geen u-vorm. Toon dat je graag helpt: woorden als "graag", "natuurlijk", "leuk dat je het vraagt" mogen, maar gedoseerd. Geen overdreven enthousiasme, geen emoji.',
   casual:
     'Antwoord in een losse, informele toon. Gebruik je/jij. Mag een knipoog en passende emoji (max 1-2 per antwoord, gedoseerd — bv. 👋 bij begroeting, 🙂 bij vriendelijke opmerking, ✨ bij iets leuks, 👍 bij bevestiging). Geen emoji-spam, geen overdreven enthousiasme.',
+  persoonlijk:
+    'Antwoord persoonlijk en warm, alsof je met de klant aan het appen bent. Gebruik je/jij, korte natuurlijke zinnen en spreektaal — geen formeel of afstandelijk register. Toon oprechte betrokkenheid ("fijn dat je het vraagt", "ik snap je", "ik help je graag even op weg") zonder overdreven of geforceerd enthousiast te worden. Emoji mag, maar spaarzaam: 0 tot 2 per antwoord, vaak nul, alleen waar het natuurlijk voelt (bv. 👋 bij een begroeting, 🙂 bij iets vriendelijks, 👍 bij een bevestiging) — nooit emoji-spam, nooit een emoji in elke zin, en LAAT EMOJI WEG bij gevoelige onderwerpen zoals prijzen/geld, klachten of medische kwesties. Blijf altijd feitelijk accuraat: persoonlijkheid en warmte mogen de inhoud of de eerlijkheid nooit vervangen.',
 };
 
 const LENGTH_INSTRUCTION_V1: Record<Length, string> = {

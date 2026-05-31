@@ -201,6 +201,7 @@ const TONE_OPTIONS: { value: Tone; label: string }[] = [
   { value: 'formal', label: 'Formeel' },
   { value: 'neutral', label: 'Neutraal' },
   { value: 'casual', label: 'Casual' },
+  { value: 'persoonlijk', label: 'Persoonlijk' },
 ];
 
 const LENGTH_OPTIONS: { value: Length; label: string }[] = [

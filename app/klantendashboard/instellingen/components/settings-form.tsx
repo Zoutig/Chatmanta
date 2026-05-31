@@ -19,8 +19,9 @@ type SaveChatbotAction = (
 ) => Promise<ActionResult<{ chatbot: ChatbotSettings }>>;
 
 const TONE_OPTIONS: { value: ToneOfVoice; label: string; help: string }[] = [
+  { value: 'personal', label: 'Persoonlijk', help: 'Warm en informeel, alsof je met de klant appt — met af en toe een emoji. Aanbevolen.' },
   { value: 'professional', label: 'Professioneel', help: 'Zakelijk, formeel, gebruikt "u"-vorm.' },
-  { value: 'friendly', label: 'Vriendelijk', help: 'Warm en toegankelijk, lichte je-vorm.' },
+  { value: 'friendly', label: 'Vriendelijk', help: 'Warm en toegankelijk, lichte je-vorm, geen emoji.' },
   { value: 'concise', label: 'Kort en direct', help: 'Geen omslachtige zinnen, snel ter zake.' },
   { value: 'enthusiastic', label: 'Enthousiast', help: 'Levendig, positief, met flair.' },
   { value: 'informal', label: 'Informeel', help: 'Volledig je-vorm, ontspannen toon.' },

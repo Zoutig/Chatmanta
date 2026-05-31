@@ -3,7 +3,7 @@
 // Geen 'server-only' import: dit bestand wordt zowel door de RAG-laag (server)
 // als door de chat UI (client) gebruikt. Bevat geen secrets of side-effects.
 
-export const TONES = ['formal', 'neutral', 'casual'] as const;
+export const TONES = ['formal', 'neutral', 'casual', 'persoonlijk'] as const;
 export const LENGTHS = ['short', 'medium', 'detailed'] as const;
 
 export type Tone = (typeof TONES)[number];

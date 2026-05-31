@@ -861,7 +861,7 @@ export function ChatMantaWidget({
                     ? { left: 'calc(24px + env(safe-area-inset-left))' }
                     : { right: 'calc(24px + env(safe-area-inset-right))' }),
                   bottom: 'calc(96px + env(safe-area-inset-bottom))',
-                  width: 'min(380px, calc(100vw - 32px))',
+                  width: 'min(440px, calc(100vw - 32px))',
                   height: 560,
                   maxHeight:
                     'calc(100dvh - 120px - env(safe-area-inset-bottom) - env(safe-area-inset-top))',

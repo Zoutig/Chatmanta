@@ -33,12 +33,14 @@ const LANG_LABEL_NL: Record<Language, string> = {
 //
 // professional → formal (zakelijk, u-vorm)
 // concise      → formal (zakelijk, kort) — geen aparte casual/playful nodig
-// friendly     → neutral (warme klantcontact-stijl, je-vorm)
+// personal     → persoonlijk (warm, je-vorm, appjes-toon, spaarzaam emoji) — default
+// friendly     → neutral (warme klantcontact-stijl, je-vorm, geen emoji)
 // enthusiastic → casual (levendig, mag emoji)
 // informal     → casual (volledig je-vorm, ontspannen)
 const TONE_MAP: Record<ChatbotSettings['toneOfVoice'], Tone> = {
   professional: 'formal',
   concise: 'formal',
+  personal: 'persoonlijk',
   friendly: 'neutral',
   enthusiastic: 'casual',
   informal: 'casual',
