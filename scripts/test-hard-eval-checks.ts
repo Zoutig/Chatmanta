@@ -17,8 +17,10 @@ import {
   unstableCases,
   normalizeQuestion,
   selectHarvestCandidates,
+  detectLanguage,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
+  QUALITY_DIMENSIONS,
   type DeterministicVerdict,
   type JudgeVerdict,
   type HardCaseFile,
@@ -241,6 +243,25 @@ const capped = selectHarvestCandidates(
 );
 check('harvest: per-org cap (3)', capped.length === 3, true);
 
+// --- detectLanguage + QUALITY_DIMENSIONS (Laag 4 — breedte) ------------------
+check('detectLanguage: NL', detectLanguage('Hoeveel kost een dakreparatie en wanneer kunt u komen?') === 'nl', true);
+check('detectLanguage: EN', detectLanguage('How much does a new roof cost and when can you come?') === 'en', true);
+check('detectLanguage: geen markers → unknown', detectLanguage('12345 €€€ !!!') === 'unknown', true);
+check('QUALITY_DIMENSIONS = answer-quality+typo+language', QUALITY_DIMENSIONS.includes('answer-quality') && QUALITY_DIMENSIONS.includes('typo') && QUALITY_DIMENSIONS.includes('language'), true);
+
+const gateQ4: DeterministicVerdict[] = [
+  dv({ caseId: 'aq', version: 'v', dimension: 'answer-quality', needsJudge: true }),
+  dv({ caseId: 'tp', version: 'v', dimension: 'typo', needsJudge: true }),
+  dv({ caseId: 'lg', version: 'v', dimension: 'language', layer1Pass: false }), // taal-fail = quality-fail
+];
+const jmQ4 = new Map<string, JudgeVerdict>([
+  ['aq::v', { caseId: 'aq', version: 'v', nuance: { correctness: 'pass', completeness: 'pass' }, overall: 'pass', reason: '' }],
+  ['tp::v', { caseId: 'tp', version: 'v', nuance: { correctness: 'pass', completeness: 'pass' }, overall: 'pass', reason: '' }],
+]);
+const gq4 = computeProductionGate(gateQ4, jmQ4, { qualityThreshold: 0.9 })[0];
+check('gate: typo+language tellen in quality (3 totaal)', gq4.qualityTotal === 3, true);
+check('gate: language layer1-fail = quality-fail (2/3 < drempel → false)', gq4.productionReady === false, true);
+
 // --- fixture-validatie (hard-dimension-cases.json) --------------------------
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), 'eval-fixtures', 'hard-dimension-cases.json'), 'utf8'),
@@ -276,6 +297,13 @@ check(
   ),
   true,
 );
+const typoCases = fixture.cases.filter((c) => c.dimension === 'typo');
+const langCases = fixture.cases.filter((c) => c.dimension === 'language');
+const citeCases = fixture.cases.filter((c) => c.dimension === 'citation-faithfulness');
+check('fixture: >= 3 typo cases', typoCases.length >= 3, true);
+check('fixture: >= 3 language cases', langCases.length >= 3, true);
+check('fixture: language cases hebben expectLanguage nl/en', langCases.every((c) => c.expectLanguage === 'nl' || c.expectLanguage === 'en'), true);
+check('fixture: >= 2 citation-faithfulness cases met checkHardFactSupport', citeCases.length >= 2 && citeCases.every((c) => c.checkHardFactSupport === true), true);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);

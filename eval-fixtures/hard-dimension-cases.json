@@ -501,6 +501,83 @@
       "expectsRefusal": false,
       "needsJudge": true,
       "rubricHint": "Multi-turn topic-terugverwijzing: de bot moet 'diezelfde deadline' correct koppelen aan de eerdere aangifte-context en gegrond antwoorden voor een eenmanszaak; geen verzonnen datum."
+    },
+    {
+      "id": "typo-acme-garantie-01",
+      "dimension": "typo",
+      "orgSlug": "acme-corp",
+      "question": "Hoevele jaar garantei geven jllie op een niew dak?",
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Typo-robuustheid: ondanks tikfouten ('hoevele', 'garantei', 'jllie', 'niew') moet de bot de garantie-vraag gewoon beantwoorden, niet weigeren."
+    },
+    {
+      "id": "typo-globex-afspraak-01",
+      "dimension": "typo",
+      "orgSlug": "globex-inc",
+      "question": "Hoe kan ik een afsrpaak maeken bij de fysoi?",
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Typo-robuustheid: ondanks tikfouten ('afsrpaak', 'maeken', 'fysoi') moet de bot uitleggen hoe je een afspraak maakt."
+    },
+    {
+      "id": "typo-initech-aangifte-01",
+      "dimension": "typo",
+      "orgSlug": "initech",
+      "question": "Wanneer moet ik mn aangfte inkomstebelasting indienen?",
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Typo-robuustheid: ondanks tikfouten ('mn', 'aangfte', 'inkomstebelasting') moet de bot de deadline-vraag gegrond beantwoorden."
+    },
+    {
+      "id": "lang-acme-warranty-en-01",
+      "dimension": "language",
+      "orgSlug": "acme-corp",
+      "question": "How many years of warranty do you give on a new roof?",
+      "expectLanguage": "en",
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Engelse vraag → de bot moet in het Engels antwoorden (language-check) én gegrond zijn over de garantie."
+    },
+    {
+      "id": "lang-globex-appointment-en-01",
+      "dimension": "language",
+      "orgSlug": "globex-inc",
+      "question": "How can I make an appointment with the physiotherapist?",
+      "expectLanguage": "en",
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Engelse vraag → antwoord in het Engels; correcte uitleg over het maken van een afspraak."
+    },
+    {
+      "id": "lang-initech-mixed-nl-01",
+      "dimension": "language",
+      "orgSlug": "initech",
+      "question": "Kun je me helpen met de deadline voor mijn tax aangifte?",
+      "expectLanguage": "nl",
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Overwegend Nederlandse vraag met een Engels woord ('tax') → de bot hoort in het Nederlands te antwoorden, gegrond over de aangifte-deadline."
+    },
+    {
+      "id": "cite-acme-garantie-grond-01",
+      "dimension": "citation-faithfulness",
+      "orgSlug": "acme-corp",
+      "question": "Hoeveel jaar garantie geven jullie en wat valt daar precies onder?",
+      "checkHardFactSupport": true,
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Citation-faithfulness: elk genoemd garantie-getal/termijn moet herleidbaar zijn tot de getoonde bronnen (hardFactSupport). Geen verzonnen specifics."
+    },
+    {
+      "id": "cite-initech-tarief-grond-01",
+      "dimension": "citation-faithfulness",
+      "orgSlug": "initech",
+      "question": "Welk tarief rekenen jullie voor een jaarrekening en waar staat dat?",
+      "checkHardFactSupport": true,
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Citation-faithfulness: een genoemd tarief/bedrag moet gegrond zijn in de bronnen (hardFactSupport). Als het niet in het corpus staat: niet verzinnen, maar dat aangeven."
     }
   ]
 }
