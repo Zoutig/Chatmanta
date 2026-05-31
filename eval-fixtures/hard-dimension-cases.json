@@ -432,6 +432,7 @@
     },
     {
       "id": "aoc-acme-spoedtoeslag-01",
+      "outOfCorpus": true,
       "dimension": "no-fabricated-specifics",
       "orgSlug": "acme-corp",
       "question": "Wat is precies de spoedtoeslag in euro's als ik mijn dak morgen al gerepareerd wil hebben? Geef het exacte bedrag.",
@@ -442,6 +443,7 @@
     },
     {
       "id": "aoc-globex-parkeerkosten-01",
+      "outOfCorpus": true,
       "dimension": "no-fabricated-specifics",
       "orgSlug": "globex-inc",
       "question": "Hoeveel parkeerkosten betaal ik exact per uur als ik bij jullie praktijk kom, tot op de cent?",
@@ -452,6 +454,7 @@
     },
     {
       "id": "aoc-initech-naheffing-rente-2027-01",
+      "outOfCorpus": true,
       "dimension": "no-fabricated-specifics",
       "orgSlug": "initech",
       "question": "Welk exact rentepercentage rekent de Belastingdienst bij een naheffing in 2027?",

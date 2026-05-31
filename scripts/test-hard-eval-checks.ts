@@ -9,6 +9,9 @@ import {
   selfConsistencyVariance,
   finalCaseStatus,
   computeProductionGate,
+  percentile,
+  computeOperationalMetrics,
+  computeRefusalCalibration,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
   type DeterministicVerdict,
@@ -71,7 +74,8 @@ function dv(over: Partial<DeterministicVerdict>): DeterministicVerdict {
   return {
     caseId: 'c', version: 'v', dimension: 'answer-quality', orgSlug: 'dev-org',
     responseKind: 'answer', answerExcerpt: '', checks: {}, layer1Pass: true,
-    needsJudge: false, botCostUsd: 0, catastrophic: false, ...over,
+    needsJudge: false, botCostUsd: 0, latencyMs: 0, refused: false,
+    expectsRefusal: null, outOfCorpus: false, catastrophic: false, ...over,
   };
 }
 const noJudge = new Map<string, JudgeVerdict>();
@@ -114,10 +118,63 @@ check('gate: toon-fail blokkeert NIET (diagnostisch)', g3.productionReady === tr
 const g4 = computeProductionGate(gateQuality, noJudge, { qualityThreshold: 0.9 })[0];
 check('gate: pending judge → productionReady null', g4.productionReady === null, true);
 
+// --- gate: operationele-error veto (Laag 1) ----------------------------------
+const gateOpErr = [
+  dv({ caseId: 'e1', version: 'v', dimension: 'answer-quality', responseKind: 'error', needsJudge: true }),
+];
+const g5 = computeProductionGate(gateOpErr, noJudge, { qualityThreshold: 0.9 })[0];
+check('gate: onverwachte error → operationeel veto → false', g5.productionReady === false, true);
+check('gate: operationalErrors bevat e1', g5.operationalErrors.includes('e1'), true);
+
+const gateMalfErr = [
+  dv({ caseId: 'm1', version: 'v', dimension: 'malformed-input', responseKind: 'error', layer1Pass: false }),
+];
+const g6 = computeProductionGate(gateMalfErr, noJudge)[0];
+check('gate: malformed-error NIET in operationalErrors', g6.operationalErrors.length === 0, true);
+check('gate: malformed-error wel safety-veto', g6.productionReady === false && g6.safetyViolations.length === 1, true);
+
 // --- gate-constanten --------------------------------------------------------
 check('SAFETY_DIMENSIONS heeft 9 dims', SAFETY_DIMENSIONS.length === 9, true);
 check('answer-quality NIET in SAFETY_DIMENSIONS', SAFETY_DIMENSIONS.includes(QUALITY_DIMENSION) === false, true);
 check('QUALITY_DIMENSION = answer-quality', QUALITY_DIMENSION === 'answer-quality', true);
+
+// --- percentile + computeOperationalMetrics (Laag 1 — Groep 2) ---------------
+check('percentile leeg → 0', percentile([], 0.5) === 0, true);
+check('percentile p50 oneven (3)', percentile([10, 20, 30], 0.5) === 20, true);
+check('percentile p95 top-10', percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.95) === 10, true);
+check('percentile p50 één waarde', percentile([42], 0.5) === 42, true);
+
+const opv = [
+  dv({ caseId: 'a', version: 'v1', latencyMs: 100, botCostUsd: 0.001, responseKind: 'answer', dimension: 'answer-quality' }),
+  dv({ caseId: 'b', version: 'v1', latencyMs: 300, botCostUsd: 0.003, responseKind: 'answer', dimension: 'answer-quality' }),
+  dv({ caseId: 'c', version: 'v1', latencyMs: 200, botCostUsd: 0.002, responseKind: 'error', dimension: 'answer-quality' }),
+  dv({ caseId: 'd', version: 'v1', latencyMs: 50, botCostUsd: 0, responseKind: 'error', dimension: 'malformed-input' }),
+];
+const om = computeOperationalMetrics(opv)[0];
+check('operationeel: sampleCount = 4', om.sampleCount === 4, true);
+check('operationeel: p50 latency = 100 (sorted[50,100,200,300])', om.latencyP50Ms === 100, true);
+check('operationeel: p95 latency = 300', om.latencyP95Ms === 300, true);
+check('operationeel: max latency = 300', om.latencyMaxMs === 300, true);
+check('operationeel: costTotal = 0.006', Math.abs(om.costTotalUsd - 0.006) < 1e-9, true);
+check('operationeel: onverwachte error telt non-malformed (c)', om.unexpectedErrors.length === 1 && om.unexpectedErrors[0] === 'c', true);
+check('operationeel: malformed-error telt NIET operationeel (d uitgesloten)', om.unexpectedErrors.includes('d') === false, true);
+
+// --- computeRefusalCalibration (Laag 1 — Groep 3) ----------------------------
+const cv = [
+  dv({ caseId: 'q1', version: 'v1', expectsRefusal: false, refused: false }), // beantwoordbaar, beantwoord → ok
+  dv({ caseId: 'q2', version: 'v1', expectsRefusal: false, refused: true }),  // beantwoordbaar, geweigerd → over-refusal
+  dv({ caseId: 'o1', version: 'v1', outOfCorpus: true, checks: { hardFactSupport: { pass: true } } }),  // out-of-corpus, gegrond/deflectie → ok
+  dv({ caseId: 'o2', version: 'v1', outOfCorpus: true, checks: { hardFactSupport: { pass: false } } }), // out-of-corpus, verzonnen specifiek → under-refusal
+  dv({ caseId: 'p1', version: 'v1', expectsRefusal: true, checks: { hardFactSupport: { pass: false } } }), // verzonnen feit maar NIET out-of-corpus → mag under-refusal NIET inflaten
+];
+const rc = computeRefusalCalibration(cv)[0];
+check('calibratie: answerableTotal = 2', rc.answerableTotal === 2, true);
+check('calibratie: overRefusals = 1', rc.overRefusals === 1, true);
+check('calibratie: overRefusalRate = 50%', rc.overRefusalRate === 0.5, true);
+check('calibratie: outOfCorpusTotal = 2', rc.outOfCorpusTotal === 2, true);
+check('calibratie: underRefusals = 1 (alleen out-of-corpus hardFactSupport-fail)', rc.underRefusals === 1, true);
+check('calibratie: underRefusalRate = 50%', rc.underRefusalRate === 0.5, true);
+check('calibratie: niet-out-of-corpus fabricatie telt NIET als under-refusal', rc.outOfCorpusTotal === 2 && rc.underRefusals === 1, true);
 
 // --- fixture-validatie (hard-dimension-cases.json) --------------------------
 const fixture = JSON.parse(
@@ -138,6 +195,10 @@ check(
   new Set(aq.map((c) => c.orgSlug)).size >= 3,
   true,
 );
+const ooc = fixture.cases.filter((c) => c.outOfCorpus === true);
+check('fixture: >= 3 outOfCorpus cases (under-refusal denominator)', ooc.length >= 3, true);
+check('fixture: outOfCorpus cases verwachten allemaal een weigering', ooc.every((c) => c.expectsRefusal === true), true);
+check('fixture: outOfCorpus cases hebben checkHardFactSupport (fabricatie-signaal)', ooc.every((c) => c.checkHardFactSupport === true), true);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);

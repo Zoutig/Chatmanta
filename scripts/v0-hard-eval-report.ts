@@ -19,13 +19,17 @@ import type {
   JudgeVerdict,
   DeterministicVerdict,
   HardDimension,
+  HardCaseFile,
 } from '../lib/v0/server/hard-eval-checks';
 import {
   finalCaseStatus,
   computeProductionGate,
+  computeOperationalMetrics,
+  computeRefusalCalibration,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
 } from '../lib/v0/server/hard-eval-checks';
+import { resolveBot } from '../lib/v0/server/bots';
 
 // Display-volgorde: alle veiligheidsdimensies, daarna de kwaliteitsdimensie.
 const DIMENSIONS: HardDimension[] = [...SAFETY_DIMENSIONS, QUALITY_DIMENSION];
@@ -62,6 +66,19 @@ if (!ts) {
 const resultsPath = join(dir, `${ts}-results.json`);
 if (!existsSync(resultsPath)) fail(`Niet gevonden: ${resultsPath}`);
 const results = JSON.parse(readFileSync(resultsPath, 'utf8')) as ResultsFile;
+
+// Back-fill outOfCorpus uit de fixture (statische case-property). Oudere
+// results.json van vóór deze Laag-1-veldtoevoeging missen het veld; de fixture
+// is de bron-van-waarheid. Nieuwe runs zetten het al native in de runner.
+const fixturePath = join(process.cwd(), 'eval-fixtures', 'hard-dimension-cases.json');
+const outOfCorpusById = new Map<string, boolean>();
+if (existsSync(fixturePath)) {
+  const fx = JSON.parse(readFileSync(fixturePath, 'utf8')) as HardCaseFile;
+  for (const c of fx.cases) outOfCorpusById.set(c.id, c.outOfCorpus === true);
+}
+for (const v of results.verdicts) {
+  v.outOfCorpus = outOfCorpusById.get(v.caseId) ?? Boolean(v.outOfCorpus);
+}
 
 const verdictsPath = join(dir, `${ts}-verdicts.json`);
 let judgeByKey = new Map<string, JudgeVerdict>();
@@ -198,6 +215,40 @@ md.push('');
 md.push('_Cel = pass/total; `(n?)` = n nog niet-beoordeelde (PENDING) judge-cases._');
 md.push('');
 
+// Operationeel (Groep 2)
+md.push('## Operationeel (Groep 2 — latency / cost / errors)');
+md.push('');
+md.push('_Onverwachte error op een valide query = hard veto (zie gate). Latency/cost = waarschuwing (⚠️) t.o.v. het per-versie budget._');
+md.push('');
+md.push('| versie | p50 lat | p95 lat | budget | mean cost | p95 cost | budget | onverwachte errors |');
+md.push('|--------|---------|---------|--------|-----------|----------|--------|--------------------|');
+const opMetrics = computeOperationalMetrics(results.verdicts);
+for (const m of opMetrics) {
+  const bot = resolveBot(m.version);
+  const latWarn = m.latencyP95Ms > bot.evalBudgetMs ? ' ⚠️' : '';
+  const costWarn = m.costP95Usd > bot.evalBudgetUsd ? ' ⚠️' : '';
+  const errStr = m.unexpectedErrors.length === 0 ? '0' : `❌ ${m.unexpectedErrors.length} (${m.unexpectedErrors.join(', ')})`;
+  md.push(
+    `| ${m.version} | ${m.latencyP50Ms}ms | ${m.latencyP95Ms}ms${latWarn} | ${bot.evalBudgetMs}ms | $${m.costMeanUsd.toFixed(4)} | $${m.costP95Usd.toFixed(4)}${costWarn} | $${bot.evalBudgetUsd.toFixed(4)} | ${errStr} |`,
+  );
+}
+md.push('');
+
+// Refusal-calibratie (Groep 3)
+md.push('## Refusal-calibratie (Groep 3 — te streng ↔ te los)');
+md.push('');
+md.push('_over-refusal = weigerde op een beantwoordbare vraag (expectsRefusal=false). under-refusal = gaf een ONGEGROND specifiek (hardFactSupport-fail) op een out-of-corpus vraag = verzonnen feit. Beide ideaal = 0%._');
+md.push('');
+md.push('| versie | over-refusal | under-refusal (hallucinatie-risico) |');
+md.push('|--------|--------------|-------------------------------------|');
+const calib = computeRefusalCalibration(results.verdicts);
+for (const c of calib) {
+  const over = c.overRefusalRate === null ? '-' : `${c.overRefusals}/${c.answerableTotal} = ${Math.round(c.overRefusalRate * 100)}%`;
+  const under = c.underRefusalRate === null ? '-' : `${c.underRefusals}/${c.outOfCorpusTotal} = ${Math.round(c.underRefusalRate * 100)}%`;
+  md.push(`| ${c.version} | ${over} | ${under} |`);
+}
+md.push('');
+
 // Catastrofale fails
 md.push('## Catastrofale fails (harde gates: canary-lek, must-not-hit, malformed-error)');
 md.push('');
@@ -268,6 +319,13 @@ console.log('  Productie-gate:');
 for (const g of gate) {
   const s = g.productionReady === true ? 'JA ' : g.productionReady === false ? 'NEE' : ' ? ';
   console.log(`   ${g.version.padEnd(8)} ${s}  ${g.reasons.join('; ')}`);
+}
+console.log('');
+console.log('  Refusal-calibratie (over / under):');
+for (const c of computeRefusalCalibration(results.verdicts)) {
+  const over = c.overRefusalRate === null ? ' - ' : `${Math.round(c.overRefusalRate * 100)}%`;
+  const under = c.underRefusalRate === null ? ' - ' : `${Math.round(c.underRefusalRate * 100)}%`;
+  console.log(`   ${c.version.padEnd(8)} over=${over.padStart(4)}  under=${under.padStart(4)}`);
 }
 console.log('');
 console.log(`  catastrofale fails: ${cats.length}`);
