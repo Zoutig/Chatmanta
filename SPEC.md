@@ -27,6 +27,11 @@ bot-versie en zonder de antwoordlengte-logica te wijzigen:
       klachten / medische onderwerpen**), nooit overdreven enthousiast, blijft
       feitelijk accuraat.
 - [ ] `DEFAULT_TONE` blijft **`neutral`** — de eval-baseline verandert niet.
+- [ ] Migratie **0044** verbreedt `query_log_tone_chk` zodat `persoonlijk` een
+      geldige `query_log.tone`-waarde is (anders faalt de query_log-insert →
+      geen `queryLogId` → kapotte feedback op personal-orgs). Toegepast op de
+      V0-Supabase via `npm run migrate`. *(Toegevoegd na Codex-review; de eerste
+      SPEC nam onterecht aan dat er geen migratie nodig was.)*
 - [ ] Het klantendashboard heeft een nieuwe tone-of-voice-keuze **"Persoonlijk"**
       (`ToneOfVoice = 'personal'`) die mapt naar pipeline-toon `persoonlijk`.
 - [ ] "Persoonlijk" is de **default-keuze** voor nieuwe chatbots.
