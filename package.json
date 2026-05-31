@@ -30,6 +30,7 @@
     "eval:run-all": "npm run eval:seed && npm run eval:run && npm run eval:report",
     "eval:hard:run": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-hard-eval-run.ts",
     "eval:hard:report": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-hard-eval-report.ts",
+    "eval:hard:harvest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-hard-eval-harvest.ts",
     "eval:relabel": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-relabel.ts",
     "audit:retrieval": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-retrieval-audit.ts",
     "audit:labels": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-label-doctor.ts",

@@ -587,3 +587,68 @@ export function buildAnchorSection(anchors: AnchorVerdict[]): string {
 export function unstableCases(verdicts: DeterministicVerdict[]): DeterministicVerdict[] {
   return verdicts.filter((v) => v.checks.consistency && !v.checks.consistency.pass);
 }
+
+// ---------------------------------------------------------------------------
+// Laag 3 — Groep 1 (realisme): query_log-harvest-selectie (pure)
+// ---------------------------------------------------------------------------
+
+export type HarvestInput = { question: string; orgSlug: HardOrgSlug };
+
+export type HarvestCandidate = {
+  id: string;
+  orgSlug: HardOrgSlug;
+  dimension: HardDimension;
+  question: string;
+  expectsRefusal: boolean;
+  needsJudge: boolean;
+};
+
+/** Normaliseer een vraag voor dedup: lowercase, witruimte-collapse, trailing
+ *  leestekens weg. Twee vragen die alleen in hoofdletters/spaties/?. verschillen
+ *  zijn duplicaten. */
+export function normalizeQuestion(q: string): string {
+  return q
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[?.!\s]+$/, '');
+}
+
+/** Selecteer representatieve, gede-dupliceerde harvest-kandidaten per org.
+ *  - skipt te korte vragen (<8 chars) en vragen die PII bevatten (`containsPii`).
+ *  - dedupe per org op genormaliseerde vraag (eerste-wint = nieuwste, mits
+ *    de caller op created_at desc sorteert).
+ *  - cap per org (`perOrg`, default 8).
+ *  Output = answer-quality-case-kandidaten (needsJudge) voor REVIEW — NOOIT
+ *  automatisch de fixture in. */
+export function selectHarvestCandidates(
+  rows: HarvestInput[],
+  opts: { perOrg?: number; containsPii?: (q: string) => boolean } = {},
+): HarvestCandidate[] {
+  const perOrg = opts.perOrg ?? 8;
+  const containsPii = opts.containsPii ?? (() => false);
+  const seen = new Set<string>();
+  const perOrgCount = new Map<string, number>();
+  const out: HarvestCandidate[] = [];
+  let idx = 0;
+  for (const r of rows) {
+    const q = r.question.trim();
+    if (q.length < 8) continue;
+    if (containsPii(q)) continue;
+    const norm = `${r.orgSlug}::${normalizeQuestion(q)}`;
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    const count = perOrgCount.get(r.orgSlug) ?? 0;
+    if (count >= perOrg) continue;
+    perOrgCount.set(r.orgSlug, count + 1);
+    out.push({
+      id: `harvest-${r.orgSlug}-${String(++idx).padStart(2, '0')}`,
+      orgSlug: r.orgSlug,
+      dimension: 'answer-quality',
+      question: q,
+      expectsRefusal: false,
+      needsJudge: true,
+    });
+  }
+  return out;
+}
