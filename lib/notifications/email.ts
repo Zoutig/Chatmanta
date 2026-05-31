@@ -6,6 +6,10 @@ import 'server-only';
 // npm-pakket: we POSTen direct naar het Resend-endpoint (hetzelfde endpoint dat de
 // SDK aanroept), zodat er geen build-time dependency bijkomt die zonder key toch
 // meegebundeld wordt. RESEND_API_KEY blijft server-only (geen NEXT_PUBLIC_*).
+//
+// De fetch heeft een harde timeout (AbortSignal.timeout): een trage/hangende
+// Resend-call mag de klant-submit nooit onbeperkt laten wachten. Een timeout valt
+// in de catch en wordt net als elke andere verzendfout geslikt.
 
 export type SendEmailResult =
   | { ok: true; id: string | null }
@@ -22,9 +26,11 @@ export async function sendEmail(msg: {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { ok: false, skipped: true, reason: 'no_api_key' };
   const from = process.env.RESEND_FROM || 'ChatManta <feedback@chatmanta.nl>';
+  const timeoutMs = Number(process.env.RESEND_TIMEOUT_MS) || 8000;
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
+      signal: AbortSignal.timeout(timeoutMs),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',

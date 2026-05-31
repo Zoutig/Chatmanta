@@ -27,24 +27,29 @@ export async function notifyNewFeedback(item: FeedbackItem, orgName: string): Pr
   try {
     const to = process.env.FEEDBACK_NOTIFY_EMAIL || 'niels@chatmanta.com';
     const op = buildOperatorEmail(item, { orgName, adminUrl: feedbackAdminUrl(item.id) });
-    logResult(
-      'operator-notificatie',
-      await sendEmail({
+
+    // Beide mails parallel: sendEmail gooit nooit (geeft een resultaat terug), dus
+    // Promise.all rejectt niet en de worst-case wachttijd is één timeout i.p.v. twee.
+    const tasks: Promise<void>[] = [
+      sendEmail({
         to,
         subject: op.subject,
         html: op.html,
         text: op.text,
         replyTo: isValidFeedbackEmail(item.submitterEmail) ? item.submitterEmail : undefined,
-      }),
-    );
+      }).then((r) => logResult('operator-notificatie', r)),
+    ];
 
     if (isValidFeedbackEmail(item.submitterEmail)) {
       const cf = buildSubmitterEmail(item);
-      logResult(
-        'indiener-bevestiging',
-        await sendEmail({ to: item.submitterEmail, subject: cf.subject, html: cf.html, text: cf.text }),
+      tasks.push(
+        sendEmail({ to: item.submitterEmail, subject: cf.subject, html: cf.html, text: cf.text }).then((r) =>
+          logResult('indiener-bevestiging', r),
+        ),
       );
     }
+
+    await Promise.all(tasks);
   } catch (e) {
     console.error('[feedback-notify] onverwachte fout', (e as Error).message);
   }
