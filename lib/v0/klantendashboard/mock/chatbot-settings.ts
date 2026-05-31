@@ -21,7 +21,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: true,
-    toneOfVoice: 'friendly',
+    toneOfVoice: 'personal',
     extraInstructions:
       'Antwoord vriendelijk en duidelijk. Houd antwoorden kort. Verwijs bij twijfel naar onze contactpagina.',
     answerLength: 'normal',
@@ -79,7 +79,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: true,
-    toneOfVoice: 'friendly',
+    toneOfVoice: 'personal',
     extraInstructions:
       'Wees warm en geruststellend. Voor medische vragen altijd doorverwijzen naar een fysiotherapeut of huisarts.',
     answerLength: 'normal',
@@ -138,7 +138,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     ],
     primaryLanguage: 'nl',
     autoDetectLanguage: true,
-    toneOfVoice: 'friendly',
+    toneOfVoice: 'personal',
     extraInstructions: '',
     answerLength: 'normal',
     mayMentionPrices: true,
