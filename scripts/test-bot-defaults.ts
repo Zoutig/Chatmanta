@@ -154,8 +154,8 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.9', 'LATEST_BOT_VERSION moet v0.9 zijn (gepromoveerd iter2: dimensie-verbetering + geen regressie; pairwise +16pp, gate-failures 10→6, safety verbeterd)');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9']);
+assert.equal(LATEST_BOT_VERSION, 'v0.9.2', 'LATEST_BOT_VERSION moet v0.9.2 zijn (latency-pass: decompose-gate, kwaliteit-neutraal)');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2']);
 
 // v0.9 (iter2) — append-only deterministische hard-fact-weigering. Aanwezig in de
 // registry, flag aan, en v0.8.1 blijft byte-identiek (krijgt de flag NIET).
@@ -169,6 +169,27 @@ assert.equal(v09.claimRegenerateEnabled, true, 'v0.9 erft claimRegenerateEnabled
 const v081 = BOTS['v0.8.1'];
 assert.notEqual(v081.hardFactDeterministicRefusal, true, 'append-only: v0.8.1 krijgt de v0.9-flag NIET (byte-identiek)');
 
+// v0.9.1 — safety-aware hard-fact-weigering + scope-hardening. Aanwezig, flags aan.
+const v091 = BOTS['v0.9.1'];
+assert.ok(v091, 'v0.9.1 ontbreekt uit BOTS-registry');
+assert.equal(v091.hardFactRefusalSafetyAware, true, 'v0.9.1 zet hardFactRefusalSafetyAware=true');
+assert.equal(v091.offDomainCodeRefusal, true, 'v0.9.1 zet offDomainCodeRefusal=true');
+assert.notEqual(v091.decomposeHeuristicGate, true, 'v0.9.1 heeft de v0.9.2-decompose-gate NIET');
+
+// v0.9.2 — latency-pass (decompose-gate). Flag aan; v0.9.1 byte-identiek incl. prompt;
+// de verworpen rerank-lever (rerankSkipOnStrong) bestaat NIET op de config.
+const v092 = BOTS['v0.9.2'];
+assert.ok(v092, 'v0.9.2 ontbreekt uit BOTS-registry');
+assert.equal(v092.version, 'v0.9.2', 'v0.9.2 version-veld moet v0.9.2 zijn');
+assert.equal(v092.decomposeHeuristicGate, true, 'v0.9.2 zet decomposeHeuristicGate=true');
+assert.equal(v092.systemPrompt, v091.systemPrompt, 'v0.9.2 erft de v0.9.1-systemPrompt byte-identiek (geen prompt-wijziging)');
+assert.equal(v092.hardFactRefusalSafetyAware, true, 'v0.9.2 erft hardFactRefusalSafetyAware=true van v0.9.1');
+assert.equal(
+  (v092 as Record<string, unknown>).rerankSkipOnStrong,
+  undefined,
+  'v0.9.2 heeft GEEN rerankSkipOnStrong (lever verworpen na no-regression-gate)',
+);
+
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
 console.log(`✓ v0.5 systemPrompt heeft soft word-ban (geen zwartelijst)`);
@@ -181,4 +202,6 @@ console.log(`✓ v0.7.1 = output-clarity (outputStyleVersion=v2, was 'v0.7')`);
 console.log(`✓ v0.7.2 = output-clarity tune (outputStyleVersion=v3, rebuild vanaf v0.6, geen v0.7.1-stacking)`);
 console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.7.2-blok, rebuild vanaf v0.6)`);
 console.log(`✓ v0.9 = deterministische hard-fact-weigering (hardFactDeterministicRefusal=true), v0.8.1 byte-identiek (append-only)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.9 (gepromoveerd iter2), BOT_VERSIONS_ORDERED = [v0.1..v0.9]`);
+console.log(`✓ v0.9.1 = safety-aware weigering + scope-hardening (geen decompose-gate)`);
+console.log(`✓ v0.9.2 = latency-pass (decomposeHeuristicGate=true), prompt byte-identiek aan v0.9.1, GEEN rerankSkipOnStrong`);
+console.log(`✓ LATEST_BOT_VERSION = v0.9.2 (latency-pass), BOT_VERSIONS_ORDERED = [v0.1..v0.9.2]`);
