@@ -115,6 +115,61 @@ export function needsHistoryResolution(question: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// looksMultiHop — keyword-heuristic: heeft de query oppervlak-splitsbare
+// deelvragen die de decompose-call zinvol maken? (v0.9.2 decompose-gate)
+// ---------------------------------------------------------------------------
+
+// Vraagwoorden. \b zodat "hoe" niet matcht binnen "hoeveel" (apart geteld) en
+// "welke?" zowel "welk" als "welke" pakt.
+const INTERROGATIVE_RE = /\b(?:wat|hoe|hoeveel|wanneer|waar|waarom|welke?|wie)\b/gi;
+// Vergelijkings-markers — vragen die twee dingen tegen elkaar afzetten.
+const COMPARISON_RE =
+  /\b(?:verschil|versus|vs\.?|vergelijk\w*|t\.?o\.?v\.?|ten opzichte)\b/i;
+const ZOWEL_ALS_RE = /\bzowel\b[\s\S]*?\bals\b/i;
+// "van X naar Y" — overstap/transitie tussen twee toestanden (vereist beide hops).
+const TRANSITION_RE = /\bvan(?:uit)?\b[\s\S]*?\bnaar\b/i;
+// Aggregatie van meerdere componenten in één antwoord.
+const AGGREGATION_RE = /\b(?:samen|allemaal|gezamenlijk|in totaal)\b/i;
+// Nevenschikkend voegwoord.
+const CONJUNCTION_RE = /\b(?:en|of)\b/i;
+
+/** Pure helper: true als de vraag waarschijnlijk meerdere deelvragen/hops bevat
+ *  (→ decompose voegt retrieval-waarde toe).
+ *
+ *  Bewust LIBERAAL richting true (bij twijfel decomposen): over-decomposen kost
+ *  alleen de TTFT-besparing op die query, geen kwaliteit. FALSE alleen bij
+ *  overtuigend single-clause single-hop. Eval-empirie (v0.9.2): de strakke
+ *  variant miste 38% van de multi_hop-vragen (false-negatives drukten recall@k);
+ *  deze variant vangt conjunctie+vraagwoord, "van X naar Y", aggregatie en
+ *  vergelijking. Puur-semantische multi-hop zonder oppervlaktemarker blijft
+ *  onvangbaar (acceptabel — decompose-skip houdt grounding binnen noise).
+ *  Gebruikt door de v0.9.2 decompose-gate (bot.decomposeHeuristicGate). */
+export function looksMultiHop(question: string): boolean {
+  if (!question || typeof question !== 'string') return false;
+  const q = question.trim();
+  if (q.length === 0) return false;
+  // ≥2 vraagtekens = meerdere vragen.
+  if ((q.match(/\?/g)?.length ?? 0) >= 2) return true;
+  // vergelijking / "zowel…als" / "van X naar Y" / aggregatie.
+  if (
+    COMPARISON_RE.test(q) ||
+    ZOWEL_ALS_RE.test(q) ||
+    TRANSITION_RE.test(q) ||
+    AGGREGATION_RE.test(q)
+  )
+    return true;
+  // ≥2 distincte vraagwoorden.
+  const matches = q.match(INTERROGATIVE_RE);
+  const distinctInterrogatives = matches ? new Set(matches.map((m) => m.toLowerCase())).size : 0;
+  if (distinctInterrogatives >= 2) return true;
+  // nevenschikkend voegwoord ("en"/"of") + minstens één vraagwoord = samengestelde
+  // vraag (bv. "Wat kost X en wordt het vergoed?"). Liberaal: een losse "en"
+  // tussen zelfstandige naamwoorden zónder vraagwoord telt niet.
+  if (CONJUNCTION_RE.test(q) && distinctInterrogatives >= 1) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // decideRagStrategy
 // ---------------------------------------------------------------------------
 

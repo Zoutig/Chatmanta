@@ -12,7 +12,7 @@
 // wordt door Claude Code beoordeeld (zie de judge-queue), $0 marginaal.
 //
 // Usage:
-//   npm run eval:hard:run                          # 5 doelversies (v0.6/v0.7.3/v0.8.1/v0.9/v0.9.1)
+//   npm run eval:hard:run                          # 6 doelversies (v0.6/v0.7.3/v0.8.1/v0.9/v0.9.1/v0.9.2)
 //   npm run eval:hard:run -- --versions=v0.9.1     # 1 versie
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,7 +33,7 @@ import {
   type ResultsFile,
 } from '../lib/v0/server/hard-eval-checks';
 
-const DEFAULT_VERSIONS = ['v0.6', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1'];
+const DEFAULT_VERSIONS = ['v0.6', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2'];
 const CONCURRENCY = 2;
 
 const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({

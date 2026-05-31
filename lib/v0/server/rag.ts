@@ -1734,7 +1734,24 @@ export async function* runRagQueryStreaming(input: {
   let decomposeCost = 0;
   let decomposeInputTokens = 0;
   let decomposeOutputTokens = 0;
-  if (bot.queryDecomposition && (withinBudget() || markSkipped('queryDecomposition'))) {
+  // v0.9.2: decompose-gate — skip de decompose-LLM-call op overtuigend single-hop
+  // vragen (looksMultiHop=false), bespaart ~820ms p50 vóór het eerste token. Een
+  // heuristiek-skip telt NIET als budget-skip (geen markSkipped). Bij
+  // decomposeHeuristicGate=false/undefined draait decompose onvoorwaardelijk
+  // (v0.9.1-gedrag).
+  let decomposeGateAllows = true;
+  if (bot.queryDecomposition && bot.decomposeHeuristicGate) {
+    const { looksMultiHop } = await import('./rag-decision');
+    // Toets zowel de originele als de herschreven vraag: de rewrite poetst soms
+    // de multi-hop-structuur ("...en hoeveel...") weg. Conservatief — decompose
+    // blijft draaien als één van beide multi-hop oogt.
+    decomposeGateAllows = looksMultiHop(original) || looksMultiHop(queryForEmbed);
+  }
+  if (
+    bot.queryDecomposition &&
+    decomposeGateAllows &&
+    (withinBudget() || markSkipped('queryDecomposition'))
+  ) {
     yield { kind: 'status', phase: 'decompose' };
     const stopDec = tMark('decompose_ms');
     const dec = await decomposeQuery(queryForEmbed, bot);
