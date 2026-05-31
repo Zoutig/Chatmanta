@@ -7,6 +7,8 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { getFeedbackSummary, listFeedback } from '@/lib/controlroom/server/feedback';
 import {
+  FEEDBACK_SOURCES,
+  FEEDBACK_SOURCE_LABELS,
   FEEDBACK_STATUSES,
   FEEDBACK_STATUS_LABELS,
   FEEDBACK_TYPES,
@@ -14,6 +16,7 @@ import {
   FEEDBACK_URGENCIES,
   FEEDBACK_URGENCY_LABELS,
   type FeedbackItem,
+  type FeedbackSource,
   type FeedbackStatus,
   type FeedbackSummary,
   type FeedbackType,
@@ -40,7 +43,7 @@ const STATUS_TONE: Record<FeedbackStatus, PillTone> = {
   gesloten: 'neutral',
 };
 
-type SP = { status?: string; type?: string; urgency?: string; org?: string };
+type SP = { status?: string; type?: string; urgency?: string; org?: string; source?: string; q?: string };
 
 function buildHref(sp: SP, patch: Partial<SP>): string {
   const merged: Record<string, string> = {};
@@ -127,11 +130,13 @@ export default async function FeedbackInboxPage({ searchParams }: { searchParams
   const status = FEEDBACK_STATUSES.includes(sp.status as FeedbackStatus) ? (sp.status as FeedbackStatus) : undefined;
   const type = FEEDBACK_TYPES.includes(sp.type as FeedbackType) ? (sp.type as FeedbackType) : undefined;
   const urgency = FEEDBACK_URGENCIES.includes(sp.urgency as FeedbackUrgency) ? (sp.urgency as FeedbackUrgency) : undefined;
+  const source = FEEDBACK_SOURCES.includes(sp.source as FeedbackSource) ? (sp.source as FeedbackSource) : undefined;
   const orgId = sp.org && resolveOrgSlugFromId(sp.org) ? sp.org : undefined;
+  const search = sp.q?.trim().slice(0, 120) || undefined;
 
   const [summary, items] = await Promise.all([
     getFeedbackSummary(),
-    listFeedback({ status, type, urgency, orgId }),
+    listFeedback({ status, type, urgency, source, orgId, search }),
   ]);
 
   return (
@@ -183,6 +188,37 @@ export default async function FeedbackInboxPage({ searchParams }: { searchParams
                   {KNOWN_ORGS[slug].name}
                 </Chip>
               ))}
+            </FilterRow>
+            <FilterRow label="Bron">
+              <Chip active={!source} href={buildHref(sp, { source: '' })}>Alle</Chip>
+              {FEEDBACK_SOURCES.map((s) => (
+                <Chip key={s} active={source === s} href={buildHref(sp, { source: s })}>
+                  {FEEDBACK_SOURCE_LABELS[s]}
+                </Chip>
+              ))}
+            </FilterRow>
+            <FilterRow label="Zoeken">
+              <form method="get" action="/admindashboard/feedback" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1, alignItems: 'center' }}>
+                {status && <input type="hidden" name="status" value={status} />}
+                {type && <input type="hidden" name="type" value={type} />}
+                {urgency && <input type="hidden" name="urgency" value={urgency} />}
+                {source && <input type="hidden" name="source" value={source} />}
+                {orgId && <input type="hidden" name="org" value={orgId} />}
+                <input
+                  type="search"
+                  name="q"
+                  defaultValue={search ?? ''}
+                  placeholder="Zoek in beschrijving of vraag…"
+                  className="klant-input"
+                  style={{ maxWidth: 280, height: 30, fontSize: 12.5 }}
+                />
+                <button type="submit" className="klant-btn" style={{ fontSize: 12, padding: '3px 12px' }}>Zoek</button>
+                {search && (
+                  <Link href={buildHref(sp, { q: '' })} className="klant-btn" style={{ fontSize: 12, padding: '3px 10px' }}>
+                    Wis
+                  </Link>
+                )}
+              </form>
             </FilterRow>
           </div>
 

@@ -9,6 +9,7 @@ import {
   listFeedbackEvents,
 } from '@/lib/controlroom/server/feedback';
 import {
+  FEEDBACK_PRIORITY_LABELS,
   FEEDBACK_STATUS_LABELS,
   FEEDBACK_TYPE_LABELS,
   FEEDBACK_URGENCY_LABELS,
@@ -20,7 +21,11 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { formatDateNL, formatRelativeNL } from '@/lib/controlroom/format';
+import { buildFeedbackClaudePayload } from '@/lib/controlroom/feedback-claude-payload';
+import { CopyButton } from '../../components/copy-button';
 import { FeedbackStatusActions } from './components/status-actions';
+import { FeedbackPriorityActions } from './components/priority-actions';
+import { FeedbackNoteForm } from './components/note-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +83,7 @@ export default async function FeedbackDetail({ params }: { params: Promise<{ id:
   const orgName = slug ? KNOWN_ORGS[slug].name : item.organizationId;
   const ext = item.attachmentName?.split('.').pop()?.toLowerCase() ?? '';
   const isImage = IMAGE_EXT.includes(ext);
+  const claudePayload = item.type === 'bug' ? buildFeedbackClaudePayload(item, events, { orgName }) : null;
 
   return (
     <>
@@ -95,12 +101,22 @@ export default async function FeedbackDetail({ params }: { params: Promise<{ id:
       />
 
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+        {claudePayload && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            <CopyButton text={claudePayload} label="Kopieer voor Claude Code" />
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
           <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>Status wijzigen:</span>
           <FeedbackStatusActions id={item.id} status={item.status} />
         </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+          <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>Prioriteit:</span>
+          <FeedbackPriorityActions id={item.id} priority={item.priority} />
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
           <Row label="Type" value={FEEDBACK_TYPE_LABELS[item.type]} />
+          <Row label="Prioriteit" value={item.priority ? FEEDBACK_PRIORITY_LABELS[item.priority] : '—'} />
           <Row label="Org" value={orgName} />
           <Row label="Ingediend door" value={item.submitterName ?? '—'} />
           <Row label="E-mail" value={item.submitterEmail ?? '—'} />
@@ -175,6 +191,11 @@ export default async function FeedbackDetail({ params }: { params: Promise<{ id:
             ))}
           </div>
         )}
+      </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <div className="klant-section-title" style={{ marginBottom: 10 }}>Notitie of reactie toevoegen</div>
+        <FeedbackNoteForm id={item.id} />
       </Card>
 
       <Link href="/admindashboard/feedback" className="klant-btn">← Terug naar Feedback</Link>

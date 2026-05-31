@@ -257,6 +257,13 @@ export const FEEDBACK_URGENCY_LABELS: Record<FeedbackUrgency, string> = {
 export const FEEDBACK_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 export type FeedbackPriority = (typeof FEEDBACK_PRIORITIES)[number];
 
+export const FEEDBACK_PRIORITY_LABELS: Record<FeedbackPriority, string> = {
+  low: 'Laag',
+  normal: 'Normaal',
+  high: 'Hoog',
+  urgent: 'Urgent',
+};
+
 export const FEEDBACK_STATUSES = [
   'nieuw',
   'in_behandeling',
@@ -274,6 +281,13 @@ export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
 
 export const FEEDBACK_SOURCES = ['klantendashboard', 'widget', 'intern', 'systeem'] as const;
 export type FeedbackSource = (typeof FEEDBACK_SOURCES)[number];
+
+export const FEEDBACK_SOURCE_LABELS: Record<FeedbackSource, string> = {
+  klantendashboard: 'Klantportaal',
+  widget: 'Widget',
+  intern: 'Intern',
+  systeem: 'Systeem',
+};
 
 export const FEEDBACK_EVENT_KINDS = [
   'created',
@@ -342,6 +356,8 @@ export type FeedbackFilter = {
   source?: FeedbackSource;
   /** Org-uuid (gevalideerd tegen KNOWN_ORGS door de caller). */
   orgId?: string;
+  /** Vrij-tekst zoekterm (matcht beschrijving + vraag, case-insensitive). */
+  search?: string;
 };
 
 export type FeedbackSummary = {
