@@ -200,6 +200,25 @@ export type BotConfig = {
    */
   adaptiveRerankMargin?: number;
   /**
+   * v0.9.2 (latency-pass): skip de LLM-rerank in het 'standard'-pad zodra
+   * retrieval 'strong' is (top1 ≥ adaptiveStrongTopSim), ongeacht de top1-top2
+   * gap. Baseline-diagnose: 74% van de queries is 'strong' maar 0% nam het
+   * fast-pad — de clear-winner-gap-eis blokkeerde het bij high-recall retrieval
+   * (kleine gaps). Rerank kost ~800ms p50 / ~3700ms p95 vóór het eerste token.
+   * Claim-verify/regenerate/cascade blijven áán (anti-hallucinatie). 'careful'
+   * (weak retrieval) reranked altijd. Default false/undefined → v0.9.1-gedrag.
+   */
+  rerankSkipOnStrong?: boolean;
+  /**
+   * v0.9.2 (latency-pass): gate de decompose-LLM-call achter looksMultiHop() —
+   * een pure pre-LLM heuristiek. Skip decompose op overtuigend single-hop vragen
+   * (~90% van het corpus), behoud 'm op multi-hop. Bespaart ~820ms p50 op het
+   * kritieke pad. Conservatief: bij twijfel wél decomposen. Vereist
+   * queryDecomposition=true om effect te hebben. Default false/undefined →
+   * decompose draait onvoorwaardelijk (v0.9.1-gedrag).
+   */
+  decomposeHeuristicGate?: boolean;
+  /**
    * v0.6.2: strenger cascadeMinTopSim wanneer adaptiveRag aan. Default 0.60
    * (vs 0.50 in v0.5 hotfix). Cascade fired alleen bij medium/strong
    * retrieval — bij weak heeft een sterker model geen grond. Zonder
@@ -1094,6 +1113,29 @@ const V0_9_1: BotConfig = {
   offDomainCodeRefusal: true,
 };
 
+// v0.9.2 — latency-pass (TTFT-reductie, kwaliteit-neutraal bedoeld). Baseline-
+// diagnose (v0.9 proxy, $0 uit eval_runs, n=168–186): TTFT p50 ≈3935ms / p95
+// ≈7748ms gaat vooral op aan drie sequentiële gpt-4o-mini-calls vóór het eerste
+// token — preprocess (859ms), decompose (820ms), rerank (798ms p50 / 3747ms p95)
+// = ~63% van TTFT. Twee daarvan draaien onnodig: decompose op élke query (maar
+// ~10% is multi-hop) en rerank op 93% (het fast-pad vuurde 0% door de averechtse
+// clear-winner-gap-eis bij high-recall retrieval). v0.9.2 zet twee gates aan:
+// decomposeHeuristicGate (skip decompose op single-hop via looksMultiHop) en
+// rerankSkipOnStrong (skip rerank bij 'strong' retrieval, los van de gap). De
+// anti-hallucinatie-lagen (claim-verify/regenerate/cascade) blijven áán; preprocess
+// blijft (doet óók smalltalk-routing). v0.9.1 byte-identiek + append-only. Gate:
+// no-regression op recall@k + hard-dimensie + grounding. Zie SPEC
+// docs/superpowers/specs/2026-05-29-latency-pass-v092-design.md.
+const V0_9_2: BotConfig = {
+  ...V0_9_1,
+  version: 'v0.9.2',
+  label: 'v0.9.2 — latency-pass (decompose- + rerank-gate)',
+  description:
+    'v0.9.1 plus twee latency-gates die TTFT verlagen zonder de antwoordkwaliteit te raken: decomposeHeuristicGate slaat de decompose-LLM-call over op overtuigend single-hop vragen (looksMultiHop-heuristiek, ~90% van het verkeer, ~820ms winst), rerankSkipOnStrong slaat de LLM-rerank over zodra retrieval sterk is (~74% van het verkeer, ~800ms p50 / ~3700ms p95 winst). Claim-verify, regenerate en cascade blijven onveranderd áán — anti-hallucinatie boven snelheid. Geen prompt-, embedding- of threshold-wijziging; v0.9.1 byte-identiek.',
+  decomposeHeuristicGate: true,
+  rerankSkipOnStrong: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1110,6 +1152,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_8_1.version]: V0_8_1,
   [V0_9.version]: V0_9,
   [V0_9_1.version]: V0_9_1,
+  [V0_9_2.version]: V0_9_2,
 };
 
 /**
@@ -1147,7 +1190,13 @@ export const BOTS: Record<string, BotConfig> = {
 // prompt-block. Harde-Dimensie-eval (cache uit, 27 cases): v0.9.1 100% vs v0.9 96%;
 // hh-globex-spoed gaat v0.9 intermittent FAIL → v0.9.1 deterministisch PASS. v0.9
 // blijft append-only behouden. De anti-fabricatie-upside van v0.9 blijft intact.
-export const LATEST_BOT_VERSION = V0_9_1.version;
+//
+// GEPROMOVEERD naar v0.9.2 (2026-05-31) — latency-pass. v0.9.1 + decomposeHeuristicGate
+// + rerankSkipOnStrong. Doel: TTFT p50 ~3935→~2300ms / p95 ~7748→~4500ms zonder
+// kwaliteitsregressie. Promotie onder de no-regression-gate (recall@k + hard-dimensie
+// + grounding); de exacte eval-cijfers staan in de PR-beschrijving. v0.9.1 blijft
+// byte-identiek + append-only.
+export const LATEST_BOT_VERSION = V0_9_2.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1163,6 +1212,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_8_1.version,
   V0_9.version,
   V0_9_1.version,
+  V0_9_2.version,
 ];
 
 /**
