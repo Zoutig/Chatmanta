@@ -46,6 +46,24 @@ import type {
   PrivacySettingsPatch,
 } from '@/lib/controlroom/types';
 import type { ChatbotSettings, WidgetSettings } from '@/lib/v0/klantendashboard/types';
+import {
+  createQuiz,
+  getActiveQuizForOrg,
+  getQuiz,
+  insertQuestions,
+  listQuestions,
+  setQuizStatus,
+  softDeleteQuestion,
+  updateQuestion,
+} from '@/lib/controlroom/server/quiz';
+import { analyzeKnowledgeBase } from '@/lib/controlroom/server/quiz-analysis';
+import {
+  QUIZ_ANALYSE_MODELS,
+  type QuizAnalyseModel,
+  type QuizQuestionInput,
+  type QuizQuestionPatch,
+} from '@/lib/controlroom/types';
+import { listDocs } from '@/lib/v0/server/rag';
 import { requireV0Auth } from './_auth';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 
@@ -268,5 +286,143 @@ export async function adminCheckWidgetInstallationAction(
       installOrigin: w.installOrigin,
       lastCheckedAt,
     };
+  });
+}
+
+// ───────────────────────── Kennisbank-Quiz (M3) ─────────────────────────
+// Operator triggert de AI-analyse, beoordeelt de gegenereerde vragen en
+// activeert de quiz. De analyse draait SYNCHROON binnen de trigger-action;
+// maxDuration=120 op de klantdetail-route dekt de ~15-60s gpt-4o(-mini)-call.
+// Org uit de route-param (requireKnownOrgId); alle DB-toegang via quiz.ts.
+
+// Her-genereren mag alleen vanuit deze statussen; actief/voltooid = eenmalig.
+const QUIZ_RETRIGGERABLE = new Set(['concept', 'leeg', 'mislukt']);
+
+export async function triggerQuizAnalysisAction(
+  orgSlug: string,
+  model: QuizAnalyseModel,
+): Promise<ActionResult<{ quizId: string; status: string; questionCount: number }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const orgId = requireKnownOrgId(orgSlug);
+    if (!(QUIZ_ANALYSE_MODELS as readonly string[]).includes(model)) {
+      fail('INPUT_INVALID', `onbekend model: ${model}`);
+    }
+    const docs = await listDocs(orgId);
+    if (docs.length === 0) {
+      fail('INPUT_INVALID', 'Kennisbank is leeg. Voeg eerst minimaal één kennisbron toe voordat je de analyse start.');
+    }
+    // Re-trigger: annuleer een herbruikbare oude quiz; blokkeer op actief/voltooid.
+    const existing = await getActiveQuizForOrg(orgId);
+    if (existing) {
+      if (!QUIZ_RETRIGGERABLE.has(existing.status)) {
+        fail('INPUT_INVALID', `Er is al een ${existing.status} quiz voor deze klant — een actieve of voltooide quiz kan niet opnieuw gegenereerd worden.`);
+      }
+      await setQuizStatus(existing.id, 'geannuleerd');
+    }
+    const quiz = await createQuiz({ organizationId: orgId, analyseModel: model });
+    const summary = await analyzeKnowledgeBase({ quizId: quiz.id, organizationId: orgId, model });
+    revalidate(orgSlug);
+    return { quizId: quiz.id, status: summary.status, questionCount: summary.questionCount };
+  });
+}
+
+export async function setQuizQuestionApprovedAction(
+  orgSlug: string,
+  questionId: string,
+  approved: boolean,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    await updateQuestion(questionId, { goedgekeurd: approved });
+    revalidate(orgSlug);
+    return { id: questionId };
+  });
+}
+
+export async function updateQuizQuestionAction(
+  orgSlug: string,
+  questionId: string,
+  patch: QuizQuestionPatch,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    if (patch.vraag !== undefined) {
+      const v = patch.vraag.trim();
+      if (v.length < 1 || v.length > 2000) fail('INPUT_INVALID', 'Vraag moet tussen 1 en 2000 tekens zijn.');
+    }
+    await updateQuestion(questionId, patch);
+    revalidate(orgSlug);
+    return { id: questionId };
+  });
+}
+
+export async function deleteQuizQuestionAction(
+  orgSlug: string,
+  quizId: string,
+  questionId: string,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    await softDeleteQuestion(quizId, questionId);
+    revalidate(orgSlug);
+    return { id: questionId };
+  });
+}
+
+export async function addQuizQuestionAction(
+  orgSlug: string,
+  quizId: string,
+  input: QuizQuestionInput,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const orgId = requireKnownOrgId(orgSlug);
+    const vraag = (input.vraag ?? '').trim();
+    if (vraag.length < 1 || vraag.length > 2000) fail('INPUT_INVALID', 'Vraag moet tussen 1 en 2000 tekens zijn.');
+    const created = await insertQuestions(quizId, orgId, [
+      { ...input, vraag, bron: 'niels', goedgekeurd: true },
+    ]);
+    revalidate(orgSlug);
+    return { id: created[0]?.id ?? '' };
+  });
+}
+
+export async function activateQuizAction(
+  orgSlug: string,
+  quizId: string,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    const quiz = await getQuiz(quizId);
+    if (!quiz) fail('NOT_FOUND', 'Quiz niet gevonden.');
+    if (quiz.status !== 'concept') {
+      fail('INPUT_INVALID', `Alleen een concept-quiz kan geactiveerd worden (huidige status: ${quiz.status}).`);
+    }
+    const active = await listQuestions(quizId, { activeOnly: true });
+    if (active.length === 0) {
+      fail('INPUT_INVALID', 'Keur eerst minimaal één vraag goed voordat je de quiz activeert.');
+    }
+    await setQuizStatus(quizId, 'actief');
+    revalidate(orgSlug);
+    revalidatePath('/klantendashboard', 'layout'); // klant-banner (M4) verschijnt
+    return { id: quizId };
+  });
+}
+
+export async function cancelQuizAction(
+  orgSlug: string,
+  quizId: string,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    requireKnownOrgId(orgSlug);
+    await setQuizStatus(quizId, 'geannuleerd');
+    revalidate(orgSlug);
+    return { id: quizId };
   });
 }
