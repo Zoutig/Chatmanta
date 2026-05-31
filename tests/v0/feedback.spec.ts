@@ -43,10 +43,30 @@ test('klant dient feedback in en operator wijzigt de status', async ({ page }) =
   await expect(row).toBeVisible({ timeout: 10_000 });
   await row.click();
 
-  // Detailpagina: status wijzigen naar "In behandeling".
-  await expect(page.getByText('Melding ingediend')).toBeVisible();
+  // Detailpagina: status wijzigen naar "In behandeling". Ruime timeout: de zwaardere
+  // [id]-route compileert bij de eerste hit onder Turbopack (cold dev-server).
+  await expect(page.getByText('Melding ingediend')).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'In behandeling' }).click();
 
   // Na refresh: historie toont de statuswijziging en de status-pill volgt.
   await expect(page.getByText(/Status:.*In behandeling/)).toBeVisible({ timeout: 10_000 });
+
+  // ── Fase 2: Copy-for-Claude (alleen type=bug), prioriteit + notitie ─────────
+  await expect(page.getByRole('button', { name: 'Kopieer voor Claude Code' })).toBeVisible();
+
+  // Prioriteit "Hoog" zetten → komt in de historie als internal_note.
+  await page.getByRole('button', { name: 'Hoog' }).click();
+  await expect(page.getByText(/Prioriteit:.*Hoog/)).toBeVisible({ timeout: 10_000 });
+
+  // Interne notitie toevoegen → verschijnt in de historie.
+  const noteText = `${token}-notitie repro-stap`;
+  await page.getByPlaceholder('Schrijf een notitie of reactie…').fill(noteText);
+  await page.getByRole('button', { name: 'Toevoegen' }).click();
+  await expect(page.getByText(noteText)).toBeVisible({ timeout: 10_000 });
+
+  // ── Fase 2: zoeken in de inbox ──────────────────────────────────────────────
+  await page.goto('/admindashboard/feedback');
+  await page.fill('input[name="q"]', token);
+  await page.getByRole('button', { name: 'Zoek' }).click();
+  await expect(page.locator('a', { hasText: token }).first()).toBeVisible({ timeout: 10_000 });
 });
