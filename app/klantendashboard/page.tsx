@@ -19,6 +19,7 @@ import { Btn } from './components/ui/btn';
 import { Icon } from './components/ui/icons';
 import { SetupChecklist } from './components/setup-checklist';
 import { DismissibleBanner } from './components/dismissible-banner';
+import { getActiveQuizForOrg, listAnswers, listQuestions } from '@/lib/controlroom/server/quiz';
 import { OnboardingTour } from './components/onboarding-tour';
 import { StartTourButton } from './components/start-tour-button';
 import { TriagePanel } from './components/overview/triage-panel';
@@ -69,6 +70,20 @@ export default async function OverviewPage() {
     }),
     getTopQuestions(activeOrg.slug, settings.topQuestions),
   ]);
+
+  // Quiz-banner: alleen als er een ACTIEVE quiz met openstaande vragen is. De
+  // queries draaien alleen in dat geval, dus orgs zonder quiz betalen niets.
+  let quizBanner: { remaining: number; answered: number; quizId: string } | null = null;
+  const activeQuiz = await getActiveQuizForOrg(orgId).catch(() => null);
+  if (activeQuiz && activeQuiz.status === 'actief') {
+    const [aq, ans] = await Promise.all([
+      listQuestions(activeQuiz.id, { activeOnly: true }),
+      listAnswers(activeQuiz.id),
+    ]);
+    const answeredIds = new Set(ans.map((a) => a.questionId));
+    const remaining = aq.filter((q) => !answeredIds.has(q.id)).length;
+    if (remaining > 0) quizBanner = { remaining, answered: aq.length - remaining, quizId: activeQuiz.id };
+  }
 
   // Zodra alle setup-stappen voltooid zijn, verdwijnt de "Aan de slag"-checklist
   // (de klant heeft de nudge niet meer nodig). every() op de 6 vaste stappen.
@@ -138,6 +153,20 @@ export default async function OverviewPage() {
               cta={{ label: 'Widget installeren', href: '/klantendashboard/widget' }}
             />
           )}
+        </div>
+      )}
+
+      {/* Kennisbank-quiz — staat klaar om de KB te verbeteren */}
+      {quizBanner && (
+        <div style={{ marginBottom: 20 }}>
+          <DismissibleBanner
+            dismissId="quiz-actief"
+            signature={`${quizBanner.quizId}:${quizBanner.answered}`}
+            variant="info"
+            title={`Er ${quizBanner.remaining === 1 ? 'staat 1 vraag' : `staan ${quizBanner.remaining} vragen`} voor je klaar`}
+            message="Beantwoord een paar korte vragen om je kennisbank te verbeteren — je chatbot wordt er slimmer van."
+            cta={{ label: 'Quiz starten', href: '/klantendashboard/quiz' }}
+          />
         </div>
       )}
 

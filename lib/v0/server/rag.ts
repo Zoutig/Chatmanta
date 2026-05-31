@@ -3017,10 +3017,14 @@ export async function ingestText({
   filename,
   text,
   organizationId,
+  metadata,
 }: {
   filename: string;
   text: string;
   organizationId: string;
+  /** Extra provenance gemerged in documents.metadata (bv. {origin:'quiz',...}).
+   *  source blijft 'v0_local' — geen nieuwe enum-waarde (CHECK-constraint). */
+  metadata?: Record<string, unknown>;
 }): Promise<IngestResult> {
   const chunks = chunkText(text);
   if (chunks.length === 0) {
@@ -3036,7 +3040,7 @@ export async function ingestText({
       filename,
       source: 'v0_local',
       status: 'processing',
-      metadata: { chars: text.length, chunk_count: chunks.length },
+      metadata: { chars: text.length, chunk_count: chunks.length, ...(metadata ?? {}) },
     })
     .select('id')
     .single();

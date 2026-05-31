@@ -13,6 +13,17 @@ import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org'
 import { requireV0Auth } from '@/app/actions/_auth';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import {
+  getActiveQuizForOrg,
+  getQuestion,
+  listAnswers,
+  listQuestions,
+  recordAnswer,
+  setQuizStatus,
+  updateQuizCounts,
+} from '@/lib/controlroom/server/quiz';
+import { ingestText } from '@/lib/v0/server/rag';
+import { redactPii } from '@/lib/observability/redact';
+import {
   createFeedback,
   uploadAttachment,
   setFeedbackAttachment,
@@ -247,5 +258,94 @@ export async function submitFeedbackAction(
     // Laat de operator-inbox (Admin Dashboard) de nieuwe melding meteen zien.
     revalidatePath('/admindashboard', 'layout');
     return { id: item.id };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Kennisbank-Quiz (M4) — klant beantwoordt of slaat een vraag over. Het antwoord
+// gaat PII-geredacteerd + lengte-gecapt de kennisbank in als nieuwe bron
+// (source 'v0_local' + metadata-provenance origin:'quiz'). Org server-side uit
+// de cookie (nooit client-payload). Bij de laatste vraag → quiz 'voltooid'.
+// ---------------------------------------------------------------------------
+const QUIZ_ANSWER_MAX = 2000;
+
+export async function submitQuizAnswerAction(
+  questionId: string,
+  payload: { antwoord?: string | null; meerkeuzeOptie?: string | null; andersTekst?: string | null; skip?: boolean },
+): Promise<ActionResult<{ done: boolean; answered: number; total: number }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const quiz = await getActiveQuizForOrg(activeOrg.id);
+    if (!quiz || quiz.status !== 'actief') fail('NOT_FOUND', 'Er staat geen actieve quiz klaar.');
+    const question = await getQuestion(questionId);
+    if (!question || question.quizId !== quiz.id || question.organizationId !== activeOrg.id) {
+      fail('NOT_FOUND', 'Vraag niet gevonden.');
+    }
+    if (question.verwijderd || !question.goedgekeurd) fail('INPUT_INVALID', 'Deze vraag is niet beschikbaar.');
+
+    let antwoord: string | null = null;
+    let meerkeuzeOptie: string | null = null;
+    let andersTekst: string | null = null;
+    let ingestedDocumentId: string | null = null;
+    let redacted = false;
+
+    if (!payload.skip) {
+      if (question.type === 'meerkeuze') {
+        meerkeuzeOptie = (payload.meerkeuzeOptie ?? '').trim().slice(0, 500) || null;
+        andersTekst = (payload.andersTekst ?? '').trim().slice(0, QUIZ_ANSWER_MAX) || null;
+        antwoord = andersTekst ?? meerkeuzeOptie; // 'Anders'-tekst heeft voorrang
+      } else {
+        antwoord = (payload.antwoord ?? '').trim().slice(0, QUIZ_ANSWER_MAX) || null;
+      }
+
+      if (antwoord && antwoord.length > 0) {
+        // PII-redactie AAN DE POORT — ruwe PII komt nooit in de KB of in admin_quiz_answer.
+        const safe = redactPii(antwoord);
+        redacted = safe !== antwoord;
+        antwoord = safe;
+        if (andersTekst) andersTekst = redactPii(andersTekst);
+        try {
+          const res = await ingestText({
+            filename: `Quiz-antwoord · ${question.categorieLabel ?? question.categorie}`,
+            text: `Vraag: ${question.vraag}\nAntwoord: ${safe}`,
+            organizationId: activeOrg.id,
+            metadata: { origin: 'quiz', quiz_id: quiz.id, question_id: question.id, label: 'quiz-antwoord' },
+          });
+          ingestedDocumentId = res.docId;
+        } catch (e) {
+          // Ingest is niet-transactioneel; een fout mag het antwoord-opslaan niet
+          // blokkeren. We loggen het gat; de operator ziet het antwoord wél terug.
+          console.error('[submitQuizAnswer] ingest faalde', (e as Error).message);
+        }
+      }
+    }
+
+    await recordAnswer({
+      quizId: quiz.id,
+      questionId: question.id,
+      organizationId: activeOrg.id,
+      antwoord, // null = overgeslagen (of meerkeuze zonder keuze)
+      meerkeuzeOptie,
+      andersTekst,
+      ingestedDocumentId,
+      redacted,
+    });
+
+    // Tellingen bijwerken + bepalen of de quiz klaar is (resume-cursor = eerste
+    // onbeantwoorde actieve vraag).
+    const active = await listQuestions(quiz.id, { activeOnly: true });
+    const answers = await listAnswers(quiz.id);
+    const answeredIds = new Set(answers.map((a) => a.questionId));
+    const answeredCount = answers.filter((a) => a.antwoord !== null).length;
+    const skippedCount = answers.filter((a) => a.antwoord === null).length;
+    await updateQuizCounts(quiz.id, { answeredCount, skippedCount });
+
+    const done = active.every((q) => answeredIds.has(q.id));
+    if (done) {
+      await setQuizStatus(quiz.id, 'voltooid');
+      revalidatePath('/admindashboard', 'layout');
+    }
+    revalidatePath('/klantendashboard', 'layout');
+    return { done, answered: answeredCount, total: active.length };
   });
 }
