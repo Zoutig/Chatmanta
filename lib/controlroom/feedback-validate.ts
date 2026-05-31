@@ -31,8 +31,10 @@ export type ParsedFeedback = {
   type: FeedbackType;
   urgency: FeedbackUrgency;
   description: string;
-  submitterName: string | null;
-  submitterEmail: string | null;
+  // Naam + e-mail zijn verplicht (Niels-verzoek): elke melding is herleidbaar naar
+  // een indiener zodat de operator kan terugkoppelen.
+  submitterName: string;
+  submitterEmail: string;
   chatId: string | null;
   question: string | null;
   privacyAccepted: boolean;
@@ -69,9 +71,19 @@ export function parseFeedbackForm(form: FormData): ParsedFeedback {
     fail('INPUT_INVALID', `De beschrijving mag maximaal ${DESCRIPTION_MAX} tekens zijn.`);
   }
 
-  const submitterEmail = optional(form, 'email', 200);
-  if (submitterEmail && !EMAIL_RE.test(submitterEmail)) {
-    fail('INPUT_INVALID', 'Vul een geldig e-mailadres in (of laat het leeg).');
+  // Naam verplicht.
+  const submitterName = str(form, 'name');
+  if (!submitterName) {
+    fail('INPUT_INVALID', 'Vul je naam in.');
+  }
+
+  // E-mail verplicht + geldig.
+  const submitterEmail = str(form, 'email');
+  if (!submitterEmail) {
+    fail('INPUT_INVALID', 'Vul je e-mailadres in.');
+  }
+  if (!EMAIL_RE.test(submitterEmail)) {
+    fail('INPUT_INVALID', 'Vul een geldig e-mailadres in.');
   }
 
   const privacyRaw = form.get('privacy');
@@ -84,8 +96,8 @@ export function parseFeedbackForm(form: FormData): ParsedFeedback {
     type: type as FeedbackType,
     urgency: urgency as FeedbackUrgency,
     description,
-    submitterName: optional(form, 'name', 120),
-    submitterEmail,
+    submitterName: submitterName.slice(0, 120),
+    submitterEmail: submitterEmail.slice(0, 200),
     chatId: optional(form, 'chatId', 120),
     question: optional(form, 'question', 2000),
     privacyAccepted,

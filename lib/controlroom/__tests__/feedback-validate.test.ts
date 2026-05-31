@@ -13,10 +13,12 @@ const valid = {
   type: 'bug',
   urgency: 'high',
   description: 'De chatbot geeft een verkeerd antwoord op openingstijden.',
+  name: 'Jan Jansen',
+  email: 'jan@firma.nl',
   privacy: 'on',
 };
 
-test('parseFeedbackForm accepteert geldige input en normaliseert optionele velden', () => {
+test('parseFeedbackForm accepteert geldige input en normaliseert velden', () => {
   const out = parseFeedbackForm(form({ ...valid, name: '  Jan  ', email: 'jan@firma.nl', chatId: '', question: ' Wat? ' }));
   assert.equal(out.type, 'bug');
   assert.equal(out.urgency, 'high');
@@ -29,6 +31,11 @@ test('parseFeedbackForm accepteert geldige input en normaliseert optionele velde
 
 test('parseFeedbackForm weigert een onbekend type', () => {
   assert.throws(() => parseFeedbackForm(form({ ...valid, type: 'spam' })), /geldig type/i);
+});
+
+test('parseFeedbackForm accepteert het type "anders"', () => {
+  const out = parseFeedbackForm(form({ ...valid, type: 'anders' }));
+  assert.equal(out.type, 'anders');
 });
 
 test('parseFeedbackForm weigert een onbekende urgentie', () => {
@@ -44,6 +51,22 @@ test('parseFeedbackForm weigert een te lange beschrijving', () => {
     () => parseFeedbackForm(form({ ...valid, description: 'x'.repeat(8001) })),
     /maximaal/i,
   );
+});
+
+test('parseFeedbackForm weigert een ontbrekende naam', () => {
+  const fd = form({ ...valid });
+  fd.delete('name');
+  assert.throws(() => parseFeedbackForm(fd), /naam/i);
+});
+
+test('parseFeedbackForm weigert een lege naam', () => {
+  assert.throws(() => parseFeedbackForm(form({ ...valid, name: '   ' })), /naam/i);
+});
+
+test('parseFeedbackForm weigert een ontbrekend e-mailadres', () => {
+  const fd = form({ ...valid });
+  fd.delete('email');
+  assert.throws(() => parseFeedbackForm(fd), /e-mailadres/i);
 });
 
 test('parseFeedbackForm weigert een ongeldig e-mailadres', () => {
