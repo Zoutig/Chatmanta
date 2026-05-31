@@ -84,9 +84,10 @@ async function runBotOnce(args: {
   history: ChatHistoryTurn[] | undefined;
   bot: ReturnType<typeof resolveBot>;
   orgId: string;
-}): Promise<{ response: ChatResponse | null; errCode: string | null }> {
+}): Promise<{ response: ChatResponse | null; errCode: string | null; latencyMs: number }> {
   let response: ChatResponse | null = null;
   let errCode: string | null = null;
+  const t0 = Date.now();
   try {
     for await (const ev of runRagQueryStreaming({
       question: args.question,
@@ -111,7 +112,7 @@ async function runBotOnce(args: {
   } catch (err) {
     errCode = err instanceof Error ? err.message : String(err);
   }
-  return { response, errCode };
+  return { response, errCode, latencyMs: Date.now() - t0 };
 }
 
 function sourceTexts(resp: ChatResponse | null): string[] {
@@ -159,7 +160,7 @@ async function evaluateCase(
   const history = c.conversationHistory as ChatHistoryTurn[] | undefined;
   const runs = Math.max(1, c.selfConsistencyRuns ?? 1);
 
-  const results: { response: ChatResponse | null; errCode: string | null }[] = [];
+  const results: { response: ChatResponse | null; errCode: string | null; latencyMs: number }[] = [];
   for (let i = 0; i < runs; i++) {
     results.push(await runBotOnce({ question: c.question, history, bot, orgId }));
   }
@@ -169,6 +170,8 @@ async function evaluateCase(
   const kind: HardResponseKind = resp ? resp.kind : 'error';
   const answer = resp?.answer ?? '';
   const botCostUsd = results.reduce((s, r) => s + (r.response?.totalCostUsd ?? 0), 0);
+  const latencyMs = primary.latencyMs;
+  const refused = kind === 'fallback' || kind === 'smalltalk' || looksLikeRefusal(answer);
 
   const checks: DeterministicVerdict['checks'] = {};
 
@@ -257,6 +260,9 @@ async function evaluateCase(
     layer1Pass,
     needsJudge,
     botCostUsd,
+    latencyMs,
+    refused,
+    expectsRefusal: c.expectsRefusal ?? null,
     catastrophic,
   };
 
