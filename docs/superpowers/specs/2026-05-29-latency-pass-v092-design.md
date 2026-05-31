@@ -53,6 +53,10 @@ van TTFT. Twee daarvan draaien onnodig:
 
 ## Mechanisme
 
+> ⚠ **ACHTERHAALD t.a.v. `rerankSkipOnStrong`** — zie herziening bovenaan. Alleen
+> `decomposeHeuristicGate` is geshipt; de tweede flag is verworpen + uit de code verwijderd.
+> v0.9.2 = `{ ...V0_9_1, version: 'v0.9.2', decomposeHeuristicGate: true }`.
+
 Twee nieuwe optionele `BotConfig`-flags (default `undefined` → bestaand gedrag → v0.9.1 onveranderd):
 
 - **`decomposeHeuristicGate?: boolean`** — pure pre-LLM heuristiek `looksMultiHop(query)` in
@@ -72,8 +76,8 @@ v0.9.2 = `{ ...V0_9_1, version: 'v0.9.2', decomposeHeuristicGate: true, rerankSk
 
 - [ ] TTFT p50 daalt betekenisvol vs v0.9.1-baseline (target ~3935 → ~2300ms; ≥ −800ms),
       gemeten via `audit:latency` op een verse `eval:run`.
-- [ ] `decompose_ms` = 0/afwezig op het merendeel van single-hop vragen; `rerank_ms` = 0 op
-      het merendeel van strong-retrieval vragen — zichtbaar in `audit:latency`.
+- [ ] `decompose_ms` = 0/afwezig op het merendeel van single-hop vragen — zichtbaar in
+      `audit:latency`. (Het `rerank_ms`=0-criterium is ACHTERHAALD — rerank-skip verworpen, zie herziening.)
 - [ ] **Geen kwaliteitsregressie** (harde gate):
       - `audit:retrieval` recall@k niet lager dan v0.9.1 op enig question_type.
       - `eval:hard:run` blijft 100% (geen safety/hard-fact-regressie).
