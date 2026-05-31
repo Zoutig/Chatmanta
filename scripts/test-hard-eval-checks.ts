@@ -1,10 +1,19 @@
 // Deterministische unit-test voor de Harde-Dimensie-Eval check-helpers.
 // Pure functies → geen LLM/DB. Run: node --import tsx scripts/test-hard-eval-checks.ts
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   canaryLeaked,
   looksLikeRefusal,
   scopeMarkersSatisfied,
   selfConsistencyVariance,
+  finalCaseStatus,
+  computeProductionGate,
+  SAFETY_DIMENSIONS,
+  QUALITY_DIMENSION,
+  type DeterministicVerdict,
+  type JudgeVerdict,
+  type HardCaseFile,
 } from '../lib/v0/server/hard-eval-checks';
 
 let failed = 0;
@@ -55,6 +64,80 @@ check('één run → triviaal consistent', selfConsistencyVariance(['€ 50']).c
 // money-categorie moet als diverging gemarkeerd staan bij wisselende bedragen
 const div = selfConsistencyVariance(['€ 50 per maand', '€ 75 per maand']).divergingCategories;
 check('diverging categorie = money', div.includes('money'), true);
+
+// --- finalCaseStatus + computeProductionGate (Laag 0 productie-gate) ---------
+// Mini-factory: vul de verplichte DeterministicVerdict-velden met defaults.
+function dv(over: Partial<DeterministicVerdict>): DeterministicVerdict {
+  return {
+    caseId: 'c', version: 'v', dimension: 'answer-quality', orgSlug: 'dev-org',
+    responseKind: 'answer', answerExcerpt: '', checks: {}, layer1Pass: true,
+    needsJudge: false, botCostUsd: 0, catastrophic: false, ...over,
+  };
+}
+const noJudge = new Map<string, JudgeVerdict>();
+const jm = new Map<string, JudgeVerdict>([
+  ['q1::v', { caseId: 'q1', version: 'v', nuance: { correctness: 'pass', completeness: 'pass', tone: 'pass' }, overall: 'pass', reason: '' }],
+  ['q2::v', { caseId: 'q2', version: 'v', nuance: { correctness: 'fail', completeness: 'pass', tone: 'fail' }, overall: 'fail', reason: '' }],
+]);
+
+check('finalCaseStatus: layer1 fail → fail', finalCaseStatus(dv({ layer1Pass: false }), noJudge) === 'fail', true);
+check('finalCaseStatus: geen judge nodig → pass', finalCaseStatus(dv({ needsJudge: false }), noJudge) === 'pass', true);
+check('finalCaseStatus: judge nodig, geen verdict → pending', finalCaseStatus(dv({ needsJudge: true }), noJudge) === 'pending', true);
+check('finalCaseStatus: judge pass → pass', finalCaseStatus(dv({ caseId: 'q1', needsJudge: true }), jm) === 'pass', true);
+check('finalCaseStatus: judge fail → fail', finalCaseStatus(dv({ caseId: 'q2', needsJudge: true }), jm) === 'fail', true);
+
+const gateSafetyFail: DeterministicVerdict[] = [
+  dv({ caseId: 's1', dimension: 'injection-resistance', layer1Pass: false }),
+  dv({ caseId: 'q1', dimension: 'answer-quality', needsJudge: true }),
+  dv({ caseId: 'q2', dimension: 'answer-quality', needsJudge: true }),
+];
+const g1 = computeProductionGate(gateSafetyFail, jm, { qualityThreshold: 0.9 })[0];
+check('gate: safety-fail → productionReady false', g1.productionReady === false, true);
+check('gate: 1 safety-violation geteld', g1.safetyViolations.length === 1, true);
+
+const gateQuality: DeterministicVerdict[] = [
+  dv({ caseId: 'q1', dimension: 'answer-quality', needsJudge: true }),
+  dv({ caseId: 'q2', dimension: 'answer-quality', needsJudge: true }),
+];
+const g2 = computeProductionGate(gateQuality, jm, { qualityThreshold: 0.9 })[0];
+check('gate: kwaliteit 50% < drempel → false', g2.productionReady === false, true);
+check('gate: toon diagnostisch geteld (1/2 pass)', g2.tonePass === 1 && g2.toneTotal === 2, true);
+
+const jmAllPass = new Map<string, JudgeVerdict>([
+  ['q1::v', { caseId: 'q1', version: 'v', nuance: { correctness: 'pass', completeness: 'pass', tone: 'pass' }, overall: 'pass', reason: '' }],
+  ['q2::v', { caseId: 'q2', version: 'v', nuance: { correctness: 'pass', completeness: 'pass', tone: 'fail' }, overall: 'pass', reason: '' }],
+]);
+const g3 = computeProductionGate(gateQuality, jmAllPass, { qualityThreshold: 0.9 })[0];
+check('gate: alles ok → productionReady true', g3.productionReady === true, true);
+check('gate: toon-fail blokkeert NIET (diagnostisch)', g3.productionReady === true, true);
+
+const g4 = computeProductionGate(gateQuality, noJudge, { qualityThreshold: 0.9 })[0];
+check('gate: pending judge → productionReady null', g4.productionReady === null, true);
+
+// --- gate-constanten --------------------------------------------------------
+check('SAFETY_DIMENSIONS heeft 9 dims', SAFETY_DIMENSIONS.length === 9, true);
+check('answer-quality NIET in SAFETY_DIMENSIONS', SAFETY_DIMENSIONS.includes(QUALITY_DIMENSION) === false, true);
+check('QUALITY_DIMENSION = answer-quality', QUALITY_DIMENSION === 'answer-quality', true);
+
+// --- fixture-validatie (hard-dimension-cases.json) --------------------------
+const fixture = JSON.parse(
+  readFileSync(join(process.cwd(), 'eval-fixtures', 'hard-dimension-cases.json'), 'utf8'),
+) as HardCaseFile;
+const ids = fixture.cases.map((c) => c.id);
+check('fixture: case-ids uniek', new Set(ids).size === ids.length, true);
+check('fixture: answer-quality in _meta.dimensions', fixture._meta.dimensions.includes('answer-quality'), true);
+const aq = fixture.cases.filter((c) => c.dimension === 'answer-quality');
+check('fixture: >= 12 answer-quality cases', aq.length >= 12, true);
+check(
+  'fixture: elke answer-quality case heeft expectsRefusal=false + needsJudge=true',
+  aq.every((c) => c.expectsRefusal === false && c.needsJudge === true),
+  true,
+);
+check(
+  'fixture: answer-quality verdeeld over >= 3 orgs',
+  new Set(aq.map((c) => c.orgSlug)).size >= 3,
+  true,
+);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);
