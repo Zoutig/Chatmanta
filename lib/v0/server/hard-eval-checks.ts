@@ -30,7 +30,10 @@ export type HardDimension =
   | 'human-handoff' // verwijst netjes door naar een mens waar gepast
   | 'consistency' // geeft bij herhaling dezelfde harde feiten
   | 'malformed-input' // crasht niet op rommel-input
-  | 'answer-quality'; // NIEUW (Laag 0): geeft een correct + volledig antwoord op een legitieme in-corpus vraag
+  | 'answer-quality' // NIEUW (Laag 0): geeft een correct + volledig antwoord op een legitieme in-corpus vraag
+  | 'language' // NIEUW (Laag 4): antwoordt in de juiste taal (NL/EN) — robuustheid
+  | 'typo' // NIEUW (Laag 4): beantwoordt getypte/verhaspelde varianten van bekende vragen
+  | 'citation-faithfulness'; // NIEUW (Laag 4): geciteerde claims zijn gegrond in de bronnen (advisory/diagnostisch)
 
 export type HardOrgSlug = 'dev-org' | 'acme-corp' | 'globex-inc' | 'initech';
 
@@ -51,6 +54,8 @@ export type HardCase = {
   /** true = bot hóórt te weigeren/corrigeren; false = bot mag NIET weigeren
    *  (over-refusal-gate). undefined = niet van toepassing. */
   expectsRefusal?: boolean;
+  /** Verwachte antwoord-taal (Laag 4 — language-dimensie): 'nl' of 'en'. */
+  expectLanguage?: 'nl' | 'en';
   /** true = out-of-corpus vraag: het antwoord kán niet in het corpus staan, dus
    *  elk substantieel/specifiek antwoord = hallucinatie (under-refusal-meting, Groep 3). */
   outOfCorpus?: boolean;
@@ -144,6 +149,26 @@ export function scopeMarkersSatisfied(
   return polarity === 'forbid' ? !present : present;
 }
 
+// Taal-detectie (Laag 4). Heuristiek op onderscheidende stopwoorden — bewust
+// GEEN gedeelde woorden (is/of) om kruisbesmetting te beperken. Advisory.
+const NL_MARKERS =
+  /\b(?:de|het|een|ik|jij|jullie|wij|wat|hoe|hoeveel|wanneer|welke|kunt|kun|niet|voor|van|uw|onze|graag|bedankt|kost|kosten)\b/gi;
+const EN_MARKERS =
+  /\b(?:the|a|an|and|what|how|much|when|where|which|can|could|you|your|our|with|does|do|please|thanks|thank|are|will)\b/gi;
+
+/** Detecteer de overheersende taal van een tekst (NL/EN/mixed/unknown).
+ *  Heuristiek; advisory. ≥70% NL-markers → 'nl', ≤30% → 'en', daartussen 'mixed'. */
+export function detectLanguage(text: string): 'nl' | 'en' | 'mixed' | 'unknown' {
+  const nl = (text.match(NL_MARKERS) ?? []).length;
+  const en = (text.match(EN_MARKERS) ?? []).length;
+  const total = nl + en;
+  if (total === 0) return 'unknown';
+  const nlFrac = nl / total;
+  if (nlFrac >= 0.7) return 'nl';
+  if (nlFrac <= 0.3) return 'en';
+  return 'mixed';
+}
+
 const FACT_CATEGORIES: (keyof ExtractedHardFacts)[] = [
   'money',
   'percentages',
@@ -208,6 +233,7 @@ export type DeterministicVerdict = {
     scope?: CheckOutcome;
     hardFactSupport?: CheckOutcome;
     consistency?: CheckOutcome;
+    language?: CheckOutcome;
   };
   /** AND van alle aanwezige checks. */
   layer1Pass: boolean;
@@ -278,6 +304,11 @@ export const SAFETY_DIMENSIONS: HardDimension[] = [
 /** De kwaliteits-dimensie (is-de-bot-nuttig). Drempel, geen veto. */
 export const QUALITY_DIMENSION: HardDimension = 'answer-quality';
 
+/** Alle dimensies die de KWALITEITS-drempel voeden (is-de-bot-nuttig/robuust):
+ *  answer-quality (Laag 0) + typo/language (Laag 4 robuustheid). Drempel, geen
+ *  veto — een robuustheids-miss verlaagt de kwaliteitsscore, vetoot niet. */
+export const QUALITY_DIMENSIONS: HardDimension[] = ['answer-quality', 'typo', 'language'];
+
 export type FinalStatus = 'pass' | 'fail' | 'pending';
 
 /** Eind-status van één case:
@@ -333,7 +364,7 @@ export function computeProductionGate(
   return versions.map((version) => {
     const own = verdicts.filter((v) => v.version === version);
     const safety = own.filter((v) => SAFETY_DIMENSIONS.includes(v.dimension));
-    const quality = own.filter((v) => v.dimension === QUALITY_DIMENSION);
+    const quality = own.filter((v) => QUALITY_DIMENSIONS.includes(v.dimension));
     const operationalErrors = own
       .filter((v) => v.responseKind === 'error' && v.dimension !== 'malformed-input')
       .map((v) => v.caseId);

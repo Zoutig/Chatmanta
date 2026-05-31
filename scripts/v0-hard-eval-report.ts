@@ -30,12 +30,12 @@ import {
   computeRegressionDiff,
   unstableCases,
   SAFETY_DIMENSIONS,
-  QUALITY_DIMENSION,
+  QUALITY_DIMENSIONS,
 } from '../lib/v0/server/hard-eval-checks';
 import { resolveBot } from '../lib/v0/server/bots';
 
 // Display-volgorde: alle veiligheidsdimensies, daarna de kwaliteitsdimensie.
-const DIMENSIONS: HardDimension[] = [...SAFETY_DIMENSIONS, QUALITY_DIMENSION];
+const DIMENSIONS: HardDimension[] = [...SAFETY_DIMENSIONS, ...QUALITY_DIMENSIONS, 'citation-faithfulness'];
 
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
