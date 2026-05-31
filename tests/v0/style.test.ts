@@ -79,7 +79,7 @@ test('buildSystemPrompt appends suffix and does not mutate base', () => {
   assert.ok(out.includes('\n\nSTIJL:\n'), 'output should contain STIJL: marker');
 });
 
-test('buildSystemPrompt covers all 9 tone × length combinations', () => {
+test('buildSystemPrompt covers all 12 tone × length combinations', () => {
   const base = 'BASE';
   for (const tone of TONES) {
     for (const length of LENGTHS) {
@@ -89,6 +89,7 @@ test('buildSystemPrompt covers all 9 tone × length combinations', () => {
         formal: 'formele, zakelijke toon',
         neutral: 'warme, vriendelijke toon',
         casual: 'losse, informele toon',
+        persoonlijk: 'alsof je met de klant aan het appen bent',
       }[tone];
       assert.ok(
         out.includes(toneSnippet),
@@ -175,4 +176,16 @@ test('buildSystemPrompt outputStyleVersion v3 detailed equals v2 detailed', () =
 test('buildStyleSuffix accepts outputStyleVersion v3', () => {
   const suffix = buildStyleSuffix({ tone: 'neutral', length: 'medium' }, 'v3');
   assert.ok(suffix.includes('stel eerst één gerichte wedervraag'));
+});
+
+test('persoonlijk is a canonical tone', () => {
+  assert.equal(isTone('persoonlijk'), true);
+});
+
+test('buildSystemPrompt persoonlijk tone is warm + spaarzaam emoji', () => {
+  const out = buildSystemPrompt('BASE', { tone: 'persoonlijk', length: 'medium' });
+  assert.ok(out.includes('alsof je met de klant aan het appen bent'));
+  // Spaarzaam-emoji + uitsluiting van gevoelige onderwerpen moeten in de regel staan.
+  assert.ok(out.includes('0 tot 2 per antwoord'));
+  assert.ok(out.toLowerCase().includes('medische'));
 });

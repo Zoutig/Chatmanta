@@ -12,6 +12,7 @@ export const STYLE_LABELS: {
     formal: 'Formeel',
     neutral: 'Neutraal',
     casual: 'Casual',
+    persoonlijk: 'Persoonlijk',
   },
   length: {
     short: 'Kort',
