@@ -16,6 +16,7 @@ import {
   createFeedback,
   uploadAttachment,
   setFeedbackAttachment,
+  addFeedbackEvent,
 } from '@/lib/controlroom/server/feedback';
 import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
 import {
@@ -227,6 +228,13 @@ export async function submitFeedbackAction(
         await setFeedbackAttachment(item.id, path, name);
       } catch (e) {
         console.error('[submitFeedbackAction] bijlage-upload faalde', (e as Error).message);
+        // Maak het zichtbaar voor de operator: de klant voegde een bijlage toe
+        // die niet kon worden opgeslagen. De melding zelf is wél bewaard.
+        await addFeedbackEvent(item.id, {
+          kind: 'internal_note',
+          author: 'systeem',
+          body: 'Bijlage-upload mislukt — de klant voegde een bestand toe dat niet kon worden opgeslagen.',
+        }).catch(() => {});
       }
     }
 

@@ -209,12 +209,19 @@ export async function setFeedbackStatus(id: string, status: FeedbackStatus): Pro
   if (current.status === status) return; // no-op
   const { error } = await sb().from(TABLE).update({ status }).eq('id', id);
   if (error) throw new Error(`setFeedbackStatus: ${error.message}`);
-  await addFeedbackEvent(id, {
-    kind: 'status_change',
-    fromStatus: current.status,
-    toStatus: status,
-    author: 'operator',
-  });
+  // Best-effort historie: de statuswijziging is al doorgevoerd, dus een
+  // mislukt event mag de action niet als fout laten terugkomen (consistent met
+  // het created-event in createFeedback). We loggen het gat hooguit.
+  try {
+    await addFeedbackEvent(id, {
+      kind: 'status_change',
+      fromStatus: current.status,
+      toStatus: status,
+      author: 'operator',
+    });
+  } catch (e) {
+    console.error('[setFeedbackStatus] status_change-event faalde', (e as Error).message);
+  }
 }
 
 // ── Bijlagen (private bucket, service-role) ────────────────────────────────
