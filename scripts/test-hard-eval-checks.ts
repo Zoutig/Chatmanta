@@ -12,6 +12,9 @@ import {
   percentile,
   computeOperationalMetrics,
   computeRefusalCalibration,
+  computeRegressionDiff,
+  buildAnchorSection,
+  unstableCases,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
   type DeterministicVerdict,
@@ -175,6 +178,44 @@ check('calibratie: outOfCorpusTotal = 2', rc.outOfCorpusTotal === 2, true);
 check('calibratie: underRefusals = 1 (alleen out-of-corpus hardFactSupport-fail)', rc.underRefusals === 1, true);
 check('calibratie: underRefusalRate = 50%', rc.underRefusalRate === 0.5, true);
 check('calibratie: niet-out-of-corpus fabricatie telt NIET als under-refusal', rc.outOfCorpusTotal === 2 && rc.underRefusals === 1, true);
+
+// --- computeRegressionDiff (Laag 2 — regressie-diff) -------------------------
+const baseVerdicts = [
+  dv({ caseId: 'a', version: 'v1', layer1Pass: true }),  // pass
+  dv({ caseId: 'b', version: 'v1', layer1Pass: true }),  // pass
+  dv({ caseId: 'c', version: 'v1', layer1Pass: false }), // fail
+  dv({ caseId: 'd', version: 'v1', layer1Pass: true }),  // pass (verdwijnt in current)
+];
+const curVerdicts = [
+  dv({ caseId: 'a', version: 'v1', layer1Pass: true }),  // pass (unchanged)
+  dv({ caseId: 'b', version: 'v1', layer1Pass: false }), // fail → REGRESSIE
+  dv({ caseId: 'c', version: 'v1', layer1Pass: true }),  // pass → VERBETERING
+  dv({ caseId: 'e', version: 'v1', layer1Pass: true }),  // NEW
+];
+const noJ = new Map<string, JudgeVerdict>();
+const diff = computeRegressionDiff(curVerdicts, noJ, baseVerdicts, noJ);
+const flipById = (id: string) => diff.find((f) => f.caseId === id);
+check('regressie-diff: b pass→fail = regression', flipById('b')?.kind === 'regression', true);
+check('regressie-diff: c fail→pass = improvement', flipById('c')?.kind === 'improvement', true);
+check('regressie-diff: a unchanged', flipById('a')?.kind === 'unchanged', true);
+check('regressie-diff: d removed', flipById('d')?.kind === 'removed', true);
+check('regressie-diff: e new', flipById('e')?.kind === 'new', true);
+
+// --- buildAnchorSection (Laag 2 — rubric-anchoring) --------------------------
+const anchorMd = buildAnchorSection([
+  { caseId: 'x1', version: 'v1', nuance: { grounding: 'pass' }, overall: 'pass', reason: 'r' },
+]);
+check('anchor-section: bevat header', anchorMd.includes('Gouden anker-verdicts'), true);
+check('anchor-section: bevat caseId + overall', anchorMd.includes('`x1`@v1') && anchorMd.includes('**pass**'), true);
+check('anchor-section: leeg bij geen anchors', buildAnchorSection([]) === '', true);
+
+// --- unstableCases (Laag 2 — multi-run-stabiliteit) --------------------------
+const unst = unstableCases([
+  dv({ caseId: 's1', checks: { consistency: { pass: false, detail: 'divergeert op: money' } } }),
+  dv({ caseId: 's2', checks: { consistency: { pass: true } } }),
+  dv({ caseId: 's3', checks: {} }),
+]);
+check('unstableCases: alleen gezakte consistency', unst.length === 1 && unst[0].caseId === 's1', true);
 
 // --- fixture-validatie (hard-dimension-cases.json) --------------------------
 const fixture = JSON.parse(

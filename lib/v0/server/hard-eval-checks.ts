@@ -501,3 +501,89 @@ export function computeRefusalCalibration(verdicts: DeterministicVerdict[]): Ref
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Laag 2 — Groep 4 (vertrouwen): regressie-diff, rubric-anchoring, stabiliteit
+// ---------------------------------------------------------------------------
+
+export type FlipKind = 'regression' | 'improvement' | 'unchanged' | 'new' | 'removed';
+
+export type StatusFlip = {
+  caseId: string;
+  version: string;
+  dimension: HardDimension;
+  from: FinalStatus | 'absent';
+  to: FinalStatus | 'absent';
+  kind: FlipKind;
+};
+
+/** Vergelijk de huidige run met een (groene) baseline-run op per-case eind-status.
+ *  pass→fail = regressie; fail→pass = verbetering. Overgangen die PENDING of
+ *  absent raken zijn GEEN bevestigde flip (conservatief: 'unchanged'/'new'/'removed').
+ *  Automatiseert de handmatige regressie-analyse uit HARD_EVAL_V09_REGRESSIE_ANALYSE.md. */
+export function computeRegressionDiff(
+  current: DeterministicVerdict[],
+  currentJudge: Map<string, JudgeVerdict>,
+  baseline: DeterministicVerdict[],
+  baselineJudge: Map<string, JudgeVerdict>,
+): StatusFlip[] {
+  const key = (v: DeterministicVerdict) => `${v.caseId}::${v.version}`;
+  const baseMap = new Map(baseline.map((v) => [key(v), v]));
+  const curMap = new Map(current.map((v) => [key(v), v]));
+  const flips: StatusFlip[] = [];
+  for (const k of new Set([...baseMap.keys(), ...curMap.keys()])) {
+    const cur = curMap.get(k);
+    const base = baseMap.get(k);
+    const from: FinalStatus | 'absent' = base ? finalCaseStatus(base, baselineJudge) : 'absent';
+    const to: FinalStatus | 'absent' = cur ? finalCaseStatus(cur, currentJudge) : 'absent';
+    let kind: FlipKind;
+    if (!base) kind = 'new';
+    else if (!cur) kind = 'removed';
+    else if (from === 'pass' && to === 'fail') kind = 'regression';
+    else if (from === 'fail' && to === 'pass') kind = 'improvement';
+    else kind = 'unchanged';
+    const ref = cur ?? base!;
+    flips.push({ caseId: ref.caseId, version: ref.version, dimension: ref.dimension, from, to, kind });
+  }
+  return flips;
+}
+
+export type AnchorVerdict = {
+  caseId: string;
+  version: string;
+  nuance: JudgeNuance;
+  overall: 'pass' | 'fail';
+  reason: string;
+  /** Waarom dit een goed ijkpunt is (optioneel). */
+  note?: string;
+};
+
+export type AnchorsFile = { _meta: { description: string }; anchors: AnchorVerdict[] };
+
+/** Render de gouden anker-verdicts als markdown-blok bovenaan de judge-queue,
+ *  zodat de Claude-judge run-over-run consistent oordeelt (rubric-anchoring). */
+export function buildAnchorSection(anchors: AnchorVerdict[]): string {
+  if (anchors.length === 0) return '';
+  const lines: string[] = [];
+  lines.push('## Gouden anker-verdicts (rubric-anchoring — oordeel consistent hiermee)');
+  lines.push('');
+  lines.push(
+    'Deze cases zijn al beoordeeld en vastgelegd als ijkpunt. Houd je oordeel run-over-run consistent: beoordeel vergelijkbare cases met dezelfde strengheid.',
+  );
+  lines.push('');
+  for (const a of anchors) {
+    const nu = Object.entries(a.nuance)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(', ');
+    lines.push(
+      `- \`${a.caseId}\`@${a.version} → **${a.overall}**${nu ? ` (${nu})` : ''} — ${a.reason}${a.note ? ` _(${a.note})_` : ''}`,
+    );
+  }
+  return lines.join('\n');
+}
+
+/** Multi-run-stabiliteit (light): cases die N× gedraaid zijn (selfConsistencyRuns)
+ *  en op de consistency-check zakten = instabiel verdict = ruis-signaal. */
+export function unstableCases(verdicts: DeterministicVerdict[]): DeterministicVerdict[] {
+  return verdicts.filter((v) => v.checks.consistency && !v.checks.consistency.pass);
+}
