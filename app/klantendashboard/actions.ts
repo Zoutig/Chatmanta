@@ -14,6 +14,7 @@ import { requireV0Auth } from '@/app/actions/_auth';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import {
   getActiveQuizForOrg,
+  getAnswerForQuestion,
   getQuestion,
   listAnswers,
   listQuestions,
@@ -274,6 +275,12 @@ export async function submitQuizAnswerAction(
   payload: { antwoord?: string | null; meerkeuzeOptie?: string | null; andersTekst?: string | null; skip?: boolean },
 ): Promise<ActionResult<{ done: boolean; answered: number; total: number }>> {
   return actionTry(async () => {
+    // Defense-in-depth + abuse/cost-rem: deze action ingest in de publieke KB +
+    // doet een embed-call, dus zelfde poort als de feedback-submit.
+    await requireV0Auth();
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+
     const activeOrg = await getActiveOrgFromCookies();
     const quiz = await getActiveQuizForOrg(activeOrg.id);
     if (!quiz || quiz.status !== 'actief') fail('NOT_FOUND', 'Er staat geen actieve quiz klaar.');
@@ -282,6 +289,17 @@ export async function submitQuizAnswerAction(
       fail('NOT_FOUND', 'Vraag niet gevonden.');
     }
     if (question.verwijderd || !question.goedgekeurd) fail('INPUT_INVALID', 'Deze vraag is niet beschikbaar.');
+    // Idempotent: een al beantwoorde/overgeslagen vraag niet opnieuw verwerken
+    // (voorkomt dubbele KB-documenten + embed-kosten bij dubbelklik/replay).
+    if (await getAnswerForQuestion(question.id)) fail('INPUT_INVALID', 'Deze vraag is al beantwoord.');
+    // Meerkeuze: valideer de keuze tegen de goedgekeurde opties (geen forged
+    // optie-tekst de KB in). 'Anders' valt buiten de lijst en heeft vrije tekst.
+    if (question.type === 'meerkeuze' && !payload.skip) {
+      const opt = (payload.meerkeuzeOptie ?? '').trim();
+      if (opt && opt !== 'Anders' && !(question.opties ?? []).includes(opt)) {
+        fail('INPUT_INVALID', 'Ongeldige keuze.');
+      }
+    }
 
     let antwoord: string | null = null;
     let meerkeuzeOptie: string | null = null;
@@ -340,7 +358,7 @@ export async function submitQuizAnswerAction(
     const skippedCount = answers.filter((a) => a.antwoord === null).length;
     await updateQuizCounts(quiz.id, { answeredCount, skippedCount });
 
-    const done = active.every((q) => answeredIds.has(q.id));
+    const done = active.length > 0 && active.every((q) => answeredIds.has(q.id));
     if (done) {
       await setQuizStatus(quiz.id, 'voltooid');
       revalidatePath('/admindashboard', 'layout');

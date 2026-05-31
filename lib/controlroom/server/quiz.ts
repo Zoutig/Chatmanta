@@ -465,6 +465,13 @@ export async function recordAnswer(input: {
   return mapAnswer(data as AnswerRow);
 }
 
+/** Bestaand antwoord voor een vraag (idempotentie-check). Null = nog niet beantwoord. */
+export async function getAnswerForQuestion(questionId: string): Promise<QuizAnswer | null> {
+  const { data, error } = await sb().from(ANSWERS).select('*').eq('question_id', questionId).maybeSingle();
+  if (error || !data) return null;
+  return mapAnswer(data as AnswerRow);
+}
+
 export async function listAnswers(quizId: string): Promise<QuizAnswer[]> {
   const { data, error } = await sb()
     .from(ANSWERS)

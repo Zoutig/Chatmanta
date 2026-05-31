@@ -49,17 +49,21 @@ import type { ChatbotSettings, WidgetSettings } from '@/lib/v0/klantendashboard/
 import {
   createQuiz,
   getActiveQuizForOrg,
+  getQuestion,
   getQuiz,
   insertQuestions,
   listQuestions,
   setQuizStatus,
   softDeleteQuestion,
   updateQuestion,
+  updateQuizCounts,
 } from '@/lib/controlroom/server/quiz';
 import { analyzeKnowledgeBase } from '@/lib/controlroom/server/quiz-analysis';
 import {
   QUIZ_ANALYSE_MODELS,
   type QuizAnalyseModel,
+  type QuizItem,
+  type QuizQuestion,
   type QuizQuestionInput,
   type QuizQuestionPatch,
 } from '@/lib/controlroom/types';
@@ -295,8 +299,28 @@ export async function adminCheckWidgetInstallationAction(
 // maxDuration=120 op de klantdetail-route dekt de ~15-60s gpt-4o(-mini)-call.
 // Org uit de route-param (requireKnownOrgId); alle DB-toegang via quiz.ts.
 
-// Her-genereren mag alleen vanuit deze statussen; actief/voltooid = eenmalig.
-const QUIZ_RETRIGGERABLE = new Set(['concept', 'leeg', 'mislukt']);
+// Her-genereren mag vanuit deze statussen; actief/voltooid = eenmalig. 'generating'
+// staat erbij zodat een afgebroken synchrone run (timeout/navigatie) herstelbaar is.
+const QUIZ_RETRIGGERABLE = new Set(['generating', 'concept', 'leeg', 'mislukt']);
+
+/** Object-level access: laad een quiz en verifieer dat hij bij deze org hoort. */
+async function loadQuizForOrg(quizId: string, orgId: string): Promise<QuizItem> {
+  const quiz = await getQuiz(quizId);
+  if (!quiz || quiz.organizationId !== orgId) fail('NOT_FOUND', 'Quiz niet gevonden voor deze klant.');
+  return quiz;
+}
+
+/** Laad een vraag, verifieer org-eigendom én dat de bijbehorende quiz nog
+ *  'concept' is (vragen bewerken/toevoegen mag alleen vóór activatie). */
+async function requireConceptQuestion(questionId: string, orgId: string): Promise<QuizQuestion> {
+  const question = await getQuestion(questionId);
+  if (!question || question.organizationId !== orgId) fail('NOT_FOUND', 'Vraag niet gevonden voor deze klant.');
+  const quiz = await loadQuizForOrg(question.quizId, orgId);
+  if (quiz.status !== 'concept') {
+    fail('INPUT_INVALID', `Vragen kunnen alleen bewerkt worden in een concept-quiz (status: ${quiz.status}).`);
+  }
+  return question;
+}
 
 export async function triggerQuizAnalysisAction(
   orgSlug: string,
@@ -334,7 +358,8 @@ export async function setQuizQuestionApprovedAction(
 ): Promise<ActionResult<{ id: string }>> {
   return actionTry(async () => {
     await requireV0Auth();
-    requireKnownOrgId(orgSlug);
+    const orgId = requireKnownOrgId(orgSlug);
+    await requireConceptQuestion(questionId, orgId);
     await updateQuestion(questionId, { goedgekeurd: approved });
     revalidate(orgSlug);
     return { id: questionId };
@@ -348,7 +373,8 @@ export async function updateQuizQuestionAction(
 ): Promise<ActionResult<{ id: string }>> {
   return actionTry(async () => {
     await requireV0Auth();
-    requireKnownOrgId(orgSlug);
+    const orgId = requireKnownOrgId(orgSlug);
+    await requireConceptQuestion(questionId, orgId);
     if (patch.vraag !== undefined) {
       const v = patch.vraag.trim();
       if (v.length < 1 || v.length > 2000) fail('INPUT_INVALID', 'Vraag moet tussen 1 en 2000 tekens zijn.');
@@ -366,7 +392,8 @@ export async function deleteQuizQuestionAction(
 ): Promise<ActionResult<{ id: string }>> {
   return actionTry(async () => {
     await requireV0Auth();
-    requireKnownOrgId(orgSlug);
+    const orgId = requireKnownOrgId(orgSlug);
+    await requireConceptQuestion(questionId, orgId);
     await softDeleteQuestion(quizId, questionId);
     revalidate(orgSlug);
     return { id: questionId };
@@ -381,6 +408,8 @@ export async function addQuizQuestionAction(
   return actionTry(async () => {
     await requireV0Auth();
     const orgId = requireKnownOrgId(orgSlug);
+    const quiz = await loadQuizForOrg(quizId, orgId);
+    if (quiz.status !== 'concept') fail('INPUT_INVALID', `Vragen toevoegen kan alleen in een concept-quiz (status: ${quiz.status}).`);
     const vraag = (input.vraag ?? '').trim();
     if (vraag.length < 1 || vraag.length > 2000) fail('INPUT_INVALID', 'Vraag moet tussen 1 en 2000 tekens zijn.');
     const created = await insertQuestions(quizId, orgId, [
@@ -397,9 +426,8 @@ export async function activateQuizAction(
 ): Promise<ActionResult<{ id: string }>> {
   return actionTry(async () => {
     await requireV0Auth();
-    requireKnownOrgId(orgSlug);
-    const quiz = await getQuiz(quizId);
-    if (!quiz) fail('NOT_FOUND', 'Quiz niet gevonden.');
+    const orgId = requireKnownOrgId(orgSlug);
+    const quiz = await loadQuizForOrg(quizId, orgId);
     if (quiz.status !== 'concept') {
       fail('INPUT_INVALID', `Alleen een concept-quiz kan geactiveerd worden (huidige status: ${quiz.status}).`);
     }
@@ -407,6 +435,8 @@ export async function activateQuizAction(
     if (active.length === 0) {
       fail('INPUT_INVALID', 'Keur eerst minimaal één vraag goed voordat je de quiz activeert.');
     }
+    // question_count weerspiegelt vanaf activatie de actieve (goedgekeurde) set.
+    await updateQuizCounts(quizId, { questionCount: active.length });
     await setQuizStatus(quizId, 'actief');
     revalidate(orgSlug);
     revalidatePath('/klantendashboard', 'layout'); // klant-banner (M4) verschijnt
@@ -420,7 +450,11 @@ export async function cancelQuizAction(
 ): Promise<ActionResult<{ id: string }>> {
   return actionTry(async () => {
     await requireV0Auth();
-    requireKnownOrgId(orgSlug);
+    const orgId = requireKnownOrgId(orgSlug);
+    const quiz = await loadQuizForOrg(quizId, orgId);
+    if (quiz.status === 'voltooid') {
+      fail('INPUT_INVALID', 'Een voltooide quiz kan niet meer geannuleerd worden (eenmalig per klant).');
+    }
     await setQuizStatus(quizId, 'geannuleerd');
     revalidate(orgSlug);
     return { id: quizId };
