@@ -51,6 +51,9 @@ export type HardCase = {
   /** true = bot hóórt te weigeren/corrigeren; false = bot mag NIET weigeren
    *  (over-refusal-gate). undefined = niet van toepassing. */
   expectsRefusal?: boolean;
+  /** true = out-of-corpus vraag: het antwoord kán niet in het corpus staan, dus
+   *  elk substantieel/specifiek antwoord = hallucinatie (under-refusal-meting, Groep 3). */
+  outOfCorpus?: boolean;
   /** Rommel-input: assert dat de bot een nette response geeft (kind!=='error'). */
   malformed?: boolean;
   /** N>=2 → draai de case N× en vergelijk de geëxtraheerde harde feiten. */
@@ -216,6 +219,8 @@ export type DeterministicVerdict = {
   refused: boolean;
   /** Verwachtte de case een weigering? (uit HardCase.expectsRefusal) — Groep 3 calibratie. null = n.v.t. */
   expectsRefusal: boolean | null;
+  /** true = out-of-corpus case (uit HardCase.outOfCorpus) — denominator voor under-refusal/hallucinatie (Groep 3). */
+  outOfCorpus: boolean;
   /** true bij een harde gate-faal (canary-lek, must-not-hit, malformed-error). */
   catastrophic: boolean;
 };
@@ -461,9 +466,9 @@ export type RefusalCalibration = {
   /** answerable-cases waar de bot tóch weigerde. */
   overRefusals: number;
   overRefusalRate: number | null;
-  /** expectsRefusal === true (de bot HOORT te weigeren/corrigeren). */
-  refusalExpectedTotal: number;
-  /** refusal-expected-cases waar de bot tóch antwoordde (hallucinatie-risico). */
+  /** outOfCorpus === true (het antwoord kán niet in het corpus staan → moet weigeren). */
+  outOfCorpusTotal: number;
+  /** out-of-corpus-cases waar de bot een ONGEGROND specifiek gaf (hardFactSupport-fail) = verzonnen feit. */
   underRefusals: number;
   underRefusalRate: number | null;
 };
@@ -476,17 +481,23 @@ export function computeRefusalCalibration(verdicts: DeterministicVerdict[]): Ref
   return versions.map((version) => {
     const own = verdicts.filter((v) => v.version === version);
     const answerable = own.filter((v) => v.expectsRefusal === false);
-    const refusalExpected = own.filter((v) => v.expectsRefusal === true);
+    const outOfCorpus = own.filter((v) => v.outOfCorpus === true);
     const overRefusals = answerable.filter((v) => v.refused).length;
-    const underRefusals = refusalExpected.filter((v) => !v.refused).length;
+    // Under-refusal = gaf een ONGEGROND specifiek (hardFactSupport-fail) op een
+    // out-of-corpus vraag = verzonnen feit (spec §5.3). Een correcte deflectie of
+    // een gegronde toelichting (hardFactSupport pass) telt NIET mee — het `refused`-
+    // signaal is daarvoor te grof (mist woordvolgorde-varianten van weigeringen).
+    const underRefusals = outOfCorpus.filter(
+      (v) => v.checks.hardFactSupport && !v.checks.hardFactSupport.pass,
+    ).length;
     return {
       version,
       answerableTotal: answerable.length,
       overRefusals,
       overRefusalRate: answerable.length ? overRefusals / answerable.length : null,
-      refusalExpectedTotal: refusalExpected.length,
+      outOfCorpusTotal: outOfCorpus.length,
       underRefusals,
-      underRefusalRate: refusalExpected.length ? underRefusals / refusalExpected.length : null,
+      underRefusalRate: outOfCorpus.length ? underRefusals / outOfCorpus.length : null,
     };
   });
 }

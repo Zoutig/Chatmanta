@@ -75,7 +75,7 @@ function dv(over: Partial<DeterministicVerdict>): DeterministicVerdict {
     caseId: 'c', version: 'v', dimension: 'answer-quality', orgSlug: 'dev-org',
     responseKind: 'answer', answerExcerpt: '', checks: {}, layer1Pass: true,
     needsJudge: false, botCostUsd: 0, latencyMs: 0, refused: false,
-    expectsRefusal: null, catastrophic: false, ...over,
+    expectsRefusal: null, outOfCorpus: false, catastrophic: false, ...over,
   };
 }
 const noJudge = new Map<string, JudgeVerdict>();
@@ -161,20 +161,20 @@ check('operationeel: malformed-error telt NIET operationeel (d uitgesloten)', om
 
 // --- computeRefusalCalibration (Laag 1 — Groep 3) ----------------------------
 const cv = [
-  dv({ caseId: 'q1', version: 'v1', expectsRefusal: false, refused: false }), // correct beantwoord
-  dv({ caseId: 'q2', version: 'v1', expectsRefusal: false, refused: true }),  // over-refusal
-  dv({ caseId: 'r1', version: 'v1', expectsRefusal: true, refused: true }),   // correct geweigerd
-  dv({ caseId: 'r2', version: 'v1', expectsRefusal: true, refused: false }),  // under-refusal (hallucinatie-risico)
-  dv({ caseId: 'x1', version: 'v1', expectsRefusal: null, refused: false }),  // n.v.t. — telt niet mee
+  dv({ caseId: 'q1', version: 'v1', expectsRefusal: false, refused: false }), // beantwoordbaar, beantwoord → ok
+  dv({ caseId: 'q2', version: 'v1', expectsRefusal: false, refused: true }),  // beantwoordbaar, geweigerd → over-refusal
+  dv({ caseId: 'o1', version: 'v1', outOfCorpus: true, checks: { hardFactSupport: { pass: true } } }),  // out-of-corpus, gegrond/deflectie → ok
+  dv({ caseId: 'o2', version: 'v1', outOfCorpus: true, checks: { hardFactSupport: { pass: false } } }), // out-of-corpus, verzonnen specifiek → under-refusal
+  dv({ caseId: 'p1', version: 'v1', expectsRefusal: true, checks: { hardFactSupport: { pass: false } } }), // verzonnen feit maar NIET out-of-corpus → mag under-refusal NIET inflaten
 ];
 const rc = computeRefusalCalibration(cv)[0];
 check('calibratie: answerableTotal = 2', rc.answerableTotal === 2, true);
 check('calibratie: overRefusals = 1', rc.overRefusals === 1, true);
 check('calibratie: overRefusalRate = 50%', rc.overRefusalRate === 0.5, true);
-check('calibratie: refusalExpectedTotal = 2', rc.refusalExpectedTotal === 2, true);
-check('calibratie: underRefusals = 1', rc.underRefusals === 1, true);
+check('calibratie: outOfCorpusTotal = 2', rc.outOfCorpusTotal === 2, true);
+check('calibratie: underRefusals = 1 (alleen out-of-corpus hardFactSupport-fail)', rc.underRefusals === 1, true);
 check('calibratie: underRefusalRate = 50%', rc.underRefusalRate === 0.5, true);
-check('calibratie: expectsRefusal=null telt niet mee', rc.answerableTotal + rc.refusalExpectedTotal === 4, true);
+check('calibratie: niet-out-of-corpus fabricatie telt NIET als under-refusal', rc.outOfCorpusTotal === 2 && rc.underRefusals === 1, true);
 
 // --- fixture-validatie (hard-dimension-cases.json) --------------------------
 const fixture = JSON.parse(
@@ -195,6 +195,10 @@ check(
   new Set(aq.map((c) => c.orgSlug)).size >= 3,
   true,
 );
+const ooc = fixture.cases.filter((c) => c.outOfCorpus === true);
+check('fixture: >= 3 outOfCorpus cases (under-refusal denominator)', ooc.length >= 3, true);
+check('fixture: outOfCorpus cases verwachten allemaal een weigering', ooc.every((c) => c.expectsRefusal === true), true);
+check('fixture: outOfCorpus cases hebben checkHardFactSupport (fabricatie-signaal)', ooc.every((c) => c.checkHardFactSupport === true), true);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);

@@ -263,6 +263,7 @@ async function evaluateCase(
     latencyMs,
     refused,
     expectsRefusal: c.expectsRefusal ?? null,
+    outOfCorpus: c.outOfCorpus ?? false,
     catastrophic,
   };
 
