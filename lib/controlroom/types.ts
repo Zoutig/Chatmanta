@@ -223,3 +223,128 @@ export const PRIVACY_DEFAULTS = {
   privacyTextShared: false,
   subprocessorInfoShared: false,
 };
+
+// ---------------------------------------------------------------------------
+// Feedback / klant-meldingen (migratie 0043_admin_feedback). Operator-beheerde
+// tickets; status is NIET klant-zichtbaar. Unions spiegelen de CHECK-enums.
+// ---------------------------------------------------------------------------
+export const FEEDBACK_TYPES = [
+  'antwoordkwaliteit',
+  'bug',
+  'dashboard',
+  'feedback',
+  'wens',
+] as const;
+export type FeedbackType = (typeof FEEDBACK_TYPES)[number];
+
+export const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
+  antwoordkwaliteit: 'Fout antwoord van de chatbot',
+  bug: 'Technisch probleem',
+  dashboard: 'Dashboard / portaalprobleem',
+  feedback: 'Algemene feedback',
+  wens: 'Suggestie of wens',
+};
+
+export const FEEDBACK_URGENCIES = ['low', 'normal', 'high'] as const;
+export type FeedbackUrgency = (typeof FEEDBACK_URGENCIES)[number];
+
+export const FEEDBACK_URGENCY_LABELS: Record<FeedbackUrgency, string> = {
+  low: 'Laag',
+  normal: 'Normaal',
+  high: 'Hoog',
+};
+
+export const FEEDBACK_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
+export type FeedbackPriority = (typeof FEEDBACK_PRIORITIES)[number];
+
+export const FEEDBACK_STATUSES = [
+  'nieuw',
+  'in_behandeling',
+  'opgelost',
+  'gesloten',
+] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+
+export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
+  nieuw: 'Nieuw',
+  in_behandeling: 'In behandeling',
+  opgelost: 'Opgelost',
+  gesloten: 'Gesloten',
+};
+
+export const FEEDBACK_SOURCES = ['klantendashboard', 'widget', 'intern', 'systeem'] as const;
+export type FeedbackSource = (typeof FEEDBACK_SOURCES)[number];
+
+export const FEEDBACK_EVENT_KINDS = [
+  'created',
+  'status_change',
+  'comment',
+  'internal_note',
+] as const;
+export type FeedbackEventKind = (typeof FEEDBACK_EVENT_KINDS)[number];
+
+export type FeedbackEventAuthor = 'klant' | 'operator' | 'systeem';
+
+/** Eén ingediende melding (admin_feedback-rij), camelCase voor de UI. */
+export type FeedbackItem = {
+  id: string;
+  organizationId: string;
+  source: FeedbackSource;
+  type: FeedbackType;
+  urgency: FeedbackUrgency;
+  priority: FeedbackPriority | null;
+  status: FeedbackStatus;
+  description: string;
+  submitterName: string | null;
+  submitterEmail: string | null;
+  chatId: string | null;
+  question: string | null;
+  attachmentPath: string | null;
+  attachmentName: string | null;
+  privacyAcceptedAt: string | null;
+  context: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FeedbackEvent = {
+  id: string;
+  feedbackId: string;
+  kind: FeedbackEventKind;
+  fromStatus: FeedbackStatus | null;
+  toStatus: FeedbackStatus | null;
+  body: string | null;
+  author: FeedbackEventAuthor;
+  createdAt: string;
+};
+
+/** Server-side gevalideerde input voor createFeedback (org wordt apart gezet). */
+export type FeedbackCreateInput = {
+  organizationId: string;
+  source: FeedbackSource;
+  type: FeedbackType;
+  urgency: FeedbackUrgency;
+  description: string;
+  submitterName?: string | null;
+  submitterEmail?: string | null;
+  chatId?: string | null;
+  question?: string | null;
+  attachmentPath?: string | null;
+  attachmentName?: string | null;
+  privacyAcceptedAt?: string | null;
+  context?: Record<string, unknown>;
+};
+
+export type FeedbackFilter = {
+  status?: FeedbackStatus;
+  type?: FeedbackType;
+  urgency?: FeedbackUrgency;
+  source?: FeedbackSource;
+  /** Org-uuid (gevalideerd tegen KNOWN_ORGS door de caller). */
+  orgId?: string;
+};
+
+export type FeedbackSummary = {
+  open: number;
+  nieuw: number;
+};
