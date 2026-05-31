@@ -15,6 +15,8 @@ import {
   computeRegressionDiff,
   buildAnchorSection,
   unstableCases,
+  normalizeQuestion,
+  selectHarvestCandidates,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
   type DeterministicVerdict,
@@ -217,6 +219,28 @@ const unst = unstableCases([
 ]);
 check('unstableCases: alleen gezakte consistency', unst.length === 1 && unst[0].caseId === 's1', true);
 
+// --- harvest-selectie (Laag 3 — Groep 1) -------------------------------------
+check('normalizeQuestion: lowercase + trim + trailing ?', normalizeQuestion('  Hoeveel Kost Het?  ') === 'hoeveel kost het', true);
+check('normalizeQuestion: witruimte-collapse', normalizeQuestion('a   b\tc') === 'a b c', true);
+
+const harvestRows = [
+  { question: 'Hoeveel garantie krijg ik op mijn dak?', orgSlug: 'acme-corp' as const },
+  { question: 'hoeveel garantie krijg ik op mijn dak??', orgSlug: 'acme-corp' as const }, // duplicaat (norm)
+  { question: 'kort', orgSlug: 'acme-corp' as const },                                    // te kort → skip
+  { question: 'Mail mij op jan@example.com aub', orgSlug: 'acme-corp' as const },         // PII → skip
+  { question: 'Wat kost een behandeling fysio?', orgSlug: 'globex-inc' as const },
+];
+const cands = selectHarvestCandidates(harvestRows, { perOrg: 8, containsPii: (q) => /@/.test(q) });
+check('harvest: dedupe (1 acme garantie)', cands.filter((c) => c.orgSlug === 'acme-corp').length === 1, true);
+check('harvest: PII + te-kort geskipt', cands.every((c) => !c.question.includes('@') && c.question.length >= 8), true);
+check('harvest: globex meegenomen', cands.some((c) => c.orgSlug === 'globex-inc'), true);
+check('harvest: kandidaten = answer-quality + needsJudge', cands.every((c) => c.dimension === 'answer-quality' && c.needsJudge === true && c.expectsRefusal === false), true);
+const capped = selectHarvestCandidates(
+  Array.from({ length: 10 }, (_, i) => ({ question: `unieke vraag nummer ${i} over daken`, orgSlug: 'acme-corp' as const })),
+  { perOrg: 3 },
+);
+check('harvest: per-org cap (3)', capped.length === 3, true);
+
 // --- fixture-validatie (hard-dimension-cases.json) --------------------------
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), 'eval-fixtures', 'hard-dimension-cases.json'), 'utf8'),
@@ -240,6 +264,18 @@ const ooc = fixture.cases.filter((c) => c.outOfCorpus === true);
 check('fixture: >= 3 outOfCorpus cases (under-refusal denominator)', ooc.length >= 3, true);
 check('fixture: outOfCorpus cases verwachten allemaal een weigering', ooc.every((c) => c.expectsRefusal === true), true);
 check('fixture: outOfCorpus cases hebben checkHardFactSupport (fabricatie-signaal)', ooc.every((c) => c.checkHardFactSupport === true), true);
+const mtCases = fixture.cases.filter((c) => c.id.startsWith('mt-'));
+check('fixture: >= 3 multi-turn (mt-) cases', mtCases.length >= 3, true);
+const withHistory = fixture.cases.filter((c) => Array.isArray(c.conversationHistory) && c.conversationHistory.length > 0);
+check(
+  'fixture: conversationHistory-turns hebben geldige role+content',
+  withHistory.every((c) =>
+    c.conversationHistory!.every(
+      (t) => (t.role === 'user' || t.role === 'assistant') && typeof t.content === 'string' && t.content.length > 0,
+    ),
+  ),
+  true,
+);
 
 if (failed > 0) {
   console.error(`\n✗ ${failed} test(s) gefaald`);

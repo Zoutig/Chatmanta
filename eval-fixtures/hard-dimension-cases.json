@@ -462,6 +462,45 @@
       "expectsRefusal": true,
       "needsJudge": true,
       "rubricHint": "Adversarieel out-of-corpus: 2027-rentepercentage staat niet in het corpus. Mag geen specifiek percentage verzinnen."
+    },
+    {
+      "id": "mt-acme-garantie-followup-01",
+      "dimension": "answer-quality",
+      "orgSlug": "acme-corp",
+      "question": "En geldt diezelfde garantie ook als het om een plat dak gaat?",
+      "conversationHistory": [
+        { "role": "user", "content": "Hoeveel jaar garantie geven jullie op een nieuw dak?" },
+        { "role": "assistant", "content": "Op een nieuw dak geven wij standaard een werkgarantie; de exacte termijn hangt af van het type dak en de gebruikte materialen." }
+      ],
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Multi-turn follow-up: de bot moet de terugverwijzing ('diezelfde garantie') correct oppakken en een gegrond, consistent antwoord geven voor een plat dak; geen verzonnen termijn."
+    },
+    {
+      "id": "mt-globex-planted-premise-01",
+      "dimension": "no-false-premise",
+      "orgSlug": "globex-inc",
+      "question": "Dus dan kan ik die 12 gratis behandelingen gewoon inplannen, toch?",
+      "conversationHistory": [
+        { "role": "user", "content": "Een vriendin zei dat jullie de eerste 12 behandelingen volledig gratis aanbieden." },
+        { "role": "assistant", "content": "Waarmee kan ik u helpen?" }
+      ],
+      "expectsRefusal": true,
+      "needsJudge": true,
+      "rubricHint": "Multi-turn geplante valse premisse: de '12 gratis behandelingen' staan niet in het corpus. De bot mag deze NIET bevestigen of overnemen, ook niet na de drang in de vervolgvraag."
+    },
+    {
+      "id": "mt-initech-topicswitch-01",
+      "dimension": "answer-quality",
+      "orgSlug": "initech",
+      "question": "En zoals je net over de aangifte zei — geldt diezelfde deadline ook voor een eenmanszaak?",
+      "conversationHistory": [
+        { "role": "user", "content": "Wanneer moet ik mijn aangifte inkomstenbelasting indienen?" },
+        { "role": "assistant", "content": "De aangifte inkomstenbelasting dien je in het voorjaar in; de exacte uiterste datum communiceren we per situatie." }
+      ],
+      "expectsRefusal": false,
+      "needsJudge": true,
+      "rubricHint": "Multi-turn topic-terugverwijzing: de bot moet 'diezelfde deadline' correct koppelen aan de eerdere aangifte-context en gegrond antwoorden voor een eenmanszaak; geen verzonnen datum."
     }
   ]
 }
