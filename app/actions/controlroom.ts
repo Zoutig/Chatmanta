@@ -19,8 +19,18 @@ import { upsertProfile } from '@/lib/controlroom/server/profiles';
 import { updateOnboardingItem } from '@/lib/controlroom/server/onboarding';
 import { upsertPrivacy } from '@/lib/controlroom/server/privacy';
 import { setErrorGroupStatus } from '@/lib/controlroom/server/errors';
-import { setFeedbackStatus, deleteFeedback } from '@/lib/controlroom/server/feedback';
-import { FEEDBACK_STATUSES, type FeedbackStatus } from '@/lib/controlroom/types';
+import {
+  setFeedbackStatus,
+  setFeedbackPriority,
+  addFeedbackEvent,
+  deleteFeedback,
+} from '@/lib/controlroom/server/feedback';
+import {
+  FEEDBACK_STATUSES,
+  FEEDBACK_PRIORITIES,
+  type FeedbackStatus,
+  type FeedbackPriority,
+} from '@/lib/controlroom/types';
 import type { ErrorStatus } from '@/lib/observability/sink';
 import {
   saveChatbotSettings,
@@ -148,6 +158,44 @@ export async function deleteFeedbackAction(id: string): Promise<ActionResult<{ i
   return actionTry(async () => {
     await requireV0Auth();
     await deleteFeedback(id);
+    revalidate();
+    return { id };
+  });
+}
+
+/** Operator-prioriteit (Fase 2). Lege string = wissen (null). De wijziging wordt
+ *  als internal_note in de historie gelogd door setFeedbackPriority. */
+export async function setFeedbackPriorityAction(
+  id: string,
+  priority: FeedbackPriority | '',
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const next: FeedbackPriority | null = priority === '' ? null : priority;
+    if (next !== null && !(FEEDBACK_PRIORITIES as readonly string[]).includes(next)) {
+      fail('INPUT_INVALID', `ongeldige prioriteit: ${priority}`);
+    }
+    await setFeedbackPriority(id, next);
+    revalidate();
+    return { id };
+  });
+}
+
+/** Operator-notitie of -reactie (Fase 2) — append-only event in de historie. */
+export async function addFeedbackNoteAction(
+  id: string,
+  kind: 'comment' | 'internal_note',
+  body: string,
+): Promise<ActionResult<{ id: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    if (kind !== 'comment' && kind !== 'internal_note') {
+      fail('INPUT_INVALID', `ongeldig notitie-type: ${kind}`);
+    }
+    const trimmed = (body ?? '').trim();
+    if (trimmed.length === 0) fail('INPUT_INVALID', 'Notitie mag niet leeg zijn.');
+    if (trimmed.length > 4000) fail('INPUT_INVALID', 'Notitie is te lang (max 4000 tekens).');
+    await addFeedbackEvent(id, { kind, body: trimmed, author: 'operator' });
     revalidate();
     return { id };
   });

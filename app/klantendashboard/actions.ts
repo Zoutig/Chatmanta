@@ -9,7 +9,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
-import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
+import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { requireV0Auth } from '@/app/actions/_auth';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import {
@@ -19,6 +19,7 @@ import {
   addFeedbackEvent,
 } from '@/lib/controlroom/server/feedback';
 import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
+import { notifyNewFeedback } from '@/lib/notifications/feedback-notify';
 import {
   saveWidgetSettings,
   getOrgSettings,
@@ -237,6 +238,11 @@ export async function submitFeedbackAction(
         }).catch(() => {});
       }
     }
+
+    // Fase 3: e-mailnotificatie (operator + evt. indiener). Fail-safe en gated op
+    // RESEND_API_KEY — notifyNewFeedback gooit nooit, dus de submit kan niet
+    // alsnog falen door een mailprobleem.
+    await notifyNewFeedback(item, KNOWN_ORGS[activeOrg.slug].name);
 
     // Laat de operator-inbox (Admin Dashboard) de nieuwe melding meteen zien.
     revalidatePath('/admindashboard', 'layout');

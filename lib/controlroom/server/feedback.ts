@@ -12,9 +12,11 @@ import type {
   FeedbackEventKind,
   FeedbackFilter,
   FeedbackItem,
+  FeedbackPriority,
   FeedbackStatus,
   FeedbackSummary,
 } from '@/lib/controlroom/types';
+import { FEEDBACK_PRIORITY_LABELS } from '@/lib/controlroom/types';
 import { sb } from './db';
 
 const TABLE = 'admin_feedback';
@@ -158,6 +160,12 @@ export async function listFeedback(filter: FeedbackFilter = {}): Promise<Feedbac
   if (filter.urgency) q = q.eq('urgency', filter.urgency);
   if (filter.source) q = q.eq('source', filter.source);
   if (filter.orgId) q = q.eq('organization_id', filter.orgId);
+  if (filter.search) {
+    // Sanitize: strip PostgREST/.or()-speciale tekens (komma, %, haakjes, *, backslash,
+    // quotes) zodat de zoekterm de filtersyntax niet kan breken; cap op 120.
+    const term = filter.search.slice(0, 120).replace(/[%,()*\\"']/g, ' ').trim();
+    if (term) q = q.or(`description.ilike.%${term}%,question.ilike.%${term}%`);
+  }
 
   const { data, error } = await q;
   if (error) {
@@ -221,6 +229,27 @@ export async function setFeedbackStatus(id: string, status: FeedbackStatus): Pro
     });
   } catch (e) {
     console.error('[setFeedbackStatus] status_change-event faalde', (e as Error).message);
+  }
+}
+
+/** Zet (of wist met null) de operator-prioriteit. Migratie-vrij: de wijziging
+ *  wordt als internal_note in de historie gelogd (geen apart event-kind). */
+export async function setFeedbackPriority(id: string, priority: FeedbackPriority | null): Promise<void> {
+  const current = await getFeedback(id);
+  if (!current) throw new Error(`setFeedbackPriority: feedback ${id} niet gevonden`);
+  if ((current.priority ?? null) === priority) return; // no-op
+  const { error } = await sb().from(TABLE).update({ priority }).eq('id', id);
+  if (error) throw new Error(`setFeedbackPriority: ${error.message}`);
+  const label = (p: FeedbackPriority | null) => (p ? FEEDBACK_PRIORITY_LABELS[p] : '—');
+  // Best-effort audit, net als bij setFeedbackStatus.
+  try {
+    await addFeedbackEvent(id, {
+      kind: 'internal_note',
+      author: 'operator',
+      body: `Prioriteit: ${label(current.priority)} → ${label(priority)}`,
+    });
+  } catch (e) {
+    console.error('[setFeedbackPriority] event faalde', (e as Error).message);
   }
 }
 
