@@ -23,9 +23,12 @@ import type {
 import {
   finalCaseStatus,
   computeProductionGate,
+  computeOperationalMetrics,
+  computeRefusalCalibration,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
 } from '../lib/v0/server/hard-eval-checks';
+import { resolveBot } from '../lib/v0/server/bots';
 
 // Display-volgorde: alle veiligheidsdimensies, daarna de kwaliteitsdimensie.
 const DIMENSIONS: HardDimension[] = [...SAFETY_DIMENSIONS, QUALITY_DIMENSION];
@@ -198,6 +201,40 @@ md.push('');
 md.push('_Cel = pass/total; `(n?)` = n nog niet-beoordeelde (PENDING) judge-cases._');
 md.push('');
 
+// Operationeel (Groep 2)
+md.push('## Operationeel (Groep 2 — latency / cost / errors)');
+md.push('');
+md.push('_Onverwachte error op een valide query = hard veto (zie gate). Latency/cost = waarschuwing (⚠️) t.o.v. het per-versie budget._');
+md.push('');
+md.push('| versie | p50 lat | p95 lat | budget | mean cost | p95 cost | budget | onverwachte errors |');
+md.push('|--------|---------|---------|--------|-----------|----------|--------|--------------------|');
+const opMetrics = computeOperationalMetrics(results.verdicts);
+for (const m of opMetrics) {
+  const bot = resolveBot(m.version);
+  const latWarn = m.latencyP95Ms > bot.evalBudgetMs ? ' ⚠️' : '';
+  const costWarn = m.costP95Usd > bot.evalBudgetUsd ? ' ⚠️' : '';
+  const errStr = m.unexpectedErrors.length === 0 ? '0' : `❌ ${m.unexpectedErrors.length} (${m.unexpectedErrors.join(', ')})`;
+  md.push(
+    `| ${m.version} | ${m.latencyP50Ms}ms | ${m.latencyP95Ms}ms${latWarn} | ${bot.evalBudgetMs}ms | $${m.costMeanUsd.toFixed(4)} | $${m.costP95Usd.toFixed(4)}${costWarn} | $${bot.evalBudgetUsd.toFixed(4)} | ${errStr} |`,
+  );
+}
+md.push('');
+
+// Refusal-calibratie (Groep 3)
+md.push('## Refusal-calibratie (Groep 3 — te streng ↔ te los)');
+md.push('');
+md.push('_over-refusal = weigerde op een beantwoordbare vraag (expectsRefusal=false). under-refusal = antwoordde i.p.v. te weigeren op een valstrik/onbeantwoordbare vraag (expectsRefusal=true, hallucinatie-risico). Beide ideaal = 0%._');
+md.push('');
+md.push('| versie | over-refusal | under-refusal (hallucinatie-risico) |');
+md.push('|--------|--------------|-------------------------------------|');
+const calib = computeRefusalCalibration(results.verdicts);
+for (const c of calib) {
+  const over = c.overRefusalRate === null ? '-' : `${c.overRefusals}/${c.answerableTotal} = ${Math.round(c.overRefusalRate * 100)}%`;
+  const under = c.underRefusalRate === null ? '-' : `${c.underRefusals}/${c.refusalExpectedTotal} = ${Math.round(c.underRefusalRate * 100)}%`;
+  md.push(`| ${c.version} | ${over} | ${under} |`);
+}
+md.push('');
+
 // Catastrofale fails
 md.push('## Catastrofale fails (harde gates: canary-lek, must-not-hit, malformed-error)');
 md.push('');
@@ -268,6 +305,13 @@ console.log('  Productie-gate:');
 for (const g of gate) {
   const s = g.productionReady === true ? 'JA ' : g.productionReady === false ? 'NEE' : ' ? ';
   console.log(`   ${g.version.padEnd(8)} ${s}  ${g.reasons.join('; ')}`);
+}
+console.log('');
+console.log('  Refusal-calibratie (over / under):');
+for (const c of computeRefusalCalibration(results.verdicts)) {
+  const over = c.overRefusalRate === null ? ' - ' : `${Math.round(c.overRefusalRate * 100)}%`;
+  const under = c.underRefusalRate === null ? ' - ' : `${Math.round(c.underRefusalRate * 100)}%`;
+  console.log(`   ${c.version.padEnd(8)} over=${over.padStart(4)}  under=${under.padStart(4)}`);
 }
 console.log('');
 console.log(`  catastrofale fails: ${cats.length}`);
