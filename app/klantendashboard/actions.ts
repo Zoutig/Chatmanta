@@ -311,7 +311,10 @@ export async function submitQuizAnswerAction(
       if (question.type === 'meerkeuze') {
         meerkeuzeOptie = (payload.meerkeuzeOptie ?? '').trim().slice(0, 500) || null;
         andersTekst = (payload.andersTekst ?? '').trim().slice(0, QUIZ_ANSWER_MAX) || null;
-        antwoord = andersTekst ?? meerkeuzeOptie; // 'Anders'-tekst heeft voorrang
+        // 'Anders' is een sentinel, geen antwoord: bij 'Anders' telt de vrije tekst
+        // (leeg → geen antwoord, niet de letterlijke string 'Anders' in de KB),
+        // anders de gekozen optie.
+        antwoord = meerkeuzeOptie === 'Anders' ? andersTekst : meerkeuzeOptie;
       } else {
         antwoord = (payload.antwoord ?? '').trim().slice(0, QUIZ_ANSWER_MAX) || null;
       }
