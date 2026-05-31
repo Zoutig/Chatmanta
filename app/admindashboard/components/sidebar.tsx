@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Building2,
   ClipboardList,
+  ListChecks,
   Workflow,
   AlertTriangle,
   Inbox,
@@ -16,10 +17,12 @@ import {
 } from 'lucide-react';
 import { NavItem } from '@/app/klantendashboard/components/nav-item';
 import { getFeedbackSummary } from '@/lib/controlroom/server/feedback';
+import { getQuizSummary } from '@/lib/controlroom/server/quiz';
 
 export async function ControlRoomSidebar() {
-  // Cheap head-count voor de badge: open = nieuw + in_behandeling. Faalt stil → 0.
+  // Cheap head-counts voor de badges. Falen stil → 0.
   const feedback = await getFeedbackSummary().catch(() => ({ open: 0, nieuw: 0 }));
+  const quiz = await getQuizSummary().catch(() => ({ pendingApproval: 0 }));
   return (
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
       {/* Brand */}
@@ -98,6 +101,9 @@ export async function ControlRoomSidebar() {
         </NavItem>
         <NavItem href="/admindashboard/onboarding" label="Onboarding">
           <ClipboardList size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/admindashboard/quiz" label="Quiz" badge={quiz.pendingApproval}>
+          <ListChecks size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/admindashboard/jobs" label="Crawls & Jobs">
           <Workflow size={17} strokeWidth={1.7} />

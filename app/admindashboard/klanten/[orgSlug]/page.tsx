@@ -15,6 +15,7 @@ import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { getAllTimeUsage } from '@/lib/v0/server/log';
 import { listOnboardingItems } from '@/lib/controlroom/server/onboarding';
 import { getPrivacy } from '@/lib/controlroom/server/privacy';
+import { getActiveQuizForOrg, listQuestions } from '@/lib/controlroom/server/quiz';
 import { detectPossiblePii } from '@/lib/controlroom/pii';
 import { formatCostUsd, formatDateNL, formatRelativeNL } from '@/lib/controlroom/format';
 import { MONTHLY_CONVERSATION_LIMITS, usageLimitStatus } from '@/lib/controlroom/usage-limits';
@@ -27,6 +28,7 @@ import { MetricCard } from '../../components/metric-card';
 import { CommercialBadge, HealthBadge, TechnicalBadge } from '../../components/badges';
 import { ReloadButton } from '../../components/reload-button';
 import { ProfileEditor } from './components/profile-editor';
+import { QuizManager } from './components/quiz-manager';
 import { NotesEditor } from './components/notes-editor';
 import { PrivacyForm } from './components/privacy-form';
 import { OnboardingChecklist } from './components/onboarding-checklist';
@@ -42,12 +44,16 @@ import {
 } from '@/app/actions/controlroom';
 
 export const dynamic = 'force-dynamic';
+// De Quiz-trigger draait de analyse synchroon binnen de server-action (~15-60s);
+// verhoog de route-limiet zodat een gpt-4o-generatie niet mid-run wordt afgekapt.
+export const maxDuration = 120;
 
 const TABS: TabDef[] = [
   { key: 'overzicht', label: 'Overzicht' },
   { key: 'botinstellingen', label: 'Botinstellingen' },
   { key: 'gesprekken', label: 'Gesprekken' },
   { key: 'bronnen', label: 'Bronnen' },
+  { key: 'quiz', label: 'Quiz' },
   { key: 'jobs', label: 'Crawls & Jobs' },
   { key: 'usage', label: 'Usage' },
   { key: 'widget', label: 'Widget' },
@@ -277,6 +283,12 @@ async function PrivacyTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) {
   );
 }
 
+async function QuizTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) {
+  const quiz = await getActiveQuizForOrg(orgId);
+  const questions = quiz ? await listQuestions(quiz.id) : [];
+  return <QuizManager orgSlug={slug} quiz={quiz} questions={questions} />;
+}
+
 // ───────────────────────── Page ─────────────────────────
 
 export default async function KlantDetailPage({
@@ -328,6 +340,7 @@ export default async function KlantDetailPage({
       {tab === 'botinstellingen' && <BotinstellingenTab slug={slug} />}
       {tab === 'gesprekken' && <GesprekkenTab slug={slug} />}
       {tab === 'bronnen' && <BronnenTab slug={slug} orgId={orgId} />}
+      {tab === 'quiz' && <QuizTab slug={slug} orgId={orgId} />}
       {tab === 'jobs' && <JobsTab orgId={orgId} />}
       {tab === 'usage' && <UsageTab klant={klant} orgId={orgId} />}
       {tab === 'widget' && <WidgetTab slug={slug} />}

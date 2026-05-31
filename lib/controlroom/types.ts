@@ -364,3 +364,189 @@ export type FeedbackSummary = {
   open: number;
   nieuw: number;
 };
+
+// ---------------------------------------------------------------------------
+// Kennisbank-Quiz (migratie 0044_admin_quiz). AI-gegenereerde quiz die
+// ontbrekende kennisbank-info bij de klant uitvraagt; operator-goedgekeurd.
+// Unions spiegelen de CHECK-enums in 0044. Eén quiz per org (eenmalig).
+// Spec: docs/superpowers/specs/2026-05-31-kennisbank-quiz-design.md
+// ---------------------------------------------------------------------------
+export const QUIZ_STATUSES = [
+  'generating',
+  'concept',
+  'actief',
+  'voltooid',
+  'geannuleerd',
+  'leeg',
+  'mislukt',
+] as const;
+export type QuizStatus = (typeof QUIZ_STATUSES)[number];
+
+export const QUIZ_STATUS_LABELS: Record<QuizStatus, string> = {
+  generating: 'Bezig met genereren',
+  concept: 'Concept (wacht op goedkeuring)',
+  actief: 'Actief',
+  voltooid: 'Voltooid',
+  geannuleerd: 'Geannuleerd',
+  leeg: 'Geen vragen (kennisbank lijkt volledig)',
+  mislukt: 'Analyse mislukt',
+};
+
+/** Model dat Niels per klant kiest voor de generatie-call (embeddings/probes
+ *  draaien op het vaste embedding-model). Beide staan in MODEL_COSTS_USD. */
+export const QUIZ_ANALYSE_MODELS = ['gpt-4o-mini', 'gpt-4o'] as const;
+export type QuizAnalyseModel = (typeof QUIZ_ANALYSE_MODELS)[number];
+
+export const QUIZ_ANALYSE_MODEL_LABELS: Record<QuizAnalyseModel, string> = {
+  'gpt-4o-mini': 'GPT-4o mini — sneller & goedkoper',
+  'gpt-4o': 'GPT-4o — hogere kwaliteit, duurder',
+};
+
+/** A/B-seam: category_probe (M2-default) of een latere map_reduce-variant. */
+export const QUIZ_ANALYSE_METHODS = ['category_probe', 'map_reduce'] as const;
+export type QuizAnalyseMethod = (typeof QUIZ_ANALYSE_METHODS)[number];
+
+export const QUIZ_QUESTION_TYPES = ['open', 'meerkeuze'] as const;
+export type QuizQuestionType = (typeof QUIZ_QUESTION_TYPES)[number];
+
+export const QUIZ_QUESTION_SOURCES = ['ai', 'niels'] as const;
+export type QuizQuestionSource = (typeof QUIZ_QUESTION_SOURCES)[number];
+
+export const QUIZ_EVENT_KINDS = [
+  'created',
+  'analyse_started',
+  'probes_scored',
+  'generated',
+  'status_change',
+  'question_edited',
+  'question_added',
+  'question_deleted',
+  'activated',
+  'failed',
+  'answer_submitted',
+] as const;
+export type QuizEventKind = (typeof QUIZ_EVENT_KINDS)[number];
+
+export type QuizEventAuthor = 'klant' | 'operator' | 'systeem' | 'ai';
+
+/** Probe-uitslag per categorie (category_probe-strategie). */
+export type QuizProbeVerdict = 'ontbreekt' | 'zwak' | 'gedekt';
+
+export type QuizProbe = {
+  categorie: string;
+  top1Similarity: number | null;
+  verdict: QuizProbeVerdict;
+};
+
+/** Afgeleide bedrijfscontext + probe-audit, opgeslagen in admin_quiz.bedrijfscontext. */
+export type QuizBedrijfscontext = {
+  branche?: string;
+  beschrijving?: string;
+  doelgroep?: string;
+  probes?: QuizProbe[];
+};
+
+/** Eén quiz (admin_quiz-rij), camelCase voor de UI. */
+export type QuizItem = {
+  id: string;
+  organizationId: string;
+  status: QuizStatus;
+  analyseModel: QuizAnalyseModel;
+  analyseMethod: QuizAnalyseMethod;
+  analyseCostUsd: number | null;
+  generationCostUsd: number | null;
+  bedrijfscontext: QuizBedrijfscontext;
+  questionCount: number;
+  answeredCount: number;
+  skippedCount: number;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+  activatedAt: string | null;
+  completedAt: string | null;
+};
+
+export type QuizQuestion = {
+  id: string;
+  quizId: string;
+  organizationId: string;
+  categorie: string;
+  categorieLabel: string | null;
+  context: string | null;
+  vraag: string;
+  type: QuizQuestionType;
+  opties: string[] | null;
+  volgorde: number;
+  bron: QuizQuestionSource;
+  goedgekeurd: boolean;
+  verwijderd: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type QuizAnswer = {
+  id: string;
+  quizId: string;
+  questionId: string;
+  organizationId: string;
+  antwoord: string | null;
+  meerkeuzeOptie: string | null;
+  andersTekst: string | null;
+  ingestedDocumentId: string | null;
+  redacted: boolean;
+  createdAt: string;
+};
+
+export type QuizEvent = {
+  id: string;
+  quizId: string;
+  kind: QuizEventKind;
+  fromStatus: QuizStatus | null;
+  toStatus: QuizStatus | null;
+  body: string | null;
+  meta: Record<string, unknown>;
+  author: QuizEventAuthor;
+  createdAt: string;
+};
+
+/** Input voor het bulk-inserten van een AI- of Niels-vraag (org apart gezet). */
+export type QuizQuestionInput = {
+  categorie: string;
+  categorieLabel?: string | null;
+  context?: string | null;
+  vraag: string;
+  type: QuizQuestionType;
+  opties?: string[] | null;
+  volgorde?: number;
+  bron?: QuizQuestionSource;
+  goedgekeurd?: boolean;
+};
+
+/** Velden die Niels op een vraag kan bewerken tijdens review. */
+export type QuizQuestionPatch = {
+  categorieLabel?: string | null;
+  context?: string | null;
+  vraag?: string;
+  type?: QuizQuestionType;
+  opties?: string[] | null;
+  volgorde?: number;
+  goedgekeurd?: boolean;
+};
+
+/** Resultaat van de M2-analyse, opgeslagen op de quiz-rij. */
+export type QuizAnalysisResult = {
+  bedrijfscontext: QuizBedrijfscontext;
+  analyseCostUsd?: number | null;
+  generationCostUsd?: number | null;
+};
+
+export type QuizFilter = {
+  status?: QuizStatus;
+  /** Org-uuid (gevalideerd tegen KNOWN_ORGS door de caller). */
+  orgId?: string;
+};
+
+export type QuizSummary = {
+  /** # quizzes in 'concept' — wacht-op-goedkeuring badge voor de operator-sidebar. */
+  pendingApproval: number;
+};
