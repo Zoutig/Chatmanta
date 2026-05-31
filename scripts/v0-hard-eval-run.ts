@@ -14,7 +14,7 @@
 // Usage:
 //   npm run eval:hard:run                          # 6 doelversies (v0.6/v0.7.3/v0.8.1/v0.9/v0.9.1/v0.9.2)
 //   npm run eval:hard:run -- --versions=v0.9.1     # 1 versie
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { runRagQueryStreaming, type ChatResponse, type ChatHistoryTurn } from '../lib/v0/server/rag';
@@ -26,11 +26,15 @@ import {
   looksLikeRefusal,
   scopeMarkersSatisfied,
   selfConsistencyVariance,
+  buildAnchorSection,
+  SAFETY_DIMENSIONS,
   type HardCase,
   type HardCaseFile,
   type HardResponseKind,
   type DeterministicVerdict,
   type ResultsFile,
+  type AnchorVerdict,
+  type AnchorsFile,
 } from '../lib/v0/server/hard-eval-checks';
 
 const DEFAULT_VERSIONS = ['v0.6', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2'];
@@ -56,6 +60,14 @@ function parseListArg(name: string): string[] | null {
   return null;
 }
 
+function parseIntArg(name: string): number | null {
+  for (const arg of process.argv.slice(2)) {
+    const m = arg.match(new RegExp(`^--${name}=(\\d+)$`));
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
 function timestamp(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
@@ -70,6 +82,9 @@ if (!process.env.OPENAI_API_KEY) fail('Missing OPENAI_API_KEY');
 
 const versionsArg = parseListArg('versions');
 const versions = versionsArg ?? DEFAULT_VERSIONS;
+// --multi-run=N: draai veiligheids-cases N× om verdict-stabiliteit te meten
+// (Groep 4). Opt-in (default uit) zodat de standaard-run niet duurder wordt.
+const MULTI_RUN = parseIntArg('multi-run');
 for (const v of versions) {
   if (!(v in BOTS)) fail(`Onbekende bot-versie: ${v}. Bekend: ${BOT_VERSIONS_ORDERED.join(', ')}`);
 }
@@ -158,7 +173,10 @@ async function evaluateCase(
   const bot = resolveBot(version);
   const orgId = ORG_ID_BY_SLUG[c.orgSlug];
   const history = c.conversationHistory as ChatHistoryTurn[] | undefined;
-  const runs = Math.max(1, c.selfConsistencyRuns ?? 1);
+  const runs = Math.max(
+    1,
+    c.selfConsistencyRuns ?? (MULTI_RUN && SAFETY_DIMENSIONS.includes(c.dimension) ? MULTI_RUN : 1),
+  );
 
   const results: { response: ChatResponse | null; errCode: string | null; latencyMs: number }[] = [];
   for (let i = 0; i < runs; i++) {
@@ -316,13 +334,18 @@ Schrijf je verdicts naar \`eval-out/hard/<ts>-verdicts.json\` met exact deze vor
 ] }
 \`\`\``;
 
-function buildJudgeQueue(ts: string, items: JudgeItem[]): string {
+function buildJudgeQueue(ts: string, items: JudgeItem[], anchors: AnchorVerdict[]): string {
   const lines: string[] = [];
   lines.push(`# Harde Dimensie Eval — judge-queue (${ts})`);
   lines.push('');
   lines.push(`${items.length} (case × versie) items die Claude-judge (Laag 2) vereisen.`);
   lines.push('');
   lines.push(FIXED_RUBRIC.replace(/<ts>/g, ts));
+  const anchorSection = buildAnchorSection(anchors);
+  if (anchorSection) {
+    lines.push('');
+    lines.push(anchorSection);
+  }
   lines.push('');
   lines.push('---');
 
@@ -381,6 +404,12 @@ async function main(): Promise<void> {
   const fixture = JSON.parse(fixtureRaw) as HardCaseFile;
   const cases = fixture.cases;
 
+  // Rubric-anchoring (Groep 4): laad gouden anker-verdicts indien aanwezig.
+  const anchorsPath = join(process.cwd(), 'eval-fixtures', 'hard-eval-anchors.json');
+  const anchors: AnchorVerdict[] = existsSync(anchorsPath)
+    ? (JSON.parse(readFileSync(anchorsPath, 'utf8')) as AnchorsFile).anchors
+    : [];
+
   type Job = { c: HardCase; version: string };
   const jobs: Job[] = [];
   for (const v of versions) for (const c of cases) jobs.push({ c, version: v });
@@ -427,7 +456,7 @@ async function main(): Promise<void> {
   const resultsPath = join(dir, `${ts}-results.json`);
   const queuePath = join(dir, `${ts}-judge-queue.md`);
   writeFileSync(resultsPath, JSON.stringify(results, null, 2), 'utf8');
-  writeFileSync(queuePath, buildJudgeQueue(ts, judgeItems), 'utf8');
+  writeFileSync(queuePath, buildJudgeQueue(ts, judgeItems, anchors), 'utf8');
 
   const cat = verdicts.filter((v) => v.catastrophic).length;
   const l1pass = verdicts.filter((v) => v.layer1Pass).length;

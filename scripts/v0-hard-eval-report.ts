@@ -20,12 +20,15 @@ import type {
   DeterministicVerdict,
   HardDimension,
   HardCaseFile,
+  StatusFlip,
 } from '../lib/v0/server/hard-eval-checks';
 import {
   finalCaseStatus,
   computeProductionGate,
   computeOperationalMetrics,
   computeRefusalCalibration,
+  computeRegressionDiff,
+  unstableCases,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
 } from '../lib/v0/server/hard-eval-checks';
@@ -87,6 +90,25 @@ if (existsSync(verdictsPath)) {
   const vf = JSON.parse(readFileSync(verdictsPath, 'utf8')) as VerdictsFile;
   judgeByKey = new Map(vf.verdicts.map((v) => [`${v.caseId}::${v.version}`, v]));
   judgeLoaded = true;
+}
+
+// Regressie-diff (Groep 4): vergelijk met een opgegeven groene baseline-run.
+const baselineTs = parseStringArg('baseline');
+let regressionFlips: StatusFlip[] | null = null;
+if (baselineTs) {
+  const baseResultsPath = join(dir, `${baselineTs}-results.json`);
+  if (!existsSync(baseResultsPath)) fail(`Baseline niet gevonden: ${baseResultsPath}`);
+  const baseResults = JSON.parse(readFileSync(baseResultsPath, 'utf8')) as ResultsFile;
+  const baseVerdictsPath = join(dir, `${baselineTs}-verdicts.json`);
+  const baseJudge = existsSync(baseVerdictsPath)
+    ? new Map(
+        (JSON.parse(readFileSync(baseVerdictsPath, 'utf8')) as VerdictsFile).verdicts.map((v) => [
+          `${v.caseId}::${v.version}`,
+          v,
+        ]),
+      )
+    : new Map<string, JudgeVerdict>();
+  regressionFlips = computeRegressionDiff(results.verdicts, judgeByKey, baseResults.verdicts, baseJudge);
 }
 
 // finalCaseStatus + computeProductionGate komen uit hard-eval-checks.ts (Laag 0).
@@ -246,6 +268,46 @@ for (const c of calib) {
   const over = c.overRefusalRate === null ? '-' : `${c.overRefusals}/${c.answerableTotal} = ${Math.round(c.overRefusalRate * 100)}%`;
   const under = c.underRefusalRate === null ? '-' : `${c.underRefusals}/${c.outOfCorpusTotal} = ${Math.round(c.underRefusalRate * 100)}%`;
   md.push(`| ${c.version} | ${over} | ${under} |`);
+}
+md.push('');
+
+// Regressie-diff (Groep 4) — alleen als --baseline opgegeven.
+if (regressionFlips) {
+  const regressions = regressionFlips.filter((f) => f.kind === 'regression');
+  const improvements = regressionFlips.filter((f) => f.kind === 'improvement');
+  md.push(`## Regressie-diff (vs baseline \`${baselineTs}\`)`);
+  md.push('');
+  md.push(
+    `_${regressions.length} regressie(s) (pass→fail), ${improvements.length} verbetering(en) (fail→pass). Alleen bevestigde flips; PENDING/absent tellen niet._`,
+  );
+  md.push('');
+  if (regressions.length === 0 && improvements.length === 0) {
+    md.push('✓ Geen status-flips t.o.v. de baseline.');
+  } else {
+    md.push('| case | versie | dim | van | naar | type |');
+    md.push('|------|--------|-----|-----|------|------|');
+    for (const f of [...regressions, ...improvements]) {
+      const mark = f.kind === 'regression' ? '❌ regressie' : '✅ verbetering';
+      md.push(`| ${f.caseId} | ${f.version} | ${f.dimension} | ${f.from} | ${f.to} | ${mark} |`);
+    }
+  }
+  md.push('');
+}
+
+// Stabiliteit (multi-run, Groep 4)
+const unstable = unstableCases(results.verdicts);
+md.push('## Stabiliteit (multi-run)');
+md.push('');
+md.push('_Cases die N× gedraaid zijn (`selfConsistencyRuns`/`--multi-run`) en op de consistency-check zakten = instabiel verdict (bot-gen-ruis). Leeg = geen multi-run of alles stabiel._');
+md.push('');
+if (unstable.length === 0) {
+  md.push('✓ Geen instabiele cases.');
+} else {
+  md.push('| case | versie | dim | divergentie |');
+  md.push('|------|--------|-----|-------------|');
+  for (const v of unstable) {
+    md.push(`| ${v.caseId} | ${v.version} | ${v.dimension} | ${v.checks.consistency?.detail ?? 'inconsistent'} |`);
+  }
 }
 md.push('');
 
