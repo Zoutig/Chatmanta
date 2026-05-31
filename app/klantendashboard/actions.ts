@@ -13,12 +13,13 @@ import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org'
 import { requireV0Auth } from '@/app/actions/_auth';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import {
+  createAnswer,
   getActiveQuizForOrg,
-  getAnswerForQuestion,
   getQuestion,
   listAnswers,
   listQuestions,
-  recordAnswer,
+  QuizAnswerExistsError,
+  setAnswerIngestedDoc,
   setQuizStatus,
   updateQuizCounts,
 } from '@/lib/controlroom/server/quiz';
@@ -289,9 +290,6 @@ export async function submitQuizAnswerAction(
       fail('NOT_FOUND', 'Vraag niet gevonden.');
     }
     if (question.verwijderd || !question.goedgekeurd) fail('INPUT_INVALID', 'Deze vraag is niet beschikbaar.');
-    // Idempotent: een al beantwoorde/overgeslagen vraag niet opnieuw verwerken
-    // (voorkomt dubbele KB-documenten + embed-kosten bij dubbelklik/replay).
-    if (await getAnswerForQuestion(question.id)) fail('INPUT_INVALID', 'Deze vraag is al beantwoord.');
     // Meerkeuze: valideer de keuze tegen de goedgekeurde opties (geen forged
     // optie-tekst de KB in). 'Anders' valt buiten de lijst en heeft vrije tekst.
     if (question.type === 'meerkeuze' && !payload.skip) {
@@ -301,10 +299,11 @@ export async function submitQuizAnswerAction(
       }
     }
 
+    // Bepaal het (geredacteerde) antwoord — PII-redactie AAN DE POORT, zodat ruwe
+    // PII nooit in de KB of in admin_quiz_answer belandt.
     let antwoord: string | null = null;
     let meerkeuzeOptie: string | null = null;
     let andersTekst: string | null = null;
-    let ingestedDocumentId: string | null = null;
     let redacted = false;
 
     if (!payload.skip) {
@@ -318,39 +317,46 @@ export async function submitQuizAnswerAction(
       } else {
         antwoord = (payload.antwoord ?? '').trim().slice(0, QUIZ_ANSWER_MAX) || null;
       }
-
       if (antwoord && antwoord.length > 0) {
-        // PII-redactie AAN DE POORT — ruwe PII komt nooit in de KB of in admin_quiz_answer.
         const safe = redactPii(antwoord);
         redacted = safe !== antwoord;
         antwoord = safe;
         if (andersTekst) andersTekst = redactPii(andersTekst);
-        try {
-          const res = await ingestText({
-            filename: `Quiz-antwoord · ${question.categorieLabel ?? question.categorie}`,
-            text: `Vraag: ${question.vraag}\nAntwoord: ${safe}`,
-            organizationId: activeOrg.id,
-            metadata: { origin: 'quiz', quiz_id: quiz.id, question_id: question.id, label: 'quiz-antwoord' },
-          });
-          ingestedDocumentId = res.docId;
-        } catch (e) {
-          // Ingest is niet-transactioneel; een fout mag het antwoord-opslaan niet
-          // blokkeren. We loggen het gat; de operator ziet het antwoord wél terug.
-          console.error('[submitQuizAnswer] ingest faalde', (e as Error).message);
-        }
       }
     }
 
-    await recordAnswer({
+    // Atomic claim VÓÓR de ingest: UNIQUE(question_id) is de echte idempotentie-
+    // grens. Een gelijktijdige tweede submit/replay verliest hier (23505) en
+    // bereikt de dure ingest dus nooit — geen dubbele KB-documenten.
+    const answer = await createAnswer({
       quizId: quiz.id,
       questionId: question.id,
       organizationId: activeOrg.id,
       antwoord, // null = overgeslagen (of meerkeuze zonder keuze)
       meerkeuzeOptie,
       andersTekst,
-      ingestedDocumentId,
       redacted,
+    }).catch((e) => {
+      if (e instanceof QuizAnswerExistsError) fail('INPUT_INVALID', 'Deze vraag is al beantwoord.');
+      throw e;
     });
+
+    // Pas ná de geslaagde claim ingesten (alleen de winnaar komt hier, één keer).
+    if (antwoord && antwoord.length > 0) {
+      try {
+        const res = await ingestText({
+          filename: `Quiz-antwoord · ${question.categorieLabel ?? question.categorie}`,
+          text: `Vraag: ${question.vraag}\nAntwoord: ${antwoord}`,
+          organizationId: activeOrg.id,
+          metadata: { origin: 'quiz', quiz_id: quiz.id, question_id: question.id, label: 'quiz-antwoord' },
+        });
+        await setAnswerIngestedDoc(answer.id, res.docId);
+      } catch (e) {
+        // Ingest is niet-transactioneel; een fout mag het opgeslagen antwoord niet
+        // terugdraaien. We loggen het gat; de operator ziet het antwoord wél terug.
+        console.error('[submitQuizAnswer] ingest faalde', (e as Error).message);
+      }
+    }
 
     // Tellingen bijwerken + bepalen of de quiz klaar is (resume-cursor = eerste
     // onbeantwoorde actieve vraag).

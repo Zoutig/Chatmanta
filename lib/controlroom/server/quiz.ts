@@ -347,6 +347,21 @@ export async function updateQuizCounts(
   if (error) throw new Error(`updateQuizCounts: ${error.message}`);
 }
 
+/** Flip status naar 'concept' of 'leeg', maar ALLEEN als de quiz nog 'generating'
+ *  is (atomic conditional update: .eq('status','generating')). Voorkomt dat een
+ *  afgebroken/geannuleerde run zijn status terugzet (cancel-tijdens-generating-race).
+ *  Returnt of er daadwerkelijk geflipt is. */
+export async function completeGeneratingQuiz(id: string, target: 'concept' | 'leeg'): Promise<boolean> {
+  const { data, error } = await sb()
+    .from(TABLE)
+    .update({ status: target })
+    .eq('id', id)
+    .eq('status', 'generating')
+    .select('id');
+  if (error) throw new Error(`completeGeneratingQuiz: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
 /** Wacht-op-goedkeuring count voor de operator-sidebar-badge (cheap COUNT). */
 export async function getQuizSummary(): Promise<QuizSummary> {
   const { count } = await sb()
@@ -432,44 +447,53 @@ export async function softDeleteQuestion(quizId: string, id: string): Promise<vo
 
 // ── Antwoorden ───────────────────────────────────────────────────────────
 
-/** Sla een klant-antwoord op (idempotent via UNIQUE question_id → upsert).
- *  antwoord=null betekent overgeslagen. Org wordt door de caller gezet. */
-export async function recordAnswer(input: {
+/** Geworpen wanneer een vraag al een antwoord-rij heeft (UNIQUE(question_id) → 23505).
+ *  De caller behandelt dit als "al beantwoord" (idempotentie). */
+export class QuizAnswerExistsError extends Error {
+  constructor(public readonly questionId: string) {
+    super(`Antwoord bestaat al voor vraag ${questionId}`);
+    this.name = 'QuizAnswerExistsError';
+  }
+}
+
+/** Claim (INSERT) een antwoord-rij. De UNIQUE(question_id)-index is de ECHTE
+ *  idempotentie-grens: bij een gelijktijdige tweede submit faalt de insert met
+ *  23505 → QuizAnswerExistsError, zodat de caller de (dure) ingest overslaat.
+ *  antwoord=null = overgeslagen. Org wordt door de caller gezet (nooit client-payload). */
+export async function createAnswer(input: {
   quizId: string;
   questionId: string;
   organizationId: string;
   antwoord?: string | null;
   meerkeuzeOptie?: string | null;
   andersTekst?: string | null;
-  ingestedDocumentId?: string | null;
   redacted?: boolean;
 }): Promise<QuizAnswer> {
   const { data, error } = await sb()
     .from(ANSWERS)
-    .upsert(
-      {
-        quiz_id: input.quizId,
-        question_id: input.questionId,
-        organization_id: input.organizationId,
-        antwoord: input.antwoord ?? null,
-        meerkeuze_optie: input.meerkeuzeOptie ?? null,
-        anders_tekst: input.andersTekst ?? null,
-        ingested_document_id: input.ingestedDocumentId ?? null,
-        redacted: input.redacted ?? false,
-      },
-      { onConflict: 'question_id' },
-    )
+    .insert({
+      quiz_id: input.quizId,
+      question_id: input.questionId,
+      organization_id: input.organizationId,
+      antwoord: input.antwoord ?? null,
+      meerkeuze_optie: input.meerkeuzeOptie ?? null,
+      anders_tekst: input.andersTekst ?? null,
+      redacted: input.redacted ?? false,
+    })
     .select('*')
     .single();
-  if (error || !data) throw new Error(`recordAnswer: ${error?.message ?? 'no row'}`);
+  if (error || !data) {
+    if (error?.code === '23505') throw new QuizAnswerExistsError(input.questionId);
+    throw new Error(`createAnswer: ${error?.message ?? 'no row'}`);
+  }
   return mapAnswer(data as AnswerRow);
 }
 
-/** Bestaand antwoord voor een vraag (idempotentie-check). Null = nog niet beantwoord. */
-export async function getAnswerForQuestion(questionId: string): Promise<QuizAnswer | null> {
-  const { data, error } = await sb().from(ANSWERS).select('*').eq('question_id', questionId).maybeSingle();
-  if (error || !data) return null;
-  return mapAnswer(data as AnswerRow);
+/** Koppel het via ingestText aangemaakte documents-record aan de antwoord-rij.
+ *  Best-effort: het antwoord is al opgeslagen, dus een mislukte update mag niet falen. */
+export async function setAnswerIngestedDoc(answerId: string, documentId: string): Promise<void> {
+  const { error } = await sb().from(ANSWERS).update({ ingested_document_id: documentId }).eq('id', answerId);
+  if (error) console.error('[setAnswerIngestedDoc]', error.message);
 }
 
 export async function listAnswers(quizId: string): Promise<QuizAnswer[]> {

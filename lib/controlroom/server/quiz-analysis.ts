@@ -27,11 +27,11 @@ import type {
 } from '@/lib/controlroom/types';
 import { sb } from './db';
 import {
+  completeGeneratingQuiz,
   insertQuestions,
   recordQuizEvent,
   setQuizAnalysis,
   setQuizError,
-  setQuizStatus,
   updateQuizCounts,
 } from './quiz';
 
@@ -154,15 +154,18 @@ async function deriveContext(sample: string): Promise<DeriveResult> {
     return { context: {}, dynamicCategories: [], inputTokens: 0, outputTokens: 0 };
   }
   const system =
-    'Je bent een analist die bedrijven indeelt voor een klantenservice-chatbot. ' +
+    'Je bent een analist die een klantenservice-chatbot helpt verbeteren. ' +
     'Je krijgt een steekproef uit de kennisbank van een bedrijf. Bepaal de branche, ' +
-    'een korte beschrijving en de doelgroep, en bedenk 2 tot 4 EXTRA informatie-categorieën ' +
-    'die juist voor DIT type bedrijf belangrijk zijn voor een chatbot — naast de standaard ' +
-    '(diensten, prijzen, doelgroep, veelgestelde vragen, openingstijden, contact, beleid). ' +
-    'Voorbeeld fysiotherapie: behandelmethoden, verwijzing huisarts, zorgverzekeraars. ' +
+    'een korte beschrijving en de doelgroep. Bedenk daarna 2 tot 4 EXTRA informatie-categorieën ' +
+    'die een KLANT van dít type bedrijf typisch zou willen weten — gebruik je algemene kennis ' +
+    'van de branche, NIET alleen wat er in de steekproef staat. Juist onderwerpen die in de ' +
+    'steekproef lijken te ONTBREKEN zijn waardevol: het doel is gaten vinden, niet beschrijven ' +
+    'wat er al is. Sla de standaard-categorieën over (diensten, prijzen, doelgroep, ' +
+    'veelgestelde vragen, openingstijden, contact, beleid). Voorbeeld fysiotherapie: ' +
+    'behandelmethoden, verwijzing huisarts, vergoeding zorgverzekeraar. ' +
     'Antwoord uitsluitend met JSON: {"branche": string, "beschrijving": string, ' +
     '"doelgroep": string, "extra_categorieen": [{"label": string, "zoekzin": string}]}. ' +
-    'De zoekzin is een korte Nederlandse zin waarmee je in de kennisbank zou checken of die info aanwezig is.';
+    'De zoekzin is een korte Nederlandse zin waarmee je in de kennisbank checkt of die info aanwezig is.';
   const { data, inputTokens, outputTokens } = await chatJson<DeriveJson>({
     model: AUX_MODEL,
     system,
@@ -393,7 +396,7 @@ export async function analyzeKnowledgeBase(input: {
       await setQuizAnalysis(quizId, { bedrijfscontext, analyseCostUsd, generationCostUsd: 0 });
       await updateQuizCounts(quizId, { questionCount: 0 });
       await recordQuizEvent(quizId, { kind: 'generated', body: '0 gaten — kennisbank lijkt volledig', author: 'systeem' });
-      await setQuizStatus(quizId, 'leeg');
+      await completeGeneratingQuiz(quizId, 'leeg'); // conditional: niet als tussentijds geannuleerd
       return { status: 'leeg', questionCount: 0, analyseCostUsd, generationCostUsd: 0 };
     }
 
@@ -406,7 +409,7 @@ export async function analyzeKnowledgeBase(input: {
       await setQuizAnalysis(quizId, { bedrijfscontext, analyseCostUsd, generationCostUsd });
       await updateQuizCounts(quizId, { questionCount: 0 });
       await recordQuizEvent(quizId, { kind: 'generated', body: 'generatie gaf 0 vragen', author: 'systeem' });
-      await setQuizStatus(quizId, 'leeg');
+      await completeGeneratingQuiz(quizId, 'leeg'); // conditional: niet als tussentijds geannuleerd
       return { status: 'leeg', questionCount: 0, analyseCostUsd, generationCostUsd };
     }
 
@@ -414,7 +417,7 @@ export async function analyzeKnowledgeBase(input: {
     await setQuizAnalysis(quizId, { bedrijfscontext, analyseCostUsd, generationCostUsd });
     await updateQuizCounts(quizId, { questionCount: gen.questions.length });
     await recordQuizEvent(quizId, { kind: 'generated', meta: { questionCount: gen.questions.length }, author: 'systeem' });
-    await setQuizStatus(quizId, 'concept');
+    await completeGeneratingQuiz(quizId, 'concept'); // conditional: niet als tussentijds geannuleerd
 
     return { status: 'concept', questionCount: gen.questions.length, analyseCostUsd, generationCostUsd };
   } catch (e) {
