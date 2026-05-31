@@ -156,6 +156,7 @@ export async function setFeedbackAttachment(id: string, path: string, name: stri
 export async function listFeedback(filter: FeedbackFilter = {}): Promise<FeedbackItem[]> {
   let q = sb().from(TABLE).select('*').order('created_at', { ascending: false }).limit(200);
   if (filter.status) q = q.eq('status', filter.status);
+  if (filter.statuses && filter.statuses.length) q = q.in('status', filter.statuses as string[]);
   if (filter.type) q = q.eq('type', filter.type);
   if (filter.urgency) q = q.eq('urgency', filter.urgency);
   if (filter.source) q = q.eq('source', filter.source);

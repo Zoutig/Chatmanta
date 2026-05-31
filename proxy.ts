@@ -23,6 +23,9 @@ export const config = {
   // Vercel-cron-route. Die laatste heeft geen login-cookie (Vercel roept 'm
   // server-side aan) en beveiligt zichzelf via CRON_SECRET in de route-handler —
   // zou anders naar /login omgeleid worden en nooit draaien.
+  // /privacy is een publieke privacyverklaring (gelinkt vanuit het feedback-
+  // formulier) en MOET zonder demo-login bereikbaar zijn. Segment-geankerd
+  // (`privacy(?:/|$)`) zodat alleen /privacy zelf de gate omzeilt.
   // /embed/* en de publieke API-paden (chat + feedback + widget-ping/token) gaan
   // NIET door de login-redirect: ze worden vanaf externe pagina's geladen zonder
   // demo-cookie. Die routes doen zelf dual-auth (cookie OF embed-token +
@@ -35,6 +38,6 @@ export const config = {
   // Segment-geankerd (`crawl-eval(?:/|$)`) zodat ALLEEN het exacte pad-segment de
   // gate omzeilt — niet een toekomstig /crawl-evaluation o.i.d. (Codex-review).
   matcher: [
-    '/((?!login|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|privacy(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };

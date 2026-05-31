@@ -17,11 +17,14 @@ import {
   DESCRIPTION_MIN,
 } from '@/lib/controlroom/feedback-validate';
 
-const URGENCY_OPTIONS: { value: FeedbackUrgency; label: string; help: string; emoji: string }[] = [
-  { value: 'low', label: 'Laag', help: 'Geen haast, wanneer het uitkomt', emoji: '🟢' },
-  { value: 'normal', label: 'Normaal', help: 'Graag binnen een paar dagen', emoji: '🟡' },
-  { value: 'high', label: 'Hoog', help: 'De chatbot werkt niet of geeft ernstig onjuiste info', emoji: '🔴' },
+const URGENCY_OPTIONS: { value: FeedbackUrgency; label: string; help: string }[] = [
+  { value: 'low', label: 'Laag', help: 'Geen haast, wanneer het uitkomt' },
+  { value: 'normal', label: 'Normaal', help: 'Graag binnen een paar dagen' },
+  { value: 'high', label: 'Hoog', help: 'De chatbot werkt niet of geeft ernstig onjuiste info' },
 ];
+
+// Spiegelt de server-side EMAIL_RE in lib/controlroom/feedback-validate.ts.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function Field({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: ReactNode }) {
   return (
@@ -38,14 +41,22 @@ export function FeedbackForm() {
   const [type, setType] = useState<FeedbackType | ''>('');
   const [urgency, setUrgency] = useState<FeedbackUrgency | ''>('');
   const [description, setDescription] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [privacy, setPrivacy] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const emailOk = EMAIL_RE.test(email.trim());
   const canSubmit =
-    type !== '' && urgency !== '' && description.trim().length >= DESCRIPTION_MIN && privacy;
+    type !== '' &&
+    urgency !== '' &&
+    description.trim().length >= DESCRIPTION_MIN &&
+    name.trim().length > 0 &&
+    emailOk &&
+    privacy;
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -99,6 +110,8 @@ export function FeedbackForm() {
               setType('');
               setUrgency('');
               setDescription('');
+              setName('');
+              setEmail('');
               setPrivacy(false);
               setFileName(null);
               setDone(false);
@@ -157,7 +170,7 @@ export function FeedbackForm() {
               />
               <span style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--klant-ink)' }}>
-                  {o.emoji} {o.label}
+                  {o.label}
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--klant-muted)' }}>{o.help}</span>
               </span>
@@ -184,11 +197,30 @@ export function FeedbackForm() {
       </Field>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-        <Field label="Naam (optioneel)" htmlFor="fb-name">
-          <input id="fb-name" name="name" className="klant-input" placeholder="Jouw naam" autoComplete="name" />
+        <Field label="Naam" htmlFor="fb-name">
+          <input
+            id="fb-name"
+            name="name"
+            className="klant-input"
+            placeholder="Jouw naam"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
         </Field>
-        <Field label="E-mailadres (optioneel)" hint="Voor een eventuele reactie." htmlFor="fb-email">
-          <input id="fb-email" name="email" type="email" className="klant-input" placeholder="jouw@bedrijf.nl" autoComplete="email" />
+        <Field label="E-mailadres" hint="Voor een reactie op je melding." htmlFor="fb-email">
+          <input
+            id="fb-email"
+            name="email"
+            type="email"
+            className="klant-input"
+            placeholder="jouw@bedrijf.nl"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </Field>
       </div>
 
@@ -225,7 +257,7 @@ export function FeedbackForm() {
           />
         </label>
         {fileName && (
-          <span style={{ fontSize: 12.5, color: 'var(--klant-muted)', marginTop: 4 }}>📎 {fileName}</span>
+          <span style={{ fontSize: 12.5, color: 'var(--klant-muted)', marginTop: 4 }}>{fileName}</span>
         )}
       </Field>
 
@@ -240,7 +272,7 @@ export function FeedbackForm() {
         />
         <span>
           Ik ga akkoord met de{' '}
-          <a href="https://chatmanta.nl/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--klant-accent)' }}>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--klant-accent)' }}>
             privacyverklaring
           </a>{' '}
           van ChatManta.

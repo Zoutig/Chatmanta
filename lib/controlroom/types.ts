@@ -234,6 +234,7 @@ export const FEEDBACK_TYPES = [
   'dashboard',
   'feedback',
   'wens',
+  'anders',
 ] as const;
 export type FeedbackType = (typeof FEEDBACK_TYPES)[number];
 
@@ -243,6 +244,7 @@ export const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   dashboard: 'Dashboard / portaalprobleem',
   feedback: 'Algemene feedback',
   wens: 'Suggestie of wens',
+  anders: 'Anders',
 };
 
 export const FEEDBACK_URGENCIES = ['low', 'normal', 'high'] as const;
@@ -278,6 +280,15 @@ export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
   opgelost: 'Opgelost',
   gesloten: 'Gesloten',
 };
+
+/** Actieve (open) statussen — de standaardweergave van de operator-inbox. */
+export const FEEDBACK_ACTIVE_STATUSES: readonly FeedbackStatus[] = ['nieuw', 'in_behandeling'];
+/** Afgehandelde statussen — verborgen uit de standaardlijst, zichtbaar onder "Afgehandeld". */
+export const FEEDBACK_CLOSED_STATUSES: readonly FeedbackStatus[] = ['opgelost', 'gesloten'];
+
+/** Lijst-weergave van de operator-inbox: open / afgehandeld / alles. */
+export const FEEDBACK_VIEWS = ['actief', 'afgehandeld', 'alle'] as const;
+export type FeedbackView = (typeof FEEDBACK_VIEWS)[number];
 
 export const FEEDBACK_SOURCES = ['klantendashboard', 'widget', 'intern', 'systeem'] as const;
 export type FeedbackSource = (typeof FEEDBACK_SOURCES)[number];
@@ -351,6 +362,8 @@ export type FeedbackCreateInput = {
 
 export type FeedbackFilter = {
   status?: FeedbackStatus;
+  /** Filter op een verzameling statussen (IN). Voor de actief/afgehandeld-weergave. */
+  statuses?: readonly FeedbackStatus[];
   type?: FeedbackType;
   urgency?: FeedbackUrgency;
   source?: FeedbackSource;
