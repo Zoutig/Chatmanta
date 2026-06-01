@@ -216,20 +216,82 @@ type JudgeItem = {
 const ALWAYS_HARD = new Set(['canary', 'malformed', 'consistency', 'language']);
 
 // ---------------------------------------------------------------------------
+// Frozen-versie-cache (opt-in `--cache`) — pipeline-fingerprinted.
+//
+// Idee: niet-gewijzigde versies geven hetzelfde antwoord, dus herhaalruns hoeven
+// niet opnieuw te genereren ($0). MAAR: de eval moet altijd HUIDIG bot-gedrag
+// testen. Daarom is de cache-sleutel een hash van (versie + case-input + een
+// PIPELINE-FINGERPRINT). De fingerprint is een content-hash van de bot-pijplijn-
+// bronnen + de geresolved bot-config. Wijzig je iets aan de pipeline of een
+// bot-config → fingerprint verandert → cache-miss → verse generatie. Zo nooit
+// stale. Alleen single-run (frozen) cases worden gecacht; de kandidaat draait
+// multi-run en dus altijd vers.
+// ---------------------------------------------------------------------------
+type RunResult = { response: ChatResponse | null; errCode: string | null; latencyMs: number };
+
+const CACHE_ENABLED = hasFlag('cache');
+const CACHE_DIR = join(process.cwd(), 'eval-out', 'hard', '.cache');
+const PIPELINE_SOURCES = ['rag.ts', 'bots.ts', 'hard-facts.ts', 'rag-decision.ts', 'claims.ts'];
+
+function computePipelineFingerprint(): string {
+  let combined = '';
+  for (const f of PIPELINE_SOURCES) {
+    try {
+      combined += readFileSync(join(process.cwd(), 'lib', 'v0', 'server', f), 'utf8');
+    } catch {
+      // Fail-safe: ontbrekend bronbestand → unieke fingerprint → cache effectief
+      // uit (liever vers genereren dan stil een verkeerde hit serveren).
+      return `nofile:${f}:${Date.now()}`;
+    }
+  }
+  return hashString(combined);
+}
+const PIPELINE_FINGERPRINT = CACHE_ENABLED ? computePipelineFingerprint() : '';
+
+const botConfigHashCache = new Map<string, string>();
+function botConfigHash(version: string): string {
+  let h = botConfigHashCache.get(version);
+  if (h === undefined) {
+    const json = JSON.stringify(resolveBot(version), (_k, v) => (typeof v === 'function' ? v.toString() : v));
+    h = hashString(json ?? '');
+    botConfigHashCache.set(version, h);
+  }
+  return h;
+}
+
+function cacheKey(version: string, c: HardCase, orgId: string): string {
+  const input = hashString(JSON.stringify({ q: c.question, h: c.conversationHistory ?? null, orgId }));
+  return hashString(`${version}|${input}|${PIPELINE_FINGERPRINT}|${botConfigHash(version)}`);
+}
+
+function readCache(key: string): RunResult | null {
+  if (!CACHE_ENABLED) return null;
+  const p = join(CACHE_DIR, `${key}.json`);
+  if (!existsSync(p)) return null;
+  try {
+    return JSON.parse(readFileSync(p, 'utf8')) as RunResult;
+  } catch {
+    return null; // corrupt → behandel als miss
+  }
+}
+
+function writeCache(key: string, r: RunResult): void {
+  if (!CACHE_ENABLED) return;
+  mkdirSync(CACHE_DIR, { recursive: true });
+  writeFileSync(join(CACHE_DIR, `${key}.json`), JSON.stringify(r), 'utf8');
+}
+
+// ---------------------------------------------------------------------------
 // Eval één case voor één versie.
 // ---------------------------------------------------------------------------
 type CaseResult = {
   verdict: DeterministicVerdict | null;
   judgeItem: JudgeItem | null;
   budgetStopped: boolean;
+  cacheHit: boolean;
 };
 
 async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
-  // Harde kostenrem: budget op → deze case NIET genereren (skip, geen kosten).
-  if (spentUsd >= MAX_COST_USD) {
-    return { verdict: null, judgeItem: null, budgetStopped: true };
-  }
-
   const bot = resolveBot(version);
   const orgId = ORG_ID_BY_SLUG[c.orgSlug];
   const history = c.conversationHistory as ChatHistoryTurn[] | undefined;
@@ -243,9 +305,31 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
       (MULTI_RUN_N >= 2 && version === CANDIDATE && eligibleForMultiRun ? MULTI_RUN_N : 1),
   );
 
-  const results: { response: ChatResponse | null; errCode: string | null; latencyMs: number }[] = [];
+  // Alleen single-run (frozen) cases cachen; de kandidaat draait multi-run = vers.
+  const key = CACHE_ENABLED && runs === 1 ? cacheKey(version, c, orgId) : null;
+
+  const results: RunResult[] = [];
+  let cacheHit = false;
   for (let i = 0; i < runs; i++) {
-    results.push(await runBotOnce({ question: c.question, history, bot, orgId }));
+    if (key) {
+      const cached = readCache(key);
+      if (cached) {
+        results.push(cached);
+        cacheHit = true;
+        continue;
+      }
+    }
+    // Verse generatie nodig — de harde kostenrem geldt ALLEEN hier (cache = gratis).
+    if (spentUsd >= MAX_COST_USD) {
+      if (results.length === 0) {
+        return { verdict: null, judgeItem: null, budgetStopped: true, cacheHit: false };
+      }
+      break; // partiële multi-run: gebruik wat we al hebben
+    }
+    const r = await runBotOnce({ question: c.question, history, bot, orgId });
+    results.push(r);
+    spentUsd += r.response?.totalCostUsd ?? 0; // alleen verse gen telt tegen de rem
+    if (key) writeCache(key, r);
   }
 
   const primary = results[0];
@@ -253,7 +337,6 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const kind: HardResponseKind = resp ? resp.kind : 'error';
   const answer = resp?.answer ?? '';
   const botCostUsd = results.reduce((s, r) => s + (r.response?.totalCostUsd ?? 0), 0);
-  spentUsd += botCostUsd; // boek tegen de kostenrem (single-threaded → race-vrij)
   const latencyMs = primary.latencyMs;
   const refused = kind === 'fallback' || kind === 'smalltalk' || looksLikeRefusal(answer);
 
@@ -380,7 +463,7 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
       }
     : null;
 
-  return { verdict, judgeItem, budgetStopped: false };
+  return { verdict, judgeItem, budgetStopped: false, cacheHit };
 }
 
 // ---------------------------------------------------------------------------
@@ -532,7 +615,9 @@ async function main(): Promise<void> {
   const verdicts = out.map((o) => o.verdict).filter((v): v is DeterministicVerdict => v !== null);
   const judgeItems = out.map((o) => o.judgeItem).filter((j): j is JudgeItem => j !== null);
   const budgetStoppedCount = out.filter((o) => o.budgetStopped).length;
-  const totalBotCostUsd = verdicts.reduce((s, v) => s + v.botCostUsd, 0);
+  const cacheHits = out.filter((o) => o.cacheHit).length;
+  // Werkelijke bestede bot-gen ($ deze run) = verse generatie (cache-hits = gratis).
+  const totalBotCostUsd = spentUsd;
   const sec = Math.round((Date.now() - t0) / 100) / 10;
 
   const ts = timestamp();
@@ -552,6 +637,7 @@ async function main(): Promise<void> {
       totalBotCostUsd,
       budgetStopped: budgetStoppedCount,
       maxCostUsd: MAX_COST_USD,
+      cacheHits,
     },
     verdicts,
   };
@@ -572,6 +658,9 @@ async function main(): Promise<void> {
     console.log(`  ⚠ KOSTENREM  : ${budgetStoppedCount} case(s) geskipt — run INCOMPLEET, gate onbetrouwbaar`);
   }
   console.log(`  judge-queue : ${judgeItems.length} items (needsJudge) — versies geanonimiseerd`);
+  if (CACHE_ENABLED) {
+    console.log(`  cache       : ${cacheHits}/${verdicts.length} hits (frozen-versie, $0) — verse gen $${totalBotCostUsd.toFixed(4)}`);
+  }
   console.log(`  bot-gen cost: $${totalBotCostUsd.toFixed(4)} / rem $${MAX_COST_USD.toFixed(2)}`);
   console.log('');
   console.log(`  results     : ${resultsPath}`);
