@@ -18,9 +18,13 @@ import {
   normalizeQuestion,
   selectHarvestCandidates,
   detectLanguage,
+  anonLabels,
+  hashString,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSION,
   QUALITY_DIMENSIONS,
+  ROBUSTNESS_DIMENSIONS,
+  UNDER_REFUSAL_MIN_N,
   type DeterministicVerdict,
   type JudgeVerdict,
   type HardCaseFile,
@@ -249,18 +253,35 @@ check('detectLanguage: EN', detectLanguage('How much does a new roof cost and wh
 check('detectLanguage: geen markers → unknown', detectLanguage('12345 €€€ !!!') === 'unknown', true);
 check('QUALITY_DIMENSIONS = answer-quality+typo+language', QUALITY_DIMENSIONS.includes('answer-quality') && QUALITY_DIMENSIONS.includes('typo') && QUALITY_DIMENSIONS.includes('language'), true);
 
+check('ROBUSTNESS_DIMENSIONS = typo+language (answer-quality NIET)', ROBUSTNESS_DIMENSIONS.includes('typo') && ROBUSTNESS_DIMENSIONS.includes('language') && !ROBUSTNESS_DIMENSIONS.includes('answer-quality'), true);
+
+// Ontpoolde gate: typo/language voeden de drempel NIET meer (advisory robuustheid).
 const gateQ4: DeterministicVerdict[] = [
   dv({ caseId: 'aq', version: 'v', dimension: 'answer-quality', needsJudge: true }),
   dv({ caseId: 'tp', version: 'v', dimension: 'typo', needsJudge: true }),
-  dv({ caseId: 'lg', version: 'v', dimension: 'language', layer1Pass: false }), // taal-fail = quality-fail
+  dv({ caseId: 'lg', version: 'v', dimension: 'language', layer1Pass: false }), // taal-fail = robustness-fail (advisory)
 ];
 const jmQ4 = new Map<string, JudgeVerdict>([
   ['aq::v', { caseId: 'aq', version: 'v', nuance: { correctness: 'pass', completeness: 'pass' }, overall: 'pass', reason: '' }],
   ['tp::v', { caseId: 'tp', version: 'v', nuance: { correctness: 'pass', completeness: 'pass' }, overall: 'pass', reason: '' }],
 ]);
 const gq4 = computeProductionGate(gateQ4, jmQ4, { qualityThreshold: 0.9 })[0];
-check('gate: typo+language tellen in quality (3 totaal)', gq4.qualityTotal === 3, true);
-check('gate: language layer1-fail = quality-fail (2/3 < drempel → false)', gq4.productionReady === false, true);
+check('gate (ontpoold): alleen answer-quality in quality-drempel (qualityTotal=1)', gq4.qualityTotal === 1, true);
+check('gate (ontpoold): typo+language in robustness (total=2, pass=1)', gq4.robustnessTotal === 2 && gq4.robustnessPass === 1, true);
+check('gate (ontpoold): language layer1-fail blokkeert de gate NIET (advisory)', gq4.productionReady === true, true);
+
+// --- eval-hardening pure helpers: hashString + anonLabels --------------------
+check('hashString: deterministisch (zelfde input → zelfde hash)', hashString('abc') === hashString('abc'), true);
+check('hashString: verschillende input → verschillende hash', hashString('abc') !== hashString('abd'), true);
+check('hashString: 8-hex output', /^[0-9a-f]{8}$/.test(hashString('willekeurige tekst')), true);
+check('UNDER_REFUSAL_MIN_N = 8', UNDER_REFUSAL_MIN_N === 8, true);
+
+const al = anonLabels(['v0.8.1', 'v0.9.1', 'v0.9.2'], 12345);
+check('anonLabels: alle versies gemapt', al.size === 3, true);
+check('anonLabels: labels zijn permutatie van A/B/C', [...al.values()].sort().join('') === 'ABC', true);
+check('anonLabels: bijectief (unieke labels)', new Set(al.values()).size === 3, true);
+check('anonLabels: deterministisch per seed', JSON.stringify([...anonLabels(['a', 'b', 'c'], 7)]) === JSON.stringify([...anonLabels(['a', 'b', 'c'], 7)]), true);
+check('anonLabels: één versie → A', anonLabels(['solo'], 99).get('solo') === 'A', true);
 
 // --- fixture-validatie (hard-dimension-cases.json) --------------------------
 const fixture = JSON.parse(
