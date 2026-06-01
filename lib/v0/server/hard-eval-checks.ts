@@ -327,15 +327,38 @@ export const UNDER_REFUSAL_MIN_N = 8;
 
 export type FinalStatus = 'pass' | 'fail' | 'pending';
 
+/** Checks die ALTIJD hard gaten (ook op judge-cases) — geen false-positive-risico. */
+export const HARD_GATE_CHECKS = new Set(['canary', 'malformed', 'consistency', 'language']);
+
+/** De runner draait de KANDIDAAT multi-run (stabiliteit) en zet dan een
+ *  consistency-check. Die check is bedoeld als hard veto voor de `consistency`-
+ *  DIMENSIE (zelfde vraag → zelfde harde feiten), maar op een ANDERE dimensie is
+ *  een harde-feit-divergentie tussen stochastische runs slechts een stabiliteits-
+ *  SIGNAAL — geen reden om een inhoudelijk correct antwoord te laten zakken (zie
+ *  SPEC: multi-run = advisory). Deze helper detecteert het geval waarin layer1
+ *  ALLEEN op zo'n advisory-consistency zakte, zodat finalCaseStatus 'm niet als
+ *  fail telt. (Robuust t.o.v. de in de runner gebakken layer1Pass — werkt ook op
+ *  bestaande results.json.) */
+function onlyAdvisoryConsistencyFailed(v: DeterministicVerdict): boolean {
+  const failingGating = Object.entries(v.checks).filter(
+    ([name, c]) => !c.pass && (HARD_GATE_CHECKS.has(name) || !v.needsJudge),
+  );
+  return (
+    failingGating.length > 0 &&
+    failingGating.every(([name]) => name === 'consistency' && v.dimension !== 'consistency')
+  );
+}
+
 /** Eind-status van één case:
- *  - layer1 hard-fail → 'fail'
+ *  - layer1 hard-fail → 'fail' (behalve als dat puur een advisory multi-run-
+ *    consistency-divergentie was — zie onlyAdvisoryConsistencyFailed)
  *  - needsJudge zonder geladen verdict → 'pending'
  *  - anders: de judge-overall (of 'pass' als geen judge nodig). */
 export function finalCaseStatus(
   v: DeterministicVerdict,
   judgeByKey: Map<string, JudgeVerdict>,
 ): FinalStatus {
-  if (!v.layer1Pass) return 'fail';
+  if (!v.layer1Pass && !onlyAdvisoryConsistencyFailed(v)) return 'fail';
   if (v.needsJudge) {
     const j = judgeByKey.get(`${v.caseId}::${v.version}`);
     if (!j) return 'pending';

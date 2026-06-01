@@ -442,7 +442,14 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const needsJudge = !!c.needsJudge;
   // Voor judge-cases gaten alléén de ALWAYS_HARD-checks; voor non-judge cases
   // gaten alle aanwezige checks (er is dan geen judge om de nuance te wegen).
-  const gating = Object.entries(checks).filter(([name]) => ALWAYS_HARD.has(name) || !needsJudge);
+  // UITZONDERING: een consistency-divergentie op een NIET-consistency-dimensie is
+  // multi-run-stabiliteits-ruis (advisory), geen harde fail — anders zakt de
+  // kandidaat op normale formulerings-variantie van harde feiten (SPEC: advisory).
+  const gating = Object.entries(checks).filter(
+    ([name]) =>
+      (ALWAYS_HARD.has(name) || !needsJudge) &&
+      !(name === 'consistency' && c.dimension !== 'consistency'),
+  );
   const layer1Pass = gating.length === 0 ? kind !== 'error' : gating.every(([, c2]) => c2.pass);
   // Catastrofaal = alléén de gates zonder false-positive-risico.
   const catastrophic =

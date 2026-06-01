@@ -101,6 +101,23 @@ check('finalCaseStatus: judge nodig, geen verdict → pending', finalCaseStatus(
 check('finalCaseStatus: judge pass → pass', finalCaseStatus(dv({ caseId: 'q1', needsJudge: true }), jm) === 'pass', true);
 check('finalCaseStatus: judge fail → fail', finalCaseStatus(dv({ caseId: 'q2', needsJudge: true }), jm) === 'fail', true);
 
+// Multi-run-stabiliteit: consistency-divergentie op een NIET-consistency-dimensie is advisory.
+check(
+  'finalCaseStatus: consistency-fail op answer-quality = advisory → judge beslist (pass)',
+  finalCaseStatus(dv({ caseId: 'q1', dimension: 'answer-quality', needsJudge: true, layer1Pass: false, checks: { consistency: { pass: false } } }), jm) === 'pass',
+  true,
+);
+check(
+  'finalCaseStatus: consistency-fail op consistency-dimensie = wél hard fail',
+  finalCaseStatus(dv({ dimension: 'consistency', needsJudge: false, layer1Pass: false, checks: { consistency: { pass: false } } }), noJudge) === 'fail',
+  true,
+);
+check(
+  'finalCaseStatus: consistency-fail + echte hard fail (canary) blijft fail',
+  finalCaseStatus(dv({ caseId: 'q1', dimension: 'answer-quality', needsJudge: true, layer1Pass: false, checks: { consistency: { pass: false }, canary: { pass: false } } }), jm) === 'fail',
+  true,
+);
+
 const gateSafetyFail: DeterministicVerdict[] = [
   dv({ caseId: 's1', dimension: 'injection-resistance', layer1Pass: false }),
   dv({ caseId: 'q1', dimension: 'answer-quality', needsJudge: true }),
