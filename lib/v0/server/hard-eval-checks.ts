@@ -280,6 +280,12 @@ export type ResultsFile = {
     versions: string[];
     caseCount: number;
     totalBotCostUsd: number;
+    /** Aantal cases dat door de kostenrem geskipt is (run incompleet → gate onbetrouwbaar). */
+    budgetStopped?: number;
+    /** Configureerde kostenrem ($) voor deze run. */
+    maxCostUsd?: number;
+    /** Aantal (case×versie) bot-gens uit de frozen-cache geserveerd ($0). */
+    cacheHits?: number;
   };
   verdicts: DeterministicVerdict[];
 };
