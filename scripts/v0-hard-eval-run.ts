@@ -12,8 +12,11 @@
 // wordt door Claude Code beoordeeld (zie de judge-queue), $0 marginaal.
 //
 // Usage:
-//   npm run eval:hard:run                          # 6 doelversies (v0.6/v0.7.3/v0.8.1/v0.9/v0.9.1/v0.9.2)
-//   npm run eval:hard:run -- --versions=v0.9.1     # 1 versie
+//   npm run eval:hard:run                          # baseline (v0.8.1) + kandidaat (nieuwste)
+//   npm run eval:hard:run -- --all                 # alle geordende versies
+//   npm run eval:hard:run -- --versions=v0.9.1     # expliciete set
+//   npm run eval:hard:run -- --max-cost=1.5        # harde kostenrem (default $2,50)
+//   npm run eval:hard:run -- --no-multi-run        # geen multi-run op de kandidaat
 import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -28,6 +31,8 @@ import {
   selfConsistencyVariance,
   buildAnchorSection,
   detectLanguage,
+  anonLabels,
+  hashString,
   SAFETY_DIMENSIONS,
   type HardCase,
   type HardCaseFile,
@@ -38,7 +43,6 @@ import {
   type AnchorsFile,
 } from '../lib/v0/server/hard-eval-checks';
 
-const DEFAULT_VERSIONS = ['v0.6', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2'];
 const CONCURRENCY = 2;
 
 const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
@@ -69,6 +73,18 @@ function parseIntArg(name: string): number | null {
   return null;
 }
 
+function parseFloatArg(name: string): number | null {
+  for (const arg of process.argv.slice(2)) {
+    const m = arg.match(new RegExp(`^--${name}=([\\d.]+)$`));
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
+function hasFlag(name: string): boolean {
+  return process.argv.slice(2).includes(`--${name}`);
+}
+
 function timestamp(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
@@ -81,14 +97,36 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_
 }
 if (!process.env.OPENAI_API_KEY) fail('Missing OPENAI_API_KEY');
 
+// Default-set = baseline + kandidaat (2 versies) i.p.v. alle versies — scheelt
+// kosten én judge-last. `--all` draait de volledige geordende set; `--versions=`
+// overschrijft expliciet.
+const BASELINE_VERSION = 'v0.8.1';
+const CANDIDATE_VERSION = BOT_VERSIONS_ORDERED[BOT_VERSIONS_ORDERED.length - 1];
 const versionsArg = parseListArg('versions');
-const versions = versionsArg ?? DEFAULT_VERSIONS;
-// --multi-run=N: draai veiligheids-cases N× om verdict-stabiliteit te meten
-// (Groep 4). Opt-in (default uit) zodat de standaard-run niet duurder wordt.
-const MULTI_RUN = parseIntArg('multi-run');
+// Dedupe: dubbele --versions zou de anon-permutatie + per-versie-aggregatie breken.
+const versions = versionsArg
+  ? [...new Set(versionsArg)]
+  : hasFlag('all')
+    ? [...BOT_VERSIONS_ORDERED]
+    : [...new Set([BASELINE_VERSION, CANDIDATE_VERSION])];
 for (const v of versions) {
   if (!(v in BOTS)) fail(`Onbekende bot-versie: ${v}. Bekend: ${BOT_VERSIONS_ORDERED.join(', ')}`);
 }
+
+// Kandidaat = laatste versie in de set (de versie-onder-evaluatie). Krijgt multi-run.
+const CANDIDATE = versions[versions.length - 1];
+
+// Multi-run-stabiliteit: default N=3 op de KANDIDAAT (answer-quality + safety-dims),
+// zodat één temperatuur-run geen vals verdict geeft. Andere versies draaien 1×.
+// `--multi-run=N` overschrijft N; `--no-multi-run` zet het uit.
+const MULTI_RUN_N = hasFlag('no-multi-run') ? 1 : (parseIntArg('multi-run') ?? 3);
+
+// Harde kostenrem (fail-safe): de runner stopt met NIEUWE bot-gen zodra dit bedrag
+// bereikt is, i.p.v. erop te hopen. `--max-cost=<usd>`, default $2,50. Met CONCURRENCY
+// parallelle workers kan de werkelijke spend de cap met ≤CONCURRENCY in-flight
+// generaties overschrijden (~$0,01) — verwaarloosbaar bij de default cap.
+const MAX_COST_USD = parseFloatArg('max-cost') ?? 2.5;
+let spentUsd = 0;
 
 // ---------------------------------------------------------------------------
 // Bot-generatie: consumeer de stream tot het terminale antwoord (mirror van
@@ -139,6 +177,24 @@ function sourceTexts(resp: ChatResponse | null): string[] {
   return [];
 }
 
+// Bronnen die de judge te zien krijgt. Vroeger: top-3 × 420 chars — dat liet de
+// judge grounding/correctness beoordelen tegen een afgekapt beeld (een gegrond
+// feit voorbij bron #3 of teken 420 leek dan "verzonnen"). Nu: ÁLLE opgehaalde
+// bronnen, elk tot 1200 chars, totaal-cap 6000 om de queue leesbaar te houden.
+const JUDGE_SOURCE_PER = 1200;
+const JUDGE_SOURCE_TOTAL = 6000;
+function judgeSources(resp: ChatResponse | null): string[] {
+  const out: string[] = [];
+  let budget = JUDGE_SOURCE_TOTAL;
+  for (const s of sourceTexts(resp)) {
+    if (budget <= 0) break;
+    const clipped = s.slice(0, Math.min(JUDGE_SOURCE_PER, budget));
+    out.push(clipped);
+    budget -= clipped.length;
+  }
+  return out;
+}
+
 type JudgeItem = {
   caseId: string;
   version: string;
@@ -165,23 +221,140 @@ type JudgeItem = {
 const ALWAYS_HARD = new Set(['canary', 'malformed', 'consistency', 'language']);
 
 // ---------------------------------------------------------------------------
+// Frozen-versie-cache (opt-in `--cache`) — pipeline-fingerprinted.
+//
+// Idee: niet-gewijzigde versies geven hetzelfde antwoord, dus herhaalruns hoeven
+// niet opnieuw te genereren ($0). MAAR: de eval moet altijd HUIDIG bot-gedrag
+// testen. Daarom is de cache-sleutel een hash van (versie + case-input + een
+// PIPELINE-FINGERPRINT). De fingerprint is een content-hash van de bot-pijplijn-
+// bronnen + de geresolved bot-config. Wijzig je iets aan de pipeline of een
+// bot-config → fingerprint verandert → cache-miss → verse generatie. Zo nooit
+// stale. Alleen single-run (frozen) cases worden gecacht; de kandidaat draait
+// multi-run en dus altijd vers.
+// ---------------------------------------------------------------------------
+type RunResult = { response: ChatResponse | null; errCode: string | null; latencyMs: number };
+
+const CACHE_ENABLED = hasFlag('cache');
+const CACHE_DIR = join(process.cwd(), 'eval-out', 'hard', '.cache');
+// Bump bij elke wijziging aan het cache-formaat → invalideert alle oude cache-files.
+const CACHE_SCHEMA = 'v2';
+// Alle bronnen op het ANTWOORD-PAD die de gegenereerde output beïnvloeden — niet
+// alleen rag/bots, ook persona/manual-qa/source-links/style/llm. Elke wijziging
+// hieraan bust de cache.
+//   ⚠ De cache dekt CODE, geen DATA: een her-ingest van het corpus verandert
+//   antwoorden ZONDER de fingerprint te raken. Wis `eval-out/hard/.cache/` na een
+//   corpus-wijziging, of draai zonder --cache.
+const PIPELINE_SOURCES = [
+  'lib/v0/server/rag.ts',
+  'lib/v0/server/bots.ts',
+  'lib/v0/server/hard-facts.ts',
+  'lib/v0/server/rag-decision.ts',
+  'lib/v0/server/claims.ts',
+  'lib/v0/server/persona.ts',
+  'lib/v0/server/manual-qa.ts',
+  'lib/v0/server/source-links.ts',
+  'lib/v0/style.ts',
+  'lib/v0/style-types.ts',
+  'lib/ai/llm.ts',
+];
+
+function computePipelineFingerprint(): string {
+  let combined = CACHE_SCHEMA;
+  for (const f of PIPELINE_SOURCES) {
+    try {
+      combined += readFileSync(join(process.cwd(), f), 'utf8');
+    } catch {
+      // Fail-safe: ontbrekend bronbestand → unieke fingerprint → cache effectief
+      // uit (liever vers genereren dan stil een verkeerde hit serveren).
+      return `nofile:${f}:${Date.now()}`;
+    }
+  }
+  return hashString(combined);
+}
+const PIPELINE_FINGERPRINT = CACHE_ENABLED ? computePipelineFingerprint() : '';
+
+const botConfigHashCache = new Map<string, string>();
+function botConfigHash(version: string): string {
+  let h = botConfigHashCache.get(version);
+  if (h === undefined) {
+    const json = JSON.stringify(resolveBot(version), (_k, v) => (typeof v === 'function' ? v.toString() : v));
+    h = hashString(json ?? '');
+    botConfigHashCache.set(version, h);
+  }
+  return h;
+}
+
+function cacheKey(version: string, c: HardCase, orgId: string): string {
+  const input = hashString(JSON.stringify({ q: c.question, h: c.conversationHistory ?? null, orgId }));
+  return hashString(`${version}|${input}|${PIPELINE_FINGERPRINT}|${botConfigHash(version)}`);
+}
+
+function readCache(key: string): RunResult | null {
+  if (!CACHE_ENABLED) return null;
+  const p = join(CACHE_DIR, `${key}.json`);
+  if (!existsSync(p)) return null;
+  try {
+    return JSON.parse(readFileSync(p, 'utf8')) as RunResult;
+  } catch {
+    return null; // corrupt → behandel als miss
+  }
+}
+
+function writeCache(key: string, r: RunResult): void {
+  if (!CACHE_ENABLED) return;
+  mkdirSync(CACHE_DIR, { recursive: true });
+  writeFileSync(join(CACHE_DIR, `${key}.json`), JSON.stringify(r), 'utf8');
+}
+
+// ---------------------------------------------------------------------------
 // Eval één case voor één versie.
 // ---------------------------------------------------------------------------
-async function evaluateCase(
-  c: HardCase,
-  version: string,
-): Promise<{ verdict: DeterministicVerdict; judgeItem: JudgeItem | null }> {
+type CaseResult = {
+  verdict: DeterministicVerdict | null;
+  judgeItem: JudgeItem | null;
+  budgetStopped: boolean;
+  cacheHit: boolean;
+};
+
+async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const bot = resolveBot(version);
   const orgId = ORG_ID_BY_SLUG[c.orgSlug];
   const history = c.conversationHistory as ChatHistoryTurn[] | undefined;
+  // Multi-run alléén voor de KANDIDAAT-versie op answer-quality + safety-dims
+  // (stabiliteit waar het telt; andere versies 1×). selfConsistencyRuns wint.
+  const eligibleForMultiRun =
+    c.dimension === 'answer-quality' || SAFETY_DIMENSIONS.includes(c.dimension);
   const runs = Math.max(
     1,
-    c.selfConsistencyRuns ?? (MULTI_RUN && SAFETY_DIMENSIONS.includes(c.dimension) ? MULTI_RUN : 1),
+    c.selfConsistencyRuns ??
+      (MULTI_RUN_N >= 2 && version === CANDIDATE && eligibleForMultiRun ? MULTI_RUN_N : 1),
   );
 
-  const results: { response: ChatResponse | null; errCode: string | null; latencyMs: number }[] = [];
+  // Alleen single-run (frozen) cases cachen; de kandidaat draait multi-run = vers.
+  const key = CACHE_ENABLED && runs === 1 ? cacheKey(version, c, orgId) : null;
+
+  const results: RunResult[] = [];
+  let cacheHit = false;
   for (let i = 0; i < runs; i++) {
-    results.push(await runBotOnce({ question: c.question, history, bot, orgId }));
+    if (key) {
+      const cached = readCache(key);
+      if (cached) {
+        results.push(cached);
+        cacheHit = true;
+        continue;
+      }
+    }
+    // Verse generatie nodig — de harde kostenrem geldt ALLEEN hier (cache = gratis).
+    if (spentUsd >= MAX_COST_USD) {
+      if (results.length === 0) {
+        return { verdict: null, judgeItem: null, budgetStopped: true, cacheHit: false };
+      }
+      break; // partiële multi-run: gebruik wat we al hebben
+    }
+    const r = await runBotOnce({ question: c.question, history, bot, orgId });
+    results.push(r);
+    spentUsd += r.response?.totalCostUsd ?? 0; // alleen verse gen telt tegen de rem
+    if (key) writeCache(key, r);
   }
 
   const primary = results[0];
@@ -269,7 +442,14 @@ async function evaluateCase(
   const needsJudge = !!c.needsJudge;
   // Voor judge-cases gaten alléén de ALWAYS_HARD-checks; voor non-judge cases
   // gaten alle aanwezige checks (er is dan geen judge om de nuance te wegen).
-  const gating = Object.entries(checks).filter(([name]) => ALWAYS_HARD.has(name) || !needsJudge);
+  // UITZONDERING: een consistency-divergentie op een NIET-consistency-dimensie is
+  // multi-run-stabiliteits-ruis (advisory), geen harde fail — anders zakt de
+  // kandidaat op normale formulerings-variantie van harde feiten (SPEC: advisory).
+  const gating = Object.entries(checks).filter(
+    ([name]) =>
+      (ALWAYS_HARD.has(name) || !needsJudge) &&
+      !(name === 'consistency' && c.dimension !== 'consistency'),
+  );
   const layer1Pass = gating.length === 0 ? kind !== 'error' : gating.every(([, c2]) => c2.pass);
   // Catastrofaal = alléén de gates zonder false-positive-risico.
   const catastrophic =
@@ -310,12 +490,12 @@ async function evaluateCase(
         rubricHint: c.rubricHint,
         answer,
         kind,
-        sources: sourceTexts(resp).slice(0, 3).map((s) => s.slice(0, 420)),
+        sources: judgeSources(resp),
         detSignals,
       }
     : null;
 
-  return { verdict, judgeItem };
+  return { verdict, judgeItem, budgetStopped: false, cacheHit };
 }
 
 // ---------------------------------------------------------------------------
@@ -342,11 +522,20 @@ Schrijf je verdicts naar \`eval-out/hard/<ts>-verdicts.json\` met exact deze vor
 ] }
 \`\`\``;
 
-function buildJudgeQueue(ts: string, items: JudgeItem[], anchors: AnchorVerdict[]): string {
+function buildJudgeQueue(
+  ts: string,
+  items: JudgeItem[],
+  anchors: AnchorVerdict[],
+  anonMap: Map<string, string>,
+): string {
   const lines: string[] = [];
   lines.push(`# Harde Dimensie Eval — judge-queue (${ts})`);
   lines.push('');
   lines.push(`${items.length} (case × versie) items die Claude-judge (Laag 2) vereisen.`);
+  lines.push('');
+  lines.push(
+    '> **Versies zijn geanonimiseerd** (Versie A/B/C) om versie-bias te voorkomen — beoordeel puur op het antwoord, niet op welke versie "het nieuwst" is. Gebruik in het `version`-veld van je verdict het anon-label (A/B/C). De report mapt terug via de keymap.',
+  );
   lines.push('');
   lines.push(FIXED_RUBRIC.replace(/<ts>/g, ts));
   const anchorSection = buildAnchorSection(anchors);
@@ -381,15 +570,22 @@ function buildJudgeQueue(ts: string, items: JudgeItem[], anchors: AnchorVerdict[
       lines.push(`**Waar op te letten:** ${first.rubricHint}`);
     }
     lines.push('');
-    lines.push('**Bron-excerpts (wat de bot zag):**');
-    if (first.sources.length === 0) {
-      lines.push('- _(geen bronnen — fallback/smalltalk/zero-hits)_');
-    } else {
-      for (const s of first.sources) lines.push(`- ${s.replace(/\n+/g, ' ')}`);
-    }
-    lines.push('');
-    for (const it of group) {
-      lines.push(`### ${it.version}  _(kind: ${it.kind})_`);
+    // Sorteer op anon-label zodat de weergave-volgorde de versie-volgorde niet verraadt.
+    const sorted = [...group].sort((a, b) =>
+      (anonMap.get(a.version) ?? a.version).localeCompare(anonMap.get(b.version) ?? b.version),
+    );
+    for (const it of sorted) {
+      const label = anonMap.get(it.version) ?? it.version;
+      lines.push(`### Versie ${label}  _(kind: ${it.kind})_`);
+      lines.push('');
+      // Bronnen PER VERSIE: versies kunnen verschillende chunks ophalen — de judge
+      // moet elke versie tegen HÁÁR eigen bronnen beoordelen, niet die van een ander.
+      lines.push('**Bron-excerpts (wat deze versie zag):**');
+      if (it.sources.length === 0) {
+        lines.push('- _(geen bronnen — fallback/smalltalk/zero-hits)_');
+      } else {
+        for (const s of it.sources) lines.push(`- ${s.replace(/\n+/g, ' ')}`);
+      }
       lines.push('');
       if (it.detSignals.length > 0) {
         lines.push(`_det-signalen (advisory): ${it.detSignals.join(' · ')}_`);
@@ -398,7 +594,7 @@ function buildJudgeQueue(ts: string, items: JudgeItem[], anchors: AnchorVerdict[
       lines.push('```');
       lines.push(it.answer.trim() || '(leeg antwoord)');
       lines.push('```');
-      lines.push(`> verdict ${it.caseId}@${it.version}: nuance={ } overall=? reason="…"`);
+      lines.push(`> verdict ${it.caseId}@${label}: nuance={ } overall=? reason="…"`);
       lines.push('');
     }
     lines.push('---');
@@ -423,48 +619,68 @@ async function main(): Promise<void> {
   for (const v of versions) for (const c of cases) jobs.push({ c, version: v });
 
   console.log('--- Harde Dimensie Eval (Laag 1, deterministisch) ---');
-  console.log(`  versies : ${versions.join(', ')}`);
-  console.log(`  cases   : ${cases.length}`);
-  console.log(`  jobs    : ${jobs.length} (excl. self-consistency-herhalingen)`);
+  console.log(`  versies   : ${versions.join(', ')}`);
+  console.log(`  kandidaat : ${CANDIDATE} (multi-run ${MULTI_RUN_N >= 2 ? `${MULTI_RUN_N}×` : 'uit'} op answer-quality+safety)`);
+  console.log(`  cases     : ${cases.length}`);
+  console.log(`  jobs      : ${jobs.length} (excl. multi-run-herhalingen)`);
+  console.log(`  max-cost  : $${MAX_COST_USD.toFixed(2)} (harde rem)`);
   console.log('');
 
   const t0 = Date.now();
-  const out = await withConcurrency<Job, { verdict: DeterministicVerdict; judgeItem: JudgeItem | null }>(
-    jobs,
-    CONCURRENCY,
-    async (job, idx) => {
-      const tag = `[${idx + 1}/${jobs.length}] ${job.c.id}@${job.version}`;
-      try {
-        const r = await evaluateCase(job.c, job.version);
-        const v = r.verdict;
-        const mark = v.catastrophic ? '🚨CATASTROOF' : v.layer1Pass ? '✓' : '✗';
-        const j = v.needsJudge ? ' →judge' : '';
-        console.log(`  ${mark} ${tag} [${job.c.dimension}] kind=${v.responseKind}${j}`);
+  const out = await withConcurrency<Job, CaseResult>(jobs, CONCURRENCY, async (job, idx) => {
+    const tag = `[${idx + 1}/${jobs.length}] ${job.c.id}@${job.version}`;
+    try {
+      const r = await evaluateCase(job.c, job.version);
+      if (r.budgetStopped) {
+        console.log(`  ⏭ ${tag} [${job.c.dimension}] — kostenrem ($${MAX_COST_USD.toFixed(2)}) bereikt, geskipt`);
         return r;
-      } catch (err) {
-        console.error(`  ✗ ${tag} — ${err instanceof Error ? err.message : String(err)}`);
-        throw err;
       }
-    },
-  );
+      const v = r.verdict!;
+      const mark = v.catastrophic ? '🚨CATASTROOF' : v.layer1Pass ? '✓' : '✗';
+      const j = v.needsJudge ? ' →judge' : '';
+      console.log(`  ${mark} ${tag} [${job.c.dimension}] kind=${v.responseKind}${j}`);
+      return r;
+    } catch (err) {
+      console.error(`  ✗ ${tag} — ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  });
 
-  const verdicts = out.map((o) => o.verdict);
+  const verdicts = out.map((o) => o.verdict).filter((v): v is DeterministicVerdict => v !== null);
   const judgeItems = out.map((o) => o.judgeItem).filter((j): j is JudgeItem => j !== null);
-  const totalBotCostUsd = verdicts.reduce((s, v) => s + v.botCostUsd, 0);
+  const budgetStoppedCount = out.filter((o) => o.budgetStopped).length;
+  const cacheHits = out.filter((o) => o.cacheHit).length;
+  // Werkelijke bestede bot-gen ($ deze run) = verse generatie (cache-hits = gratis).
+  const totalBotCostUsd = spentUsd;
   const sec = Math.round((Date.now() - t0) / 100) / 10;
 
   const ts = timestamp();
   const dir = join(process.cwd(), 'eval-out', 'hard');
   mkdirSync(dir, { recursive: true });
 
+  // Version-anonimisering voor de judge-queue (seed uit ts → per-run stabiel,
+  // run-over-run wisselend). De report de-anonimiseert via de keymap.
+  const anonMap = anonLabels(versions, parseInt(hashString(ts), 16));
+  const keymap = Object.fromEntries([...anonMap].map(([version, label]) => [label, version]));
+
   const results: ResultsFile = {
-    meta: { timestamp: ts, versions, caseCount: cases.length, totalBotCostUsd },
+    meta: {
+      timestamp: ts,
+      versions,
+      caseCount: cases.length,
+      totalBotCostUsd,
+      budgetStopped: budgetStoppedCount,
+      maxCostUsd: MAX_COST_USD,
+      cacheHits,
+    },
     verdicts,
   };
   const resultsPath = join(dir, `${ts}-results.json`);
   const queuePath = join(dir, `${ts}-judge-queue.md`);
+  const keymapPath = join(dir, `${ts}-judge-keymap.json`);
   writeFileSync(resultsPath, JSON.stringify(results, null, 2), 'utf8');
-  writeFileSync(queuePath, buildJudgeQueue(ts, judgeItems, anchors), 'utf8');
+  writeFileSync(queuePath, buildJudgeQueue(ts, judgeItems, anchors, anonMap), 'utf8');
+  writeFileSync(keymapPath, JSON.stringify({ timestamp: ts, map: keymap }, null, 2), 'utf8');
 
   const cat = verdicts.filter((v) => v.catastrophic).length;
   const l1pass = verdicts.filter((v) => v.layer1Pass).length;
@@ -472,13 +688,20 @@ async function main(): Promise<void> {
   console.log(`--- Klaar (${sec}s) ---`);
   console.log(`  Laag-1 pass : ${l1pass}/${verdicts.length}`);
   console.log(`  catastrofaal: ${cat}`);
-  console.log(`  judge-queue : ${judgeItems.length} items (needsJudge)`);
-  console.log(`  bot-gen cost: $${totalBotCostUsd.toFixed(4)}`);
+  if (budgetStoppedCount > 0) {
+    console.log(`  ⚠ KOSTENREM  : ${budgetStoppedCount} case(s) geskipt — run INCOMPLEET, gate onbetrouwbaar`);
+  }
+  console.log(`  judge-queue : ${judgeItems.length} items (needsJudge) — versies geanonimiseerd`);
+  if (CACHE_ENABLED) {
+    console.log(`  cache       : ${cacheHits}/${verdicts.length} hits (frozen-versie, $0) — verse gen $${totalBotCostUsd.toFixed(4)}`);
+  }
+  console.log(`  bot-gen cost: $${totalBotCostUsd.toFixed(4)} / rem $${MAX_COST_USD.toFixed(2)}`);
   console.log('');
   console.log(`  results     : ${resultsPath}`);
   console.log(`  judge-queue : ${queuePath}`);
+  console.log(`  keymap      : ${keymapPath}`);
   console.log('');
-  console.log(`  Volgende: Claude beoordeelt de judge-queue en schrijft ${ts}-verdicts.json,`);
+  console.log(`  Volgende: Claude beoordeelt de judge-queue (anon-labels) en schrijft ${ts}-verdicts.json,`);
   console.log(`            daarna \`npm run eval:hard:report\`.`);
 }
 

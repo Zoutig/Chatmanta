@@ -31,6 +31,7 @@ import {
   unstableCases,
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSIONS,
+  UNDER_REFUSAL_MIN_N,
 } from '../lib/v0/server/hard-eval-checks';
 import { resolveBot } from '../lib/v0/server/bots';
 
@@ -53,9 +54,45 @@ function parseStringArg(name: string): string | null {
 const dir = join(process.cwd(), 'eval-out', 'hard');
 if (!existsSync(dir)) fail(`Geen eval-out/hard map. Run eerst \`npm run eval:hard:run\`.`);
 
+// De judge-queue toont versies geanonimiseerd (A/B/C); de keymap mapt label→versie.
+// Hier de-anonimiseren we de judge-verdicts zodat ze op de echte versie matchen.
+function loadKeymap(runTs: string): Map<string, string> {
+  const p = join(dir, `${runTs}-judge-keymap.json`);
+  if (!existsSync(p)) return new Map();
+  try {
+    const km = JSON.parse(readFileSync(p, 'utf8')) as { map: Record<string, string> };
+    return new Map(Object.entries(km.map));
+  } catch {
+    return new Map();
+  }
+}
+
+function loadJudge(runTs: string): { map: Map<string, JudgeVerdict>; loaded: boolean } {
+  const p = join(dir, `${runTs}-verdicts.json`);
+  if (!existsSync(p)) return { map: new Map(), loaded: false };
+  const vf = JSON.parse(readFileSync(p, 'utf8')) as VerdictsFile;
+  const labelToVersion = loadKeymap(runTs);
+  const map = new Map<string, JudgeVerdict>();
+  let unmappedLabelLike = 0;
+  for (const v of vf.verdicts) {
+    const realVersion = labelToVersion.get(v.version) ?? v.version; // label→versie (of al echt)
+    // Anon-label (A/B/C) zonder keymap-treffer → mapt niet op een echte versie.
+    if (!labelToVersion.has(v.version) && /^[A-Z]$/.test(v.version)) unmappedLabelLike++;
+    map.set(`${v.caseId}::${realVersion}`, { ...v, version: realVersion });
+  }
+  if (unmappedLabelLike > 0) {
+    console.error(
+      `⚠ ${runTs}: ${unmappedLabelLike} verdict(s) met een anon-label maar GEEN keymap-treffer (${runTs}-judge-keymap.json ontbreekt/corrupt) — die mappen NIET op een echte versie en blijven PENDING. Herstel de keymap.`,
+    );
+  }
+  return { map, loaded: true };
+}
+
 const tsArg = parseStringArg('ts');
 const thrArg = parseStringArg('quality-threshold');
 const qualityThreshold = thrArg ? Number(thrArg) : 0.9;
+// --ops-veto: promoveer cost p95 > budget tot een echte gate-veto (i.p.v. waarschuwing).
+const OPS_VETO = process.argv.slice(2).includes('--ops-veto');
 let ts = tsArg;
 if (!ts) {
   const resultFiles = readdirSync(dir)
@@ -83,14 +120,7 @@ for (const v of results.verdicts) {
   v.outOfCorpus = outOfCorpusById.get(v.caseId) ?? Boolean(v.outOfCorpus);
 }
 
-const verdictsPath = join(dir, `${ts}-verdicts.json`);
-let judgeByKey = new Map<string, JudgeVerdict>();
-let judgeLoaded = false;
-if (existsSync(verdictsPath)) {
-  const vf = JSON.parse(readFileSync(verdictsPath, 'utf8')) as VerdictsFile;
-  judgeByKey = new Map(vf.verdicts.map((v) => [`${v.caseId}::${v.version}`, v]));
-  judgeLoaded = true;
-}
+const { map: judgeByKey, loaded: judgeLoaded } = loadJudge(ts);
 
 // Regressie-diff (Groep 4): vergelijk met een opgegeven groene baseline-run.
 const baselineTs = parseStringArg('baseline');
@@ -99,15 +129,7 @@ if (baselineTs) {
   const baseResultsPath = join(dir, `${baselineTs}-results.json`);
   if (!existsSync(baseResultsPath)) fail(`Baseline niet gevonden: ${baseResultsPath}`);
   const baseResults = JSON.parse(readFileSync(baseResultsPath, 'utf8')) as ResultsFile;
-  const baseVerdictsPath = join(dir, `${baselineTs}-verdicts.json`);
-  const baseJudge = existsSync(baseVerdictsPath)
-    ? new Map(
-        (JSON.parse(readFileSync(baseVerdictsPath, 'utf8')) as VerdictsFile).verdicts.map((v) => [
-          `${v.caseId}::${v.version}`,
-          v,
-        ]),
-      )
-    : new Map<string, JudgeVerdict>();
+  const baseJudge = loadJudge(baselineTs).map; // de-anonimiseert via de baseline-keymap
   regressionFlips = computeRegressionDiff(results.verdicts, judgeByKey, baseResults.verdicts, baseJudge);
 }
 
@@ -177,14 +199,44 @@ if (!judgeLoaded) {
   md.push('');
 }
 
+// Kostenrem / cache-status.
+const budgetStopped = results.meta.budgetStopped ?? 0;
+if (budgetStopped > 0) {
+  md.push(
+    `> 🛑 **RUN INCOMPLEET** — ${budgetStopped} case(s) geskipt door de kostenrem ($${(results.meta.maxCostUsd ?? 0).toFixed(2)}). Het gate-verdict hieronder is op een DEELSET en dus onbetrouwbaar; verhoog \`--max-cost\` of gebruik \`--cache\`.`,
+  );
+  md.push('');
+}
+if ((results.meta.cacheHits ?? 0) > 0) {
+  md.push(`_Cache: ${results.meta.cacheHits} (case×versie) uit frozen-cache ($0); verse bot-gen $${results.meta.totalBotCostUsd.toFixed(4)}._`);
+  md.push('');
+}
+
 // Productie-gate verdict — de headline.
 const gate = computeProductionGate(results.verdicts, judgeByKey, { qualityThreshold });
+const opMetrics = computeOperationalMetrics(results.verdicts);
+
+// --ops-veto: cost p95 > per-versie budget promoveert tot een echte gate-veto.
+if (OPS_VETO) {
+  const opByVer = new Map(opMetrics.map((m) => [m.version, m]));
+  for (const g of gate) {
+    const m = opByVer.get(g.version);
+    const budget = resolveBot(g.version).evalBudgetUsd;
+    if (m && m.costP95Usd > budget) {
+      g.productionReady = false;
+      g.reasons.push(`cost p95 $${m.costP95Usd.toFixed(4)} > budget $${budget.toFixed(4)} — operationeel veto`);
+    }
+  }
+}
+
 md.push('## Productie-gate verdict');
 md.push('');
-md.push(`_Kwaliteits-drempel: ${Math.round(qualityThreshold * 100)}% · veiligheid = hard veto · toon = diagnostisch._`);
+md.push(
+  `_Kwaliteits-drempel: ${Math.round(qualityThreshold * 100)}% (answer-quality) · veiligheid = hard veto · cost = ${OPS_VETO ? 'veto (--ops-veto)' : 'waarschuwing'} · toon + robuustheid = diagnostisch._`,
+);
 md.push('');
-md.push('| versie | PRODUCTIEWAARDIG | veiligheid | kwaliteit | toon (diag.) | redenen |');
-md.push('|--------|------------------|------------|-----------|--------------|---------|');
+md.push('| versie | PRODUCTIEWAARDIG | veiligheid | kwaliteit (AQ) | robuustheid | toon (diag.) | redenen |');
+md.push('|--------|------------------|------------|----------------|-------------|--------------|---------|');
 for (const g of gate) {
   const verdictStr = g.productionReady === true ? '✅ JA' : g.productionReady === false ? '❌ NEE' : '⏳ onbeslist';
   const safetyStr =
@@ -198,8 +250,13 @@ for (const g of gate) {
       ? '-'
       : `${g.qualityPass}/${g.qualityTotal}${g.qualityPending ? ` (${g.qualityPending}?)` : ''}` +
         (g.qualityPassRate !== null ? ` = ${Math.round(g.qualityPassRate * 100)}%` : '');
+  const robStr =
+    g.robustnessTotal === 0
+      ? '-'
+      : `${g.robustnessPass}/${g.robustnessTotal}` +
+        (g.robustnessPassRate !== null ? ` = ${Math.round(g.robustnessPassRate * 100)}%` : '');
   const toneStr = g.toneTotal === 0 ? '-' : `${g.tonePass}/${g.toneTotal}`;
-  md.push(`| ${g.version} | ${verdictStr} | ${safetyStr} | ${qualStr} | ${toneStr} | ${g.reasons.join('; ')} |`);
+  md.push(`| ${g.version} | ${verdictStr} | ${safetyStr} | ${qualStr} | ${robStr} | ${toneStr} | ${g.reasons.join('; ')} |`);
 }
 md.push('');
 if (gate.some((g) => g.safetyViolations.length > 0)) {
@@ -240,11 +297,12 @@ md.push('');
 // Operationeel (Groep 2)
 md.push('## Operationeel (Groep 2 — latency / cost / errors)');
 md.push('');
-md.push('_Onverwachte error op een valide query = hard veto (zie gate). Latency/cost = waarschuwing (⚠️) t.o.v. het per-versie budget._');
+md.push(
+  `_Onverwachte error op een valide query = hard veto (zie gate). Latency = waarschuwing (⚠️). Cost = ${OPS_VETO ? 'VETO (--ops-veto actief)' : 'waarschuwing (⚠️)'} t.o.v. het per-versie budget._`,
+);
 md.push('');
 md.push('| versie | p50 lat | p95 lat | budget | mean cost | p95 cost | budget | onverwachte errors |');
 md.push('|--------|---------|---------|--------|-----------|----------|--------|--------------------|');
-const opMetrics = computeOperationalMetrics(results.verdicts);
 for (const m of opMetrics) {
   const bot = resolveBot(m.version);
   const latWarn = m.latencyP95Ms > bot.evalBudgetMs ? ' ⚠️' : '';
@@ -259,14 +317,20 @@ md.push('');
 // Refusal-calibratie (Groep 3)
 md.push('## Refusal-calibratie (Groep 3 — te streng ↔ te los)');
 md.push('');
-md.push('_over-refusal = weigerde op een beantwoordbare vraag (expectsRefusal=false). under-refusal = gaf een ONGEGROND specifiek (hardFactSupport-fail) op een out-of-corpus vraag = verzonnen feit. Beide ideaal = 0%._');
+md.push(
+  `_over-refusal = weigerde op een beantwoordbare vraag (expectsRefusal=false). under-refusal = gaf een ONGEGROND specifiek (hardFactSupport-fail) op een out-of-corpus vraag = verzonnen feit. Beide ideaal = 0%. Bij < ${UNDER_REFUSAL_MIN_N} out-of-corpus-cases is under-refusal te ruisig → advisory._`,
+);
 md.push('');
 md.push('| versie | over-refusal | under-refusal (hallucinatie-risico) |');
 md.push('|--------|--------------|-------------------------------------|');
 const calib = computeRefusalCalibration(results.verdicts);
 for (const c of calib) {
   const over = c.overRefusalRate === null ? '-' : `${c.overRefusals}/${c.answerableTotal} = ${Math.round(c.overRefusalRate * 100)}%`;
-  const under = c.underRefusalRate === null ? '-' : `${c.underRefusals}/${c.outOfCorpusTotal} = ${Math.round(c.underRefusalRate * 100)}%`;
+  const lowN = c.outOfCorpusTotal < UNDER_REFUSAL_MIN_N;
+  const under =
+    c.underRefusalRate === null
+      ? '-'
+      : `${c.underRefusals}/${c.outOfCorpusTotal} = ${Math.round(c.underRefusalRate * 100)}%${lowN ? ' ⚠ lage N (advisory)' : ''}`;
   md.push(`| ${c.version} | ${over} | ${under} |`);
 }
 md.push('');
