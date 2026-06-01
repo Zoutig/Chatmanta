@@ -202,10 +202,8 @@ assert.notEqual(v093.systemPrompt, v092.systemPrompt, 'v0.9.3 voegt het taal-blo
 assert.match(v093.systemPrompt, /TAAL — SPIEGEL ALTIJD DE GEBRUIKER/, 'v0.9.3 systemPrompt moet het taal-spiegelblok bevatten');
 assert.equal(v093.decomposeHeuristicGate, true, 'v0.9.3 erft decomposeHeuristicGate=true van v0.9.2');
 assert.equal(v093.hardFactRefusalSafetyAware, true, 'v0.9.3 erft hardFactRefusalSafetyAware=true');
-assert.equal(v093.mirrorUserLanguage, true, 'v0.9.3 zet mirrorUserLanguage=true (user-turn taal-directive)');
-// Append-only: v0.9.2 krijgt het taal-blok NIET en de mirrorUserLanguage-flag NIET
+// Append-only: v0.9.2 krijgt het v0.9.3-taal-reinforcement-blok NIET
 assert.doesNotMatch(v092.systemPrompt, /TAAL — SPIEGEL ALTIJD DE GEBRUIKER/, 'append-only: v0.9.2 blijft zonder het v0.9.3-taal-blok (byte-identiek)');
-assert.notEqual(v092.mirrorUserLanguage, true, 'append-only: v0.9.2 krijgt de v0.9.3 mirrorUserLanguage-flag NIET');
 
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);

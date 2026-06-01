@@ -49,7 +49,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
       'Hoe vraag ik een offerte aan?',
     ],
     primaryLanguage: 'nl',
-    autoDetectLanguage: false,
+    autoDetectLanguage: true,
     toneOfVoice: 'professional',
     extraInstructions:
       'Spreek de klant aan met "u". Verwijs voor concrete offertes altijd door naar onze contactpagina.',
@@ -107,7 +107,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
       'Doen jullie ook particuliere aangifte?',
     ],
     primaryLanguage: 'nl',
-    autoDetectLanguage: false,
+    autoDetectLanguage: true,
     toneOfVoice: 'professional',
     extraInstructions:
       'Wees zakelijk en nauwkeurig. Geef geen fiscaal advies dat afhangt van persoonlijke situatie — verwijs door.',

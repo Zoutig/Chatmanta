@@ -80,6 +80,15 @@ export type ChatbotPromptOverrides = {
    * terug op een generic "zeg eerlijk dat je het niet weet"-formulering.
    */
   unknownAnswerMessage: string;
+  /**
+   * Taal-instelling, structured doorgegeven zodat rag.ts de taal-directive in de
+   * USER-turn kan bouwen (een taalregel in de system-prompt wordt door gpt-4o-mini
+   * genegeerd — de STIJL-suffix komt erná). Geldt voor ALLE bot-versies.
+   * autoDetectLanguage=false → antwoord altijd in primaryLanguage; true → spiegel
+   * de bezoeker (val terug op primaryLanguage bij onbekende taal).
+   */
+  primaryLanguage: Language;
+  autoDetectLanguage: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -189,5 +198,7 @@ export function buildChatbotOverrides(
     extraSystemInstructions,
     fallbackMessage: settings.fallbackMessage.trim(),
     unknownAnswerMessage: settings.unknownAnswerMessage.trim(),
+    primaryLanguage: settings.primaryLanguage,
+    autoDetectLanguage: settings.autoDetectLanguage,
   };
 }

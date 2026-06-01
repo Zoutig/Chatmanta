@@ -2259,16 +2259,34 @@ KRITISCHE FORMAT-REGELS:
     linkEnabled && providedUrls.length > 0
       ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Beantwoord de vraag ALTIJD eerst zelf — geef een kort, op de CONTEXT gebaseerd antwoord (enkele zinnen die samenvatten wat je weet). Gebruik links NOOIT als vervanging van een antwoord: antwoord dus niet met alleen "ik heb geen informatie, kijk op deze links" wanneer de context wél iets relevants bevat. Sluit je antwoord daarna — als er een relevante Bron-URL is — af met een korte doorverwijzing voor wie meer wil lezen: één of enkele markdown-links [korte omschrijving](URL). Gebruik UITSLUITEND exact een van de gegeven Bron-URLs, letterlijk overgenomen — verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
       : '';
-  // v0.9.3 — taal-spiegeling. gpt-4o-mini negeert een taalregel in de system-
-  // prompt (de Nederlandse STIJL-suffix komt erná → recency wint; empirisch
-  // bevestigd op de v0.9.3-confirm-run: EN-vraag → nog steeds NL-antwoord).
-  // De betrouwbare plek is de USER-turn, ná de vraag (hoogste salience):
-  // detecteer de vraagtaal en injecteer bij een Engelse vraag een expliciete
-  // directive in het Engels. Flag-gated; default uit én inert voor NL/mixed-NL
-  // vragen → user-prompt byte-identiek voor oudere versies en NL-verkeer.
+  // Taal-instelling — afgedwongen in de USER-turn (ná de vraag, hoogste salience).
+  // Een taalregel in de system-prompt wordt door gpt-4o-mini genegeerd (de
+  // Nederlandse STIJL-suffix komt erná → recency wint; empirisch bevestigd).
+  // Gedreven door de KLANT-INSTELLING (autoDetectLanguage + primaryLanguage uit het
+  // klantendashboard) → geldt voor ALLE bot-versies, niet per versie:
+  //   autoDetectLanguage=false → antwoord altijd in primaryLanguage;
+  //   autoDetectLanguage=true  → spiegel de bezoeker (detectLanguage), val terug op
+  //                              primaryLanguage bij mixed/onbekende taal.
+  // Nederlands is de natuurlijke default van het model (NL-prompt + NL-bronnen), dus
+  // injecteren we alléén een directive wanneer de doeltaal NIET Nederlands is.
+  // Geen overrides (bv. eval) → default mirror met primaryLanguage 'nl'.
+  const primaryLanguage = input.chatbotOverrides?.primaryLanguage ?? 'nl';
+  const autoDetectLanguage = input.chatbotOverrides?.autoDetectLanguage ?? true;
+  let answerLanguage: string = primaryLanguage;
+  if (autoDetectLanguage) {
+    const detected = detectLanguage(original);
+    if (detected === 'nl' || detected === 'en') answerLanguage = detected;
+  }
+  const ANSWER_LANGUAGE_NAMES: Record<string, string> = {
+    nl: 'Dutch',
+    en: 'English',
+    de: 'German',
+    fr: 'French',
+    es: 'Spanish',
+  };
   const languageDirective =
-    bot.mirrorUserLanguage && detectLanguage(original) === 'en'
-      ? '\n\nIMPORTANT — ANSWER LANGUAGE: the question above is written in English. Write your ENTIRE answer in English. Translate any Dutch source material into English; do not answer in Dutch.'
+    answerLanguage !== 'nl'
+      ? `\n\nIMPORTANT — ANSWER LANGUAGE: write your ENTIRE answer in ${ANSWER_LANGUAGE_NAMES[answerLanguage] ?? answerLanguage}, regardless of the language of the context or sources. Translate any source facts as needed; stay grounded and invent nothing.`
       : '';
   const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
 
