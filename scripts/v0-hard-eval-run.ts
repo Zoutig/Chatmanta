@@ -103,9 +103,12 @@ if (!process.env.OPENAI_API_KEY) fail('Missing OPENAI_API_KEY');
 const BASELINE_VERSION = 'v0.8.1';
 const CANDIDATE_VERSION = BOT_VERSIONS_ORDERED[BOT_VERSIONS_ORDERED.length - 1];
 const versionsArg = parseListArg('versions');
-const versions =
-  versionsArg ??
-  (hasFlag('all') ? [...BOT_VERSIONS_ORDERED] : [...new Set([BASELINE_VERSION, CANDIDATE_VERSION])]);
+// Dedupe: dubbele --versions zou de anon-permutatie + per-versie-aggregatie breken.
+const versions = versionsArg
+  ? [...new Set(versionsArg)]
+  : hasFlag('all')
+    ? [...BOT_VERSIONS_ORDERED]
+    : [...new Set([BASELINE_VERSION, CANDIDATE_VERSION])];
 for (const v of versions) {
   if (!(v in BOTS)) fail(`Onbekende bot-versie: ${v}. Bekend: ${BOT_VERSIONS_ORDERED.join(', ')}`);
 }
@@ -119,7 +122,9 @@ const CANDIDATE = versions[versions.length - 1];
 const MULTI_RUN_N = hasFlag('no-multi-run') ? 1 : (parseIntArg('multi-run') ?? 3);
 
 // Harde kostenrem (fail-safe): de runner stopt met NIEUWE bot-gen zodra dit bedrag
-// bereikt is, i.p.v. erop te hopen. `--max-cost=<usd>`, default $2,50.
+// bereikt is, i.p.v. erop te hopen. `--max-cost=<usd>`, default $2,50. Met CONCURRENCY
+// parallelle workers kan de werkelijke spend de cap met ≤CONCURRENCY in-flight
+// generaties overschrijden (~$0,01) — verwaarloosbaar bij de default cap.
 const MAX_COST_USD = parseFloatArg('max-cost') ?? 2.5;
 let spentUsd = 0;
 
@@ -231,13 +236,33 @@ type RunResult = { response: ChatResponse | null; errCode: string | null; latenc
 
 const CACHE_ENABLED = hasFlag('cache');
 const CACHE_DIR = join(process.cwd(), 'eval-out', 'hard', '.cache');
-const PIPELINE_SOURCES = ['rag.ts', 'bots.ts', 'hard-facts.ts', 'rag-decision.ts', 'claims.ts'];
+// Bump bij elke wijziging aan het cache-formaat → invalideert alle oude cache-files.
+const CACHE_SCHEMA = 'v2';
+// Alle bronnen op het ANTWOORD-PAD die de gegenereerde output beïnvloeden — niet
+// alleen rag/bots, ook persona/manual-qa/source-links/style/llm. Elke wijziging
+// hieraan bust de cache.
+//   ⚠ De cache dekt CODE, geen DATA: een her-ingest van het corpus verandert
+//   antwoorden ZONDER de fingerprint te raken. Wis `eval-out/hard/.cache/` na een
+//   corpus-wijziging, of draai zonder --cache.
+const PIPELINE_SOURCES = [
+  'lib/v0/server/rag.ts',
+  'lib/v0/server/bots.ts',
+  'lib/v0/server/hard-facts.ts',
+  'lib/v0/server/rag-decision.ts',
+  'lib/v0/server/claims.ts',
+  'lib/v0/server/persona.ts',
+  'lib/v0/server/manual-qa.ts',
+  'lib/v0/server/source-links.ts',
+  'lib/v0/style.ts',
+  'lib/v0/style-types.ts',
+  'lib/ai/llm.ts',
+];
 
 function computePipelineFingerprint(): string {
-  let combined = '';
+  let combined = CACHE_SCHEMA;
   for (const f of PIPELINE_SOURCES) {
     try {
-      combined += readFileSync(join(process.cwd(), 'lib', 'v0', 'server', f), 'utf8');
+      combined += readFileSync(join(process.cwd(), f), 'utf8');
     } catch {
       // Fail-safe: ontbrekend bronbestand → unieke fingerprint → cache effectief
       // uit (liever vers genereren dan stil een verkeerde hit serveren).
@@ -538,13 +563,6 @@ function buildJudgeQueue(
       lines.push(`**Waar op te letten:** ${first.rubricHint}`);
     }
     lines.push('');
-    lines.push('**Bron-excerpts (wat de bot zag):**');
-    if (first.sources.length === 0) {
-      lines.push('- _(geen bronnen — fallback/smalltalk/zero-hits)_');
-    } else {
-      for (const s of first.sources) lines.push(`- ${s.replace(/\n+/g, ' ')}`);
-    }
-    lines.push('');
     // Sorteer op anon-label zodat de weergave-volgorde de versie-volgorde niet verraadt.
     const sorted = [...group].sort((a, b) =>
       (anonMap.get(a.version) ?? a.version).localeCompare(anonMap.get(b.version) ?? b.version),
@@ -552,6 +570,15 @@ function buildJudgeQueue(
     for (const it of sorted) {
       const label = anonMap.get(it.version) ?? it.version;
       lines.push(`### Versie ${label}  _(kind: ${it.kind})_`);
+      lines.push('');
+      // Bronnen PER VERSIE: versies kunnen verschillende chunks ophalen — de judge
+      // moet elke versie tegen HÁÁR eigen bronnen beoordelen, niet die van een ander.
+      lines.push('**Bron-excerpts (wat deze versie zag):**');
+      if (it.sources.length === 0) {
+        lines.push('- _(geen bronnen — fallback/smalltalk/zero-hits)_');
+      } else {
+        for (const s of it.sources) lines.push(`- ${s.replace(/\n+/g, ' ')}`);
+      }
       lines.push('');
       if (it.detSignals.length > 0) {
         lines.push(`_det-signalen (advisory): ${it.detSignals.join(' · ')}_`);

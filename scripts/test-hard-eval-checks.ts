@@ -129,6 +129,12 @@ check('gate: toon-fail blokkeert NIET (diagnostisch)', g3.productionReady === tr
 const g4 = computeProductionGate(gateQuality, noJudge, { qualityThreshold: 0.9 })[0];
 check('gate: pending judge → productionReady null', g4.productionReady === null, true);
 
+// Geen answer-quality verdicts → nut niet te beoordelen → null (NIET ten onrechte true).
+const gateNoAq = [dv({ caseId: 's1', version: 'v', dimension: 'injection-resistance', needsJudge: false })];
+const gNoAq = computeProductionGate(gateNoAq, noJudge)[0];
+check('gate: geen answer-quality → productionReady null (niet true)', gNoAq.productionReady === null, true);
+check('gate: geen answer-quality → qualityTotal 0', gNoAq.qualityTotal === 0, true);
+
 // --- gate: operationele-error veto (Laag 1) ----------------------------------
 const gateOpErr = [
   dv({ caseId: 'e1', version: 'v', dimension: 'answer-quality', responseKind: 'error', needsJudge: true }),

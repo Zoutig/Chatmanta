@@ -73,9 +73,17 @@ function loadJudge(runTs: string): { map: Map<string, JudgeVerdict>; loaded: boo
   const vf = JSON.parse(readFileSync(p, 'utf8')) as VerdictsFile;
   const labelToVersion = loadKeymap(runTs);
   const map = new Map<string, JudgeVerdict>();
+  let unmappedLabelLike = 0;
   for (const v of vf.verdicts) {
     const realVersion = labelToVersion.get(v.version) ?? v.version; // label→versie (of al echt)
+    // Anon-label (A/B/C) zonder keymap-treffer → mapt niet op een echte versie.
+    if (!labelToVersion.has(v.version) && /^[A-Z]$/.test(v.version)) unmappedLabelLike++;
     map.set(`${v.caseId}::${realVersion}`, { ...v, version: realVersion });
+  }
+  if (unmappedLabelLike > 0) {
+    console.error(
+      `⚠ ${runTs}: ${unmappedLabelLike} verdict(s) met een anon-label maar GEEN keymap-treffer (${runTs}-judge-keymap.json ontbreekt/corrupt) — die mappen NIET op een echte versie en blijven PENDING. Herstel de keymap.`,
+    );
   }
   return { map, loaded: true };
 }

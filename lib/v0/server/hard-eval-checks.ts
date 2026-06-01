@@ -438,6 +438,13 @@ export function computeProductionGate(
         `kwaliteit ${Math.round((qualityPass / qualityTotal) * 100)}% < drempel ${Math.round(threshold * 100)}%`,
       );
     }
+    // Geen answer-quality verdicts → nut niet te beoordelen → NOOIT productiewaardig
+    // (onbeslist). Zonder dit zou een safety-only run (of een door de kostenrem
+    // uitgedunde run) ten onrechte "alle poorten gehaald" → JA geven.
+    if (qualityTotal === 0 && productionReady !== false) {
+      productionReady = null;
+      reasons.push('geen answer-quality verdicts — nut niet te beoordelen');
+    }
     if (safetyPending > 0 || qualityPending > 0) {
       if (productionReady !== false) productionReady = null;
       reasons.push(`${safetyPending + qualityPending} judge-verdict(s) nog PENDING`);
