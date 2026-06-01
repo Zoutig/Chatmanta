@@ -327,17 +327,6 @@ export type BotConfig = {
    */
   sourceLinksEnabled?: boolean;
   /**
-   * v0.9.3: taal-spiegeling. Wanneer aan, detecteert de answer-pipeline de taal
-   * van de gebruikersvraag (detectLanguage) en injecteert bij een Engelse vraag
-   * een expliciete "answer in English"-directive AAN HET EIND van de user-turn
-   * (rag.ts). Reden: een taalregel in de system-prompt wordt door gpt-4o-mini
-   * genegeerd — de NL STIJL-suffix komt erná (recency wint; empirisch bevestigd
-   * op de v0.9.3-confirm-run). De user-turn-directive (ná de vraag, hoogste
-   * salience) is de betrouwbare plek. Inert voor NL/mixed-NL vragen en oudere
-   * versies → byte-identiek. Default false/undefined.
-   */
-  mirrorUserLanguage?: boolean;
-  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
@@ -1159,18 +1148,15 @@ const V0_9_2: BotConfig = {
   decomposeHeuristicGate: true,
 };
 
-// v0.9.3 — taal-spiegeling. De Productie-gate-eval (Laag 4) vond dat v0.9.2
-// Engelse vragen in het Nederlands beantwoordt. De enige taal-regel ("Antwoord
-// in dezelfde taal als de vraag — default Nederlands", V0_5) staat midden in een
-// verder volledig Nederlandse prompt; een tweede, emphatisch taal-blok in de
-// system-prompt bleek EMPIRISCH óók onvoldoende (de NL STIJL-suffix komt via
-// buildSystemPrompt erná → recency wint; v0.9.3-confirm-run: EN-vraag → nog
-// steeds NL-antwoord). De betrouwbare lever is de USER-turn: mirrorUserLanguage
-// detecteert de vraagtaal (detectLanguage) en injecteert bij een Engelse vraag
-// een directive in het Engels AAN HET EIND van de user-turn (ná de vraag,
-// hoogste salience) — zie rag.ts. Het system-prompt-blok hieronder blijft als
-// zachte reinforcement (inert voor NL). Geen retrieval-/threshold-wijziging;
-// inert voor NL/mixed-NL vragen + oudere versies → byte-identiek + append-only.
+// v0.9.3 — taal-spiegeling. De Productie-gate-eval (Laag 4) vond dat de bot
+// Engelse vragen in het Nederlands beantwoordt. Achtergrond: een taal-regel in de
+// system-prompt wordt door gpt-4o-mini genegeerd (de NL STIJL-suffix komt via
+// buildSystemPrompt erná → recency wint; empirisch bevestigd). De ECHTE afdwinging
+// gebeurt sindsdien in de USER-turn, gedreven door de KLANT-INSTELLING
+// (autoDetectLanguage + primaryLanguage) — zie rag.ts + build-chatbot-overrides.ts —
+// en geldt dus voor ALLE versies, niet per versie. Het blok hieronder is daarbovenop
+// een zachte system-prompt-reinforcement op v0.9.3 (inert voor NL). Geen retrieval-/
+// threshold-wijziging; v0.9.2 byte-identiek + append-only.
 const V0_9_3_LANGUAGE_BLOCK = `
 
 TAAL — SPIEGEL ALTIJD DE GEBRUIKER:
@@ -1181,9 +1167,8 @@ const V0_9_3: BotConfig = {
   version: 'v0.9.3',
   label: 'v0.9.3 — taal-spiegeling',
   description:
-    'v0.9.2 plus taal-spiegeling: de answer-pipeline detecteert de taal van de gebruikersvraag en injecteert bij een Engelse vraag een expliciete "answer in English"-directive aan het eind van de user-turn (mirrorUserLanguage), plus een reinforcement-blok in de system-prompt. Engelse vraag → Engels antwoord, ongeacht de Nederlandse bronnen. Repareert language=FAIL (Productie-gate Laag 4). Inert voor NL/mixed-NL vragen; geen retrieval-/threshold-wijziging; v0.9.2 byte-identiek.',
+    'v0.9.2 plus een zachte taal-reinforcement in de system-prompt. De echte taal-afdwinging (Engelse vraag → Engels antwoord, of altijd-primaryLanguage) zit in de answer-pipeline en wordt gedreven door de klant-instelling autoDetectLanguage/primaryLanguage — geldt voor álle versies, niet alleen deze. Geen retrieval-/threshold-wijziging; v0.9.2 byte-identiek.',
   systemPrompt: V0_9_2.systemPrompt + V0_9_3_LANGUAGE_BLOCK,
-  mirrorUserLanguage: true,
 };
 
 // ---------------------------------------------------------------------------
