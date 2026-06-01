@@ -327,6 +327,17 @@ export type BotConfig = {
    */
   sourceLinksEnabled?: boolean;
   /**
+   * v0.9.3: taal-spiegeling. Wanneer aan, detecteert de answer-pipeline de taal
+   * van de gebruikersvraag (detectLanguage) en injecteert bij een Engelse vraag
+   * een expliciete "answer in English"-directive AAN HET EIND van de user-turn
+   * (rag.ts). Reden: een taalregel in de system-prompt wordt door gpt-4o-mini
+   * genegeerd — de NL STIJL-suffix komt erná (recency wint; empirisch bevestigd
+   * op de v0.9.3-confirm-run). De user-turn-directive (ná de vraag, hoogste
+   * salience) is de betrouwbare plek. Inert voor NL/mixed-NL vragen en oudere
+   * versies → byte-identiek. Default false/undefined.
+   */
+  mirrorUserLanguage?: boolean;
+  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
@@ -1148,6 +1159,33 @@ const V0_9_2: BotConfig = {
   decomposeHeuristicGate: true,
 };
 
+// v0.9.3 — taal-spiegeling. De Productie-gate-eval (Laag 4) vond dat v0.9.2
+// Engelse vragen in het Nederlands beantwoordt. De enige taal-regel ("Antwoord
+// in dezelfde taal als de vraag — default Nederlands", V0_5) staat midden in een
+// verder volledig Nederlandse prompt; een tweede, emphatisch taal-blok in de
+// system-prompt bleek EMPIRISCH óók onvoldoende (de NL STIJL-suffix komt via
+// buildSystemPrompt erná → recency wint; v0.9.3-confirm-run: EN-vraag → nog
+// steeds NL-antwoord). De betrouwbare lever is de USER-turn: mirrorUserLanguage
+// detecteert de vraagtaal (detectLanguage) en injecteert bij een Engelse vraag
+// een directive in het Engels AAN HET EIND van de user-turn (ná de vraag,
+// hoogste salience) — zie rag.ts. Het system-prompt-blok hieronder blijft als
+// zachte reinforcement (inert voor NL). Geen retrieval-/threshold-wijziging;
+// inert voor NL/mixed-NL vragen + oudere versies → byte-identiek + append-only.
+const V0_9_3_LANGUAGE_BLOCK = `
+
+TAAL — SPIEGEL ALTIJD DE GEBRUIKER:
+Antwoord ALTIJD in de taal van de laatste vraag van de gebruiker. Schrijft de gebruiker in het Engels, antwoord dan volledig in het Engels; in het Nederlands → Nederlands; in een andere taal → die taal. De taal van de CONTEXT, de bronnen, de voorbeelden in deze prompt en deze instructies zelf is NIET leidend — alléén de taal waarin de gebruiker zélf schrijft telt. Dit overschrijft elke eerdere "default Nederlands"-formulering. Vertaal waar nodig de feiten uit de Nederlandstalige bronnen naar de taal van de gebruiker; verzin daarbij niets nieuws en blijf even gegrond als altijd.`;
+
+const V0_9_3: BotConfig = {
+  ...V0_9_2,
+  version: 'v0.9.3',
+  label: 'v0.9.3 — taal-spiegeling',
+  description:
+    'v0.9.2 plus taal-spiegeling: de answer-pipeline detecteert de taal van de gebruikersvraag en injecteert bij een Engelse vraag een expliciete "answer in English"-directive aan het eind van de user-turn (mirrorUserLanguage), plus een reinforcement-blok in de system-prompt. Engelse vraag → Engels antwoord, ongeacht de Nederlandse bronnen. Repareert language=FAIL (Productie-gate Laag 4). Inert voor NL/mixed-NL vragen; geen retrieval-/threshold-wijziging; v0.9.2 byte-identiek.',
+  systemPrompt: V0_9_2.systemPrompt + V0_9_3_LANGUAGE_BLOCK,
+  mirrorUserLanguage: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1165,6 +1203,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_9.version]: V0_9,
   [V0_9_1.version]: V0_9_1,
   [V0_9_2.version]: V0_9_2,
+  [V0_9_3.version]: V0_9_3,
 };
 
 /**
@@ -1210,7 +1249,12 @@ export const BOTS: Record<string, BotConfig> = {
 // retrieval-misses op nummer-zware klantvragen (zie de v0.9.2-comment hierboven).
 // Promotie onder de gate (recall@k + hard-dimensie + grounding); exacte eval-cijfers
 // in de PR-beschrijving. v0.9.1 blijft byte-identiek + append-only.
-export const LATEST_BOT_VERSION = V0_9_2.version;
+//
+// GEPROMOVEERD naar v0.9.3 (2026-06-01) — taal-fix. v0.9.2 + taal-spiegelblok dat
+// Engelse vragen in het Engels laat beantwoorden (Productie-gate Laag 4 vond
+// language=FAIL op v0.9.2 EN-cases). Puur prompt-append aan het eind; geen
+// pipeline-/retrieval-wijziging. v0.9.2 blijft byte-identiek + append-only.
+export const LATEST_BOT_VERSION = V0_9_3.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1227,6 +1271,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_9.version,
   V0_9_1.version,
   V0_9_2.version,
+  V0_9_3.version,
 ];
 
 /**

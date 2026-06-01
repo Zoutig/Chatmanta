@@ -30,6 +30,10 @@ import {
   containsEmergencyHandoff,
   containsCodeOutput,
 } from './hard-facts';
+// v0.9.3 — hergebruik dezelfde taal-detectie als de eval-check (detectLanguage),
+// zodat de taal-spiegel-fix en de language-dimensie exact dezelfde taalnotie
+// delen. hard-eval-checks.ts is puur (imports alleen ./hard-facts) → veilig.
+import { detectLanguage } from './hard-eval-checks';
 import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from './source-links';
 import { findMatchingManualQA } from './manual-qa';
 import type { ManualQA } from '../klantendashboard/types';
@@ -2255,7 +2259,18 @@ KRITISCHE FORMAT-REGELS:
     linkEnabled && providedUrls.length > 0
       ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Beantwoord de vraag ALTIJD eerst zelf — geef een kort, op de CONTEXT gebaseerd antwoord (enkele zinnen die samenvatten wat je weet). Gebruik links NOOIT als vervanging van een antwoord: antwoord dus niet met alleen "ik heb geen informatie, kijk op deze links" wanneer de context wél iets relevants bevat. Sluit je antwoord daarna — als er een relevante Bron-URL is — af met een korte doorverwijzing voor wie meer wil lezen: één of enkele markdown-links [korte omschrijving](URL). Gebruik UITSLUITEND exact een van de gegeven Bron-URLs, letterlijk overgenomen — verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
       : '';
-  const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
+  // v0.9.3 — taal-spiegeling. gpt-4o-mini negeert een taalregel in de system-
+  // prompt (de Nederlandse STIJL-suffix komt erná → recency wint; empirisch
+  // bevestigd op de v0.9.3-confirm-run: EN-vraag → nog steeds NL-antwoord).
+  // De betrouwbare plek is de USER-turn, ná de vraag (hoogste salience):
+  // detecteer de vraagtaal en injecteer bij een Engelse vraag een expliciete
+  // directive in het Engels. Flag-gated; default uit én inert voor NL/mixed-NL
+  // vragen → user-prompt byte-identiek voor oudere versies en NL-verkeer.
+  const languageDirective =
+    bot.mirrorUserLanguage && detectLanguage(original) === 'en'
+      ? '\n\nIMPORTANT — ANSWER LANGUAGE: the question above is written in English. Write your ENTIRE answer in English. Translate any Dutch source material into English; do not answer in Dutch.'
+      : '';
+  const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.

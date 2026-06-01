@@ -154,8 +154,8 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.9.2', 'LATEST_BOT_VERSION moet v0.9.2 zijn (latency-pass: decompose-gate, kwaliteit-neutraal)');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2']);
+assert.equal(LATEST_BOT_VERSION, 'v0.9.3', 'LATEST_BOT_VERSION moet v0.9.3 zijn (taal-spiegeling bovenop de v0.9.2-latency-pass)');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2', 'v0.9.3']);
 
 // v0.9 (iter2) — append-only deterministische hard-fact-weigering. Aanwezig in de
 // registry, flag aan, en v0.8.1 blijft byte-identiek (krijgt de flag NIET).
@@ -190,6 +190,23 @@ assert.equal(
   'v0.9.2 heeft GEEN rerankSkipOnStrong (lever verworpen na no-regression-gate)',
 );
 
+// v0.9.3 — taal-spiegeling. Prompt-append bovenop v0.9.2; pipeline ongewijzigd.
+const v093 = BOTS['v0.9.3'];
+assert.ok(v093, 'v0.9.3 ontbreekt uit BOTS-registry');
+assert.equal(v093.version, 'v0.9.3', 'v0.9.3 version-veld moet v0.9.3 zijn');
+assert.ok(
+  v093.systemPrompt.startsWith(v092.systemPrompt),
+  'v0.9.3 systemPrompt moet beginnen met de volledige v0.9.2-prompt (append-only: alleen toegevoegd aan het eind)',
+);
+assert.notEqual(v093.systemPrompt, v092.systemPrompt, 'v0.9.3 voegt het taal-blok toe → prompt ≠ v0.9.2');
+assert.match(v093.systemPrompt, /TAAL — SPIEGEL ALTIJD DE GEBRUIKER/, 'v0.9.3 systemPrompt moet het taal-spiegelblok bevatten');
+assert.equal(v093.decomposeHeuristicGate, true, 'v0.9.3 erft decomposeHeuristicGate=true van v0.9.2');
+assert.equal(v093.hardFactRefusalSafetyAware, true, 'v0.9.3 erft hardFactRefusalSafetyAware=true');
+assert.equal(v093.mirrorUserLanguage, true, 'v0.9.3 zet mirrorUserLanguage=true (user-turn taal-directive)');
+// Append-only: v0.9.2 krijgt het taal-blok NIET en de mirrorUserLanguage-flag NIET
+assert.doesNotMatch(v092.systemPrompt, /TAAL — SPIEGEL ALTIJD DE GEBRUIKER/, 'append-only: v0.9.2 blijft zonder het v0.9.3-taal-blok (byte-identiek)');
+assert.notEqual(v092.mirrorUserLanguage, true, 'append-only: v0.9.2 krijgt de v0.9.3 mirrorUserLanguage-flag NIET');
+
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
 console.log(`✓ v0.5 systemPrompt heeft soft word-ban (geen zwartelijst)`);
@@ -204,4 +221,5 @@ console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.
 console.log(`✓ v0.9 = deterministische hard-fact-weigering (hardFactDeterministicRefusal=true), v0.8.1 byte-identiek (append-only)`);
 console.log(`✓ v0.9.1 = safety-aware weigering + scope-hardening (geen decompose-gate)`);
 console.log(`✓ v0.9.2 = latency-pass (decomposeHeuristicGate=true), prompt byte-identiek aan v0.9.1, GEEN rerankSkipOnStrong`);
-console.log(`✓ LATEST_BOT_VERSION = v0.9.2 (latency-pass), BOT_VERSIONS_ORDERED = [v0.1..v0.9.2]`);
+console.log(`✓ v0.9.3 = taal-spiegeling (taal-blok aan eind van prompt), v0.9.2 byte-identiek (append-only)`);
+console.log(`✓ LATEST_BOT_VERSION = v0.9.3 (taal-spiegeling), BOT_VERSIONS_ORDERED = [v0.1..v0.9.3]`);
