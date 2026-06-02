@@ -134,7 +134,7 @@ export type AllTimeUsage = {
 };
 
 export async function getAllTimeUsage(
-  organizationId: string = DEV_ORG_ID,
+  organizationId: string,
 ): Promise<AllTimeUsage> {
   const empty: AllTimeUsage = {
     queryCount: 0,
@@ -178,8 +178,11 @@ export async function getAllTimeUsage(
 export async function logQuery(
   question: string,
   response: ChatResponse,
-  injection?: { detected: boolean; pattern: string | null },
-  organizationId: string = DEV_ORG_ID,
+  // C10 (v0.10): injection is verplicht (mag `undefined` zijn) zodat organizationId
+  // erna verplicht kan zijn zonder TS "required-na-optional"-fout. Geen stille
+  // DEV_ORG_ID-fallback meer op het productie-logpad — de caller MOET de org leveren.
+  injection: { detected: boolean; pattern: string | null } | undefined,
+  organizationId: string,
   hydeMeta?: HydeMeta,
   requestId?: string,
   /**

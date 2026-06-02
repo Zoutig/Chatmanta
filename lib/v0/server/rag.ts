@@ -3065,7 +3065,7 @@ export type DocSummary = {
   createdAt: string;
 };
 
-export async function listDocs(organizationId: string = DEV_ORG_ID): Promise<DocSummary[]> {
+export async function listDocs(organizationId: string): Promise<DocSummary[]> {
   const sb = supabase();
   const { data: docs, error } = await sb
     .from('documents')
