@@ -305,6 +305,21 @@ export type BotConfig = {
    */
   hardFactRefusalSafetyAware?: boolean;
   /**
+   * v0.10 (C11): over-refusal-tune. Beperkt de deterministische hard-fact-weiger-
+   * gate (hardFactDeterministicRefusal) tot de FABRICATIE-KLASSE: de gate vuurt
+   * alléén nog wanneer een ONGEGROND feit in {money, percentage, date} valt, niet
+   * bij een benign generiek getal/jaartal/aantal dat in een verder gegrond antwoord
+   * landt. Reden: v0.9.3 weigert ~13% van de beantwoordbare vragen doordat een
+   * gegrond antwoord met een benign getal dat net niet exact in de bron staat, bij
+   * medium-retrieval (top1Sim 0,50–0,56) door de generieke weigering wordt vervangen.
+   * De fabricatie-klasse (geld/datum/percentage) is precies waar hallucinatie
+   * schadelijk is → die blijft 100% gegate (de aoc-* geld-fabricaties blijven
+   * medium-retrieval gevangen). Vereist hardFactDeterministicRefusal=true om effect
+   * te hebben. Default false/undefined → v0.9.3-gedrag (alle ongegronde harde feiten
+   * gaten, append-only). Zie shouldDeterministicallyRefuseHardFact (hard-facts.ts).
+   */
+  hardFactRefusalFabricationClassOnly?: boolean;
+  /**
    * v0.9.1: deterministische off-domein-code-guard. Wanneer het antwoord code/
    * programmeer-syntax bevat (``` , def/function, for-in-range, etc.) wordt het
    * vervangen door de off-topic-refusal. Een klantcontact-bot van een niet-
@@ -1204,6 +1219,22 @@ const V0_9_3: BotConfig = {
   systemPrompt: V0_9_3_SYSTEM_PROMPT,
 };
 
+// v0.10 — productie-hardening + over-refusal-tune. Append-only snapshot bovenop
+// v0.9.3. P3 = byte-identieke snapshot (alle GEDRAG-flags + systemPrompt = v0.9.3).
+// De bot-KWALITEIT-wijziging landt in C11: de deterministische hard-fact-weiger-gate
+// (hardFactDeterministicRefusal) krijgt dan hardFactRefusalFabricationClassOnly zodat
+// hij alleen nog op de FABRICATIE-KLASSE (geld/percentage/datum) vuurt i.p.v. élk
+// ongegrond getal — gericht op de v0.9.3-over-refusal (~13%) zónder de geld/datum-
+// fabricatie-bescherming te verzwakken. De v0.10 CODE-hardening (kosten-cap, AVG-laag,
+// isolatie, observability) zit buiten de bot-config.
+const V0_10: BotConfig = {
+  ...V0_9_3,
+  version: 'v0.10',
+  label: 'v0.10 — productie-hardening + over-refusal-tune',
+  description:
+    'v0.9.3-gedrag als basis voor de v0.10 productie-hardening (per-org dag-budget-cap, PII-redactie in logQuery, retentie-cron, widget graceful-degradatie, orgId-verplichting, startup-asserts) + de C11 over-refusal-tune. systemPrompt + alle GEDRAG-flags byte-identiek aan v0.9.3 in P3; de C11-tune (hardFactRefusalFabricationClassOnly) volgt apart.',
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1222,6 +1253,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_9_1.version]: V0_9_1,
   [V0_9_2.version]: V0_9_2,
   [V0_9_3.version]: V0_9_3,
+  [V0_10.version]: V0_10,
 };
 
 /**
@@ -1290,6 +1322,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_9_1.version,
   V0_9_2.version,
   V0_9_3.version,
+  V0_10.version,
 ];
 
 /**

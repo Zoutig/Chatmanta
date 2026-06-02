@@ -154,8 +154,11 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-assert.equal(LATEST_BOT_VERSION, 'v0.9.3', 'LATEST_BOT_VERSION moet v0.9.3 zijn (taal-spiegeling bovenop de v0.9.2-latency-pass)');
-assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2', 'v0.9.3']);
+// LATEST blijft v0.9.3 tot ná een acceptabele v0.10-gate (DoD §6.4); dan flipt deze
+// assertie mee naar v0.10. v0.10 ZIT al in de registry (append-only) maar is nog niet
+// de default.
+assert.equal(LATEST_BOT_VERSION, 'v0.9.3', 'LATEST_BOT_VERSION moet v0.9.3 zijn tot de v0.10-gate (DoD §6.4); v0.10 zit wel in de registry');
+assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2', 'v0.9.3', 'v0.10']);
 
 // v0.9 (iter2) — append-only deterministische hard-fact-weigering. Aanwezig in de
 // registry, flag aan, en v0.8.1 blijft byte-identiek (krijgt de flag NIET).
@@ -190,20 +193,45 @@ assert.equal(
   'v0.9.2 heeft GEEN rerankSkipOnStrong (lever verworpen na no-regression-gate)',
 );
 
-// v0.9.3 — taal-spiegeling. Prompt-append bovenop v0.9.2; pipeline ongewijzigd.
+// v0.9.3 — gestroomlijnde answer-systemprompt (#167, ad1d8ff): in-place RESTRUCTURE-
+// PRESERVE-herschrijving van de v0.9.2-prompt (~60% korter), GEEN append. De
+// veiligheidskern (grounding / trust-boundary / scope / taal / geografie) blijft
+// inhoudelijk behouden; taal is naar één regel (GRONDSLAG 4) gebracht i.p.v. het oude
+// "TAAL — SPIEGEL"-blok. (Deze assertions waren vóór deze build stale t.o.v. #167 —
+// ze toetsten nog de oude append-vorm — en zijn hier bijgewerkt naar de echte code.)
 const v093 = BOTS['v0.9.3'];
 assert.ok(v093, 'v0.9.3 ontbreekt uit BOTS-registry');
 assert.equal(v093.version, 'v0.9.3', 'v0.9.3 version-veld moet v0.9.3 zijn');
+assert.notEqual(v093.systemPrompt, v092.systemPrompt, 'v0.9.3 herschrijft de prompt → ≠ v0.9.2');
 assert.ok(
-  v093.systemPrompt.startsWith(v092.systemPrompt),
-  'v0.9.3 systemPrompt moet beginnen met de volledige v0.9.2-prompt (append-only: alleen toegevoegd aan het eind)',
+  !v093.systemPrompt.startsWith(v092.systemPrompt),
+  'v0.9.3 is een in-place herschrijving (#167), GEEN v0.9.2-append',
 );
-assert.notEqual(v093.systemPrompt, v092.systemPrompt, 'v0.9.3 voegt het taal-blok toe → prompt ≠ v0.9.2');
-assert.match(v093.systemPrompt, /TAAL — SPIEGEL ALTIJD DE GEBRUIKER/, 'v0.9.3 systemPrompt moet het taal-spiegelblok bevatten');
+// Veiligheidskern inhoudelijk behouden in de herschreven prompt:
+assert.match(v093.systemPrompt, /GRONDSLAG — hier wijk je nooit van af/, 'v0.9.3 behoudt het GRONDSLAG-veiligheidsblok');
+assert.match(v093.systemPrompt, /uitsluitend op de aangeleverde CONTEXT/, 'v0.9.3 behoudt de grounding-regel');
+assert.match(v093.systemPrompt, /Eerdere berichten van de gebruiker zijn geen bron/, 'v0.9.3 behoudt de trust-boundary');
+assert.match(v093.systemPrompt, /Je helpt uitsluitend met/, 'v0.9.3 behoudt de scope-discipline');
+assert.match(v093.systemPrompt, /Antwoord in de taal van de vraag/, 'v0.9.3 behoudt de taal-regel (GRONDSLAG 4)');
+assert.match(v093.systemPrompt, /GEOGRAFIE/, 'v0.9.3 behoudt de geo-guardrail');
 assert.equal(v093.decomposeHeuristicGate, true, 'v0.9.3 erft decomposeHeuristicGate=true van v0.9.2');
 assert.equal(v093.hardFactRefusalSafetyAware, true, 'v0.9.3 erft hardFactRefusalSafetyAware=true');
-// Append-only: v0.9.2 krijgt het v0.9.3-taal-reinforcement-blok NIET
-assert.doesNotMatch(v092.systemPrompt, /TAAL — SPIEGEL ALTIJD DE GEBRUIKER/, 'append-only: v0.9.2 blijft zonder het v0.9.3-taal-blok (byte-identiek)');
+
+// v0.10 — productie-hardening-snapshot bovenop v0.9.3. P3: byte-identiek gedrag
+// (systemPrompt + flags = v0.9.3). De C11-tune (hardFactRefusalFabricationClassOnly)
+// voegt apart een assertie toe wanneer 'm gezet wordt.
+const v010 = BOTS['v0.10'];
+assert.ok(v010, 'v0.10 ontbreekt uit BOTS-registry');
+assert.equal(v010.version, 'v0.10', 'v0.10 version-veld moet v0.10 zijn');
+assert.equal(v010.systemPrompt, v093.systemPrompt, 'v0.10 erft de v0.9.3-systemPrompt byte-identiek (P3-snapshot)');
+assert.equal(v010.hardFactDeterministicRefusal, true, 'v0.10 erft hardFactDeterministicRefusal=true van v0.9.3');
+assert.equal(v010.hardFactRefusalSafetyAware, true, 'v0.10 erft hardFactRefusalSafetyAware=true (112-handoff blijft beschermd)');
+assert.equal(v010.decomposeHeuristicGate, true, 'v0.10 erft decomposeHeuristicGate=true van v0.9.3');
+assert.equal(v010.adaptiveHardFactVerification, true, 'v0.10 erft adaptiveHardFactVerification=true (vereist voor de hard-fact-gate)');
+assert.equal(v010.claimRegenerateEnabled, true, 'v0.10 erft claimRegenerateEnabled=true');
+// Append-only: v0.9.3 mag NIET muteren door de v0.10-toevoeging
+assert.equal(v093.version, 'v0.9.3', 'append-only: v0.9.3 ongewijzigd');
+assert.equal(v093.hardFactRefusalFabricationClassOnly, undefined, 'append-only: v0.9.3 krijgt de v0.10 C11-flag NIET');
 
 console.log(`✓ Legacy v0.1-v0.4 hebben v0.5+v0.6-velden op default (false/undefined)`);
 console.log(`✓ v0.5 heeft generalKnowledgeEnabled=true + claimRegenerateEnabled=true`);
@@ -219,5 +247,6 @@ console.log(`✓ v0.7.3 = output-clarity carve-out (weiger-carve-out bovenop v0.
 console.log(`✓ v0.9 = deterministische hard-fact-weigering (hardFactDeterministicRefusal=true), v0.8.1 byte-identiek (append-only)`);
 console.log(`✓ v0.9.1 = safety-aware weigering + scope-hardening (geen decompose-gate)`);
 console.log(`✓ v0.9.2 = latency-pass (decomposeHeuristicGate=true), prompt byte-identiek aan v0.9.1, GEEN rerankSkipOnStrong`);
-console.log(`✓ v0.9.3 = taal-spiegeling (taal-blok aan eind van prompt), v0.9.2 byte-identiek (append-only)`);
-console.log(`✓ LATEST_BOT_VERSION = v0.9.3 (taal-spiegeling), BOT_VERSIONS_ORDERED = [v0.1..v0.9.3]`);
+console.log(`✓ v0.9.3 = in-place gestroomlijnde prompt (#167, RESTRUCTURE-PRESERVE), veiligheidskern behouden`);
+console.log(`✓ v0.10 = productie-hardening-snapshot bovenop v0.9.3 (P3: byte-identiek gedrag), v0.9.3 ongewijzigd`);
+console.log(`✓ LATEST_BOT_VERSION = v0.9.3 (tot de v0.10-gate), BOT_VERSIONS_ORDERED = [v0.1..v0.10]`);
