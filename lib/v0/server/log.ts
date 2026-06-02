@@ -9,6 +9,7 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEV_ORG_ID } from './rag';
 import type { ChatResponse, HydeModeRequest, HydeModeResolved } from './rag';
+import { redactPii } from '@/lib/observability/redact';
 
 /**
  * Per-call HyDE-modus telemetrie. Wordt door route.ts gepasst aan logQuery
@@ -267,18 +268,27 @@ export async function logQuery(
     const hardFactSupported = typeof hfs?.supported === 'boolean' ? hfs.supported : null;
     const missingHardFacts = hfs?.missing ?? null;
 
+    // C7 (v0.10) — AVG: redacteer PII (e-mail/telefoon/IBAN/BSN) uit de vrije-tekst
+    // vóór de insert. De query_log is de analyse-/telemetrie-laag (de operator-
+    // conversatieweergave leest v0_threads, niet dit); we redacteren altijd (const
+    // default-aan) — logQuery is best-effort/never-throws, dus geen per-query DB-flag-
+    // lookup die de insert kan laten falen. Geldt voor vraag én antwoord (een bot kan
+    // door de gebruiker genoemde PII echoën).
+    const redactedQuestion = redactPii(question);
+    const redactedAnswer = redactPii(response.answer);
+
     const row: QueryLogRow =
       response.kind === 'smalltalk'
         ? {
             organization_id: organizationId,
             bot_version: response.botVersion,
             kind: 'smalltalk' as const,
-            question,
+            question: redactedQuestion,
             rewritten: null,
             threshold: null,
             top_similarity: null,
             source_count: 0,
-            answer: response.answer,
+            answer: redactedAnswer,
             embed_tokens: 0,
             chat_in_tokens: 0,
             chat_out_tokens: 0,
@@ -318,7 +328,7 @@ export async function logQuery(
             organization_id: organizationId,
             bot_version: response.botVersion,
             kind: response.kind,
-            question,
+            question: redactedQuestion,
             rewritten: response.rewrite?.rewritten ?? null,
             threshold: response.threshold,
             top_similarity:
@@ -326,7 +336,7 @@ export async function logQuery(
                 ? response.topSimilarity
                 : (response.sources[0]?.similarity ?? null),
             source_count: response.sources.length,
-            answer: response.answer,
+            answer: redactedAnswer,
             embed_tokens: response.embedTokens,
             chat_in_tokens: response.kind === 'answer' ? response.chatInputTokens : 0,
             chat_out_tokens: response.kind === 'answer' ? response.chatOutputTokens : 0,
@@ -426,7 +436,8 @@ export async function logBlockedQuery(input: {
       organization_id: input.organizationId ?? DEV_ORG_ID,
       bot_version: input.botVersion,
       kind: 'blocked',
-      question: input.question,
+      // C7 (v0.10) — AVG: ook de geblokkeerde (injection-)vraag PII-redacteren.
+      question: redactPii(input.question),
       rewritten: null,
       threshold: null,
       top_similarity: null,
