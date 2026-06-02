@@ -146,6 +146,11 @@ export async function getAllTimeUsage(
     totalTokens: 0,
   };
   try {
+    // NB (bekende limitatie): dit plat-select + JS-sum kapt af op de PostgREST
+    // db-max-rows (~1000) zodra een org meer dan ~1000 query_log-rijen heeft → de
+    // all-time totalen onder-tellen dan. Display-telemetrie (niet kostenkritisch),
+    // dus pre-existing en bewust niet in v0.10 herschreven; de kostenrem-som
+    // (budget.ts) is wél gepagineerd. Volledige fix = DB-side aggregate (aparte PR).
     const { data, error } = await sb()
       .from('query_log')
       .select(

@@ -1,10 +1,16 @@
 // C9 (v0.10) — AVG-verwijderpad: een widget-bezoeker wist zijn EIGEN gesprekken.
 //
 // Auth: dezelfde dual-auth als de chat (cookie OF geldig embed-token + same-origin),
-// via de gedeelde embed-auth-helpers. De visitor-id komt uit de EIGEN cookie/header
-// van de beller — NOOIT uit de request-body — zodat iemand alléén zijn eigen data kan
-// wissen, niet die van een andere bezoeker. De org komt uit de actieve-org-resolutie
-// (embed-token is org-gebonden), dus de verwijdering is strikt org-gescoped.
+// via de gedeelde embed-auth-helpers. De org komt uit de actieve-org-resolutie
+// (embed-token is org-gebonden), dus de verwijdering is strikt ORG-gescoped.
+//
+// Identiteits-scope = het V0 visitor-id-model: de id komt uit de EIGEN cookie/header van
+// de beller (x-chatmanta-visitor), NOOIT uit de request-body — exact hetzelfde signaal
+// dat de chat al voor thread-grouping gebruikt. Het is een 122-bit random device-id dat
+// alléén in de eigen browser-localStorage leeft (geen extern harvest-pad), GEEN
+// geauthenticeerde identiteit: wie het device-id van een ander kent (≈ toegang tot diens
+// browser) zou binnen dezelfde org diens gesprekken kunnen wissen. Voor de V0-sandbox
+// (fake demo-data) is dit het bewuste model; echte per-bezoeker-auth is V1.
 
 import { NextResponse } from 'next/server';
 import { isChatAuthorized } from '@/lib/v0/server/embed-auth';

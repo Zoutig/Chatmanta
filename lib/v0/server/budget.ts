@@ -60,17 +60,36 @@ function sb(): SupabaseClient {
 /** Som van query_log.cost_usd voor `organizationId` sinds UTC-middernacht. Fail-open:
  *  bij een lees-/DB-fout → 0 (de cap mag de bot niet platleggen bij een transiente
  *  fout), maar log luid zodat het niet onopgemerkt blijft. */
+// PostgREST levert per request maximaal ~1000 rijen (Supabase db-max-rows). Een plat
+// .select() + JS-sum zou de dag-som dus afkappen rond 1000 rijen → bij goedkope
+// gpt-4o-mini-vragen (~$0,0003) zadelt de som zich ruim ONDER de cap vast en klapt de
+// rem nooit dicht — precies de high-volume-abuse die de cap moet stoppen. Daarom
+// pagineren we met .range() tot de pagina niet meer vol is. Stabiele volgorde
+// (created_at asc) zodat pagina-grenzen kloppen; een rij die tijdens het pagineren
+// binnenkomt mag een paar cent over/onder tellen — acceptabel voor een backstop.
+const PAGE_SIZE = 1000;
+// Veiligheidsplafond tegen een eindeloze loop: 100 pagina's = 100k vragen/dag. Wie daar
+// overheen gaat zit hoe dan ook mijlenver over elke cap → de tot-dan-som klapt 'm dicht.
+const MAX_PAGES = 100;
+
 export async function getOrgSpendTodayUsd(organizationId: string): Promise<number> {
   try {
     const sinceIso = startOfUtcDayIso(new Date());
-    const { data, error } = await sb()
-      .from('query_log')
-      .select('cost_usd')
-      .eq('organization_id', organizationId)
-      .gte('created_at', sinceIso);
-    if (error) throw error;
     let sum = 0;
-    for (const r of data ?? []) sum += Number((r as { cost_usd: number | null }).cost_usd) || 0;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const from = page * PAGE_SIZE;
+      const { data, error } = await sb()
+        .from('query_log')
+        .select('cost_usd')
+        .eq('organization_id', organizationId)
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      const rows = data ?? [];
+      for (const r of rows) sum += Number((r as { cost_usd: number | null }).cost_usd) || 0;
+      if (rows.length < PAGE_SIZE) break; // laatste (incomplete) pagina
+    }
     return sum;
   } catch (err) {
     console.error(
