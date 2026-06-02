@@ -28,6 +28,8 @@
     "eval:run": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-run.ts",
     "eval:report": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-eval-report.ts",
     "eval:run-all": "npm run eval:seed && npm run eval:run && npm run eval:report",
+    "test:budget": "node --env-file=.env.local --conditions=react-server --import tsx scripts/test-budget-cap.ts",
+    "test:injection": "node --conditions=react-server --import tsx scripts/test-injection-mode.ts",
     "eval:hard:run": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-hard-eval-run.ts",
     "eval:hard:report": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-hard-eval-report.ts",
     "eval:hard:harvest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v0-hard-eval-harvest.ts",

@@ -6,6 +6,7 @@
 
 export const APP_ERROR_CODES = [
   'RATE_LIMIT',          // 429 — te veel requests in venster
+  'BUDGET_EXHAUSTED',    // 402 — per-org dag-budget (USD) bereikt (C3, v0.10)
   'LLM_TIMEOUT',         // OpenAI stream gaf geen output binnen budget
   'LLM_UNAVAILABLE',     // OpenAI-fout (5xx, quota, network)
   'EMBED_FAILED',        // text-embedding-3-small fout (chat- en ingest-pad)

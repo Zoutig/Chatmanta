@@ -22,6 +22,11 @@ export function userView(
         action: 'Probeer opnieuw',
       };
     }
+    case 'BUDGET_EXHAUSTED':
+      return {
+        title: 'De chat is even niet beschikbaar',
+        body: 'De chatassistent heeft vandaag zijn limiet bereikt en is morgen weer beschikbaar. Voor een dringende vraag kun je het beste rechtstreeks contact opnemen.',
+      };
     case 'LLM_TIMEOUT':
       return {
         title: 'Het antwoord duurde te lang',
