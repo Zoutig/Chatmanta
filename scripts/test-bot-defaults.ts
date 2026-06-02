@@ -217,14 +217,14 @@ assert.match(v093.systemPrompt, /GEOGRAFIE/, 'v0.9.3 behoudt de geo-guardrail');
 assert.equal(v093.decomposeHeuristicGate, true, 'v0.9.3 erft decomposeHeuristicGate=true van v0.9.2');
 assert.equal(v093.hardFactRefusalSafetyAware, true, 'v0.9.3 erft hardFactRefusalSafetyAware=true');
 
-// v0.10 — productie-hardening-snapshot bovenop v0.9.3. P3: byte-identiek gedrag
-// (systemPrompt + flags = v0.9.3). De C11-tune (hardFactRefusalFabricationClassOnly)
-// voegt apart een assertie toe wanneer 'm gezet wordt.
+// v0.10 — productie-hardening-snapshot bovenop v0.9.3. systemPrompt byte-identiek;
+// C11-tune = hardFactRefusalFabricationClassOnly (de enige GEDRAG-wijziging).
 const v010 = BOTS['v0.10'];
 assert.ok(v010, 'v0.10 ontbreekt uit BOTS-registry');
 assert.equal(v010.version, 'v0.10', 'v0.10 version-veld moet v0.10 zijn');
-assert.equal(v010.systemPrompt, v093.systemPrompt, 'v0.10 erft de v0.9.3-systemPrompt byte-identiek (P3-snapshot)');
-assert.equal(v010.hardFactDeterministicRefusal, true, 'v0.10 erft hardFactDeterministicRefusal=true van v0.9.3');
+assert.equal(v010.systemPrompt, v093.systemPrompt, 'v0.10 erft de v0.9.3-systemPrompt byte-identiek (geen prompt-wijziging)');
+assert.equal(v010.hardFactRefusalFabricationClassOnly, true, 'v0.10 zet de C11-lever hardFactRefusalFabricationClassOnly=true');
+assert.equal(v010.hardFactDeterministicRefusal, true, 'v0.10 erft hardFactDeterministicRefusal=true van v0.9.3 (de gate blijft aan, alleen ingeperkt)');
 assert.equal(v010.hardFactRefusalSafetyAware, true, 'v0.10 erft hardFactRefusalSafetyAware=true (112-handoff blijft beschermd)');
 assert.equal(v010.decomposeHeuristicGate, true, 'v0.10 erft decomposeHeuristicGate=true van v0.9.3');
 assert.equal(v010.adaptiveHardFactVerification, true, 'v0.10 erft adaptiveHardFactVerification=true (vereist voor de hard-fact-gate)');

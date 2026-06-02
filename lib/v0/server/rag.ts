@@ -2784,6 +2784,9 @@ KRITISCHE FORMAT-REGELS:
     adoptedHistoryEntity: unsupportedHistoryEntity,
     safetyAware: bot.hardFactRefusalSafetyAware === true,
     draftHasSafetyHandoff,
+    // v0.10 (C11) — fabricatie-klasse-lever: benign los getal weigert niet meer.
+    fabricationClassOnly: bot.hardFactRefusalFabricationClassOnly === true,
+    missingHardFacts,
   });
   if (bot.claimRegenerateEnabled && deterministicHardFactRefusal) {
     activeAnswerText =

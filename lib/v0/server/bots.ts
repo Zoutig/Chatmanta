@@ -1220,19 +1220,23 @@ const V0_9_3: BotConfig = {
 };
 
 // v0.10 — productie-hardening + over-refusal-tune. Append-only snapshot bovenop
-// v0.9.3. P3 = byte-identieke snapshot (alle GEDRAG-flags + systemPrompt = v0.9.3).
-// De bot-KWALITEIT-wijziging landt in C11: de deterministische hard-fact-weiger-gate
-// (hardFactDeterministicRefusal) krijgt dan hardFactRefusalFabricationClassOnly zodat
-// hij alleen nog op de FABRICATIE-KLASSE (geld/percentage/datum) vuurt i.p.v. élk
-// ongegrond getal — gericht op de v0.9.3-over-refusal (~13%) zónder de geld/datum-
-// fabricatie-bescherming te verzwakken. De v0.10 CODE-hardening (kosten-cap, AVG-laag,
-// isolatie, observability) zit buiten de bot-config.
+// v0.9.3. De bot-KWALITEIT-wijziging (C11) is hardFactRefusalFabricationClassOnly:
+// de deterministische hard-fact-weiger-gate vuurt niet meer op een puur benign
+// generiek getal (aantal/los nummer) dat net niet exact in de bron staat, maar
+// blijft volledig actief op de schadelijke fabricatie-klasse (geld/percentage/datum/
+// email/url/telefoon). NB: na de P4-meetfix bleek de v0.9.3-over-refusal al ~3% (de
+// eerdere ~13% was een CTA-regex-artefact) — deze lever richt zich op benign-getal-
+// over-refusal op echte productie-traffic en is op de huidige fixture eval-neutraal
+// én safety-neutraal. systemPrompt + alle overige GEDRAG-flags byte-identiek aan
+// v0.9.3. De v0.10 CODE-hardening (kosten-cap, AVG-laag, isolatie, observability)
+// zit buiten de bot-config.
 const V0_10: BotConfig = {
   ...V0_9_3,
   version: 'v0.10',
   label: 'v0.10 — productie-hardening + over-refusal-tune',
   description:
-    'v0.9.3-gedrag als basis voor de v0.10 productie-hardening (per-org dag-budget-cap, PII-redactie in logQuery, retentie-cron, widget graceful-degradatie, orgId-verplichting, startup-asserts) + de C11 over-refusal-tune. systemPrompt + alle GEDRAG-flags byte-identiek aan v0.9.3 in P3; de C11-tune (hardFactRefusalFabricationClassOnly) volgt apart.',
+    'v0.9.3-gedrag + C11 over-refusal-tune (hardFactRefusalFabricationClassOnly): de deterministische hard-fact-weiger-gate weigert niet meer op een puur benign generiek getal (aantal/los nummer) dat net niet in de bron staat, maar blijft volledig gate-en op de schadelijke fabricatie-klasse (geld/percentage/datum/email/url/telefoon). systemPrompt + alle overige GEDRAG-flags byte-identiek aan v0.9.3. Begeleidt de v0.10 code-hardening (per-org dag-budget-cap, PII-redactie in logQuery, retentie-cron, widget graceful-degradatie, orgId-verplichting, startup-asserts). NB: de v0.9.3-over-refusal bleek na de P4-meetfix al ~3% (de eerdere ~13% was een CTA-regex-artefact); deze lever richt zich op benign-getal-over-refusal op echte productie-traffic en is op de huidige fixture eval-neutraal + safety-neutraal.',
+  hardFactRefusalFabricationClassOnly: true,
 };
 
 // ---------------------------------------------------------------------------
