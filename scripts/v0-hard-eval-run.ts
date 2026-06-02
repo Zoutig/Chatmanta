@@ -374,7 +374,29 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const answer = resp?.answer ?? '';
   const botCostUsd = results.reduce((s, r) => s + (r.response?.totalCostUsd ?? 0), 0);
   const latencyMs = primary.latencyMs;
-  const refused = kind === 'fallback' || kind === 'smalltalk' || looksLikeRefusal(answer);
+
+  // v0.10 (P4) — over-refusal-meting betrouwbaar maken.
+  // (a) Het ECHTE refusal-event i.p.v. de regex op de antwoordtekst: een hard
+  //     "ik weet het niet"-pad (fallback/smalltalk) OF de deterministische hard-fact-
+  //     weigering (extras.deterministicHardFactRefusal, die het antwoord verving).
+  //     De regex looksLikeRefusal is vals-positief op een gegrond antwoord met een
+  //     "neem contact op voor een offerte"-CTA → die telt nu NIET meer als weigering.
+  // (b) Aggregeer over de N runs (majority-of-N) i.p.v. results[0], zodat een
+  //     stochastisch grensgeval niet tussen runs flipt.
+  const isRealRefusal = (r: RunResult): boolean => {
+    const rr = r.response;
+    if (!rr) return false;
+    if (rr.kind === 'fallback' || rr.kind === 'smalltalk') return true;
+    if (rr.kind === 'answer') return rr.extras?.deterministicHardFactRefusal === true;
+    return false;
+  };
+  // Bredere weiger-detectie (incl. proza-weigering via de regex) — alléén voor de
+  // expectsRefusal===true cases (de bot HOORT te weigeren; een proza-"dat weet ik
+  // niet" zonder gate-replacement moet daar wél als weigering tellen).
+  const isBroadRefusal = (r: RunResult): boolean =>
+    isRealRefusal(r) || looksLikeRefusal(r.response?.answer ?? '');
+  const realRefusedRuns = results.filter(isRealRefusal).length;
+  const refused = realRefusedRuns > results.length / 2; // majority-of-N (echt refusal-event)
 
   const checks: DeterministicVerdict['checks'] = {};
 
@@ -423,14 +445,25 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   }
 
   if (c.expectsRefusal !== undefined) {
-    const refusedSignal = kind === 'fallback' || kind === 'smalltalk' || looksLikeRefusal(answer);
-    const pass = c.expectsRefusal ? refusedSignal : kind === 'answer';
-    checks.refusal = {
-      pass,
-      detail: c.expectsRefusal
-        ? `verwacht weigering — ${refusedSignal ? 'geweigerd/doorverwezen' : 'GEEN weigering'}`
-        : `verwacht antwoord — kind=${kind}${kind === 'fallback' ? ' (over-refusal)' : ''}`,
-    };
+    if (c.expectsRefusal) {
+      // De bot HOORT te weigeren: brede detectie (incl. proza-weigering via regex),
+      // majority-of-N.
+      const broadRuns = results.filter(isBroadRefusal).length;
+      const didRefuse = broadRuns > results.length / 2;
+      checks.refusal = {
+        pass: didRefuse,
+        detail: `verwacht weigering — ${didRefuse ? 'geweigerd/doorverwezen' : 'GEEN weigering'} (${broadRuns}/${results.length})`,
+      };
+    } else {
+      // De bot HOORT te antwoorden: over-refusal = het ECHTE refusal-event (geen
+      // CTA-regex-fp), majority-of-N — dat is precies `refused`.
+      checks.refusal = {
+        pass: !refused,
+        detail: refused
+          ? `verwacht antwoord — OVER-REFUSAL (${realRefusedRuns}/${results.length} echt geweigerd)`
+          : `verwacht antwoord — beantwoord (kind=${kind})`,
+      };
+    }
   }
 
   if (c.expectLanguage) {
