@@ -154,6 +154,10 @@ async function runBotOnce(args: {
       // binnen dezelfde versie zou een gecacht (stale) antwoord van vóór de fix
       // worden geserveerd. De eval moet altijd het HUIDIGE bot-gedrag testen.
       disableCache: true,
+      // Geef de judge de VOLLEDIGE parent_content (= de bot's SURROUNDING_CONTEXT)
+      // i.p.v. het ≤800-char parentExcerpt-preview, anders flag't de judge
+      // gegronde getallen voorbij teken ~800 als "verzonnen" (false grounding-fail).
+      includeFullParentContent: true,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         response = ev.response;
@@ -172,17 +176,24 @@ async function runBotOnce(args: {
 function sourceTexts(resp: ChatResponse | null): string[] {
   if (!resp) return [];
   if (resp.kind === 'answer' || resp.kind === 'fallback') {
-    return resp.sources.map((s) => s.parentExcerpt ?? s.contentExcerpt);
+    // parentContentFull = de ONgetrunceerde SURROUNDING_CONTEXT die de bot zag
+    // (eval-only veld, gevuld via includeFullParentContent). Val terug op het
+    // ≤800-char parentExcerpt-preview en daarna het small-chunk contentExcerpt
+    // voor oude responses/chunks zonder parent.
+    return resp.sources.map((s) => s.parentContentFull ?? s.parentExcerpt ?? s.contentExcerpt);
   }
   return [];
 }
 
-// Bronnen die de judge te zien krijgt. Vroeger: top-3 × 420 chars — dat liet de
-// judge grounding/correctness beoordelen tegen een afgekapt beeld (een gegrond
-// feit voorbij bron #3 of teken 420 leek dan "verzonnen"). Nu: ÁLLE opgehaalde
-// bronnen, elk tot 1200 chars, totaal-cap 6000 om de queue leesbaar te houden.
-const JUDGE_SOURCE_PER = 1200;
-const JUDGE_SOURCE_TOTAL = 6000;
+// Bronnen die de judge te zien krijgt. Historie: top-3 × 420 → ÁLLE bronnen ×
+// 1200 (#165). Beide lieten de judge nog tegen een AFGEKAPT beeld oordelen:
+// parentExcerpt is zelf een ≤800-char preview, dus een gegrond getal voorbij
+// teken ~800 leek "verzonnen" (systematische false grounding-fails — de
+// smoking gun bleef). Nu: de VOLLEDIGE parent_content (= wat de bot zag) per
+// bron, ruime caps zodat we niet alsnog afkappen; totaal-cap puur als
+// runaway-rem bij veel/grote bronnen.
+const JUDGE_SOURCE_PER = 8000;
+const JUDGE_SOURCE_TOTAL = 24000;
 function judgeSources(resp: ChatResponse | null): string[] {
   const out: string[] = [];
   let budget = JUDGE_SOURCE_TOTAL;

@@ -921,6 +921,16 @@ export type ChatSource = {
    * lege allowlist → eventuele verzonnen links worden alsnog gestript).
    */
   url?: string | null;
+  /**
+   * EVAL-ONLY: de VOLLEDIGE `parent_content` die de answer-LLM als
+   * SURROUNDING_CONTEXT kreeg (zie regel ~2236) — ONgetrunceerd, in
+   * tegenstelling tot het ≤800-char `parentExcerpt`-preview. Alleen gevuld
+   * wanneer `runRagQueryStreaming({ includeFullParentContent: true })` (de
+   * Harde-Dimensie/Productie-gate-eval), zodat de Claude-judge grounding
+   * beoordeelt tegen EXACT wat de bot zag i.p.v. een afgekapt beeld. NOOIT
+   * gezet op het productie-/chat-pad → de response-cache blijft onaangeraakt.
+   */
+  parentContentFull?: string;
 };
 
 export type ChatRewriteInfo = {
@@ -1155,7 +1165,7 @@ function truncateSentence(text: string, min: number, max: number): string {
   return text.slice(0, max).trimEnd() + '…';
 }
 
-function toSource(c: RetrievedChunk): ChatSource {
+function toSource(c: RetrievedChunk, includeFullParent = false): ChatSource {
   const contentExcerpt = truncateSentence(c.content, EXCERPT_MIN, EXCERPT_MAX);
   // Parent-content is alleen aanwezig als bot.parentDocumentRetrieval=true
   // EN de chunk een gehydrateerde parent had. Null of undefined → we slaan
@@ -1174,6 +1184,11 @@ function toSource(c: RetrievedChunk): ChatSource {
     similarity: c.similarity,
     contentExcerpt,
     ...(parentExcerpt !== undefined ? { parentExcerpt } : {}),
+    // EVAL-ONLY: volledige parent_content (ongetrunceerd) zodat de judge ziet
+    // wat de bot zag. Productie zet includeFullParent niet → veld afwezig.
+    ...(includeFullParent && typeof c.parent_content === 'string' && c.parent_content.length > 0
+      ? { parentContentFull: c.parent_content }
+      : {}),
     parentIndex: c.parent_index ?? null,
     ...(c.source_url ? { url: c.source_url } : {}),
   };
@@ -1263,7 +1278,7 @@ export async function runRagQuery({
     }
   }
   const merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
-  const allSources = merged.map(toSource);
+  const allSources = merged.map((c) => toSource(c));
   const topSim = merged[0]?.similarity ?? null;
 
   // 5. Threshold filter.
@@ -1330,7 +1345,7 @@ export async function runRagQuery({
     kind: 'answer',
     answer: chat.text.trim(),
     rewrite: rewriteInfo,
-    sources: final.slice(0, used).map(toSource),
+    sources: final.slice(0, used).map((c) => toSource(c)),
     threshold,
     embedTokens,
     chatInputTokens: chat.inputTokens + rerankInputTokens,
@@ -1423,6 +1438,16 @@ export async function* runRagQueryStreaming(input: {
    * aan zodat hij ALTIJD het huidige bot-gedrag test, niet een gecachte run.
    */
   disableCache?: boolean;
+  /**
+   * EVAL-ONLY: voeg op elke ChatSource het ongetrunceerde `parentContentFull`
+   * toe (de volledige SURROUNDING_CONTEXT die de answer-LLM kreeg). De
+   * Harde-Dimensie/Productie-gate-eval zet dit aan zodat de Claude-judge
+   * grounding beoordeelt tegen EXACT wat de bot zag i.p.v. het ≤800-char
+   * `parentExcerpt`-preview (dat liet gegronde getallen voorbij teken ~800
+   * "verzonnen" lijken — false grounding-fails). Default uit → productie/cache
+   * onaangeraakt.
+   */
+  includeFullParentContent?: boolean;
   /**
    * Per-query HyDE-modus override (v0.5 evaluatie-toggle). 'auto' of undefined
    * = volg bot-config. Override wint altijd, ook over bots met useHyDE=false.
@@ -1906,7 +1931,7 @@ export async function* runRagQueryStreaming(input: {
     selectiveHyDEEmbedTokens = hydeEmbed.tokens;
     selectiveHyDEEmbedCost = hydeEmbed.costUsd;
   }
-  const allSources = merged.map(toSource);
+  const allSources = merged.map((c) => toSource(c));
 
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
@@ -2293,7 +2318,7 @@ KRITISCHE FORMAT-REGELS:
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
   yield { kind: 'status', phase: 'answer' };
-  const usedSources = final.slice(0, used).map(toSource);
+  const usedSources = final.slice(0, used).map((c) => toSource(c, input.includeFullParentContent ?? false));
   yield {
     kind: 'answer-start',
     botVersion: bot.version,
