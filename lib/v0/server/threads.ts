@@ -372,3 +372,55 @@ export async function deleteThread(
     .is('deleted_at', null);
   if (error) throw new Error(`deleteThread: ${error.message}`);
 }
+
+// ---------------------------------------------------------------------------
+// C9 (v0.10) — AVG-verwijderrecht: HARD-delete alle gesprekken van één visitor
+// binnen één org. Anders dan deleteThread (soft-delete op thread-id) en C8-retentie
+// (org-brede anonimisering op leeftijd): dit wist de daadwerkelijke rijen voor een
+// specifieke visitor_id, strikt org-gescoped.
+//
+// v0_thread_messages heeft GEEN organization_id → org-scope loopt via thread_id IN
+// de (org + visitor)-eigen threads (zelfde JOIN-idee als listThreads/retention).
+// orgId is verplicht (geen DEV_ORG_ID-default): een verwijderactie mag nooit stil op
+// de verkeerde tenant landen.
+// ---------------------------------------------------------------------------
+export async function deleteVisitorData(
+  organizationId: string,
+  visitorId: string,
+): Promise<{ threadsDeleted: number; messagesDeleted: number }> {
+  if (!organizationId) throw new Error('deleteVisitorData: organizationId verplicht');
+  if (!visitorId) return { threadsDeleted: 0, messagesDeleted: 0 };
+  const sb = db();
+
+  // 1. Thread-ids van deze visitor BINNEN deze org (de org-grens).
+  const { data: threads, error: selErr } = await sb
+    .from('v0_threads')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('visitor_id', visitorId);
+  if (selErr) throw new Error(`deleteVisitorData(select): ${selErr.message}`);
+  const ids = (threads ?? []).map((t) => (t as { id: string }).id);
+  if (ids.length === 0) return { threadsDeleted: 0, messagesDeleted: 0 };
+
+  // 2. Messages eerst (org-scope via thread_id IN de org-eigen threads).
+  const { data: delMsgs, error: msgErr } = await sb
+    .from('v0_thread_messages')
+    .delete()
+    .in('thread_id', ids)
+    .select('id');
+  if (msgErr) throw new Error(`deleteVisitorData(messages): ${msgErr.message}`);
+
+  // 3. Threads zelf — dubbel-gescoped op org + visitor (defense-in-depth).
+  const { data: delThreads, error: thrErr } = await sb
+    .from('v0_threads')
+    .delete()
+    .eq('organization_id', organizationId)
+    .eq('visitor_id', visitorId)
+    .select('id');
+  if (thrErr) throw new Error(`deleteVisitorData(threads): ${thrErr.message}`);
+
+  return {
+    threadsDeleted: (delThreads ?? []).length,
+    messagesDeleted: (delMsgs ?? []).length,
+  };
+}

@@ -383,6 +383,33 @@ export function ChatMantaWidget({
     }
   }, [orgSlug]);
 
+  // C9 (v0.10) — AVG-verwijderpad: de bezoeker wist zijn eigen gesprekken. De
+  // visitor-id gaat als header mee (zelfde identiteit als de chat) zodat de server
+  // alléén déze bezoeker zijn data verwijdert, org-gescoped. De lokale staat wordt
+  // sowieso gewist (de bezoeker wil 'weg'), ook als de server-call faalt.
+  const handleDeleteConversations = useCallback(async () => {
+    if (typeof window !== 'undefined' &&
+        !window.confirm('Weet je zeker dat je je gesprek wilt verwijderen? Dit kan niet ongedaan worden gemaakt.')) {
+      return;
+    }
+    const visitorId =
+      visitorIdRef.current ?? (visitorIdRef.current = getOrCreateVisitorId());
+    try {
+      await fetch(`/api/v0/widget/delete-conversations?org=${encodeURIComponent(orgSlug)}`, {
+        method: 'POST',
+        headers: {
+          ...(embedTokenRef.current ? { 'x-chatmanta-embed': embedTokenRef.current } : {}),
+          ...(visitorId ? { 'x-chatmanta-visitor': visitorId } : {}),
+        },
+      });
+    } catch {
+      // best-effort — lokaal toch wissen.
+    }
+    setMessages([]);
+    setThreads([]);
+    setActiveThreadId(null);
+  }, [orgSlug]);
+
   // Kern van het chat-request: fetch + token-refresh-retry + stream-verwerking
   // voor een bestaande assistant-bubble. Gedeeld door `send` (nieuwe vraag) en
   // `retry` (mislukt bericht opnieuw). De caller zet `pending` aan en voegt de
@@ -1182,6 +1209,34 @@ export function ChatMantaWidget({
             >
               ChatManta
             </a>
+            {/* C9 (v0.10) — AVG-disclosure + verwijderpad */}
+            <div style={{ marginTop: 4, fontSize: 10.5, color: '#9ca3af', lineHeight: 1.5 }}>
+              Je gesprek wordt tijdelijk opgeslagen om je beter te helpen.{' '}
+              <a
+                href="/privacy"
+                style={{ color: '#6b7280', textDecoration: 'underline' }}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Privacy
+              </a>
+              {' · '}
+              <button
+                type="button"
+                onClick={() => void handleDeleteConversations()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  color: '#6b7280',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                }}
+              >
+                Verwijder mijn gesprek
+              </button>
+            </div>
           </div>
 
           {/* Thread-drawer als overlay binnen het paneel. Hij zit boven de
