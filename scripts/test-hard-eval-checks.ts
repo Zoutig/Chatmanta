@@ -5,8 +5,12 @@ import { join } from 'node:path';
 import {
   canaryLeaked,
   looksLikeRefusal,
+  looksLikeHardRefusal,
+  isRefusalForCalibration,
+  SUBSTANTIVE_ANSWER_MIN_CHARS,
   scopeMarkersSatisfied,
   selfConsistencyVariance,
+  consistencyWithGrounding,
   finalCaseStatus,
   computeProductionGate,
   percentile,
@@ -52,6 +56,67 @@ check('weigering "weet ik niet" → refusal', looksLikeRefusal('Dat weet ik hela
 check('doorverwijzing "neem contact op" → refusal', looksLikeRefusal('Neem gerust contact op met ons kantoor.'), true);
 check('buiten werkgebied → refusal', looksLikeRefusal('Dat valt buiten ons werkgebied.'), true);
 check('feitelijk antwoord → geen refusal', looksLikeRefusal('Een dakrenovatie duurt gemiddeld 3 tot 5 werkdagen.'), false);
+
+// --- looksLikeHardRefusal + isRefusalForCalibration (eval-fix A) -------------
+// looksLikeRefusal blijft ÓÓK op soft-CTA matchen (expected-refusal-verificatie);
+// looksLikeHardRefusal matcht ALLÉÉN echte weiger-markers.
+check('hardRefusal: "weet ik niet" → hard', looksLikeHardRefusal('Dat weet ik helaas niet.'), true);
+check('hardRefusal: "buiten ons werkgebied" → hard', looksLikeHardRefusal('Dat valt buiten ons werkgebied.'), true);
+check('hardRefusal: soft contact-CTA → NIET hard', looksLikeHardRefusal('Neem gerust contact op met ons kantoor.'), false);
+check('looksLikeRefusal: soft-CTA blijft refusal (ongewijzigd)', looksLikeRefusal('Neem gerust contact op met ons kantoor.'), true);
+
+// Substantieel antwoord (≥ SUBSTANTIVE_ANSWER_MIN_CHARS) dat eindigt op een CTA.
+const substAnswerWithCta =
+  'Ja, fysiotherapie kan meetellen voor je eigen risico, afhankelijk van je zorgverzekering en het type behandeling. ' +
+  'Bij een chronische indicatie geldt het eigen risico vanaf de 21e behandeling, bij niet-chronische zorg meestal niet. ' +
+  'Voor de exacte dekking kun je het beste contact opnemen met je zorgverzekeraar.';
+check('substantieel antwoord is ≥ drempel', substAnswerWithCta.length >= SUBSTANTIVE_ANSWER_MIN_CHARS, true);
+check(
+  'calibratie: volledig antwoord + afsluitende CTA (kind=answer) → GEEN over-refusal',
+  isRefusalForCalibration(substAnswerWithCta, 'answer'),
+  false,
+);
+check(
+  'calibratie: korte CTA-only (kind=answer) → wél weigering',
+  isRefusalForCalibration('Hiervoor kun je het beste contact met ons opnemen.', 'answer'),
+  true,
+);
+check(
+  'calibratie: lange tekst mét harde weiger-marker (kind=answer) → wél weigering',
+  isRefusalForCalibration(
+    'Dat weet ik helaas niet uit de beschikbare informatie. Wat ik wel kan zeggen is dat fysiotherapie vaak vergoed ' +
+      'wordt, maar voor jouw specifieke situatie en het eigen risico verwijs ik je naar je zorgverzekeraar, die je ' +
+      'hier verder goed over kan informeren en alle details kan toelichten.',
+    'answer',
+  ),
+  true,
+);
+check('calibratie: smalltalk-deflectie → weigering', isRefusalForCalibration('Natuurlijk! Heb je een specifieke vraag?', 'smalltalk'), true);
+check('calibratie: fallback → weigering', isRefusalForCalibration('', 'fallback'), true);
+check('calibratie: gewoon antwoord zonder marker → geen weigering', isRefusalForCalibration('Een dakrenovatie duurt 3 tot 5 werkdagen.', 'answer'), false);
+
+// --- consistencyWithGrounding (eval-fix B2) ----------------------------------
+const alwaysGrounded = () => true;
+const cwgConsistent = consistencyWithGrounding(
+  [{ answer: 'Het tarief is 19% tot € 200.000.', sources: [] }, { answer: 'Het Vpb-tarief is 19% tot € 200.000.', sources: [] }],
+  alwaysGrounded,
+);
+check('cwg: identieke feiten → pass + consistent', cwgConsistent.pass && cwgConsistent.consistent, true);
+
+const cwgDivGrounded = consistencyWithGrounding(
+  [{ answer: 'Het tarief is 19% tot € 200.000.', sources: [] }, { answer: 'Het tarief is 19% en 25,8% tot € 200.000.', sources: [] }],
+  alwaysGrounded,
+);
+check('cwg: divergent maar elke run gegrond → pass (advisory)', cwgDivGrounded.pass, true);
+check('cwg: advisory-divergentie geflagd', cwgDivGrounded.advisoryDivergence && !cwgDivGrounded.consistent, true);
+check('cwg: divergerende categorie = percentages', cwgDivGrounded.divergingCategories.includes('percentages'), true);
+
+const cwgDivUngrounded = consistencyWithGrounding(
+  [{ answer: 'Het tarief is 19%.', sources: [] }, { answer: 'Het tarief is 21%.', sources: [] }],
+  (a) => !a.includes('21%'), // run 2 verzint 21% → ongegrond
+);
+check('cwg: divergent + één run ongegrond → HARD fail', cwgDivUngrounded.pass === false, true);
+check('cwg: ongegronde divergentie is GEEN advisory', cwgDivUngrounded.advisoryDivergence === false, true);
 
 // --- scopeMarkersSatisfied --------------------------------------------------
 check('require: marker aanwezig → ok', scopeMarkersSatisfied('Wij doen dakwerken en isolatie.', ['dak'], 'require'), true);
@@ -247,6 +312,14 @@ const unst = unstableCases([
   dv({ caseId: 's3', checks: {} }),
 ]);
 check('unstableCases: alleen gezakte consistency', unst.length === 1 && unst[0].caseId === 's1', true);
+
+// eval-fix B2: een gegronde (advisory) divergentie heeft pass=true maar moet wél
+// zichtbaar blijven in de stabiliteits-sectie (detail bevat "divergeert").
+const unstAdvisory = unstableCases([
+  dv({ caseId: 'a1', checks: { consistency: { pass: true, detail: 'divergeert op percentages — elke run gegrond (advisory)' } } }),
+  dv({ caseId: 'a2', checks: { consistency: { pass: true, detail: '3 runs consistent' } } }),
+]);
+check('unstableCases: advisory-divergentie (pass=true) wél zichtbaar', unstAdvisory.length === 1 && unstAdvisory[0].caseId === 'a1', true);
 
 // --- harvest-selectie (Laag 3 — Groep 1) -------------------------------------
 check('normalizeQuestion: lowercase + trim + trailing ?', normalizeQuestion('  Hoeveel Kost Het?  ') === 'hoeveel kost het', true);
