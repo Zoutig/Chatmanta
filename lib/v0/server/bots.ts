@@ -1308,7 +1308,17 @@ export const BOTS: Record<string, BotConfig> = {
 // Engelse vragen in het Engels laat beantwoorden (Productie-gate Laag 4 vond
 // language=FAIL op v0.9.2 EN-cases). Puur prompt-append aan het eind; geen
 // pipeline-/retrieval-wijziging. v0.9.2 blijft byte-identiek + append-only.
-export const LATEST_BOT_VERSION = V0_9_3.version;
+// GEPROMOVEERD naar v0.10 (2026-06-03) — productie-hardening + over-refusal-tune.
+// Eind-gate (runs=3 op de kandidaat, mét de #168-judge-fix): v0.10 = PRODUCTIEWAARDIG
+// JA (100% 59/59, 0 veiligheidsveto's, over-refusal 3% ≤ drempel, under-refusal 0%);
+// v0.9.3 = NEE op dezelfde run (2 schendingen: een nfs-exacte-prijs-fabricatie die
+// v0.10 correct weigerde + een consistency-divergentie). De C11 fabricatie-klasse-lever
+// is op de fixture eval-neutraal én safety-neutraal — de JA steunt op de eval-bewezen
+// v0.9.3-veiligheidskern + de P4-meetfix + multi-run-robuustheid, niet op de lever zelf.
+// v0.10 is op élke deterministische as ≥ v0.9.3. Promotie ALLEEN op deze branch (niet
+// gemerged/gedeployd) — zie V0_10_BUILD_REPORT.md voor de gate-output + caveats.
+// v0.9.3 blijft byte-identiek + append-only behouden.
+export const LATEST_BOT_VERSION = V0_10.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [

@@ -154,10 +154,10 @@ assert.equal(v073.generalKnowledgeEnabled, true, 'v0.7.3 erft generalKnowledgeEn
 // Append-only: v0.7.2 niet gemuteerd door de v0.7.3-toevoeging
 assert.doesNotMatch(v072.systemPrompt, /WEIGER KORT EN SCHOON/, 'append-only: v0.7.2 krijgt de v0.7.3-carve-out NIET');
 
-// LATEST blijft v0.9.3 tot ná een acceptabele v0.10-gate (DoD §6.4); dan flipt deze
-// assertie mee naar v0.10. v0.10 ZIT al in de registry (append-only) maar is nog niet
-// de default.
-assert.equal(LATEST_BOT_VERSION, 'v0.9.3', 'LATEST_BOT_VERSION moet v0.9.3 zijn tot de v0.10-gate (DoD §6.4); v0.10 zit wel in de registry');
+// LATEST gepromoveerd naar v0.10 ná de groene eind-gate (DoD §6.4, 2026-06-03):
+// v0.10 = PRODUCTIEWAARDIG JA, ≥ v0.9.3 op elke deterministische as. Promotie ALLEEN
+// op de branch feat/seb/v0-10-autonoom (niet gemerged/gedeployd).
+assert.equal(LATEST_BOT_VERSION, 'v0.10', 'LATEST_BOT_VERSION = v0.10 na de groene eind-gate (DoD §6.4)');
 assert.deepEqual(BOT_VERSIONS_ORDERED, ['v0.1', 'v0.2', 'v0.3', 'v0.4', 'v0.5', 'v0.6', 'v0.7.1', 'v0.7.2', 'v0.7.3', 'v0.8.1', 'v0.9', 'v0.9.1', 'v0.9.2', 'v0.9.3', 'v0.10']);
 
 // v0.9 (iter2) — append-only deterministische hard-fact-weigering. Aanwezig in de
@@ -249,4 +249,4 @@ console.log(`✓ v0.9.1 = safety-aware weigering + scope-hardening (geen decompo
 console.log(`✓ v0.9.2 = latency-pass (decomposeHeuristicGate=true), prompt byte-identiek aan v0.9.1, GEEN rerankSkipOnStrong`);
 console.log(`✓ v0.9.3 = in-place gestroomlijnde prompt (#167, RESTRUCTURE-PRESERVE), veiligheidskern behouden`);
 console.log(`✓ v0.10 = productie-hardening-snapshot bovenop v0.9.3 (P3: byte-identiek gedrag), v0.9.3 ongewijzigd`);
-console.log(`✓ LATEST_BOT_VERSION = v0.9.3 (tot de v0.10-gate), BOT_VERSIONS_ORDERED = [v0.1..v0.10]`);
+console.log(`✓ LATEST_BOT_VERSION = v0.10 (groene eind-gate, DoD §6.4), BOT_VERSIONS_ORDERED = [v0.1..v0.10]`);
