@@ -13,11 +13,11 @@ Je werkt in de ChatManta-codebase en kent de projectcontext. Dit is een wrapper 
 leidend spec-bestand — niet een tweede spec.
 
 ## Bron van waarheid
-`docs/V0_10_BUILD_CRITERIA_AUTONOOM.md` is je VOLLEDIGE, leidende opdracht: P1–P3 (prereqs),
+`docs/V0_10_BUILD_CRITERIA_AUTONOOM.md` is je VOLLEDIGE, leidende opdracht: P1–P4 (prereqs),
 C1–C13 (build-items, elk met "Klaar wanneer" + "Verifieer met"), §6 (Definition of Done). Lees
 het bestand eerst volledig. **Conflicteert iets in deze wrapper met de MD, dan wint de MD.**
-Deze wrapper voegt alleen vier beslissingen + een paar repo-feiten toe die in de MD onvoldoende
-scherp staan.
+Deze wrapper voegt alleen de uitvoeringsbeslissingen + een paar repo-feiten toe die in de MD
+onvoldoende scherp staan.
 
 ## Eerste actie (vóór je ook maar één bestand analyseert)
 De branch `feat/seb/v0-10-autonoom` BESTAAT AL — aangemaakt off `origin/main` met déze spec +
@@ -26,7 +26,11 @@ prompt erop gecommit. Her-maak de branch NIET.
 2. Maak je worktree op de bestaande branch: `git worktree add ../chatmanta-v0-10
    feat/seb/v0-10-autonoom`. Kopieer `.env.local` erin en draai `npm ci` (worktrees hebben eigen
    node_modules; Turbopack-dev wil een echte install). Gebruik een vrije poort (`next dev -p 3001`).
-3. HARD-VERIFY vóór analyse: `git show HEAD:lib/v0/server/bots.ts | Select-String
+3. **PRE-FLIGHT FAIL-FAST (kritiek):** draai één smoke-`npm run v0:chat`. Komt er GEEN echt
+   antwoord terug (ontbrekende `OPENAI_API_KEY` in de worktree-`.env.local`, lege `node_modules`,
+   etc.) → **STOP en rapporteer**. Ga NIET de nacht in met een kapotte setup — dan draait elke
+   eval key-loos en is alles stil verspild. Pas door als de smoke een normaal antwoord geeft.
+4. HARD-VERIFY vóór analyse: `git show HEAD:lib/v0/server/bots.ts | Select-String
    'LATEST_BOT_VERSION'` → moet `V0_9_3` tonen, en de hoogste migratie is `0045_*` (volgende
    veilige nummer = 0046). Klopt dit niet → STOP en rapporteer; bouw nooit op een tree waar
    v0.9.3 ontbreekt (anders kopieert P3 een stale snapshot en meet C11 de over-refusal tegen
@@ -39,17 +43,18 @@ PR #168 (judge ziet volledige parent_content i.p.v. ≤800-char preview) zit al 
 bevestig de caps en stel je baselines (v0.9.2/v0.9.3) empirisch opnieuw vast — vertrouw geen
 onthouden verdict-getal (de oude "v0.9.2 = JA ~93% / v0.8.1 = NEE" is pre-#168). Zie MD §P2.
 
-## Orchestratie
-Voer dit uit via de **`big-ship` skill**: één sequentiële implementer die de MD stage-voor-stage
-bouwt (P1→P3→C1→C13), met advies-subagents op beslispunten (RAG-tuning C11, security AVG-laag
-C7–C9) en een adversariële review-loop aan het eind (/code-review ⇄ Codex = de "Code Review
-Agent"). GEEN rauwe 5-agent-parallel-Workflow — parallelle file-editors racen op `bots.ts` en
-breken de tsc/build-gates. De big-ship design/tournament-fase neemt §3–§5 als **vaste, gesloten
-scope**: recon mag bepalen HOE je C1–C13 bouwt, niet WELKE criteria erbij komen. De ~45-criteria
-analyse-docs zijn achtergrond, geen scope.
+## Orchestratie — GEEN skill met sign-off-gates
+Dit is een onbewaakte nacht-run. Gebruik **GEEN** `big-ship` (tournament-/spec-/ultra-sign-off-gates
+stallen VÓÓR de bouw → de nacht is verspild voor er één C-item staat) en **GEEN** `ship-feature`
+(spec/plan-sign-off kan onbewaakt pauzeren). Deze MD ÍS al je spec+plan. **Voer 'm zelf
+stage-voor-stage uit als één sequentiële implementer** (P1→P4→C1→C13). Zet subagents alleen in als
+**advies** op beslispunten (RAG-tuning C11, security AVG-laag C7–C9), en sluit af met een
+adversariële **review-loop** (/code-review ⇄ Codex = de "Code Review Agent"). Bouw nooit een gate
+die op een mens wacht. GEEN parallelle file-editors — die racen op `bots.ts` en breken de
+tsc/build-gates. §3–§5 is **vaste, gesloten scope**; de ~45-criteria analyse-docs zijn achtergrond.
 
 ## Scope (gesloten)
-- Bouw ALLEEN P1–P3 + C1–C13. Respecteer per criterium de build-vs-verify-marker: **C5 en C13
+- Bouw ALLEEN P1–P4 + C1–C13. Respecteer per criterium de build-vs-verify-marker: **C5 en C13
   zijn verify-only** (test/spot-check, geen nieuwbouw); **C6/C10 bedraden of verharden bestaande
   code** — niet her-architecteren. Kleinste correcte wijziging die "Klaar wanneer" +
   "Verifieer met" haalt.
@@ -90,6 +95,12 @@ analyse-docs zijn achtergrond, geen scope.
   ~93%, v0.8.1 = NEE) zijn pre-#168 en mogelijk stale. Lees de werkelijke gate-output
   (`eval-out/hard/`) en stel je ijkpunt daarop vast vóór je C11/C12 tunet. Regressie-diff = tegen
   v0.9.2/v0.9.3.
+- **Over-refusal-meting eerst betrouwbaar maken (P4).** De huidige over-refusal-maat is een regex
+  op run[0] die false-positief is op goede "neem contact op"-antwoorden → onbetrouwbaar op n=30.
+  Doe P4 (tel op het échte refusal-event + majority-of-N) VÓÓR je C11 tunet, en lees elke
+  over-refusal-hit handmatig na. **≤5% is met n=30 niet hard te certificeren** — verwacht dus de
+  §6.3-fallback (over-refusal aantoonbaar < v0.9.3 + 0 fabricatie + gap-analyse), dat is een
+  volwaardige uitkomst, geen mislukking.
 - **Veiligheid boven JA.** Lukt over-refusal omlaag niet zonder fabricatie te herintroduceren →
   blijf NIET de gate losser zetten om een JA te forceren. Neem de §6.3-Fallback. Een verzonnen
   PASS is een failure; een eerlijk gedocumenteerde gap is succes.

@@ -20,6 +20,8 @@ Lever **botversie v0.10**, gebouwd bovenop **v0.9.3** (de huidige `LATEST_BOT_VE
 ## 1. Harde guardrails (NIET overtreden — ook niet 's nachts)
 
 - **Branch & isolatie.** Werk in een eigen worktree/branch (`feat/seb/v0-10-autonoom`), gebaseerd op **`origin/main`** (= v0.9.3). De huidige lokale werkbranch loopt achter; begin met `git fetch origin && git checkout -b feat/seb/v0-10-autonoom origin/main`. `origin/main` bevat nu de #168-judge-fix (commit `ce25dbc`) — fetch eerst, anders mis je 'm en is je gate stale.
+- **Uitvoeringsmodel: GEEN orchestratie-skill met sign-off-gates.** Dit is een onbewaakte nacht-run. Gebruik **niet** `big-ship` (heeft tournament-/spec-/ultra-sign-off-gates die VÓÓR de bouw stallen) en **niet** `ship-feature` (spec/plan-sign-off kan onbewaakt pauzeren). Deze MD ÍS al je spec+plan — voer 'm zelf **stage-voor-stage** uit als één sequentiële implementer. Zet subagents alleen in als **advies** op beslispunten (RAG-tuning C11, AVG-laag C7–C9) en sluit af met een **review-loop** (`/code-review` ⇄ Codex). Nooit een gate inbouwen die op een mens wacht.
+- **Pre-flight fail-fast (vóór je íets bouwt).** `.env.local` is gitignored en reist niet mee naar een worktree. Na worktree-setup: kopieer `.env.local` erin, draai `npm ci`, en draai **één smoke-`npm run v0:chat`**. Komt er **geen echt antwoord** terug (ontbrekende `OPENAI_API_KEY`, lege `node_modules`, etc.) → **STOP en log het**; ga NIET de nacht in, want dan draait elke eval key-loos en is alles verspild. Pas doorgaan als de smoke een normaal antwoord geeft.
 - **NOOIT** `git push origin main`, **NOOIT** mergen, **NOOIT** `--no-verify`. Commit op je branch. Aan het eind: optioneel een **draft** PR openen. Mergen/deployen is voor de ochtend.
 - **NOOIT** productie-env-vars zetten, externe accounts aanmaken, of secrets genereren. Die staan in §2 als handoff. Schrijf de code die ze gebruikt + documenteer de stap.
 - **Append-only bot-versies.** Maak een **nieuwe** `V0_10`-snapshot in `lib/v0/server/bots.ts`. **Muteer v0.9.3 of eerdere snapshots niet.** Tuning (prompt/gate) gebeurt in de v0.10-snapshot.
@@ -45,6 +47,8 @@ alle criteria in §3–§5 die `[CODE]` zijn — wiring, routes, migraties, test
 - **UptimeRobot** (gratis) → monitor op `https://www.chatmanta.nl/api/v0/widget/ping` → alert-mail.
 - **OPENAI_ADMIN_KEY** (optioneel, graceful fallback bestaat) en **FIRECRAWL_API_KEY** verifiëren op prod.
 - **DPA-template + sub-processor-lijst** juridisch laten tekenen (jij levert alleen het concept-document).
+- **Push-alerting (UITGESTELD — known limitation).** v0.10 heeft GEEN push-alert als de bot fouten spuwt of geld verbrandt (alleen de in-app Issues-tab + UptimeRobot-ping). Documenteer dit expliciet als launch-preconditie: tot er een alert is (bv. een Resend-mail bij budget-cap-hit + error-rate-spike), moet de operator het dashboard handmatig monitoren. Bouw dit NIET nu (bewuste scope-keuze); noem het als #1 post-launch-ops-item.
+- **Launch-preconditie multi-tenancy (HARD).** Het publieke embed-pad is veilig (per-org HMAC embed-token gebonden aan de URL-slug — cookie/`?org=`-switch faalt met 401). MAAR de cookie-authed demo/admin-surface laat vrij org-switchen (de `V0_DEMO_PASSWORD`-sandbox). **Zet echte klantdata NOOIT in een demo-bereikbare sandbox-org.** Dit is de dragende veiligheidsgrens voor testklanten — niet C10. Leg het vast als expliciete preconditie, niet als code-comment.
 
 `HANDOFF.md` moet voor elk handoff-item bevatten: wat, waarom, exacte stap, en hoe te verifiëren dat het werkt.
 
@@ -63,8 +67,14 @@ alle criteria in §3–§5 die `[CODE]` zijn — wiring, routes, migraties, test
 - **Verifieer met:** `npm run eval:hard:run -- --versions=v0.9.2,v0.9.3 --max-cost 2.50` → gegronde-getal-cases false-failen niet meer; de overgebleven answer-quality-fails zijn échte fabricaties. Spot-check 2–3 fails handmatig tegen `scripts/fixtures/sandbox-orgs/*`.
 
 ### P3 — v0.10-snapshot aanmaken `[CODE]`
-- **Doe:** kopieer v0.9.3 naar een nieuwe `V0_10`-config in `bots.ts` (append-only). Dit is de versie waarin je in §5 de over-refusal tunet. Registreer 'm overal waar versies geregistreerd worden (incl. eval DEFAULT/BOT_VERSIONS_ORDERED en de `query_log.bot_version` CHECK indien aanwezig).
-- **Klaar wanneer:** `tsc` schoon; `resolveBot('v0.10')` werkt; een smoke-vraag geeft een normaal antwoord.
+- **Doe:** kopieer v0.9.3 naar een nieuwe `V0_10`-config in `bots.ts` (append-only). Dit is de versie waarin je in §5 de over-refusal tunet. Registreer 'm overal waar versies geregistreerd worden (`BOT_VERSIONS_ORDERED` is een handmatige array; `EVAL_DEFAULT_VERSIONS = …slice(-2)` pakt 'm dan automatisch). **Let op:** een `query_log.bot_version` CHECK bestaat NIET (geen migratie nodig), maar `scripts/test-bot-defaults.ts` hardcodeert de versie-array + `LATEST` → werk die mee bij, anders breekt `npm test`.
+- **Klaar wanneer:** `tsc` schoon; `resolveBot('v0.10')` werkt; een smoke-vraag geeft een normaal antwoord; `npm test` groen.
+
+### P4 — Over-refusal-meting betrouwbaar maken (vóór je C11 tunet) `[CODE]`
+De huidige over-refusal-maat is **niet betrouwbaar genoeg om op te tunen**: in `lib/v0/server/hard-eval-checks.ts` bepaalt `looksLikeRefusal` (een **regex**) of een antwoord een weigering is, gemeten op **alléén `results[0]`** (de eerste run). Twee meetfouten: (a) een correct antwoord met "neem contact op voor een offerte" matcht de regex → telt vals als over-refusal; (b) bij stochastische generatie (temp ≠ 0, geen seed) flipt een grensgeval tussen runs. Met n=30 is 1 case = 3,3%, dus deze ruis maakt "13%→≤5%" onmeetbaar.
+- **Doe:** tel over-refusal op het **échte refusal-event** (het deterministische `claim-regenerate`/answer-replacement-signaal uit de hard-fact-gate, niet de regex op de antwoordtekst) **en** aggregeer over de N runs (**majority-of-N**, niet `results[0]`). Behoud de bestaande dimensie-/gate-structuur; dit is een meet-fix, geen gate-wijziging.
+- **Klaar wanneer:** een over-refusal-hit komt aantoonbaar uit een echte gate-weigering (niet uit een CTA-zin); de maat is stabiel over 2 identieke runs op v0.9.3.
+- **Verifieer met:** draai de hard-eval 2× op v0.9.3 ná de fix → de over-refusal-count is identiek en elke gemarkeerde case is bij handmatige check een échte weigering. Pas hierna is C11's ≤5%-doel betekenisvol meetbaar.
 
 ---
 
@@ -80,20 +90,20 @@ Maak `.github/workflows/build.yml`: `npm ci` → `next build` op een schone runn
 - Verifieer met: schone build groen + `npx tsc --noEmit` schoon.
 
 **C2 — DEPLOY.md compleet + startup-assert `[CODE + HANDOFF]`**
-Vul `DEPLOY.md` aan met álle prod-env-vars (`EMBED_TOKEN_SECRET`, `USE_UPSTASH`, `UPSTASH_REDIS_REST_URL/_TOKEN`, `CRON_SECRET`, `OPENAI_ADMIN_KEY`, `FIRECRAWL_API_KEY`). Bouw een **startup-assert** (in `instrumentation.ts` of gelijkwaardig bootstrap-punt): bij ontbrekende **`EMBED_TOKEN_SECRET`** → harde fout (fail-closed); bij `USE_UPSTASH=true` maar ontbrekende Redis-vars → luide fout i.p.v. stille in-memory fallback.
+Vul `DEPLOY.md` aan met álle prod-env-vars (`EMBED_TOKEN_SECRET`, `USE_UPSTASH`, `UPSTASH_REDIS_REST_URL/_TOKEN`, `CRON_SECRET`, `OPENAI_ADMIN_KEY`, `FIRECRAWL_API_KEY`). Bouw een **startup-assert** in `instrumentation.ts` (bestaat, met `register()` gegate op `NEXT_RUNTIME === 'nodejs'` = het juiste bootstrap-punt): bij ontbrekende **`EMBED_TOKEN_SECRET`** → harde fout (fail-closed); bij `USE_UPSTASH=true` maar ontbrekende Redis-vars → luide fout i.p.v. stille in-memory fallback. *(Dit is écht nieuwbouw: vandaag faalt een ontbrekende `EMBED_TOKEN_SECRET` STIL-closed — `verifyEmbedToken` geeft `false` zonder log → de hele publieke widget gaat 401-zwart zonder signaal. Daarom luid falen.)*
 - Klaar wanneer: assert-code aanwezig + unit/integration-test die de faal-paden dekt; DEPLOY.md volledig.
 - Verifieer met: test groen; HANDOFF.md beschrijft het zetten van de vars.
 
 ### Stage 1 — geld-kraan & misbruik (de publieke widget kost nu al echt geld)
 
 **C3 — Per-org dag-budget-cap in USD `[CODE]`**
-Voeg vóór de RAG-pipeline in `app/api/v0/chat/route.ts` een check toe: som `query_log.cost_usd` voor de org over de huidige dag; bij overschrijding van een **configureerbare USD-dagcap** → weiger de LLM-call en stuur een net `budget_exhausted` stream-event / HTTP 402. **Reken in USD** (de meting bestaat al; EUR hangt aan de niet-gebouwde `callLLM()` — niet doen).
+Voeg vóór de RAG-pipeline in `app/api/v0/chat/route.ts` een check toe: som `query_log.cost_usd` voor de org over de huidige dag; bij overschrijding van een **configureerbare USD-dagcap** → weiger de LLM-call en stuur een net `budget_exhausted` stream-event / HTTP 402. **Reken in USD** (de meting bestaat al; EUR hangt aan de niet-gebouwde `callLLM()` — niet doen). **⚠ Twee correctheids-vallen:** (1) `logQuery` is best-effort/never-throws en draait ná de stream in een `after()`-block — faalt die insert (juist de failure die kosten laat ontsporen), dan landt `cost_usd` niet en trekt de cap nooit. Koppel de cap dus niet blind aan die som als enige rem; overweeg de cap-overschrijding ook luid te loggen. (2) Naïef "lees de dag-som" is racy: N gelijktijdige streams lezen allemaal de pre-increment-som en passeren allemaal — accepteer dat een kleine overschoot mogelijk is, maar zorg dat de cap onder aanhoudende load wél dichtklapt.
 - Klaar wanneer: cap configureerbaar per org (default ruim, bv. $2/dag); bij overschrijding 0 LLM-calls. *(Er bestaat nog geen `daily_budget_usd`-kolom — kies de kleinste optie: een const-default + optionele env-override; voeg pas een migratie (0046 + RLS) toe als een echte per-org-waarde nodig is, niet "voor de zekerheid".)*
 - Verifieer met: zet cap op $0.01 voor een test-org, stuur 5 requests via `npm run v0:chat` of een testscript → request 2+ krijgt budget-exhausted, geen LLM-antwoord, geen 500.
 
 **C4 — Graceful degradatie in de widget `[CODE]`**
-De widget toont een leesbare NL-melding bij `budget_exhausted`, `RATE_LIMIT`, `LLM_TIMEOUT`, `NOT_FOUND` — geen JSON-blob, geen bevroren spinner.
-- Klaar wanneer: elke `AppError`-code mapt op een leesbare boodschap + (waar zinvol) retry.
+De widget toont een leesbare NL-melding bij `budget_exhausted`, `RATE_LIMIT`, `LLM_TIMEOUT`, `NOT_FOUND` — geen JSON-blob, geen bevroren spinner. **⚠ Bestaande bug om te fixen (geen verificatie):** `app/widget/components/chatmanta-widget.tsx` checkt nu `code === 'RATE_LIMITED'`, maar de echte `AppError`-code is **`'RATE_LIMIT'`** (`app-error.ts`) → die tak is dóde code, een echte rate-limit toont nu de generieke "Er ging iets mis". `budget_exhausted`/`LLM_TIMEOUT` worden niet apart afgehandeld. C4 is dus een echte fix.
+- Klaar wanneer: elke `AppError`-code mapt op een leesbare boodschap + (waar zinvol) retry; de `RATE_LIMIT`-mismatch is weg.
 - Verifieer met: simuleer elk geval; widget toont de juiste melding.
 
 **C5 — Injection block op embed: verifiëren (GEEN bouwwerk) `[CODE]`**
@@ -107,7 +117,7 @@ De code is klaar (`lib/v0/server/rate-limit.ts`). Jij: zorg dat de startup-asser
 ### Stage 2 — AVG-codelaag (echte bezoeker-data stroomt al door de widget)
 
 **C7 — PII-redactie bedraden in `logQuery()` `[CODE]`**
-`redactPii()` bestaat (`lib/observability/redact.ts`) maar wordt niet aangeroepen in `lib/v0/server/log.ts`. Pas het toe op `query_log.question` (en overweeg `answer`) wanneer de org-setting `piiRedactionEnabled` aan staat. *(Org-settings worden geresolved via `getOrgSettings` / `v0_org_settings`. Bestaat de flag `piiRedactionEnabled` daar nog niet, kies de kleinste optie: default-aan via const, geen stille settings-uitbouw; een migratie alleen als per-org echt nodig is.)*
+`redactPii()` bestaat (`lib/observability/redact.ts`) maar wordt niet aangeroepen in `lib/v0/server/log.ts`. Pas het toe op `query_log.question` (en overweeg `answer`). *(Correctie van eerdere aanname: de flag zit NIET in `v0_org_settings`/`getOrgSettings`. Een per-org flag `pii_redaction_enabled` bestaat al in **`admin_privacy_settings`** via `lib/controlroom/server/privacy.ts` — bedraad daarheen. Let op: `logQuery` heeft alleen `organizationId` (UUID); die lookup vereist een org-id → een passende key. Lukt de bedrading niet schoon binnen budget, val terug op **default-aan via const** (redacteer altijd) — geen nieuwe settings-tabel/migratie.)*
 - Klaar wanneer: `logQuery` redacteert; flag stuurt het gedrag.
 - Verifieer met: test/insert met een e-mail+telefoon in de vraag → `query_log.question` bevat geen ruwe PII.
 
@@ -117,7 +127,7 @@ De code is klaar (`lib/v0/server/rate-limit.ts`). Jij: zorg dat de startup-asser
 - Verifieer met: lokale aanroep met geldige secret → anonimiseert rijen ouder dan de termijn; zonder secret → 401.
 
 **C9 — Widget-bezoeker disclosure + verwijderpad `[CODE]`**
-Toon in de widget een minimale disclosure (bv. "Chat wordt tijdelijk opgeslagen voor hulpverlening" + link naar `/privacy`). Bouw een delete-endpoint dat alle rijen in `v0_threads`/`v0_thread_messages` voor een gegeven `visitor_id` verwijdert (org-gescoped). Voeg de per-org privacy-link hierin samen.
+Toon in de widget een minimale disclosure (bv. "Chat wordt tijdelijk opgeslagen voor hulpverlening" + link naar `/privacy`). Bouw een delete-endpoint dat alle rijen in `v0_threads`/`v0_thread_messages` voor een gegeven `visitor_id` verwijdert (org-gescoped). Voeg de per-org privacy-link hierin samen. *(⚠ Groter dan een banner: `/privacy` bestaat nog NIET, er is GEEN delete-by-visitor functie (`deleteThread` is thread-id-gebaseerd), en `v0_thread_messages` heeft GEEN `organization_id` — org-scope moet via een JOIN op `v0_threads` (zie `retention.ts` voor het patroon). Dus: nieuwe publieke pagina + nieuwe org-gescopte delete-functie/-endpoint + cascade. Stem af met C8: retention anonimiseert org-breed op leeftijd, C9 verwijdert op visitor-id — geef "delete" niet twee conflicterende betekenissen.)*
 - Klaar wanneer: disclosure zichtbaar; delete-endpoint verwijdert de juiste rijen en niets van een andere org.
 - Verifieer met: integration-test of script: maak een thread → delete per visitor-id → 0 rijen over voor die visitor, andere orgs onaangeroerd.
 
@@ -126,20 +136,22 @@ Toon in de widget een minimale disclosure (bv. "Chat wordt tijdelijk opgeslagen 
 **C10 — `orgId` niet-optioneel op de productie-surface `[CODE]`**
 Meerdere functies hebben `organizationId: string = DEV_ORG_ID` (default-param staat o.a. in `lib/v0/server/rag.ts`, `lib/v0/server/log.ts`, `lib/v0/server/threads.ts`). Maak `orgId` **verplicht** op de publieke surface (`runRagQueryStreaming`, `logQuery`); behoud een interne default **alleen** voor de bewuste eval-/cross-org-paden (`eval.ts`). **Inventariseer eerst álle callsites** — grep beide spellingen: `git grep -nE "organizationId: string = DEV_ORG_ID|orgId: string = DEV_ORG_ID" -- lib/` — zodat je geen eval-scripts of `v0:chat` breekt. Zet de grep-lijst in de PR-omschrijving.
 - Klaar wanneer: geen productie-pad valt stil terug op `DEV_ORG_ID`; eval/scripts werken nog.
-- Verifieer met: grep-lijst in de PR-omschrijving; `npm run eval:hard:run` + `npm run v0:chat` werken; `tsc` schoon.
+- Verifieer met: grep-lijst in de PR-omschrijving; `npm run eval:hard:run` + `npm run v0:chat` werken; `tsc` schoon. *(Geverifieerd: dit breekt niets — alle productie-/eval-callsites van `runRagQueryStreaming`/`logQuery` geven `organizationId` al expliciet door en `v0:chat` raakt deze functies niet. Het is wél een grotere typecheck-cascade (≈10 callsites in rag/log/threads) dan "2 functies" — onderschat de omvang niet.)*
 
 ---
 
 ## 5. v0.10 bot-kwaliteit (MUST) — de reden dat het een botversie is
 
 **C11 — Over-refusal tunen zonder fabricatie te herintroduceren `[CODE]`**
-v0.9.3 weigert te vaak: **13% over-refusal (4/30) vs v0.8.1 3% (1/30)** op beantwoordbare vragen (deterministisch gemeten, niet judge-afhankelijk). Tune de v0.10-snapshot (systemprompt en/of hard-fact-gate-drempels) zodat over-refusal daalt richting ≤5%, **terwijl** under-refusal/fabricatie op de safety-buckets **0 blijft** en de named regressie-cases (112-handoff, €295/€4,20-fabricatie-klasse) groen blijven.
-- Klaar wanneer: hard-eval op v0.10 toont over-refusal ≤ ~5% **én** 0 fabricaties/must-not-schendingen op de safety-dimensies.
+v0.9.3 weigert te vaak (pre-#168-meting: ~13% vs v0.8.1 ~3% op beantwoordbare vragen). **Meet eerst opnieuw met de P4-fix** — vertrouw het 13%-getal niet blind. **Mechaniek (geverifieerd):** de over-refusal komt uit één deterministische gate, `hardFactDeterministicRefusal` in `lib/v0/server/hard-facts.ts`, die afgaat bij `retrievalStrength` = 'weak'/'medium' (top1Sim < ~0,56) **én** een niet-exact-gematcht getal — en dan het **hele** antwoord vervangt. Voor NL + `text-embedding-3-small` landen gegronde antwoorden routinematig in 0,50–0,56 = de gevarenzone. **Veilige, hoge-hefboom-lever:** vuur alleen op écht zwakke retrieval (drop 'medium'), en/of key de gate op de **fabricatie-klasse** (geld/percentage/datum) i.p.v. álle getallen — niet de systemprompt slopen. Tune in de v0.10-snapshot zodat over-refusal daalt **terwijl** fabricatie op de safety-buckets **0 blijft** en de named regressies (112-handoff, €295/€4,20-klasse) groen blijven.
+- **⚠ Verwachting (eerlijk):** met n=30 (1 case = 3,3%) en een judge-afhankelijke JA is **≤5% niet hard te certificeren**, ook ná P4. De realistische uitkomst is vaak de **§6.3-fallback**: over-refusal aantoonbaar lager dan v0.9.3 + 0 fabricatie + gap-analyse. Forceer geen JA door de gate los te draaien — kies veiligheid (§7).
+- **Verifieer de over-refusal-hits HANDMATIG** vóór je her-tunet: lees elke gemarkeerde case en bevestig dat het een échte weigering is (geen CTA-false-positive die P4 zou moeten wegnemen).
+- Klaar wanneer: over-refusal op v0.10 (P4-meting) < v0.9.3 **én** 0 fabricaties/must-not-schendingen op de safety-dimensies; richt op ≤5% maar accepteer de fallback als de meting het niet hard maakt.
 - Verifieer met: `npm run eval:hard:run -- --versions=v0.9.3,v0.10 --max-cost 2.50` → v0.10 over-refusal < v0.9.3, safety-veto schoon.
 
 **C12 — Hard-fact-gate stabiel op v0.10 `[CODE]`**
-Geen verzonnen getallen/prijzen/datums/URLs door de gate; geen false-positieve weigering op correct-beantwoordbare of nood-/handoff-antwoorden (112-klasse).
-- Klaar wanneer: de bestaande deterministische safety-checks zijn 100% op v0.10; named regressie-fixtures groen.
+Geen verzonnen getallen/prijzen/datums/URLs door de gate; geen false-positieve weigering op correct-beantwoordbare of nood-/handoff-antwoorden (112-klasse). *(⚠ Fixture-gap: de letterlijke €295/€4,20-cases staan NIET in `eval-fixtures/hard-dimension-cases.json` — de fabricatie-klasse wordt geborgd door de 3 out-of-corpus `aoc-*`-cases (Acme-spoedtoeslag, Globex-parkeerkosten, Initech-naheffing). Gebruik die als de fabricatie-guard; voeg alléén een letterlijke €295/€4,20-case toe als het triviaal is. Under-refusal leunt op slechts 3 cases (< `UNDER_REFUSAL_MIN_N`=8) → het is advisory, geen statistisch signaal; vertrouw ook op de safety-judge. 112-handoff is wél gedekt (4 human-handoff-cases incl. de mixed-intent-regressie).)*
+- Klaar wanneer: de bestaande deterministische safety-checks zijn 100% op v0.10; de 3 `aoc-*`-fabricatie-cases + de 112-handoff-cases groen.
 
 **C13 — UX-discipline geverifieerd op de bevroren v0.10-bot `[CODE/verify]`**
 Directe antwoorden (BLUF, geen opvultekst) en zichtbare streaming zonder tag-lekken, op alle paden (normaal/smalltalk/fallback). Dit is verificatie, geen nieuwbouw.
@@ -152,11 +164,11 @@ Directe antwoorden (BLUF, geen opvultekst) en zichtbare streaming zonder tag-lek
 ## 6. Definition of Done
 
 ### Agent-DoD (jij moet dit halen vóór je stopt)
-1. P1–P3 + alle MUST (C1–C13) afgerond of expliciet `BLOCKED-HANDOFF` met reden in `HANDOFF.md`.
+1. P1–P4 + alle MUST (C1–C13) afgerond of expliciet `BLOCKED-HANDOFF` met reden in `HANDOFF.md`.
 2. `tsc --noEmit` schoon + schone `next build` groen + bestaande unit-tests groen + jouw nieuwe tests groen.
 3. **Eind-gate op v0.10** (mét de P2-fix), `--max-cost 2.50`, runs=3 op de kandidaat:
    - **Streefuitkomst:** `PRODUCTIEWAARDIG: JA` op v0.10 — 0 safety-veto's, answer-quality ≥ drempel, over-refusal ≤ ~5%, en regressie-diff t.o.v. v0.9.2/v0.9.3 toont **geen nieuwe** safety-fails.
-   - **Fallback (als een schone automated JA niet haalbaar is):** lever v0.10 dat op **élke deterministische as ≥ v0.9.3** is (no-fabricated-specifics ≥ v0.9.3, over-refusal < v0.9.3, niet trager) en schrijf een eerlijke **gap-analyse** in `HANDOFF.md` (welke cases, judge-afhankelijk of echt, waarom). Verzin **nooit** een PASS. Bewaar de run-output in `eval-out/hard/`.
+   - **Fallback (een volwaardige, wáárschijnlijke uitkomst — geen mislukking):** een schone automated JA is met n=30 + judge-afhankelijke drempel vaak niet hard te halen. Lever dan v0.10 dat op **élke deterministische as ≥ v0.9.3** is (no-fabricated-specifics ≥ v0.9.3, over-refusal < v0.9.3 op de P4-meting, niet trager) en schrijf een eerlijke **gap-analyse** in `HANDOFF.md` (welke cases, judge-afhankelijk of echt, waarom). Verzin **nooit** een PASS en draai geen extra gate-rondes om er een te forceren (≤ ~2 betaalde eind-gates binnen de $15-cap). Bewaar de run-output in `eval-out/hard/`.
 4. Pas **ná** een groene/▲-acceptabele gate: zet `LATEST_BOT_VERSION = V0_10.version` **op je branch** (niet mergen, niet deployen).
 5. Lever op je branch: alle commits, `HANDOFF.md`, en een korte `V0_10_BUILD_REPORT.md` (wat groen, wat geblokkeerd, gate-uitkomst, eval-spend, open beslissingen voor de ochtend). Optioneel: een **draft** PR.
 
