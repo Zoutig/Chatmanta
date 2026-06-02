@@ -1,0 +1,43 @@
+name: build
+
+# C1 — schone verificatie-build. Bewijst dat de app op een verse runner compileert
+# en bouwt (geen dev-server, geen lint/coverage): tsc-typecheck + next build.
+#
+# LET OP (HANDOFF — repo-secrets vereist): `next build` draait generateStaticParams
+# voor de SSG-widget-pagina's (`/widget/[slug]/[page]`), die Supabase queryt. Zet
+# daarom in GitHub → Settings → Secrets and variables → Actions deze repo-secrets:
+#   - NEXT_PUBLIC_SUPABASE_URL
+#   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   - SUPABASE_SERVICE_ROLE_KEY
+# Dit zijn de keys van het V0-sandbox-Supabase-project (alléén fake demo-data, geen
+# prod-klantdata). Zonder deze secrets faalt de SSG-stap van de build. Zie HANDOFF.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Eén build per branch/PR tegelijk; nieuwere push annuleert de lopende run.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install (clean)
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

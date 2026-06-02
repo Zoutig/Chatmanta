@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:unit": "node --import tsx --test lib/observability/__tests__/fingerprint.test.ts lib/observability/__tests__/redact.test.ts lib/observability/__tests__/claude-payload.test.ts lib/controlroom/__tests__/feedback-validate.test.ts lib/controlroom/__tests__/feedback-claude-payload.test.ts lib/notifications/__tests__/feedback-email.test.ts",
+    "test:unit": "node --import tsx --test lib/observability/__tests__/fingerprint.test.ts lib/observability/__tests__/redact.test.ts lib/observability/__tests__/claude-payload.test.ts lib/controlroom/__tests__/feedback-validate.test.ts lib/controlroom/__tests__/feedback-claude-payload.test.ts lib/notifications/__tests__/feedback-email.test.ts lib/v0/server/__tests__/startup-assert.test.ts",
     "check-env": "node --env-file=.env.local scripts/check-env.mjs",
     "verify-schema": "node --env-file=.env.local scripts/verify-schema.mjs",
     "v0:ingest": "node --env-file=.env.local scripts/v0-ingest.mjs",
