@@ -96,6 +96,39 @@ export function isCurrentMonth(year: number, month: number, now = new Date()): b
   return year === now.getFullYear() && month === now.getMonth() + 1;
 }
 
+const MONTHS_NL = [
+  'januari', 'februari', 'maart', 'april', 'mei', 'juni',
+  'juli', 'augustus', 'september', 'oktober', 'november', 'december',
+];
+
+/** "mei 2026" voor (year, month=1-12). */
+export function monthLabelNL(year: number, month: number): string {
+  return `${MONTHS_NL[month - 1] ?? ''} ${year}`.trim();
+}
+
+export type MonthOption = { value: string; label: string };
+
+/** Maandkiezer-opties: lopende maand + (count-1) vorige maanden, nieuwste eerst. */
+export function buildMonthOptions(count = 12, now = new Date()): MonthOption[] {
+  const opts: MonthOption[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const label = monthLabelNL(y, m) + (i === 0 && isCurrentMonth(y, m, now) ? ' (lopende maand)' : '');
+    opts.push({ value: periodMonthKey(y, m), label });
+  }
+  return opts;
+}
+
+/** "2 min 24 sec" / "45 sec" voor een aantal seconden (gespreksduur-weergave). */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const m = Math.floor(s / 60);
+  const rest = s % 60;
+  return m > 0 ? `${m} min ${rest} sec` : `${rest} sec`;
+}
+
 /** Uur 0-23 in Europe/Amsterdam uit een ISO-timestamp. */
 export function amsterdamHour(iso: string): number {
   const parts = new Intl.DateTimeFormat('nl-NL', {

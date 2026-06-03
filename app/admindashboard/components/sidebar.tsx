@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Inbox,
   BarChart3,
+  CalendarRange,
   Settings2,
   ArrowLeft,
 } from 'lucide-react';
@@ -116,6 +117,9 @@ export async function ControlRoomSidebar() {
         </NavItem>
         <NavItem href="/admindashboard/usage" label="Usage & Kosten">
           <BarChart3 size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/admindashboard/maandelijkse-recap" label="Maandelijkse Recap">
+          <CalendarRange size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/admindashboard/instellingen" label="Instellingen">
           <Settings2 size={17} strokeWidth={1.7} />

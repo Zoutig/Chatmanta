@@ -12,26 +12,16 @@ import 'server-only';
 import OpenAI from 'openai';
 import { costForModelUsd } from '@/lib/ai/llm';
 import { redactPii } from '@/lib/observability/redact';
-import type { RecapSignal, RecapStats, RecapTopQuestion } from '../recap-logic';
+import {
+  formatDuration,
+  monthLabelNL,
+  type RecapSignal,
+  type RecapStats,
+  type RecapTopQuestion,
+} from '../recap-logic';
 
 // Vast model — modelkeuze is Sebastiaans beslissing, niet die van de feature.
 const RECAP_MODEL = 'gpt-4o-mini';
-
-const MONTHS_NL = [
-  'januari', 'februari', 'maart', 'april', 'mei', 'juni',
-  'juli', 'augustus', 'september', 'oktober', 'november', 'december',
-];
-
-/** "mei 2026" voor (year, month=1-12). */
-export function monthLabelNL(year: number, month: number): string {
-  return `${MONTHS_NL[month - 1] ?? ''} ${year}`.trim();
-}
-
-function durationLabel(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m} min ${s} sec` : `${s} sec`;
-}
 
 const SYSTEM_PROMPT = `Je bent een assistent die maandelijkse chatbotprestaties analyseert voor ChatManta.
 Schrijf een beknopte samenvatting van maximaal 3-4 zinnen in het Nederlands.
@@ -78,7 +68,7 @@ function buildUserPrompt(input: {
     'Statistieken:',
     `- Totaal gesprekken: ${stats.totalConversations}`,
     `- Unieke bezoekers: ${stats.uniqueVisitors}`,
-    `- Gemiddelde gespreksduur: ${durationLabel(stats.avgDurationSeconds)}`,
+    `- Gemiddelde gespreksduur: ${formatDuration(stats.avgDurationSeconds)}`,
     `- Gemiddeld aantal berichten per gesprek: ${stats.avgMessagesPerConversation}`,
     `- Onbeantwoorde vragen: ${stats.unansweredCount}`,
     `- Piekuur: ${stats.peakHour != null ? `${stats.peakHour}:00 uur` : 'n.v.t.'}`,
