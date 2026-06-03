@@ -563,3 +563,83 @@ export type QuizSummary = {
   /** # quizzes in 'concept' — wacht-op-goedkeuring badge voor de operator-sidebar. */
   pendingApproval: number;
 };
+
+// ---------------------------------------------------------------------------
+// Maandelijkse Recap (migratie 0047_admin_monthly_recap). Niels-getriggerde
+// maandrapportage per org: LIVE-berekende stats + AI-prozasamenvatting +
+// deterministische signaleringen + notities. Unions spiegelen de CHECK-enums
+// in 0047. Spec: docs/superpowers/specs/2026-06-02-maandelijkse-recap-design.md
+// ---------------------------------------------------------------------------
+export const RECAP_STATUSES = ['draft', 'gepubliceerd'] as const;
+export type RecapStatus = (typeof RECAP_STATUSES)[number];
+
+export const RECAP_STATUS_LABELS: Record<RecapStatus, string> = {
+  draft: 'Concept',
+  gepubliceerd: 'Gepubliceerd',
+};
+
+/** Deterministische signaal-types (berekend in recap.ts:computeSignals).
+ *  korte_gesprekken + lage_engagement zijn BEWUST geschrapt t.o.v. Niels' MD:
+ *  kort/weinig = doorgaans góéd voor een Q&A-kennisbot, en duur is slechts een
+ *  updated_at−created_at-proxy. Zie de spec voor de onderbouwing. */
+export const RECAP_SIGNAL_TYPES = [
+  'kennisbank_incompleet',
+  'ontbrekende_info',
+  'gebruik_buiten_kantooruren',
+  'geen_gebruik',
+] as const;
+export type RecapSignalType = (typeof RECAP_SIGNAL_TYPES)[number];
+
+export const RECAP_SIGNAL_TYPE_LABELS: Record<RecapSignalType, string> = {
+  kennisbank_incompleet: 'Kennisbank incompleet',
+  ontbrekende_info: 'Ontbrekende info',
+  gebruik_buiten_kantooruren: 'Gebruik buiten kantooruren',
+  geen_gebruik: 'Geen gebruik',
+};
+
+export const RECAP_SIGNAL_SEVERITIES = ['inzicht', 'waarschuwing', 'actie_vereist'] as const;
+export type RecapSignalSeverity = (typeof RECAP_SIGNAL_SEVERITIES)[number];
+
+/** Ernst per signaal-type — bepaalt de overzicht-bol (🟢 geen / 🟡 let op /
+ *  🔴 actie vereist): de bol = de zwaarste ernst onder de actieve signalen. */
+export const RECAP_SIGNAL_SEVERITY: Record<RecapSignalType, RecapSignalSeverity> = {
+  kennisbank_incompleet: 'waarschuwing',
+  ontbrekende_info: 'waarschuwing',
+  gebruik_buiten_kantooruren: 'inzicht',
+  geen_gebruik: 'actie_vereist',
+};
+
+export const RECAP_SIGNAL_STATUSES = ['nieuw', 'genegeerd', 'behandeld'] as const;
+export type RecapSignalStatus = (typeof RECAP_SIGNAL_STATUSES)[number];
+
+export const RECAP_SIGNAL_STATUS_LABELS: Record<RecapSignalStatus, string> = {
+  nieuw: 'Nieuw',
+  genegeerd: 'Genegeerd',
+  behandeld: 'Behandeld',
+};
+
+/** Eén opgeslagen recap-rij (admin_monthly_recaps), camelCase voor de UI.
+ *  De maandstatistieken staan hier BEWUST NIET in — die worden live berekend
+ *  (zie lib/controlroom/server/recap.ts). */
+export type MonthlyRecap = {
+  id: string;
+  organizationId: string;
+  periodMonth: string; // 'YYYY-MM'
+  aiSummary: string | null;
+  nielsNotes: string | null;
+  recapStatus: RecapStatus;
+  generatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Opgeslagen operator-triage van één signaal (admin_recap_signals). Het
+ *  signaal-bericht zelf is niet opgeslagen — dat wordt live herberekend. */
+export type RecapSignalTriage = {
+  id: string;
+  recapId: string;
+  signalType: RecapSignalType;
+  status: RecapSignalStatus;
+  createdAt: string;
+  updatedAt: string;
+};

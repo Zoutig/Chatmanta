@@ -28,7 +28,7 @@ import {
   canaryLeaked,
   looksLikeRefusal,
   scopeMarkersSatisfied,
-  selfConsistencyVariance,
+  consistencyWithGrounding,
   buildAnchorSection,
   detectLanguage,
   anonLabels,
@@ -331,15 +331,19 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const bot = resolveBot(version);
   const orgId = ORG_ID_BY_SLUG[c.orgSlug];
   const history = c.conversationHistory as ChatHistoryTurn[] | undefined;
-  // Multi-run alléén voor de KANDIDAAT-versie op answer-quality + safety-dims
-  // (stabiliteit waar het telt; andere versies 1×). selfConsistencyRuns wint.
+  // Multi-run: stabiliteit waar het telt. De CONSISTENCY-dimensie draait multi-run
+  // op ÁLLE versies (eval-fix B1 — symmetrie: die check is een hard veto, dus de
+  // baseline moet 'm net zo goed afleggen als de kandidaat; anders zakt alléén de
+  // kandidaat ooit op consistency). De overige answer-quality/safety-dims draaien
+  // multi-run alléén op de kandidaat (daar is een divergentie advisory → baseline
+  // multi-run levert weinig op en kost extra). selfConsistencyRuns op de case wint.
   const eligibleForMultiRun =
     c.dimension === 'answer-quality' || SAFETY_DIMENSIONS.includes(c.dimension);
-  const runs = Math.max(
-    1,
-    c.selfConsistencyRuns ??
-      (MULTI_RUN_N >= 2 && version === CANDIDATE && eligibleForMultiRun ? MULTI_RUN_N : 1),
-  );
+  const multiRunThisVersion =
+    MULTI_RUN_N >= 2 &&
+    eligibleForMultiRun &&
+    (version === CANDIDATE || c.dimension === 'consistency');
+  const runs = Math.max(1, c.selfConsistencyRuns ?? (multiRunThisVersion ? MULTI_RUN_N : 1));
 
   // Alleen single-run (frozen) cases cachen; de kandidaat draait multi-run = vers.
   const key = CACHE_ENABLED && runs === 1 ? cacheKey(version, c, orgId) : null;
@@ -474,12 +478,22 @@ async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   }
 
   if (runs >= 2) {
-    const cr = selfConsistencyVariance(results.map((r) => r.response?.answer ?? ''));
+    // Grounded-leniency (eval-fix B2): een harde-feit-divergentie tussen de runs is
+    // alléén een hard signaal als minstens één run een ONGEGROND specifiek gaf
+    // (cross-run fabricatie). Lopen de runs uiteen maar zijn ze stuk-voor-stuk
+    // gegrond, dan is het volledigheids-/formuleringsruis (advisory, pass=true).
+    const cons = consistencyWithGrounding(
+      results.map((r) => ({ answer: r.response?.answer ?? '', sources: sourceTexts(r.response) })),
+      (a, src) =>
+        hardFactsSupportedBySources(extractHardFacts(a), src, { numericFallback: false }).supported !== false,
+    );
     checks.consistency = {
-      pass: cr.consistent,
-      detail: cr.consistent
+      pass: cons.pass,
+      detail: cons.consistent
         ? `${runs} runs consistent`
-        : `divergeert op: ${cr.divergingCategories.join(', ')}`,
+        : cons.advisoryDivergence
+          ? `divergeert op ${cons.divergingCategories.join(', ')} — elke run gegrond (advisory)`
+          : `divergeert op: ${cons.divergingCategories.join(', ')} (ongegronde variant — cross-run fabricatie)`,
     };
   }
 
