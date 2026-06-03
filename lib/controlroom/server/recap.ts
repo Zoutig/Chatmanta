@@ -79,24 +79,30 @@ export async function getRecapStats(
     const totalConversations = threads.length;
     const visitors = new Set<string>();
     const hourBuckets = new Array<number>(24).fill(0);
+    // Duur + berichten begrenzen op het maandvenster: een gesprek dat in deze
+    // maand startte maar dóórliep in de volgende maand mag de (afgesloten) maand
+    // niet blijven oprekken. updated_at wordt op untilIso gekapt en berichten van
+    // ná de maand tellen niet mee → een afgesloten maand blijft stabiel.
+    const untilMs = new Date(untilIso).getTime();
     let durationSum = 0;
     for (const t of threads) {
       if (t.visitor_id) visitors.add(String(t.visitor_id));
       const created = new Date(String(t.created_at)).getTime();
-      const updated = new Date(String(t.updated_at)).getTime();
+      const updated = Math.min(new Date(String(t.updated_at)).getTime(), untilMs);
       if (updated > created) durationSum += (updated - created) / 1000;
       hourBuckets[amsterdamHour(String(t.created_at))] += 1;
     }
     const peakHour = totalConversations === 0 ? null : hourBuckets.indexOf(Math.max(...hourBuckets));
 
-    // --- berichten/gesprek: count messages voor de maand-threads ---
+    // --- berichten/gesprek: count messages voor de maand-threads (binnen venster) ---
     let avgMessagesPerConversation = 0;
     if (totalConversations > 0) {
       const ids = threads.map((t) => String(t.id));
       const { count, error: mErr } = await sb()
         .from('v0_thread_messages')
         .select('id', { count: 'exact', head: true })
-        .in('thread_id', ids);
+        .in('thread_id', ids)
+        .lt('created_at', untilIso);
       const messageCount = mErr ? 0 : (count ?? 0);
       avgMessagesPerConversation = Number((messageCount / totalConversations).toFixed(1));
     }
@@ -434,20 +440,29 @@ export async function getRecapOverviewRow(
 
 /** Vind de recap-rij voor (org, maand) of maak een minimale aan; geef het id. */
 export async function getOrCreateRecapId(organizationId: string, periodMonth: string): Promise<string> {
-  const existing = await sb()
-    .from('admin_monthly_recaps')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('period_month', periodMonth)
-    .maybeSingle();
+  const read = () =>
+    sb()
+      .from('admin_monthly_recaps')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('period_month', periodMonth)
+      .maybeSingle();
+
+  const existing = await read();
   if (existing.data?.id) return String(existing.data.id);
+
   const ins = await sb()
     .from('admin_monthly_recaps')
     .insert({ organization_id: organizationId, period_month: periodMonth })
     .select('id')
     .single();
-  if (ins.error || !ins.data) throw new Error(`kon recap-rij niet aanmaken: ${ins.error?.message ?? 'onbekend'}`);
-  return String(ins.data.id);
+  if (ins.data?.id) return String(ins.data.id);
+
+  // Race: een parallelle (her)generatie kan de rij net hebben aangemaakt en de
+  // unique(organization_id, period_month)-constraint laten klappen → opnieuw lezen.
+  const retry = await read();
+  if (retry.data?.id) return String(retry.data.id);
+  throw new Error(`kon recap-rij niet aanmaken: ${ins.error?.message ?? 'onbekend'}`);
 }
 
 export type RecapArtifactPatch = {

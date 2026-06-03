@@ -249,7 +249,16 @@ export default async function MaandRecapDetailPage({
       {/* Sectie 6 — Notities van Niels */}
       <SectionTitle>Notities</SectionTitle>
       <Card>
-        <NotesEditor orgSlug={slug} year={year} month={month} initialNotes={stored?.nielsNotes ?? null} />
+        {/* key op de recap-identiteit → remount met verse state bij maand-/klant-wissel
+            (anders blijft de stale textarea-inhoud staan en wordt 'm bij de verkeerde
+            recap opgeslagen). */}
+        <NotesEditor
+          key={`${slug}-${currentKey}`}
+          orgSlug={slug}
+          year={year}
+          month={month}
+          initialNotes={stored?.nielsNotes ?? null}
+        />
       </Card>
 
       {/* Archief — Eerdere recaps */}
