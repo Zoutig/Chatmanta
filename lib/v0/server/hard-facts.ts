@@ -464,6 +464,15 @@ export function shouldDeterministicallyRefuseHardFact(args: {
   /** v0.9.1 — draft bevat al een nood-/escalatie-doorverwijzing (alleen relevant
    *  wanneer safetyAware): true → niet weigeren (spaar de doorverwijzing). */
   draftHasSafetyHandoff?: boolean;
+  /** v0.10 (C11) — bot.hardFactRefusalFabricationClassOnly. Beperkt de gate tot de
+   *  schadelijke fabricatie-klasse: vuur alléén wanneer een ONGEGROND feit in
+   *  {money, percentage, date, email, url, phone} valt, NIET bij een puur benign
+   *  generiek getal (categorie `number:` — aantal/los nummer). false/undefined →
+   *  v0.9.3-gedrag (élk ongegrond hard feit gate't). */
+  fabricationClassOnly?: boolean;
+  /** v0.10 (C11) — categorie-geprefixte missing-facts ("money:50","number:20",…) uit
+   *  hardFactsSupportedBySources. Alleen geraadpleegd wanneer fabricationClassOnly. */
+  missingHardFacts?: string[];
 }): boolean {
   const {
     enabled,
@@ -472,6 +481,8 @@ export function shouldDeterministicallyRefuseHardFact(args: {
     adoptedHistoryEntity,
     safetyAware,
     draftHasSafetyHandoff,
+    fabricationClassOnly,
+    missingHardFacts,
   } = args;
   if (!enabled || adoptedHistoryEntity) return false;
   // v0.9.1: een correcte nood-/escalatie-doorverwijzing mag nooit door de
@@ -481,5 +492,21 @@ export function shouldDeterministicallyRefuseHardFact(args: {
   // Gevarenzone: zwakke/medium retrieval (over-answer-risico). STRONG = gegronde
   // directe match → spaar correcte calc. NONE → al afgehandeld vóór dit punt.
   const weakRetrieval = retrievalStrength === 'weak' || retrievalStrength === 'medium';
-  return unsupportedHardFact && weakRetrieval;
+  if (!unsupportedHardFact || !weakRetrieval) return false;
+  // v0.10 (C11) — fabricatie-klasse-lever. Een gegrond antwoord dat een benign
+  // generiek getal (aantal/los nummer) noemt dat net niet exact in de bron staat,
+  // landt bij medium-retrieval (top1Sim 0,50–0,56) anders onder de generieke
+  // hard-fact-weigering → over-refusal. Onder de flag vuurt de gate daarom alléén
+  // wanneer minstens één ONGEGROND feit BUITEN de benign `number:`-categorie valt
+  // (geld/percentage/datum/email/url/telefoon = de schadelijke fabricatie-klasse,
+  // die volledig gegate blijft). Een ongegrond bedrag/datum/contactgegeven weigert
+  // dus nog steeds; alleen een los benign getal niet. (Bewust strikter dan de spec-
+  // letter "money/%/date" — email/url/phone blijven mee-gegate: veiligheid eerst.)
+  if (fabricationClassOnly) {
+    const hasDangerousFabrication = (missingHardFacts ?? []).some(
+      (m) => !m.startsWith('number:'),
+    );
+    if (!hasDangerousFabrication) return false;
+  }
+  return true;
 }

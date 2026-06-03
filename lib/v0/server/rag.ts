@@ -1076,6 +1076,17 @@ export type V03Extras = {
    * gedetecteerd is.
    */
   adoptedHistoryEntities?: string[];
+  /**
+   * v0.10 (P4) — true wanneer de DETERMINISTISCHE hard-fact-weiger-gate
+   * (shouldDeterministicallyRefuseHardFact) het antwoord heeft vervangen door het
+   * eerlijke weiger/doorverwijs-template. Onderscheidt deze weigering van de
+   * LLM-claim-regenerate (beide komen als `replacement`-event met reason
+   * 'claim-regenerate'). De hard-eval-runner gebruikt dit als het ECHTE
+   * refusal-event voor de over-refusal-meting (i.p.v. de regex op de antwoordtekst,
+   * die vals-positief is op gegronde "neem contact op"-CTA's). Alleen aanwezig
+   * wanneer de gate vuurde.
+   */
+  deterministicHardFactRefusal?: boolean;
 };
 
 /** v0.4 latency telemetrie. Alle waarden afgerond naar hele ms. */
@@ -2773,6 +2784,9 @@ KRITISCHE FORMAT-REGELS:
     adoptedHistoryEntity: unsupportedHistoryEntity,
     safetyAware: bot.hardFactRefusalSafetyAware === true,
     draftHasSafetyHandoff,
+    // v0.10 (C11) — fabricatie-klasse-lever: benign los getal weigert niet meer.
+    fabricationClassOnly: bot.hardFactRefusalFabricationClassOnly === true,
+    missingHardFacts,
   });
   if (bot.claimRegenerateEnabled && deterministicHardFactRefusal) {
     activeAnswerText =
@@ -2783,6 +2797,9 @@ KRITISCHE FORMAT-REGELS:
       answer: activeAnswerText,
       extras: {
         ...(activeResponse.extras ?? {}),
+        // v0.10 (P4): markeer dit als de DETERMINISTISCHE hard-fact-weigering zodat
+        // de eval-runner het echte refusal-event kan tellen (los van de LLM-regenerate).
+        deterministicHardFactRefusal: true,
         ...(hardFactSupported !== undefined
           ? {
               hardFactSupport: {
@@ -3048,7 +3065,7 @@ export type DocSummary = {
   createdAt: string;
 };
 
-export async function listDocs(organizationId: string = DEV_ORG_ID): Promise<DocSummary[]> {
+export async function listDocs(organizationId: string): Promise<DocSummary[]> {
   const sb = supabase();
   const { data: docs, error } = await sb
     .from('documents')

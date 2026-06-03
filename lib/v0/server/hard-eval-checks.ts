@@ -316,7 +316,12 @@ export type DeterministicVerdict = {
   botCostUsd: number;
   /** Wall-clock van de primaire bot-run in ms (Groep 2 — operationeel). */
   latencyMs: number;
-  /** Klonk het antwoord als een weigering/doorverwijzing (fallback/smalltalk/refusal-marker)? — Groep 3. */
+  /** v0.10 (P4): het ECHTE refusal-event, majority-of-N over de runs — een hard
+   *  "ik weet het niet"-pad (fallback/smalltalk) OF de deterministische hard-fact-
+   *  weigering (extras.deterministicHardFactRefusal). NIET meer de regex op de
+   *  antwoordtekst (die was vals-positief op gegronde "neem contact op"-CTA's). Dit
+   *  is de over-refusal-maat (computeRefusalCalibration leest 'm op expectsRefusal===
+   *  false cases). — Groep 3. */
   refused: boolean;
   /** Verwachtte de case een weigering? (uit HardCase.expectsRefusal) — Groep 3 calibratie. null = n.v.t. */
   expectsRefusal: boolean | null;

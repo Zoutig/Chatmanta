@@ -51,4 +51,19 @@ export function getInjectionMode(): InjectionMode {
   return DEFAULT_INJECTION_MODE;
 }
 
+/**
+ * C5 (v0.10) — welke injection-modus geldt voor deze request? Het PUBLIEKE embed-pad
+ * (geen demo-cookie) blokkeert injection ALTIJD, ongeacht de env-modus; de cookie-
+ * authed admin/test-tool volgt `envMode` (default log-only) zodat het tunen van
+ * patterns niet door false-positives gehinderd wordt terwijl externe bezoekers wél
+ * beschermd zijn. Pure functie zodat de borg-test deze veiligheidsbranch zonder
+ * request-mock kan dekken.
+ */
+export function resolveInjectionMode(
+  cookieAuthed: boolean,
+  envMode: InjectionMode,
+): InjectionMode {
+  return cookieAuthed ? envMode : 'block';
+}
+
 export { INJECTION_BLOCKED_MESSAGE };

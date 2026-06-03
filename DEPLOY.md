@@ -71,3 +71,37 @@ Migrations runnen we **lokaal** met `npm run migrate` — Vercel raakt de databa
 3. Push code → Vercel deploy gebruikt het verse schema
 
 Voor V1 met meer teamleden: overweeg een dedicated CI-stap voor migrations, of Supabase CLI met dev/prod environments.
+
+---
+
+## v0.10 — extra prod-env-vars (productie-hardening)
+
+v0.10 voegt een kosten-/misbruik-cap, een AVG-codelaag en observability-haken toe. Zet
+deze env-vars in Vercel (Production) **en redeploy** (env-wijzigingen worden pas na een
+redeploy actief). Genereer secrets lokaal (`openssl rand -hex 32` of
+`node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`) en
+commit ze NOOIT.
+
+| Variable | Verplicht? | Waarom | Default als leeg |
+|---|---|---|---|
+| `EMBED_TOKEN_SECRET` | **JA (≥16 chars)** | HMAC embed-token (fail-closed). | **Boot crasht luid** via de startup-assert (C2) — bewust, anders gaat de hele publieke widget stil 401-zwart. |
+| `CRON_SECRET` | JA (voor retentie) | Beschermt `/api/cron/retention` (C8). | Cron-route weigert alles (401) → retentie draait niet. |
+| `USE_UPSTASH` | aanbevolen (`true`) | Gedeelde rate-limit-store i.p.v. in-memory (C6). | In-memory fallback (telt niet over instances). |
+| `UPSTASH_REDIS_REST_URL` | als `USE_UPSTASH=true` | Upstash REST endpoint. | **Boot crasht luid** via de startup-assert (C2) bij `USE_UPSTASH=true` zonder deze vars — geen stille fallback. |
+| `UPSTASH_REDIS_REST_TOKEN` | als `USE_UPSTASH=true` | Upstash REST token. | idem. |
+| `CHATMANTA_DAILY_BUDGET_USD` | optioneel | Per-dag-per-org LLM-kostencap in USD (C3). | const-default (zie `lib/v0/server/budget.ts`). |
+| `OPENAI_ADMIN_KEY` | optioneel | Usage/cost-rapportage; graceful fallback. | Cost-rapport valt terug op schatting. |
+| `FIRECRAWL_API_KEY` | optioneel | Live website-crawl. | Crawl uitgeschakeld. |
+
+### Startup-assert (C2 — fail-closed boot-check)
+`instrumentation.ts` draait bij server-boot (`register()`, alleen `NEXT_RUNTIME==='nodejs'`)
+een assert:
+- **`EMBED_TOKEN_SECRET` ontbreekt of < 16 chars → harde fout, boot stopt.** Zonder deze
+  assert faalt `verifyEmbedToken` STIL (geeft `false` zonder log) en gaat de hele publieke
+  widget 401-zwart zonder signaal. Daarom luid falen.
+- **`USE_UPSTASH=true` maar Upstash-URL/token ontbreekt → harde fout.** Voorkomt dat
+  productie stil terugvalt op de in-memory rate-limit (die niet over instances telt).
+
+Op een lokale dev-machine met volledige `.env.local` zijn beide groen. Mist er een var op
+prod, dan zie je het direct in de Vercel function-/build-logs (boot-fout), niet pas als de
+widget bij een bezoeker faalt.

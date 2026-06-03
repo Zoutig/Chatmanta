@@ -305,6 +305,21 @@ export type BotConfig = {
    */
   hardFactRefusalSafetyAware?: boolean;
   /**
+   * v0.10 (C11): over-refusal-tune. Beperkt de deterministische hard-fact-weiger-
+   * gate (hardFactDeterministicRefusal) tot de FABRICATIE-KLASSE: de gate vuurt
+   * alléén nog wanneer een ONGEGROND feit in {money, percentage, date} valt, niet
+   * bij een benign generiek getal/jaartal/aantal dat in een verder gegrond antwoord
+   * landt. Reden: v0.9.3 weigert ~13% van de beantwoordbare vragen doordat een
+   * gegrond antwoord met een benign getal dat net niet exact in de bron staat, bij
+   * medium-retrieval (top1Sim 0,50–0,56) door de generieke weigering wordt vervangen.
+   * De fabricatie-klasse (geld/datum/percentage) is precies waar hallucinatie
+   * schadelijk is → die blijft 100% gegate (de aoc-* geld-fabricaties blijven
+   * medium-retrieval gevangen). Vereist hardFactDeterministicRefusal=true om effect
+   * te hebben. Default false/undefined → v0.9.3-gedrag (alle ongegronde harde feiten
+   * gaten, append-only). Zie shouldDeterministicallyRefuseHardFact (hard-facts.ts).
+   */
+  hardFactRefusalFabricationClassOnly?: boolean;
+  /**
    * v0.9.1: deterministische off-domein-code-guard. Wanneer het antwoord code/
    * programmeer-syntax bevat (``` , def/function, for-in-range, etc.) wordt het
    * vervangen door de off-topic-refusal. Een klantcontact-bot van een niet-
@@ -1204,6 +1219,26 @@ const V0_9_3: BotConfig = {
   systemPrompt: V0_9_3_SYSTEM_PROMPT,
 };
 
+// v0.10 — productie-hardening + over-refusal-tune. Append-only snapshot bovenop
+// v0.9.3. De bot-KWALITEIT-wijziging (C11) is hardFactRefusalFabricationClassOnly:
+// de deterministische hard-fact-weiger-gate vuurt niet meer op een puur benign
+// generiek getal (aantal/los nummer) dat net niet exact in de bron staat, maar
+// blijft volledig actief op de schadelijke fabricatie-klasse (geld/percentage/datum/
+// email/url/telefoon). NB: na de P4-meetfix bleek de v0.9.3-over-refusal al ~3% (de
+// eerdere ~13% was een CTA-regex-artefact) — deze lever richt zich op benign-getal-
+// over-refusal op echte productie-traffic en is op de huidige fixture eval-neutraal
+// én safety-neutraal. systemPrompt + alle overige GEDRAG-flags byte-identiek aan
+// v0.9.3. De v0.10 CODE-hardening (kosten-cap, AVG-laag, isolatie, observability)
+// zit buiten de bot-config.
+const V0_10: BotConfig = {
+  ...V0_9_3,
+  version: 'v0.10',
+  label: 'v0.10 — productie-hardening + over-refusal-tune',
+  description:
+    'v0.9.3-gedrag + C11 over-refusal-tune (hardFactRefusalFabricationClassOnly): de deterministische hard-fact-weiger-gate weigert niet meer op een puur benign generiek getal (aantal/los nummer) dat net niet in de bron staat, maar blijft volledig gate-en op de schadelijke fabricatie-klasse (geld/percentage/datum/email/url/telefoon). systemPrompt + alle overige GEDRAG-flags byte-identiek aan v0.9.3. Begeleidt de v0.10 code-hardening (per-org dag-budget-cap, PII-redactie in logQuery, retentie-cron, widget graceful-degradatie, orgId-verplichting, startup-asserts). NB: de v0.9.3-over-refusal bleek na de P4-meetfix al ~3% (de eerdere ~13% was een CTA-regex-artefact); deze lever richt zich op benign-getal-over-refusal op echte productie-traffic en is op de huidige fixture eval-neutraal + safety-neutraal.',
+  hardFactRefusalFabricationClassOnly: true,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1222,6 +1257,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_9_1.version]: V0_9_1,
   [V0_9_2.version]: V0_9_2,
   [V0_9_3.version]: V0_9_3,
+  [V0_10.version]: V0_10,
 };
 
 /**
@@ -1272,7 +1308,17 @@ export const BOTS: Record<string, BotConfig> = {
 // Engelse vragen in het Engels laat beantwoorden (Productie-gate Laag 4 vond
 // language=FAIL op v0.9.2 EN-cases). Puur prompt-append aan het eind; geen
 // pipeline-/retrieval-wijziging. v0.9.2 blijft byte-identiek + append-only.
-export const LATEST_BOT_VERSION = V0_9_3.version;
+// GEPROMOVEERD naar v0.10 (2026-06-03) — productie-hardening + over-refusal-tune.
+// Eind-gate (runs=3 op de kandidaat, mét de #168-judge-fix): v0.10 = PRODUCTIEWAARDIG
+// JA (100% 59/59, 0 veiligheidsveto's, over-refusal 3% ≤ drempel, under-refusal 0%);
+// v0.9.3 = NEE op dezelfde run (2 schendingen: een nfs-exacte-prijs-fabricatie die
+// v0.10 correct weigerde + een consistency-divergentie). De C11 fabricatie-klasse-lever
+// is op de fixture eval-neutraal én safety-neutraal — de JA steunt op de eval-bewezen
+// v0.9.3-veiligheidskern + de P4-meetfix + multi-run-robuustheid, niet op de lever zelf.
+// v0.10 is op élke deterministische as ≥ v0.9.3. Promotie ALLEEN op deze branch (niet
+// gemerged/gedeployd) — zie V0_10_BUILD_REPORT.md voor de gate-output + caveats.
+// v0.9.3 blijft byte-identiek + append-only behouden.
+export const LATEST_BOT_VERSION = V0_10.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1290,6 +1336,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_9_1.version,
   V0_9_2.version,
   V0_9_3.version,
+  V0_10.version,
 ];
 
 /**

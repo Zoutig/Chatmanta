@@ -39,6 +39,8 @@ export function httpStatusFor(code: AppErrorCode): number {
   switch (code) {
     case 'RATE_LIMIT':
       return 429;
+    case 'BUDGET_EXHAUSTED':
+      return 402;
     case 'INPUT_INVALID':
       return 400;
     case 'INJECTION_BLOCKED':

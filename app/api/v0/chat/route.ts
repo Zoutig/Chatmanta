@@ -18,9 +18,15 @@ import {
 import { resolveBot } from '@/lib/v0/server/bots';
 import { logQuery, logBlockedQuery, type HydeMeta } from '@/lib/v0/server/log';
 import { normalizeStyle } from '@/lib/v0/style';
-import { detectInjection, getInjectionMode, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
+import {
+  detectInjection,
+  getInjectionMode,
+  resolveInjectionMode,
+  INJECTION_BLOCKED_MESSAGE,
+} from '@/lib/v0/server/injection';
 import { getClientIp, getRateLimiter, getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
 import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
+import { checkOrgDailyBudget } from '@/lib/v0/server/budget';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import {
   buildChatbotOverrides,
@@ -38,62 +44,10 @@ import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
 import { captureError } from '@/lib/v0/server/error-capture';
 import type { ErrorSeverity, ErrorSurface } from '@/lib/observability/sink';
-import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
-import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
-
-// Widget-detectie via referer-header. Twee publieke chat-paden:
-//   /widget/<slug>  — de demo-rotatie op onze eigen omgeving
-//   /embed/<slug>   — de iframe van public/widget.js op een externe site
-// Beide moeten server-side een v0_threads-rij krijgen (commitTurn) zodat het
-// gesprek in klanten-/admindashboard verschijnt. De testtool zit op
-// /klantendashboard/test en commit zelf client-side → bewust géén match hier
-// (anders dubbele rijen). Als extra zekerheid telt ook een aanwezig embed-token
-// (alleen de embed-client stuurt dat) als widget-signaal voor het geval de
-// referer door een strikte Referrer-Policy gestript is.
-function isWidgetRequest(req: Request): boolean {
-  if (req.headers.get('x-chatmanta-embed')) return true;
-  const referer = req.headers.get('referer');
-  if (!referer) return false;
-  try {
-    const path = new URL(referer).pathname;
-    return path.startsWith('/widget/') || path.startsWith('/embed/');
-  } catch {
-    return false;
-  }
-}
-
-// Dual-auth voor het publieke chat-pad. Geldig als óf het V0-demo-cookie klopt
-// (ingelogde admin/test/widget-demo paden — geen regressie), óf een geldig
-// embed-token + same-origin. Anders 401. Rate-limit draait al ervóór.
-// True als de request het geldige V0-demo-cookie draagt (ingelogde admin/test/
-// /widget-demo). Onderscheidt het admin-pad van het publieke embed-pad — dat
-// laatste authoriseert via embed-token en krijgt strengere injection-handling.
-function isCookieAuthed(req: Request): boolean {
-  const cookie = req.headers
-    .get('cookie')
-    ?.match(new RegExp(`(?:^|;\\s*)${AUTH_COOKIE.name}=([^;]+)`))?.[1];
-  return verifyAuthCookieValue(cookie ? decodeURIComponent(cookie) : undefined);
-}
-
-function isChatAuthorized(req: Request): boolean {
-  if (isCookieAuthed(req)) return true;
-
-  // Token moet bij de gevraagde org horen.
-  const orgSlug = resolveOrgSlugFromId(getActiveOrgId(req));
-  if (!orgSlug) return false;
-  const token = req.headers.get('x-chatmanta-embed');
-  if (!verifyEmbedToken(token, orgSlug)) return false;
-
-  // Origin-lock: same-origin POST stuurt een Origin die de app-host moet zijn.
-  const host = req.headers.get('host');
-  const originHdr = req.headers.get('origin') ?? req.headers.get('referer');
-  if (!host || !originHdr) return false;
-  try {
-    return new URL(originHdr).host === host;
-  } catch {
-    return false;
-  }
-}
+// C9 (v0.10): de embed-auth-/herkomst-checks zijn naar lib/v0/server/embed-auth.ts
+// getild zodat de chat-route en het AVG-delete-endpoint dezelfde veiligheidsgrens
+// delen (geen drift). Gedrag byte-identiek.
+import { isWidgetRequest, isCookieAuthed, isChatAuthorized } from '@/lib/v0/server/embed-auth';
 
 export const runtime = 'nodejs';
 
@@ -269,7 +223,7 @@ export async function POST(req: Request) {
   // testtool (cookie) volgt de env-modus (default log-only), zodat het tunen van
   // patterns niet gehinderd wordt door false-positives terwijl externe bezoekers
   // wél beschermd zijn.
-  const injectionMode = isCookieAuthed(req) ? getInjectionMode() : 'block';
+  const injectionMode = resolveInjectionMode(isCookieAuthed(req), getInjectionMode());
 
   if (injection.detected && injectionMode === 'block') {
     const patternName = injection.pattern?.name ?? 'unknown';
@@ -356,6 +310,27 @@ export async function POST(req: Request) {
         },
       });
     }
+  }
+
+  // C3 (v0.10) — per-org dag-budget-cap (USD). Som de query_log-kosten van vandaag;
+  // bij overschrijding van de cap weigeren we de LLM-call (HTTP 402 BUDGET_EXHAUSTED)
+  // i.p.v. te genereren. Backstop tegen kosten-runaway op de publieke widget; geldt
+  // org-breed (de ruime $2-default raakt legitiem gebruik praktisch nooit). Draait ná
+  // de rate-limit zodat goedkope, al-gerate-limite requests geen extra DB-read doen.
+  // De som kan onder-tellen als een eerdere logQuery-insert faalde (best-effort), dus
+  // dit is een backstop — we loggen een cap-hit ook luid (capture).
+  const budget = await checkOrgDailyBudget(organizationId);
+  if (budget.over) {
+    capture('BUDGET_EXHAUSTED', {
+      severity: 'warning',
+      message: `dag-budget bereikt: $${budget.spentUsd.toFixed(4)} >= cap $${budget.capUsd.toFixed(2)}`,
+      organizationId,
+    });
+    const err = new AppError('BUDGET_EXHAUSTED');
+    return NextResponse.json(toWire(err, requestId), {
+      status: err.status,
+      headers: { 'X-Request-Id': requestId },
+    });
   }
 
   // Eén v0_org_settings-read voor zowel manual Q&A fast-path als de

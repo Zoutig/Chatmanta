@@ -18,6 +18,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
+// C4 (v0.10) — canonieke code→leesbare-NL-melding mapping. Pure modules (geen
+// server-only), dus veilig in de client/embed-bundle.
+import { fromWire } from '@/lib/errors/app-error';
+import { userView } from '@/lib/errors/user-messages';
 import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { cleanWidgetAnswer, renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
@@ -379,6 +383,33 @@ export function ChatMantaWidget({
     }
   }, [orgSlug]);
 
+  // C9 (v0.10) — AVG-verwijderpad: de bezoeker wist zijn eigen gesprekken. De
+  // visitor-id gaat als header mee (zelfde identiteit als de chat) zodat de server
+  // alléén déze bezoeker zijn data verwijdert, org-gescoped. De lokale staat wordt
+  // sowieso gewist (de bezoeker wil 'weg'), ook als de server-call faalt.
+  const handleDeleteConversations = useCallback(async () => {
+    if (typeof window !== 'undefined' &&
+        !window.confirm('Weet je zeker dat je je gesprek wilt verwijderen? Dit kan niet ongedaan worden gemaakt.')) {
+      return;
+    }
+    const visitorId =
+      visitorIdRef.current ?? (visitorIdRef.current = getOrCreateVisitorId());
+    try {
+      await fetch(`/api/v0/widget/delete-conversations?org=${encodeURIComponent(orgSlug)}`, {
+        method: 'POST',
+        headers: {
+          ...(embedTokenRef.current ? { 'x-chatmanta-embed': embedTokenRef.current } : {}),
+          ...(visitorId ? { 'x-chatmanta-visitor': visitorId } : {}),
+        },
+      });
+    } catch {
+      // best-effort — lokaal toch wissen.
+    }
+    setMessages([]);
+    setThreads([]);
+    setActiveThreadId(null);
+  }, [orgSlug]);
+
   // Kern van het chat-request: fetch + token-refresh-retry + stream-verwerking
   // voor een bestaande assistant-bubble. Gedeeld door `send` (nieuwe vraag) en
   // `retry` (mislukt bericht opnieuw). De caller zet `pending` aan en voegt de
@@ -425,11 +456,23 @@ export function ChatMantaWidget({
 
         if (!res.ok || !res.body) {
           const status = res.status;
+          // 401/403 op het embed-pad: token verlopen — visitor logt niet in, dus een
+          // embed-specifieke melding (geen userView 'AUTH_REQUIRED'-inlog-tekst).
+          if (status === 401 || status === 403) {
+            updateAssistant(setMessages, assistantId, {
+              content: 'Deze chat is even niet beschikbaar. Ververs de pagina en probeer het opnieuw.',
+              error: `HTTP ${status}`,
+              streaming: false,
+            });
+            return;
+          }
+          // C4: andere faalpaden (402 BUDGET_EXHAUSTED, 429 RATE_LIMIT, 5xx) → parse de
+          // AppError-body en toon de canonieke leesbare melding i.p.v. een generieke zin.
+          const wire = fromWire(await res.json().catch(() => ({})));
+          const view = userView(wire.code, { retryAfterSec: wire.retryAfterSec });
           updateAssistant(setMessages, assistantId, {
-            content: status === 401 || status === 403
-              ? 'Deze chat is even niet beschikbaar. Ververs de pagina en probeer het opnieuw.'
-              : 'Er ging iets mis met dit antwoord. Probeer het opnieuw.',
-            error: `HTTP ${status}`,
+            content: view.body,
+            error: wire.code,
             streaming: false,
           });
           return;
@@ -1166,6 +1209,34 @@ export function ChatMantaWidget({
             >
               ChatManta
             </a>
+            {/* C9 (v0.10) — AVG-disclosure + verwijderpad */}
+            <div style={{ marginTop: 4, fontSize: 10.5, color: '#9ca3af', lineHeight: 1.5 }}>
+              Je gesprek wordt tijdelijk opgeslagen om je beter te helpen.{' '}
+              <a
+                href="/privacy"
+                style={{ color: '#6b7280', textDecoration: 'underline' }}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Privacy
+              </a>
+              {' · '}
+              <button
+                type="button"
+                onClick={() => void handleDeleteConversations()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  color: '#6b7280',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                }}
+              >
+                Verwijder mijn gesprek
+              </button>
+            </div>
           </div>
 
           {/* Thread-drawer als overlay binnen het paneel. Hij zit boven de
@@ -1274,12 +1345,14 @@ function handleEvent(
   }
 
   if (e.kind === 'error') {
-    const code = (e as { code?: string }).code ?? 'UNKNOWN';
+    // C4: map de echte AppError-code op een leesbare NL-melding (fromWire normaliseert
+    // onbekende codes → INTERNAL). Vangt RATE_LIMIT (was de dode 'RATE_LIMITED'-tak),
+    // LLM_TIMEOUT, BUDGET_EXHAUSTED, NOT_FOUND, etc. — geen generieke blob meer.
+    const wire = fromWire(e);
+    const view = userView(wire.code, { retryAfterSec: wire.retryAfterSec });
     updateAssistant(setMessages, assistantId, {
-      content: code === 'RATE_LIMITED'
-        ? 'Even rustig aan — te veel berichten op rij. Probeer over een momentje opnieuw.'
-        : 'Er ging iets mis aan onze kant. Probeer het zo nog eens.',
-      error: code,
+      content: view.body,
+      error: wire.code,
       streaming: false,
     });
   }

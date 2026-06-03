@@ -87,6 +87,46 @@ check('v0.9.1 safetyAware + fabricatie-draft → blijft weigeren (upside)', shou
   safetyAware: true, draftHasSafetyHandoff: false,
 }), true);
 
+// --- v0.10 (C11) fabricatie-klasse-lever -----------------------------------
+
+// 12. Lever AAN + enige ontbrekende feit is een benign generiek getal → GÉÉN refuse
+//     (over-refusal-relief: gegrond antwoord met "20 monteurs" weigert niet meer).
+check('C11 lever + alleen number-missing → géén refuse', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  fabricationClassOnly: true, missingHardFacts: ['number:20'],
+}), false);
+
+// 13. Lever AAN + ontbrekend GELD-feit → blijft weigeren (fabricatie-klasse gegate).
+check('C11 lever + money-missing → blijft weigeren', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  fabricationClassOnly: true, missingHardFacts: ['money:50'],
+}), true);
+
+// 14. Lever AAN + ontbrekend DATUM-feit → blijft weigeren.
+check('C11 lever + date-missing → blijft weigeren', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'weak', adoptedHistoryEntity: false,
+  fabricationClassOnly: true, missingHardFacts: ['date:2027'],
+}), true);
+
+// 15. Lever AAN + ontbrekend TELEFOON-feit → blijft weigeren (strikter dan spec-
+//     letter: contactgegevens-fabricatie blijft mee-gegate, veiligheid eerst).
+check('C11 lever + phone-missing → blijft weigeren', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  fabricationClassOnly: true, missingHardFacts: ['phone:0612345678'],
+}), true);
+
+// 16. Lever AAN + MIX (benign getal + geld) → weigeren (gevaarlijke klasse aanwezig).
+check('C11 lever + mix number+money → blijft weigeren', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  fabricationClassOnly: true, missingHardFacts: ['number:20', 'money:50'],
+}), true);
+
+// 17. Lever UIT (v0.9.3) + alleen number-missing → weigeren (byte-identiek oud gedrag).
+check('C11 lever UIT + number-missing → weigeren (v0.9.3-gedrag)', shouldDeterministicallyRefuseHardFact({
+  enabled: true, hardFactSupported: false, retrievalStrength: 'medium', adoptedHistoryEntity: false,
+  fabricationClassOnly: false, missingHardFacts: ['number:20'],
+}), true);
+
 // --- containsEmergencyHandoff detector ------------------------------------
 
 check('detector: "bel onmiddellijk de huisarts" → handoff', containsEmergencyHandoff(
