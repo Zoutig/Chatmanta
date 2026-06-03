@@ -427,3 +427,70 @@ export async function getRecapOverviewRow(
     hasRecap: stored != null && stored.generatedAt != null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// WRITES — gebruikt door de server-actions (app/actions/recap.ts).
+// ---------------------------------------------------------------------------
+
+/** Vind de recap-rij voor (org, maand) of maak een minimale aan; geef het id. */
+export async function getOrCreateRecapId(organizationId: string, periodMonth: string): Promise<string> {
+  const existing = await sb()
+    .from('admin_monthly_recaps')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('period_month', periodMonth)
+    .maybeSingle();
+  if (existing.data?.id) return String(existing.data.id);
+  const ins = await sb()
+    .from('admin_monthly_recaps')
+    .insert({ organization_id: organizationId, period_month: periodMonth })
+    .select('id')
+    .single();
+  if (ins.error || !ins.data) throw new Error(`kon recap-rij niet aanmaken: ${ins.error?.message ?? 'onbekend'}`);
+  return String(ins.data.id);
+}
+
+export type RecapArtifactPatch = {
+  aiSummary?: string | null;
+  nielsNotes?: string | null;
+  recapStatus?: MonthlyRecap['recapStatus'];
+  generatedAt?: string | null;
+};
+
+/** Partial update van de opgeslagen artefacten (raakt ALLEEN meegegeven kolommen,
+ *  zodat regenereren de ai_summary ververst maar niels_notes ongemoeid laat). */
+export async function updateRecapArtifacts(recapId: string, patch: RecapArtifactPatch): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.aiSummary !== undefined) row.ai_summary = patch.aiSummary;
+  if (patch.nielsNotes !== undefined) row.niels_notes = patch.nielsNotes;
+  if (patch.recapStatus !== undefined) row.recap_status = patch.recapStatus;
+  if (patch.generatedAt !== undefined) row.generated_at = patch.generatedAt;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await sb().from('admin_monthly_recaps').update(row).eq('id', recapId);
+  if (error) throw new Error(`kon recap niet bijwerken: ${error.message}`);
+}
+
+/** Insert ontbrekende signaal-triage-rijen als 'nieuw'; bestaande status blijft. */
+export async function ensureSignalRows(recapId: string, types: RecapSignalType[]): Promise<void> {
+  if (types.length === 0) return;
+  const rows = types.map((t) => ({ recap_id: recapId, signal_type: t, status: 'nieuw' as RecapSignalStatus }));
+  const { error } = await sb()
+    .from('admin_recap_signals')
+    .upsert(rows, { onConflict: 'recap_id,signal_type', ignoreDuplicates: true });
+  if (error) throw new Error(`kon signaal-rijen niet aanmaken: ${error.message}`);
+}
+
+/** Zet de triage-status van één signaal (upsert op recap_id+signal_type). */
+export async function setSignalTriageStatus(
+  recapId: string,
+  signalType: RecapSignalType,
+  status: RecapSignalStatus,
+): Promise<void> {
+  const { error } = await sb()
+    .from('admin_recap_signals')
+    .upsert(
+      { recap_id: recapId, signal_type: signalType, status },
+      { onConflict: 'recap_id,signal_type' },
+    );
+  if (error) throw new Error(`kon signaal-status niet zetten: ${error.message}`);
+}
