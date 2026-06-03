@@ -20,7 +20,10 @@ import 'server-only';
 import { sb } from './db';
 import { LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import { KNOWN_ORGS, listKnownOrgs, type OrgSlug } from '@/lib/v0/server/active-org';
-import type { DailyLinePoint } from '@/app/admindashboard/components/daily-line-chart';
+
+// Dag-trend punt voor de grafiek. Structureel identiek aan de DailyLineChart-prop,
+// maar bewust hier gedefinieerd zodat de data-laag niet van een app/-component afhangt.
+export type DailyLinePoint = { date: string; label: string; value: number };
 
 // Onder deze drempel is elke ratio ruis → "lage volume"-staat (gedempt + badge).
 export const LOW_VOLUME_THRESHOLD = 30;
@@ -311,7 +314,7 @@ async function fetchRecentNegatives(orgId: string, sinceIso: string): Promise<Re
   try {
     const { data, error } = await sb()
       .from('v0_feedback')
-      .select('created_at, comment, query_log:query_log_id(question)')
+      .select('created_at, comment, query_log!inner(question)')
       .eq('organization_id', orgId)
       .eq('rating', 'down')
       .not('comment', 'is', null)
@@ -320,12 +323,13 @@ async function fetchRecentNegatives(orgId: string, sinceIso: string): Promise<Re
       .limit(8);
     if (error || !data) return [];
     return data.map((r) => {
-      const ql = r.query_log as { question?: string | null } | { question?: string | null }[] | null;
-      const q = Array.isArray(ql) ? ql[0]?.question : ql?.question;
+      // PostgREST geeft een genest object terug (ook bij !inner) — zelfde
+      // shape als lib/v0/klantendashboard/server/feedback.ts.
+      const ql = (r as { query_log?: { question?: string | null } }).query_log;
       return {
         createdAt: r.created_at as string,
         comment: (r.comment as string | null) ?? null,
-        question: q ?? null,
+        question: ql?.question ?? null,
       };
     });
   } catch {

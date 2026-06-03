@@ -240,10 +240,19 @@ function FeedbackSection({ stats, negatives }: { stats: BotPerfStats; negatives?
   );
 }
 
-function TrendChart({ daily, window }: { daily: BotPerfOverview['daily']; window: PerfWindow }) {
+function TrendChart({
+  daily,
+  window,
+  hasTraffic,
+}: {
+  daily: BotPerfOverview['daily'];
+  window: PerfWindow;
+  hasTraffic: boolean;
+}) {
   return (
     <DailyLineChart
       points={daily}
+      hasData={hasTraffic}
       title="Weiger-ratio per dag"
       formatValue={(n) => `${n}%`}
       peakPrefix="piek"
@@ -344,7 +353,7 @@ function OverviewView({ overview }: { overview: BotPerfOverview }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
         <VolumeNotice stats={aggregate} window={window} />
         <StatsGrid stats={aggregate} window={window} />
-        <TrendChart daily={daily} window={window} />
+        <TrendChart daily={daily} window={window} hasTraffic={aggregate.total > 0} />
         <GapSection stats={aggregate} />
         <LatencySection stats={aggregate} />
         <FeedbackSection stats={aggregate} />
@@ -386,7 +395,7 @@ function DetailView({ detail }: { detail: BotPerfDetail }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
         <VolumeNotice stats={org.stats} window={window} />
         <StatsGrid stats={org.stats} window={window} />
-        <TrendChart daily={daily} window={window} />
+        <TrendChart daily={daily} window={window} hasTraffic={org.stats.total > 0} />
         <GapSection stats={org.stats} />
         <LatencySection stats={org.stats} />
         <FeedbackSection stats={org.stats} negatives={recentNegatives} />

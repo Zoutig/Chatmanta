@@ -24,6 +24,7 @@ const BASELINE = PAD_T + INNER_H;
 
 export function DailyLineChart({
   points,
+  hasData: hasDataProp,
   title,
   formatValue,
   headerRight,
@@ -34,6 +35,8 @@ export function DailyLineChart({
   gradientId = 'klant-line-area',
 }: {
   points: DailyLinePoint[];
+  /** Overschrijf de auto-detectie (max>0). Nodig voor een legitieme platte 0-reeks. */
+  hasData?: boolean;
   title: string;
   /** Formatteert een waarde voor tooltip + piek-label (bv. `(n) => `${n}%``). */
   formatValue: (value: number) => string;
@@ -47,9 +50,12 @@ export function DailyLineChart({
   gradientId?: string;
 }) {
   const max = points.reduce((m, p) => Math.max(m, p.value), 0);
-  const hasData = max > 0 && points.length > 0;
-  // 15% headroom zodat de piek niet tegen de bovenrand plakt.
-  const ceiling = max * 1.15;
+  // hasDataProp overschrijft de default zodat een legitieme platte 0-reeks (bv.
+  // verkeer met 0% weiger-ratio) tóch als platte lijn getekend wordt i.p.v. "geen data".
+  const hasData = (hasDataProp ?? max > 0) && points.length > 0;
+  // 15% headroom zodat de piek niet tegen de bovenrand plakt; bij een volledig
+  // platte reeks val terug op 1 zodat yAt niet door nul deelt (lijn op de baseline).
+  const ceiling = max > 0 ? max * 1.15 : 1;
   // Aslabel-dichtheid: bij veel dagen tonen we ~elke 5e dag een dagnummer.
   const labelEvery = points.length > 14 ? 5 : 2;
 
