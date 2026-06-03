@@ -22,12 +22,19 @@ import { headers } from 'next/headers';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
+import { getSink } from '@/lib/observability/sink';
+import { checkWithFallback } from './rate-limit-fallback';
+
 const DEFAULT_MAX_REQUESTS_PER_MIN = 30;
 const DEFAULT_MUTATION_MAX_PER_MIN = 10;
 // Per-org bucket: ruimer dan per-IP (één org heeft legitiem meerdere bezoekers
 // vanaf verschillende IP's), maar laag genoeg om een gescript misbruik dat over
 // IP's roteert af te knijpen op kosten. Override via ORG_RATE_LIMIT_PER_MIN.
 const DEFAULT_ORG_MAX_PER_MIN = 120;
+// Bij een Upstash-storing valt de limiter terug op in-memory en slaat alarm; dit
+// dempt dat alarm tot hooguit één melding per instance per venster (anders zou
+// een aanhoudende storing de logs + Issues-sink overspoelen).
+const ALARM_THROTTLE_MS = 60_000;
 
 export type RateLimitVerdict = {
   allowed: boolean;
@@ -94,10 +101,18 @@ export class InMemoryRateLimiter implements RateLimiter {
  * `ratelimit.limit()` is async (HTTP call naar Upstash REST), vandaar dat de
  * interface `check()` Promise-returnt. In-memory wrapt zijn return ook in een
  * Promise om dezelfde signatuur te delen.
+ *
+ * Fail-safe: faalt de Upstash-call (Redis down / netwerk / foute credential),
+ * dan 500't de route NIET — `check()` valt via {@link checkWithFallback} terug
+ * op een per-instance in-memory teller en slaat (gedempt) alarm. Tijdens de
+ * storing telt de limiet dus per-process i.p.v. globaal, maar de ergste runaway
+ * blijft begrensd en de publieke routes blijven overeind.
  */
 export class UpstashRateLimiter implements RateLimiter {
   private readonly ratelimit: Ratelimit;
   private readonly limitValue: number;
+  private readonly fallback: InMemoryRateLimiter;
+  private lastAlarmAtMs = 0;
 
   constructor(opts: { maxRequestsPerMin: number; prefix: string; redis: Redis }) {
     this.limitValue = opts.maxRequestsPerMin;
@@ -107,9 +122,19 @@ export class UpstashRateLimiter implements RateLimiter {
       analytics: false,
       prefix: opts.prefix,
     });
+    this.fallback = new InMemoryRateLimiter({ maxRequestsPerMin: opts.maxRequestsPerMin });
   }
 
-  async check(key: string): Promise<RateLimitVerdict> {
+  check(key: string): Promise<RateLimitVerdict> {
+    return checkWithFallback(
+      () => this.limitViaUpstash(key),
+      this.fallback,
+      key,
+      (err) => this.alarm(err),
+    );
+  }
+
+  private async limitViaUpstash(key: string): Promise<RateLimitVerdict> {
     const { success, remaining, reset } = await this.ratelimit.limit(key);
     const now = Date.now();
     const retryAfterSec = success ? 0 : Math.max(1, Math.ceil((reset - now) / 1000));
@@ -120,6 +145,29 @@ export class UpstashRateLimiter implements RateLimiter {
       retryAfterSec,
       resetAt: reset,
     };
+  }
+
+  /** Luid maar gedempt alarm bij een Upstash-storing: console + observability-
+   *  sink (Issues-tab), zodat een stille terugval op in-memory zichtbaar wordt.
+   *  Hooguit één melding per ALARM_THROTTLE_MS per instance. */
+  private alarm(err: unknown): void {
+    const now = Date.now();
+    if (now - this.lastAlarmAtMs < ALARM_THROTTLE_MS) return;
+    this.lastAlarmAtMs = now;
+    console.error(
+      '[rate-limit] Upstash-call faalde — terugval op in-memory limiter ' +
+        '(per-instance, niet globaal gedeeld). Controleer Upstash-status/credentials.',
+      err,
+    );
+    getSink().capture({
+      surface: 'system',
+      severity: 'error',
+      code: 'RATE_LIMIT_BACKEND',
+      title: 'Upstash rate-limit onbereikbaar — terugval op in-memory',
+      message: err instanceof Error ? err.message : String(err),
+      error: err,
+      context: { route: 'rate-limit' },
+    });
   }
 }
 
