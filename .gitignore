@@ -62,6 +62,8 @@ tests/.auth-state.json
 
 # lokale QA-artefacten (screenshots + dev-server logs, regenereerbaar)
 qa-*.png
+# losse screenshots in de repo-root (sessie-artefacten); echte assets staan in public/
+/*.png
 dev-server.log
 
 # ad-hoc debug scripts (browser automation, one-off diagnostics)
