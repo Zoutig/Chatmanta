@@ -47,9 +47,9 @@ export function buildOperatorEmail(item: FeedbackItem, opts: { orgName: string; 
     ['Type', typeLabel],
     ['Urgentie', FEEDBACK_URGENCY_LABELS[item.urgency]],
     ['Status', FEEDBACK_STATUS_LABELS[item.status]],
-    ['Ingediend door', item.submitterName || '—'],
-    ['E-mail', item.submitterEmail || '—'],
-    ['Chat-ID', item.chatId || '—'],
+    ['Ingediend door', item.submitterName || 'niet opgegeven'],
+    ['E-mail', item.submitterEmail || 'niet opgegeven'],
+    ['Chat-ID', item.chatId || 'geen'],
   ];
   const text = [
     `Nieuwe melding in ChatManta (${opts.orgName})`,
@@ -80,7 +80,7 @@ export function buildOperatorEmail(item: FeedbackItem, opts: { orgName: string; 
 
 /** Optionele bevestiging naar de indiener (alleen bij geldig e-mailadres). */
 export function buildSubmitterEmail(item: FeedbackItem): BuiltEmail {
-  const subject = 'We hebben je feedback ontvangen — ChatManta';
+  const subject = 'We hebben je feedback ontvangen · ChatManta';
   const greeting = item.submitterName ? `Hoi ${item.submitterName},` : 'Hoi,';
   const summary = truncate(item.description, 300);
   const text = [
@@ -91,7 +91,7 @@ export function buildSubmitterEmail(item: FeedbackItem): BuiltEmail {
     'Samenvatting van je melding:',
     summary,
     '',
-    'Je hoeft niets te doen — we nemen contact met je op zodra we je melding hebben bekeken.',
+    'Je hoeft verder niets te doen. We nemen contact met je op zodra we je melding hebben bekeken.',
     '',
     'Met vriendelijke groet,',
     'Team ChatManta',
@@ -102,7 +102,7 @@ export function buildSubmitterEmail(item: FeedbackItem): BuiltEmail {
       <p>Bedankt voor je melding. We hebben hem ontvangen en <strong>Niels</strong> bekijkt hem zo snel mogelijk.</p>
       <div style="font-weight:600;margin:14px 0 4px">Samenvatting van je melding</div>
       <div style="white-space:pre-wrap;background:#f6f6f6;border-radius:8px;padding:10px 12px">${esc(summary)}</div>
-      <p style="color:#666;margin-top:14px">Je hoeft niets te doen — we nemen contact met je op zodra we je melding hebben bekeken.</p>
+      <p style="color:#666;margin-top:14px">Je hoeft verder niets te doen. We nemen contact met je op zodra we je melding hebben bekeken.</p>
       <p style="margin-top:16px">Met vriendelijke groet,<br/>Team ChatManta</p>
     </div>`.trim();
   return { subject, html, text };
