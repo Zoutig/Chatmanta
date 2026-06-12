@@ -13,6 +13,7 @@ import {
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_MB,
   DESCRIPTION_MAX,
   DESCRIPTION_MIN,
 } from '@/lib/controlroom/feedback-validate';
@@ -66,7 +67,7 @@ export function FeedbackForm() {
       return;
     }
     if (f.size > ATTACHMENT_MAX_BYTES) {
-      setError('De bijlage is groter dan 10 MB.');
+      setError(`De bijlage is groter dan ${ATTACHMENT_MAX_MB} MB. Verklein hem of mail hem naar ons.`);
       e.target.value = '';
       setFileName(null);
       return;
@@ -80,11 +81,17 @@ export function FeedbackForm() {
     setError(null);
     const fd = new FormData(formRef.current);
     startTransition(async () => {
-      const res = await submitFeedbackAction(fd);
-      if (res.ok) {
-        setDone(true);
-      } else {
-        setError(res.error);
+      try {
+        const res = await submitFeedbackAction(fd);
+        if (res.ok) {
+          setDone(true);
+        } else {
+          setError(res.error);
+        }
+      } catch {
+        // Bv. een 413 (request-body te groot) of netwerkfout — de action zelf
+        // draait dan nooit, dus zonder catch blijft het formulier stil hangen.
+        setError('Versturen is niet gelukt. Probeer het zonder bijlage, of met een kleiner bestand.');
       }
     });
   }
@@ -241,7 +248,7 @@ export function FeedbackForm() {
         </Field>
       </div>
 
-      <Field label="Screenshot of bijlage (optioneel)" hint="JPG, PNG, GIF, WEBP of PDF — max 10 MB.">
+      <Field label="Screenshot of bijlage (optioneel)" hint={`JPG, PNG, GIF, WEBP of PDF — max ${ATTACHMENT_MAX_MB} MB.`}>
         <label
           className="klant-btn"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', width: 'fit-content' }}

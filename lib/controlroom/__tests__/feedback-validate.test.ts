@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
+import { parseFeedbackForm, assertValidAttachment, ATTACHMENT_MAX_BYTES } from '@/lib/controlroom/feedback-validate';
 
 function form(fields: Record<string, string>): FormData {
   const fd = new FormData();
@@ -79,7 +79,7 @@ test('parseFeedbackForm weigert wanneer de privacy-checkbox niet aan staat', () 
   assert.throws(() => parseFeedbackForm(fd), /privacyverklaring/i);
 });
 
-// assertValidAttachment — duck-typed File (size/name/type) om geen 10MB te alloceren.
+// assertValidAttachment — duck-typed File (size/name/type) om geen megabytes te alloceren.
 function fakeFile(size: number, name: string, type: string): File {
   return { size, name, type } as unknown as File;
 }
@@ -90,7 +90,9 @@ test('assertValidAttachment accepteert een geldig klein bestand', () => {
 });
 
 test('assertValidAttachment weigert een te groot bestand', () => {
-  assert.throws(() => assertValidAttachment(fakeFile(11 * 1024 * 1024, 'groot.png', 'image/png')), /10 MB/);
+  // Net boven de limiet — de grens zelf is een constante (Vercel ~4,5MB body-cap).
+  assert.throws(() => assertValidAttachment(fakeFile(ATTACHMENT_MAX_BYTES + 1, 'groot.png', 'image/png')), /MB/);
+  assert.doesNotThrow(() => assertValidAttachment(fakeFile(ATTACHMENT_MAX_BYTES, 'rand.png', 'image/png')));
 });
 
 test('assertValidAttachment weigert een verkeerd bestandstype', () => {

@@ -58,7 +58,7 @@ import {
   updateQuestion,
   updateQuizCounts,
 } from '@/lib/controlroom/server/quiz';
-import { analyzeKnowledgeBase } from '@/lib/controlroom/server/quiz-analysis';
+import { analyzeKnowledgeBase, hasAnalyzableContent } from '@/lib/controlroom/server/quiz-analysis';
 import {
   QUIZ_ANALYSE_MODELS,
   type QuizAnalyseModel,
@@ -67,7 +67,6 @@ import {
   type QuizQuestionInput,
   type QuizQuestionPatch,
 } from '@/lib/controlroom/types';
-import { listDocs } from '@/lib/v0/server/rag';
 import { requireV0Auth } from './_auth';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 
@@ -332,9 +331,8 @@ export async function triggerQuizAnalysisAction(
     if (!(QUIZ_ANALYSE_MODELS as readonly string[]).includes(model)) {
       fail('INPUT_INVALID', `onbekend model: ${model}`);
     }
-    const docs = await listDocs(orgId);
-    if (docs.length === 0) {
-      fail('INPUT_INVALID', 'Kennisbank is leeg. Voeg eerst minimaal één kennisbron toe voordat je de analyse start.');
+    if (!(await hasAnalyzableContent(orgId))) {
+      fail('INPUT_INVALID', 'Kennisbank is leeg. Voeg eerst minimaal één kennisbron toe (document of website-scrape) voordat je de analyse start.');
     }
     // Re-trigger: annuleer een herbruikbare oude quiz; blokkeer op actief/voltooid.
     const existing = await getActiveQuizForOrg(orgId);

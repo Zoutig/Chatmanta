@@ -13,7 +13,11 @@ import {
 
 export const DESCRIPTION_MIN = 10;
 export const DESCRIPTION_MAX = 8000;
-export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+// Vercel serverless kapt de hele request-body op ~4,5 MB (negeert
+// serverActions.bodySizeLimit). Meer beloven = harde 413 vóór de action draait,
+// zonder foutmelding of DB-spoor. Dus: 4 MB, met marge voor multipart-overhead.
+export const ATTACHMENT_MAX_MB = 4;
+export const ATTACHMENT_MAX_BYTES = ATTACHMENT_MAX_MB * 1024 * 1024;
 export const ATTACHMENT_ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'] as const;
 export const ATTACHMENT_ALLOWED_MIME = [
   'image/jpeg',
@@ -109,7 +113,7 @@ export function parseFeedbackForm(form: FormData): ParsedFeedback {
  *  opgeslagen. */
 export function assertValidAttachment(file: File): void {
   if (file.size > ATTACHMENT_MAX_BYTES) {
-    fail('INPUT_INVALID', 'De bijlage is groter dan 10 MB.');
+    fail('INPUT_INVALID', `De bijlage is groter dan ${ATTACHMENT_MAX_MB} MB.`);
   }
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const mimeOk = (ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(file.type);
