@@ -106,27 +106,64 @@ async function chatJson<T>(opts: {
   return { data, inputTokens, outputTokens };
 }
 
+// ── Gate ────────────────────────────────────────────────────────────────────
+/** Is er überhaupt analyseerbare content voor deze org? Telt naast documenten
+ *  ook gecrawlde website-chunks mee (met dezelfde included/soft-delete-filters
+ *  als match_chunks), zodat een crawl-only kennisbank niet als "leeg" telt. */
+export async function hasAnalyzableContent(orgId: string): Promise<boolean> {
+  const docs = await listDocs(orgId);
+  if (docs.some((d) => d.chunkCount > 0)) return true;
+  const { count, error } = await sb()
+    .from('document_chunks')
+    .select('id, website_pages!inner(id)', { count: 'exact', head: true })
+    .eq('organization_id', orgId)
+    .eq('website_pages.included', true)
+    .is('website_pages.deleted_at', null);
+  if (error) throw new Error(`hasAnalyzableContent: ${error.message}`);
+  return (count ?? 0) > 0;
+}
+
 // ── Laag-2 steekproef ───────────────────────────────────────────────────────
-/** Begrensde steekproef uit de KB (max SAMPLE_MAX_DOCS docs × SAMPLE_CHUNKS_PER_DOC
- *  chunks, harde char-ceiling) — NIET de hele KB. Voedt de branche-detectie. */
+/** Begrensde steekproef uit de KB (documenten + gecrawlde website-pagina's;
+ *  max SAMPLE_MAX_DOCS bronnen × SAMPLE_CHUNKS_PER_DOC chunks, harde
+ *  char-ceiling) — NIET de hele KB. Voedt de branche-detectie. */
 async function fetchSample(orgId: string): Promise<string> {
   const docs = await listDocs(orgId);
-  const usable = docs.filter((d) => d.chunkCount > 0).slice(0, SAMPLE_MAX_DOCS);
-  if (usable.length === 0) return '';
+  type SampleSource = { col: 'document_id' | 'website_page_id'; id: string; label: string };
+  const sources: SampleSource[] = docs
+    .filter((d) => d.chunkCount > 0)
+    .slice(0, SAMPLE_MAX_DOCS)
+    .map((d) => ({ col: 'document_id' as const, id: d.id, label: d.filename }));
+  const pageSlots = SAMPLE_MAX_DOCS - sources.length;
+  if (pageSlots > 0) {
+    const { data: pages } = await sb()
+      .from('website_pages')
+      .select('id, title, url')
+      .eq('organization_id', orgId)
+      .eq('included', true)
+      .is('deleted_at', null)
+      .order('url', { ascending: true })
+      .limit(pageSlots);
+    for (const p of pages ?? []) {
+      const title = p.title as string | null;
+      sources.push({ col: 'website_page_id', id: p.id as string, label: title || (p.url as string) });
+    }
+  }
+  if (sources.length === 0) return '';
   const blocks: string[] = [];
   let total = 0;
-  for (const doc of usable) {
+  for (const src of sources) {
     const { data } = await sb()
       .from('document_chunks')
       .select('content')
-      .eq('document_id', doc.id)
+      .eq(src.col, src.id)
       .limit(SAMPLE_CHUNKS_PER_DOC);
     const text = (data ?? [])
       .map((r) => (r as { content: string }).content)
       .join('\n')
       .slice(0, 1500);
     if (!text.trim()) continue;
-    const block = `### ${doc.filename}\n${text}`;
+    const block = `### ${src.label}\n${text}`;
     if (total + block.length > SAMPLE_MAX_CHARS) break;
     blocks.push(block);
     total += block.length;
