@@ -2338,18 +2338,16 @@ KRITISCHE FORMAT-REGELS:
   // Gedreven door de KLANT-INSTELLING (autoDetectLanguage + primaryLanguage uit het
   // klantendashboard) → geldt voor ALLE bot-versies, niet per versie:
   //   autoDetectLanguage=false → antwoord altijd in primaryLanguage;
-  //   autoDetectLanguage=true  → spiegel de bezoeker (detectLanguage), val terug op
-  //                              primaryLanguage bij mixed/onbekende taal.
+  //   autoDetectLanguage=true  → spiegel de taal van de bezoeker.
+  // Hybride spiegeling: de deterministische detector dekt nl/en (zo blijft de
+  // eval-baseline byte-identiek — die test alleen nl/en); voor élke ándere taal
+  // krijgt de LLM een "antwoord in dezelfde taal als de vraag"-instructie i.p.v.
+  // een terugval op Nederlands. Anders bleef een Spaanse/Duitse vraag Nederlands
+  // beantwoord zodra auto-detectie aan stond (Niels item 10).
   // Nederlands is de natuurlijke default van het model (NL-prompt + NL-bronnen), dus
-  // injecteren we alléén een directive wanneer de doeltaal NIET Nederlands is.
-  // Geen overrides (bv. eval) → default mirror met primaryLanguage 'nl'.
+  // bij doeltaal Nederlands injecteren we géén directive.
   const primaryLanguage = input.chatbotOverrides?.primaryLanguage ?? 'nl';
   const autoDetectLanguage = input.chatbotOverrides?.autoDetectLanguage ?? true;
-  let answerLanguage: string = primaryLanguage;
-  if (autoDetectLanguage) {
-    const detected = detectLanguage(original);
-    if (detected === 'nl' || detected === 'en') answerLanguage = detected;
-  }
   const ANSWER_LANGUAGE_NAMES: Record<string, string> = {
     nl: 'Dutch',
     en: 'English',
@@ -2357,10 +2355,20 @@ KRITISCHE FORMAT-REGELS:
     fr: 'French',
     es: 'Spanish',
   };
-  const languageDirective =
-    answerLanguage !== 'nl'
-      ? `\n\nIMPORTANT — ANSWER LANGUAGE: write your ENTIRE answer in ${ANSWER_LANGUAGE_NAMES[answerLanguage] ?? answerLanguage}, regardless of the language of the context or sources. Translate any source facts as needed; stay grounded and invent nothing.`
-      : '';
+  const namedLanguageDirective = (lang: string) =>
+    `\n\nIMPORTANT — ANSWER LANGUAGE: write your ENTIRE answer in ${ANSWER_LANGUAGE_NAMES[lang] ?? lang}, regardless of the language of the context or sources. Translate any source facts as needed; stay grounded and invent nothing.`;
+  // Spiegel-instructie: laat de LLM zélf de taal van de vraag overnemen — dekt
+  // élke taal zonder detector.
+  const mirrorLanguageDirective = `\n\nIMPORTANT — ANSWER LANGUAGE: write your ENTIRE answer in the SAME LANGUAGE as the user's question (VRAAG above), regardless of the language of the context or sources. Translate any source facts as needed; stay grounded and invent nothing.`;
+  let languageDirective = '';
+  if (autoDetectLanguage) {
+    const detected = detectLanguage(original);
+    if (detected === 'en') languageDirective = namedLanguageDirective('en');
+    else if (detected !== 'nl') languageDirective = mirrorLanguageDirective;
+    // detected === 'nl' → geen directive (Nederlands = natuurlijke default).
+  } else if (primaryLanguage !== 'nl') {
+    languageDirective = namedLanguageDirective(primaryLanguage);
+  }
   const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
