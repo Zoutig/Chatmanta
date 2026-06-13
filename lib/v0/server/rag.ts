@@ -14,6 +14,7 @@ import { performance } from 'node:perf_hooks';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import type { BotConfig } from './bots';
+import { stripQuotes, parsePreProcessOutput } from './preprocess-parse';
 import { buildSystemPrompt } from '../style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
 import { costForModelUsd } from '../../ai/llm';
@@ -234,41 +235,12 @@ type PreProcessTokens = {
 
 type PreProcessResult =
   | ({ kind: 'smalltalk'; reply: string } & PreProcessTokens)
-  | ({ kind: 'search'; query: string } & PreProcessTokens);
+  | ({ kind: 'search'; query: string } & PreProcessTokens)
+  | ({ kind: 'off_topic' } & PreProcessTokens);
 
-function stripQuotes(s: string): string {
-  const t = s.trim();
-  if (t.length < 2) return t;
-  const first = t[0];
-  const last = t[t.length - 1];
-  if ((first === '"' && last === '"') || (first === '„' && last === '"') || (first === "'" && last === "'")) {
-    return t.slice(1, -1).trim();
-  }
-  return t;
-}
-
-/**
- * Parse the model's two-line output. Returns null on malformed reply so the
- * caller can fall back to default search behavior.
- */
-function parsePreProcessOutput(raw: string): { kind: 'smalltalk'; reply: string } | { kind: 'search'; query: string } | null {
-  const text = raw.trim();
-  const actionMatch = text.match(/^ACTION:\s*(smalltalk|search)\b/im);
-  if (!actionMatch) return null;
-  const action = actionMatch[1].toLowerCase();
-
-  if (action === 'smalltalk') {
-    const replyMatch = text.match(/^REPLY:\s*([\s\S]+?)$/im);
-    const reply = stripQuotes(replyMatch?.[1] ?? '').slice(0, 500);
-    if (!reply) return null;
-    return { kind: 'smalltalk', reply };
-  }
-
-  const queryMatch = text.match(/^QUERY:\s*([\s\S]+?)$/im);
-  const query = stripQuotes(queryMatch?.[1] ?? '').slice(0, 1000);
-  if (!query) return null;
-  return { kind: 'search', query };
-}
+// stripQuotes + parsePreProcessOutput zijn verplaatst naar ./preprocess-parse
+// (pure module, side-effect-vrij) zodat ze zonder env/OpenAI-SDK te testen zijn.
+// Geïmporteerd bovenaan dit bestand.
 
 // Beperk hoeveel turns we meegeven aan de LLM-calls. Meer = duurder en
 // kan de LLM verwarren met oude context die niet meer relevant is.
