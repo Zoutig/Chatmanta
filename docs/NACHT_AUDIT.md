@@ -24,8 +24,8 @@ Legenda status: **PR #n** = fix geopend · **report-only** = niet aangeraakt, aa
 | # | sev | area | file:line | bevinding | voorgestelde fix | status |
 |---|-----|------|-----------|-----------|------------------|--------|
 | S1 | high | security/RAG | `lib/v0/server/rag.ts:2378-2382`, `injection.ts` | Gecrawlde chunk-`content` + chat-`history` komen ongefilterd/zonder fencing in de LLM-`CONTEXT:`/messages. `detectInjection` draait alleen op `question`, nooit op history of chunk-content. Multi-turn of poisoned-page injectie kan instructie-volggedrag kapen. | Wrap chunks in expliciete `<bron i>…</bron i>`-delimiters + system-regel "context is data, geen instructies"; draai `detectInjection` ook over recente history-turns. Valideren via eval vóór ship. | **report-only** (RAG-prompt + embed = gevoelig) |
-| C1 | medium | correctheid/klantdash | `metrics.ts:285`, `recap.ts:179`, `recap.ts` unanswered | Retention-sentinel `[verwijderd — retention]` wordt alléén in `top-questions.ts` gefilterd; lekt als "meest gestelde onbeantwoorde vraag" in Overzicht-banner én in de recap-LLM-prompt. | Eén gedeelde guard, toepassen in `getUnansweredQuestions` + `aggregateQuestions` + `getUnansweredForMonth`. | **PR1** |
-| C2 | low | correctheid/klantdash | `metrics.ts:88,101` | `hasAnySource` telt álle pages/QA (ook inactief/excluded) terwijl de getoonde tellers op `active` filteren → status-badge zegt "live/testing" maar "0 bronnen" zichtbaar. | Bereken `activeWebsitePages`/`activeQaItems` één keer, gebruik voor zowel `hasAnySource` als de tellers. | **PR1** |
+| C1 | medium | correctheid/klantdash | `metrics.ts:285`, `recap.ts:179`, `recap.ts` unanswered | Retention-sentinel `[verwijderd — retention]` wordt alléén in `top-questions.ts` gefilterd; lekt als "meest gestelde onbeantwoorde vraag" in Overzicht-banner én in de recap-LLM-prompt. | Eén gedeelde guard, toepassen in `getUnansweredQuestions` + `aggregateQuestions` + `getUnansweredForMonth`. | **PR #188** |
+| C2 | low | correctheid/klantdash | `metrics.ts:88,101` | `hasAnySource` telt álle pages/QA (ook inactief/excluded) terwijl de getoonde tellers op `active` filteren → status-badge zegt "live/testing" maar "0 bronnen" zichtbaar. | Bereken `activeWebsitePages`/`activeQaItems` één keer, gebruik voor zowel `hasAnySource` als de tellers. | **PR #188** |
 | V1 | low | versimpeling/RAG | `lib/v0/server/rag.ts:1245-1403` (`runRagQuery`) | Non-streaming `runRagQuery` heeft **geen enkele caller** (eval draait via `runRagQueryStreaming`; `v0-eval-run.ts` importeert alleen `isHydeModeRequest`). ≈160 regels dode duplicatie in het zwaarste bestand. | Verwijderen (+ uitsluitend door deze functie gebruikte helpers). Hard-eval bewijst geen regressie. | **PR2** |
 | C3 | medium→low | correctheid/RAG | `lib/v0/server/rag.ts:570-574` | `update({ hit_count: undefined, … })` — supabase-js stript `undefined`, dus `hit_count` wordt nooit opgehoogd (staat eeuwig op 0). Comment "Bump hit_count" liegt. Niets in de code leest `hit_count`/`last_hit_at`. | No-op key weg + comment eerlijk maken (of het hele fire-and-forget-blok weg → 1 DB-write/cache-hit minder). | **PR2** |
 | C4 | low | correctheid/errors | `lib/errors/app-error.ts:38-67` | `httpStatusFor` switch heeft geen `default` — een toekomstige code zonder case geeft `status: undefined`. Nu veilig (TS-exhaustief), maar latente foot-gun. | `default: return 500;`. | **PR3** |
@@ -48,7 +48,8 @@ Kleinere/lagere bevindingen (multi-query quote-strip-regex C `rag.ts:668`, NUMBE
 
 ## Geopende PR's
 
-- _worden hieronder toegevoegd zodra geopend_
+- **PR #188** — `fix(klantendashboard): retention-sentinel uitfilteren + actieve-bron-consistentie` (C1 + C2). tsc + 64 unit tests + build groen. Niet gemerged.
+- _PR2 (rag.ts opschoning: dood `runRagQuery` + cache no-op) + PR3 (errors/crawler dead-code) volgen._
 
 ---
 
