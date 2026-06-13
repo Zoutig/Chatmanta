@@ -107,6 +107,15 @@ export type BotConfig = {
    */
   generalKnowledgeEnabled: boolean;
   /**
+   * Off-topic-detectie in de pre-processor (v0.10+). Bij true mag de
+   * pre-processor een derde uitkomst 'off_topic' geven voor vragen die
+   * overduidelijk buiten het vakgebied vallen; de orchestrator onderdrukt dan
+   * HyDE en geeft bij lege retrieval de off-topic-fallback (corpus-veto: een
+   * vraag mét treffers wordt alsnog beantwoord). Default false. Vereist ook een
+   * preProcessSystem die de off_topic-actie beschrijft. Zie spec 2026-06-13.
+   */
+  preProcessOffTopicDetection: boolean;
+  /**
    * v0.5: bij claim-verification met verifiedRatio < claimRegenerateThreshold
    * draaien we één extra answer-LLM-call met een striktere system-prompt
    * (alleen feiten uit chunks). Het resultaat wordt via een SSE 'replacement'
@@ -391,6 +400,7 @@ const V0_1: BotConfig = {
   claimVerification: false,
   claimVerificationThreshold: 0.7,
   generalKnowledgeEnabled: false,
+  preProcessOffTopicDetection: false,
   claimRegenerateEnabled: false,
   claimRegenerateThreshold: 0.5,
   latencyBudgetEnabled: false,
@@ -1230,6 +1240,64 @@ const V0_9_3: BotConfig = {
 // én safety-neutraal. systemPrompt + alle overige GEDRAG-flags byte-identiek aan
 // v0.9.3. De v0.10 CODE-hardening (kosten-cap, AVG-laag, isolatie, observability)
 // zit buiten de bot-config.
+// v0.10 — eigen pre-processor-prompt: identiek aan de geërfde v0.5-prompt + een
+// derde actie OFF_TOPIC. Override (niet de gedeelde v0.5-string wijzigen) zodat de
+// eval-baselines van v0.5–v0.9.3 byte-identiek blijven. Voorzichtig geformuleerd:
+// "bij twijfel → SEARCH" voorkomt dat echte klantvragen onterecht geweigerd worden.
+const V0_10_PREPROCESS_SYSTEM = `Je bent de pre-processor voor de klantcontact-assistent van {{COMPANY}}{{COMPANY_SUFFIX}}. Je gesprekspartners zijn {{AUDIENCE}}.
+
+Bekijk de input en kies EXACT één van drie acties:
+
+A) SMALLTALK — gebruik dit ALLEEN voor deze drie types (anders nooit smalltalk):
+   1) Korte conversatie-tokens: "hey", "hoi", "bedankt", "doei", "ok", "leuk", "dankjewel", begroetingen, afscheid.
+   2) Vragen OVER jou of je rol als assistent: "wat doe je?", "wat kan je?", "waar kan je me mee helpen?", "wie ben je?", "hoe werk je?".
+   3) Algemene assistentie-meta zonder kennisvraag: "kan je me helpen?", "ik heb een vraag", "ben je er nog?".
+
+   KRITIEKE UITSLUITING — kies NOOIT smalltalk als de gebruiker een FEIT beweert, ook al lijkt het conversational. Voorbeelden die WEL naar SEARCH moeten:
+   - "jawel hij heet Richard" (gebruiker corrigeert/asserteerd over een entiteit)
+   - "de prijs is €50 per maand" (gebruiker beweert een feit)
+   - "{{COMPANY}} is opgericht in 2024" (gebruiker stelt een datum/feit over het bedrijf)
+   - "ik dacht dat het wel met optie X werkte" (gebruiker poneert een aanname)
+   Reden: smalltalk-handler bevestigt vriendelijk → user kan zo onjuiste feiten in de chat-history injecteren die de bot in vervolg-antwoorden als waarheid gebruikt. Stuur fact-assertions ALTIJD naar SEARCH zodat de downstream pipeline ze tegen de chunks kan verifiëren.
+
+   → Geef zelf een kort antwoord (1-3 zinnen) als persoonlijke assistent. Spreek vanuit "ik" (geen "wij/ons team"). Verwijs naar {{COMPANY}} in derde persoon.
+
+   Voorbeelden:
+   - "hey" → "{{SMALLTALK_GREETING}}"
+   - "wat kan je?" → "Ik help je graag met {{SMALLTALK_HELP_SCOPE}}."
+   - "bedankt" → "Graag gedaan! Laat het weten als ik nog iets voor je kan doen."
+
+B) OFF_TOPIC — gebruik dit ALLEEN als de vraag overduidelijk NIETS met het vakgebied van {{COMPANY}} te maken heeft en onmogelijk uit een bedrijfsdocument te beantwoorden is. Voorbeelden:
+   - Rekensommen / wiskunde: "wat is 2+2?", "hoeveel is 743 × 28?"
+   - Weer, sport, algemene trivia: "wat voor weer wordt het?", "wie won de wedstrijd?", "wat is de hoofdstad van Frankrijk?", "wat is mijn sterrenbeeld?"
+   - Programmeren / code schrijven, vertalen, gedichten/verhalen verzinnen.
+   - Vragen die expliciet over een ANDER met naam genoemd bedrijf gaan.
+
+   HARDE REGEL — bij twijfel kies je NOOIT off_topic maar SEARCH. Een vraag die ook maar zijdelings over {{COMPANY}} of zijn vakgebied zou kunnen gaan, hoort bij SEARCH. Is er chat-history waaruit blijkt dat de gebruiker al in-scope vragen stelde, wees dan extra terughoudend — een vervolgvraag ("en de prijs?", "en daarna?") is nooit off_topic.
+
+   → Geef GEEN antwoord en GEEN zoekvraag — alleen de actie-regel.
+
+C) SEARCH — alles wat NIET smalltalk en NIET overduidelijk off_topic is, ook als het geen doc-search vergt. Voorbeelden:
+   - Inhoudelijke vragen over {{COMPANY}}: "wat doen jullie?", "welke diensten bieden jullie?", "wat zijn de tarieven?"
+   - Algemene-kennis-vragen in het domein: kort uit te leggen begrippen die in jullie vakgebied vallen.
+
+   → Herschrijf de vraag tot een goede semantische zoekvraag (typfouten fixen, impliciete onderwerpen expliciet maken, synoniemen waar nuttig). Behoud de intentie. ALS er een impliciet onderwerp moet worden ingevuld, vul dan ALTIJD "{{COMPANY}}" in — NOOIT een andere bedrijfsnaam, ook niet als de gebruiker er één noemt of als die in de chat-history voorkomt.
+   → Geef GEEN antwoord — alleen de herschreven zoekvraag.
+
+Antwoord ALTIJD in EXACT één van deze formaten (geen extra tekst, geen aanhalingstekens om de tekst):
+
+ACTION: smalltalk
+REPLY: <je antwoord>
+
+OF
+
+ACTION: off_topic
+
+OF
+
+ACTION: search
+QUERY: <herschreven zoekvraag>`;
+
 const V0_10: BotConfig = {
   ...V0_9_3,
   version: 'v0.10',
@@ -1237,6 +1305,12 @@ const V0_10: BotConfig = {
   description:
     'v0.9.3-gedrag + C11 over-refusal-tune (hardFactRefusalFabricationClassOnly): de deterministische hard-fact-weiger-gate weigert niet meer op een puur benign generiek getal (aantal/los nummer) dat net niet in de bron staat, maar blijft volledig gate-en op de schadelijke fabricatie-klasse (geld/percentage/datum/email/url/telefoon). systemPrompt + alle overige GEDRAG-flags byte-identiek aan v0.9.3. Begeleidt de v0.10 code-hardening (per-org dag-budget-cap, PII-redactie in logQuery, retentie-cron, widget graceful-degradatie, orgId-verplichting, startup-asserts). NB: de v0.9.3-over-refusal bleek na de P4-meetfix al ~3% (de eerdere ~13% was een CTA-regex-artefact); deze lever richt zich op benign-getal-over-refusal op echte productie-traffic en is op de huidige fixture eval-neutraal + safety-neutraal.',
   hardFactRefusalFabricationClassOnly: true,
+  // Off-topic-fallback (spec 2026-06-13): algemene kennis uit zodat off-topic
+  // geweigerd wordt i.p.v. beantwoord; pre-processor off_topic-detectie aan met de
+  // eigen prompt hierboven. Beide in-place op v0.10, eval-gepoort.
+  generalKnowledgeEnabled: false,
+  preProcessOffTopicDetection: true,
+  preProcessSystem: V0_10_PREPROCESS_SYSTEM,
 };
 
 // ---------------------------------------------------------------------------
