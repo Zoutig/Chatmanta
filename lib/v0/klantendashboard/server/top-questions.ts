@@ -73,7 +73,7 @@ export async function getTopQuestions(
     const map = new Map<string, TopQuestion>();
     for (const r of data) {
       const q = String(r.question ?? '').trim();
-      if (!q) continue;
+      if (!q || q === '[verwijderd — retention]') continue;
       const key = q.toLowerCase();
       const createdAt = String(r.created_at ?? '');
       const status: TopQuestion['lastStatus'] =
