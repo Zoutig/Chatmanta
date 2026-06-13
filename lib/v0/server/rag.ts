@@ -1253,6 +1253,7 @@ export async function runRagQuery({
   //    the knowledge base).
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
+  let offTopicSuspected = false;
   if (enableRewrite) {
     // runRagQuery (non-streaming) is alleen de eval-pad — geen orgId-param,
     // dus we vallen terug op DEV_ORG persona. De live chat draait via
@@ -1270,14 +1271,28 @@ export async function runRagQuery({
         totalCostUsd: pp.costUsd,
       };
     }
-    rewriteInfo = {
-      original,
-      rewritten: pp.query,
-      inputTokens: pp.inputTokens,
-      outputTokens: pp.outputTokens,
-      costUsd: pp.costUsd,
-    };
-    queryForEmbed = pp.query;
+    if (pp.kind === 'off_topic') {
+      // Zacht signaal: geen rewrite (zoek op de originele vraag). De pp-cost
+      // boeken we via rewriteInfo (rewritten=origineel) zodat totalCostUsd klopt.
+      offTopicSuspected = bot.preProcessOffTopicDetection === true;
+      rewriteInfo = {
+        original,
+        rewritten: original,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = original;
+    } else {
+      rewriteInfo = {
+        original,
+        rewritten: pp.query,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = pp.query;
+    }
   }
 
   // 2. Optional multi-query expansion. Cost: extra LLM call when count > 1.
@@ -1305,20 +1320,29 @@ export async function runRagQuery({
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
   if (aboveThreshold.length === 0) {
+    // Corpus-veto: off_topic kwam alleen hier omdat retrieval óók leeg is →
+    // de classifier zat goed. Een in-scope vraag met treffers passeert dit blok
+    // en wordt gewoon beantwoord.
+    const evalPersonaForFallback = getPersonaById(DEV_ORG_ID);
     return {
       botVersion: bot.version,
       tone,
       length,
       generalKnowledgeActual: null,
       kind: 'fallback',
-      answer: FALLBACK_MESSAGE,
-      reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
+      answer: offTopicSuspected
+        ? `Ik help met vragen rondom ${evalPersonaForFallback.offTopicScope}. Wat wil je weten?`
+        : FALLBACK_MESSAGE,
+      reason: offTopicSuspected
+        ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
+        : `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
       topSimilarity: topSim,
       rewrite: rewriteInfo,
       sources: allSources,
       threshold,
       embedTokens,
       totalCostUsd: embedCost + rewriteCost + expansionCost,
+      ...(offTopicSuspected && bot.knowledgeGapLogging ? { gapKind: 'off_topic' as const } : {}),
     };
   }
 
