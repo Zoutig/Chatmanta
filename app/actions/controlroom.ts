@@ -260,21 +260,38 @@ export async function sendFeedbackReplyAction(
       text: email.text,
     });
 
-    // Audit-spoor: leg vast dát en wát er naar de klant is gestuurd.
-    await addFeedbackEvent(id, {
-      kind: 'comment',
-      body: `Reactie gemaild naar ${item.submitterEmail}:\n${trimmed}`.slice(0, 4000),
-      author: 'operator',
-    });
+    // Audit-spoor: leg vast wát er is gebeurd — mét de werkelijke verzendstatus
+    // (geen vaste "gemaild"-tekst die ook bij een mislukte/overgeslagen verzending
+    // verschijnt). Best-effort: een falende audit-insert mag een geslaagde
+    // verzending niet maskeren (anders → action-error → operator-retry → dubbele
+    // mail). Codex-review golf-2 #4.
+    const auditStatus = result.ok
+      ? `verzonden naar ${item.submitterEmail}`
+      : result.skipped
+        ? `NIET verzonden (geen mailconfiguratie) — bedoeld voor ${item.submitterEmail}`
+        : `NIET verzonden (${result.error}) — bedoeld voor ${item.submitterEmail}`;
+    let audited = true;
+    try {
+      await addFeedbackEvent(id, {
+        kind: 'comment',
+        body: `Reactie ${auditStatus}:\n${trimmed}`.slice(0, 4000),
+        author: 'operator',
+      });
+    } catch (err) {
+      audited = false;
+      console.warn('[feedback reply] audit-event faalde (verzending niet beïnvloed):', err);
+    }
     revalidate();
 
     if (result.ok) {
       return { id, sent: true, detail: 'Reactie verzonden naar de klant.' };
     }
+    // Alleen claimen dat het in de historie staat als de audit-insert ook lukte.
+    const histNote = audited ? ' De reactie is wel in de historie vastgelegd.' : '';
     if (result.skipped) {
-      return { id, sent: false, detail: 'E-mail niet verzonden: geen mailconfiguratie (RESEND_API_KEY ontbreekt). De reactie is wel in de historie vastgelegd.' };
+      return { id, sent: false, detail: `E-mail niet verzonden: geen mailconfiguratie (RESEND_API_KEY ontbreekt).${histNote}` };
     }
-    return { id, sent: false, detail: `E-mail niet verzonden: ${result.error}. De reactie is wel in de historie vastgelegd.` };
+    return { id, sent: false, detail: `E-mail niet verzonden: ${result.error}.${histNote}` };
   });
 }
 

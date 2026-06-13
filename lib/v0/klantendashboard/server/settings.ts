@@ -262,10 +262,16 @@ export async function deleteQAItem(
   const orgId = KNOWN_ORGS[orgSlug].id;
   const current = await getOrgSettings(orgSlug);
   const removed = current.qa.find((x) => x.id === qaId);
+  // AVG-wisrecht: verwijder de ge-embede chunk EERST en propageer een fout. Anders
+  // (settings-first + swallow) zou een gefaalde delete de Q&A uit het overzicht halen
+  // terwijl de content via de zoek-index opvraagbaar blijft — "verwijderd" zou dan
+  // liegen. Faalt de delete → action-error → operator kan opnieuw proberen.
+  // Codex-review golf-2 #3.
+  if (removed?.ingestedDocId) {
+    await deleteDoc(removed.ingestedDocId, orgId);
+  }
   const next = current.qa.filter((x) => x.id !== qaId);
   await writeOrgSettings(orgId, { qa: next });
-  // AVG-wisrecht: content moet ook uit de vector-/hybrid-search verdwijnen.
-  await safeDeleteQADoc(orgId, removed?.ingestedDocId);
   await purgeAnswerCache(orgId);
   return next;
 }
