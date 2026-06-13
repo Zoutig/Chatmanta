@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   buildOperatorEmail,
   buildSubmitterEmail,
+  buildFeedbackReplyEmail,
   feedbackAdminUrl,
   isValidFeedbackEmail,
 } from '@/lib/notifications/feedback-email';
@@ -76,5 +77,31 @@ test('bevestigingsmail aan indiener: groet + samenvatting + onderwerp', () => {
 
 test('bevestigingsmail zonder naam gebruikt neutrale groet', () => {
   const out = buildSubmitterEmail(item({ submitterName: null }));
+  assert.match(out.text, /^Hoi,/);
+});
+
+test('reply-mail bevat groet, reactietekst en org-voettekst', () => {
+  const out = buildFeedbackReplyEmail(
+    item({ submitterName: 'Lena' }),
+    'Je past het logo aan onder Widget > Uiterlijk.',
+    { orgName: 'Acme BV' },
+  );
+  assert.match(out.subject, /Reactie op je feedback/);
+  assert.match(out.subject, /Acme BV/);
+  assert.match(out.text, /Hoi Lena,/);
+  assert.match(out.text, /logo aan onder Widget/);
+  assert.match(out.text, /feedback hebt ingediend bij Acme BV/);
+});
+
+test('reply-mail bevat GEEN em-dash en escapet HTML in de reactietekst', () => {
+  const out = buildFeedbackReplyEmail(
+    item({ submitterName: null }),
+    'Bekijk <b>hier</b> de uitleg.',
+    { orgName: 'Acme' },
+  );
+  assert.doesNotMatch(out.subject, /—/);
+  assert.doesNotMatch(out.text, /—/);
+  assert.doesNotMatch(out.html, /<b>hier<\/b>/);
+  assert.match(out.html, /&lt;b&gt;hier&lt;\/b&gt;/);
   assert.match(out.text, /^Hoi,/);
 });
