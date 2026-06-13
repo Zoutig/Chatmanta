@@ -116,10 +116,9 @@ shape, geen nieuwe `kind`.
 - Nieuw veld op `BotConfig`: `preProcessOffTopicDetection: boolean` (default `false`).
 - Aan op de **live versie (v0.10)**; uit op alle oudere versies → geen mutatie van
   oude eval-snapshots, en instant terug te draaien.
-- **Open beslissing (zie §9):** flag in-place op v0.10 zetten (precedent: bron-links-
-  fix direct op v0.9.1) vs. een nieuwe versie v0.11 knippen. Aanbeveling: in-place op
-  v0.10, want het is een strikte verbetering van duidelijk-kapot off-topic-gedrag, en
-  de eval-poort (§6) bewaakt regressie.
+- **Beslist (§9):** flag **in-place op v0.10** (precedent: bron-links-fix direct op
+  v0.9.1). Het is een strikte verbetering van duidelijk-kapot off-topic-gedrag, en de
+  eval-poort (§6) bewaakt regressie.
 
 ### 3.5 Respect voor `generalKnowledgeEnabled`
 
@@ -196,10 +195,10 @@ randgeval-in-scope-vragen blijven beantwoord.
 - Off-topic-bewoording-vloer / tiered fallback-wording.
 - Wijzigingen aan HyDE-gedrag buiten de off-topic-suspected query.
 
-## 9. Open beslissingen
+## 9. Beslissingen (vastgelegd 2026-06-13)
 
-1. **Versie:** flag in-place op v0.10 (aanbevolen) vs. nieuwe versie v0.11.
-2. **Copy:** bestaande `OFF_TOPIC_REFUSAL`-tekst houden vs. aanscherpen naar
-   "Ik kan alleen helpen met vragen over …".
-3. **`generalKnowledgeEnabled`-respect** meenemen (aanbevolen, §3.5) vs. altijd
-   weigeren bij off_topic.
+1. **Versie:** flag **in-place op v0.10**.
+2. **Copy:** **bestaande** `OFF_TOPIC_REFUSAL`-tekst houden ("Ik help met vragen
+   rondom {scope}. Wat wil je weten?").
+3. **`generalKnowledgeEnabled`-respect:** **meenemen** (§3.5) — orgs met de toggle aan
+   beantwoorden algemene vragen i.p.v. weigeren.
