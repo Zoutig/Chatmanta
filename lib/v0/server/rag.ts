@@ -1546,7 +1546,9 @@ export async function* runRagQueryStreaming(input: {
   // org kwamen. Unknown orgId → fallback DEV_ORG persona.
   const persona = getPersonaById(orgId);
   const hydeModeRequested: HydeModeRequest = input.hydeModeOverride ?? 'auto';
-  const hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
+  // `let` zodat de off_topic-branch hieronder HyDE kan uitzetten (HyDE's
+  // fabricatie-rescue ondermijnt anders het off-topic-signaal).
+  let hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
   // v0.5 general-knowledge toggle: gate combined with bot config. Default true
   // for backwards-compat (older clients/scripts without the field).
   const enableGeneralKnowledge = input.enableGeneralKnowledge !== false;
@@ -1697,6 +1699,7 @@ export async function* runRagQueryStreaming(input: {
   let queryForEmbed = original;
   let preCacheEmbedTokens = 0;
   let preCacheEmbedCost = 0;
+  let offTopicSuspected = false;
 
   const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history) : null;
   const cacheEmbedPromise = bot.cacheEnabled ? embedTexts([original]) : null;
@@ -1724,14 +1727,30 @@ export async function* runRagQueryStreaming(input: {
       };
       return;
     }
-    rewriteInfo = {
-      original,
-      rewritten: pp.query,
-      inputTokens: pp.inputTokens,
-      outputTokens: pp.outputTokens,
-      costUsd: pp.costUsd,
-    };
-    queryForEmbed = pp.query;
+    if (pp.kind === 'off_topic') {
+      // Zacht signaal met corpus-veto: geen rewrite, HyDE uit, en bij lege
+      // retrieval geeft de fallback hieronder de off-topic-tekst. Een in-scope
+      // vraag met treffers passeert en wordt gewoon beantwoord.
+      offTopicSuspected = bot.preProcessOffTopicDetection === true;
+      if (offTopicSuspected) hydeModeActual = 'off';
+      rewriteInfo = {
+        original,
+        rewritten: original,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = original;
+    } else {
+      rewriteInfo = {
+        original,
+        rewritten: pp.query,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = pp.query;
+    }
   }
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
@@ -2205,8 +2224,9 @@ KRITISCHE FORMAT-REGELS:
       return;
     }
 
-    // Legacy pad (v0.1-v0.4): vaste fallback zoals voorheen — maar wel met
-    // klant-override van fallbackMessage als die er is.
+    // Legacy pad: vaste fallback. Bij een bevestigd off_topic-signaal (pre-processor
+    // zei off_topic ÉN retrieval is leeg → corpus-veto akkoord) gebruiken we de nette
+    // off-topic-tekst i.p.v. de generieke fallback (anders klant-override fallbackMessage).
     yield {
       kind: 'fallback',
       response: {
@@ -2214,10 +2234,18 @@ KRITISCHE FORMAT-REGELS:
         tone,
         length,
         generalKnowledgeActual: false,
-        ...(bot.knowledgeGapLogging ? { gapKind: 'zero_hits' as const } : {}),
+        ...(offTopicSuspected && bot.knowledgeGapLogging
+          ? { gapKind: 'off_topic' as const }
+          : bot.knowledgeGapLogging
+            ? { gapKind: 'zero_hits' as const }
+            : {}),
         kind: 'fallback',
-        answer: fallbackMessage,
-        reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
+        answer: offTopicSuspected
+          ? `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`
+          : fallbackMessage,
+        reason: offTopicSuspected
+          ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
+          : `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
         topSimilarity: topSim,
         rewrite: rewriteInfo,
         sources: allSources,
