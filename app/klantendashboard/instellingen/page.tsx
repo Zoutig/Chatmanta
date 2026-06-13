@@ -1,8 +1,9 @@
 // V0 Klantendashboard — Scherm 4: Instellingen.
 //
-// Server component die de mock chatbot-settings ophaalt en doorgeeft aan de
-// client-side SettingsForm. Save is mock-only — bij V1 wordt dit een server
-// action die de settings persisteert in een chatbot_settings tabel.
+// Server component die de chatbot-settings ophaalt en doorgeeft aan de
+// client-side SettingsForm. Opslaan persisteert via saveChatbotSettingsAction
+// in v0_org_settings; een save purget de org-answer-cache zodat een
+// gewijzigde toon/taal/lengte direct in nieuwe antwoorden zichtbaar is.
 
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';

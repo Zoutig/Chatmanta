@@ -13,6 +13,7 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import { purgeAnswerCache } from '@/lib/v0/server/rag';
 import { getMockWidgetSettings } from '../mock/widget-settings';
 import { getMockChatbotSettings } from '../mock/chatbot-settings';
 import { getMockManualQA } from '../mock/manual-qa';
@@ -186,6 +187,10 @@ export async function saveChatbotSettings(
   const current = await getOrgSettings(orgSlug);
   const next: ChatbotSettings = { ...current.chatbot, ...patch };
   await writeOrgSettings(orgId, { chatbot: next });
+  // De answer-cache bevat geen stijl/taal in z'n key → een settings-wijziging
+  // propageert pas na een purge. Awaiten (geen fire-and-forget): serverless kan
+  // de runtime na de response killen. Purge mag de save nooit terugdraaien.
+  await purgeAnswerCache(orgId);
   return next;
 }
 
@@ -204,6 +209,8 @@ export async function upsertQAItem(
       ? current.qa.map((x, i) => (i === exists ? item : x))
       : [item, ...current.qa];
   await writeOrgSettings(orgId, { qa: next });
+  // Q&A telt mee in de antwoorden (fast-path + fallback) → cache invalideren.
+  await purgeAnswerCache(orgId);
   return next;
 }
 
@@ -215,6 +222,7 @@ export async function deleteQAItem(
   const current = await getOrgSettings(orgSlug);
   const next = current.qa.filter((x) => x.id !== qaId);
   await writeOrgSettings(orgId, { qa: next });
+  await purgeAnswerCache(orgId);
   return next;
 }
 
@@ -229,6 +237,7 @@ export async function setQAActive(
     x.id === qaId ? { ...x, active, updatedAt: new Date().toISOString() } : x,
   );
   await writeOrgSettings(orgId, { qa: next });
+  await purgeAnswerCache(orgId);
   return next;
 }
 
