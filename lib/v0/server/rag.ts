@@ -596,6 +596,43 @@ async function writeCachedAnswer(
   }
 }
 
+/**
+ * Wis de volledige answer-cache van één org (alle bot-versies, alle vragen).
+ *
+ * Nodig omdat de cache-key (org, bot_version, vraag-embedding) géén stijl-, taal-
+ * of Q&A-state bevat: een instellings- of Q&A-wijziging propageert daarom niet
+ * naar al-gecachte antwoorden tenzij we ze hier wegvegen. De cache is volledig
+ * regenereerbaar uit de pipeline, dus org-breed wissen kost niets behalve een
+ * tijdelijk lagere hit-rate.
+ *
+ * Niet-throwend: een cache-purge mag een geslaagde settings-save nooit terugdraaien.
+ * organizationId is VERPLICHT (geen DEV_ORG_ID-default zoals lookup/write) — een
+ * lege/ontbrekende org is een programmeerfout, geen stilzwijgend dev-pad.
+ *
+ * @returns aantal gewiste rijen, of null bij een DB-fout.
+ */
+export async function purgeAnswerCache(organizationId: string): Promise<number | null> {
+  if (!organizationId) {
+    throw new Error('purgeAnswerCache: organizationId is verplicht');
+  }
+  try {
+    const sb = supabase();
+    const { count, error } = await sb
+      .from('answer_cache')
+      .delete({ count: 'exact' })
+      .eq('organization_id', organizationId);
+    if (error) {
+      console.warn(`[cache] purge failed org=${organizationId}:`, error.message);
+      return null;
+    }
+    console.info(`[cache] purged ${count ?? 0} rows org=${organizationId}`);
+    return count ?? 0;
+  } catch (err) {
+    console.warn(`[cache] purge failed org=${organizationId}:`, err);
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Multi-query expansion — generate N variant search queries via one LLM call.
 // Returns the variants (always includes the original as one of them) plus the
