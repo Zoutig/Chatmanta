@@ -9,6 +9,7 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
 import { getWebsiteSources } from '@/lib/v0/server/crawler';
 import { getOrgSettings } from './settings';
 import { countUnansweredThreads, getConversationSuccessRate } from './conversations';
@@ -85,7 +86,13 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
       ? 'detected'
       : 'not_installed';
 
-  const hasAnySource = docs.length > 0 || websitePages.length > 0 || qaItems.length > 0;
+  // Tel uitsluitend ACTIEVE bronnen — gelijk aan wat de `sources`-tellers tonen,
+  // anders zegt de status-badge "live/testing" terwijl er "0 bronnen" zichtbaar is
+  // (org met enkel excluded pages of inactieve Q&A).
+  const activeWebsitePages = websitePages.filter((p) => p.status === 'active');
+  const activeQaItems = qaItems.filter((q) => q.active);
+  const hasAnySource =
+    docs.length > 0 || activeWebsitePages.length > 0 || activeQaItems.length > 0;
   const chatbotStatus: ChatbotStatus = !hasAnySource
     ? 'concept'
     : widget.isActive
@@ -98,9 +105,9 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
     chatbotStatus,
     widgetStatus,
     sources: {
-      websitePages: websitePages.filter((p) => p.status === 'active').length,
+      websitePages: activeWebsitePages.length,
       documents: docs.length,
-      qaItems: qaItems.filter((q) => q.active).length,
+      qaItems: activeQaItems.length,
     },
     conversationsThisMonth: monthlyStats,
     unansweredCount: unanswered.count,
@@ -283,7 +290,7 @@ export async function getUnansweredQuestions(
     const groups = new Map<string, UnansweredQuestion>();
     for (const row of data) {
       const q = String(row.question ?? '').trim();
-      if (!q) continue;
+      if (!q || q === RETENTION_REDACTED) continue;
       const key = q.toLowerCase();
       const existing = groups.get(key);
       if (existing) {

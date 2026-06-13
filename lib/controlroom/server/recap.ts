@@ -19,6 +19,7 @@
 import 'server-only';
 
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
 import { redactPii } from '@/lib/observability/redact';
 import type { MonthlyRecap, RecapSignalSeverity, RecapSignalStatus, RecapSignalType } from '../types';
 import {
@@ -177,7 +178,7 @@ async function aggregateQuestions(
   const map = new Map<string, QuestionAgg>();
   for (const r of data) {
     const raw = String(r.question ?? '').trim();
-    if (!raw) continue;
+    if (!raw || raw === RETENTION_REDACTED) continue;
     const question = redactPii(raw); // AVG: maskeer vóór groeperen/tonen
     const key = question.toLowerCase();
     const createdAt = String(r.created_at ?? '');
@@ -235,7 +236,7 @@ export async function getUnansweredForMonth(
     const map = new Map<string, RecapUnanswered>();
     for (const r of data) {
       const raw = String(r.question ?? '').trim();
-      if (!raw) continue;
+      if (!raw || raw === RETENTION_REDACTED) continue;
       const question = redactPii(raw);
       const key = question.toLowerCase();
       const existing = map.get(key);

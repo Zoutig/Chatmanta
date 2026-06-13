@@ -13,6 +13,7 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
+import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
 import type { TopQuestionsConfig } from '../types';
 
 let _sb: SupabaseClient | null = null;
@@ -73,7 +74,7 @@ export async function getTopQuestions(
     const map = new Map<string, TopQuestion>();
     for (const r of data) {
       const q = String(r.question ?? '').trim();
-      if (!q || q === '[verwijderd — retention]') continue;
+      if (!q || q === RETENTION_REDACTED) continue;
       const key = q.toLowerCase();
       const createdAt = String(r.created_at ?? '');
       const status: TopQuestion['lastStatus'] =
