@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { Card } from '../ui/card';
 import { Sparkline } from '../ui/sparkline';
+import { InfoTip } from '../ui/info-tip';
 import type { OverviewMetrics } from '@/lib/v0/klantendashboard/types';
 
 export function MetricStrip({ metrics }: { metrics: OverviewMetrics }) {
@@ -32,6 +33,7 @@ export function MetricStrip({ metrics }: { metrics: OverviewMetrics }) {
       />
       <MetricCard
         label="Behulpzaam"
+        info="Een gesprek telt als geholpen, behalve als het laatste antwoord een doorverwijzing was (de bot wist het niet) of een duim-omlaag kreeg. Het percentage gaat over deze kalendermaand."
         value={metrics.helpfulness.rate === null ? '—' : `${metrics.helpfulness.rate}%`}
         sub={
           metrics.helpfulness.total > 0
@@ -59,17 +61,22 @@ function MetricCard({
   sub,
   delta,
   spark,
+  info,
 }: {
   label: string;
   value: ReactNode;
   sub?: string;
   delta?: { text: string; dir: 'up' | 'down' };
   spark?: number[];
+  info?: string;
 }) {
   return (
     <Card padded={false} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px' }}>
       <div
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
           fontSize: 11.5,
           color: 'var(--klant-muted)',
           textTransform: 'uppercase',
@@ -78,6 +85,7 @@ function MetricCard({
         }}
       >
         {label}
+        {info && <InfoTip text={info} label={`Uitleg ${label}`} />}
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <div

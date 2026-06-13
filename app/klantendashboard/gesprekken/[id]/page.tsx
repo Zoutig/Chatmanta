@@ -6,12 +6,13 @@
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getConversationDetail } from '@/lib/v0/klantendashboard/server/conversations';
 import { PageHead } from '../../components/ui/page-head';
 import { StatusBadge } from '../../components/status-badge';
 import { Icon } from '../../components/ui/icons';
+import { CollapsibleSources } from '../../components/ui/collapsible-sources';
 import { ConversationActions } from './components/conversation-actions';
 
 export const dynamic = 'force-dynamic';
@@ -196,63 +197,7 @@ export default async function GesprekDetailPage({
 
         {/* Rechterkolom: bronnen + acties */}
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <h3 className="klant-section-title">
-              <BookOpen
-                size={15}
-                strokeWidth={1.7}
-                style={{ display: 'inline', marginRight: 6, verticalAlign: '-2px' }}
-              />
-              Gebruikte bronnen
-            </h3>
-            {allSources.length === 0 ? (
-              <p
-                style={{
-                  fontSize: 13,
-                  color: 'var(--klant-fg-muted)',
-                  margin: 0,
-                }}
-              >
-                Geen bronnen gevonden. Dit gesprek had geen relevant antwoord in je kennisbank.
-              </p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {allSources.slice(0, 10).map((s, i) => {
-                  const excerpt = s.parentExcerpt ?? s.contentExcerpt ?? '';
-                  return (
-                    <li
-                      key={i}
-                      style={{
-                        padding: '8px 10px',
-                        background: 'var(--klant-surface)',
-                        borderRadius: 'var(--klant-r-sm)',
-                        fontSize: 12,
-                      }}
-                    >
-                      <div style={{ color: 'var(--klant-fg)', fontWeight: 500 }}>
-                        {s.filename || 'Onbekend'}
-                      </div>
-                      {excerpt && (
-                        <div
-                          style={{
-                            color: 'var(--klant-fg-muted)',
-                            marginTop: 2,
-                            lineHeight: 1.5,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {excerpt}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <CollapsibleSources sources={allSources} />
 
           <ConversationActions
             suggestedQuestion={firstUserMsg?.content ?? ''}
