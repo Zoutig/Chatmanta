@@ -380,3 +380,12 @@ export type AccountInfo = {
     documentsCount: number;
   };
 };
+
+/** Klant-aanpasbare account-display-velden (Niels item 8). Opgeslagen in
+ *  v0_org_settings.account; bij lezen winnen deze over de mock-/KNOWN_ORGS-waarden.
+ *  Bewust GEEN identiteit/login (V1) en GEEN verzend-adres — puur weergave. */
+export type AccountOverrides = {
+  companyName?: string;
+  contactPerson?: string;
+  email?: string;
+};

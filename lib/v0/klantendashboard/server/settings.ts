@@ -20,6 +20,7 @@ import { getMockManualQA } from '../mock/manual-qa';
 import {
   TOP_QUESTIONS_DEFAULT,
   TOP_QUESTIONS_LIMITS,
+  type AccountOverrides,
   type ChatbotSettings,
   type ManualQA,
   type TopQuestionsConfig,
@@ -329,5 +330,84 @@ export async function saveTopQuestionsConfig(
   const next: TopQuestionsConfig = { minCount, topN };
   const orgId = KNOWN_ORGS[orgSlug].id;
   await writeOrgSettings(orgId, { topQuestions: next });
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Account-overrides (Niels item 8) — klant-aanpasbare display-velden in de
+// `account` jsonb-kolom. Lezen: alleen de overrides (de caller merget ze over de
+// mock-/KNOWN_ORGS-waarden). GEEN identiteit/login (V1), GEEN verzend-adres.
+// ---------------------------------------------------------------------------
+const ACCOUNT_FIELD_MAX = 120;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseAccountOverrides(raw: unknown): AccountOverrides {
+  if (!raw || typeof raw !== 'object') return {};
+  const obj = raw as Record<string, unknown>;
+  const out: AccountOverrides = {};
+  if (typeof obj.companyName === 'string' && obj.companyName.trim()) out.companyName = obj.companyName;
+  if (typeof obj.contactPerson === 'string' && obj.contactPerson.trim()) out.contactPerson = obj.contactPerson;
+  if (typeof obj.email === 'string' && obj.email.trim()) out.email = obj.email;
+  return out;
+}
+
+export async function getAccountOverrides(orgSlug: OrgSlug): Promise<AccountOverrides> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const { data, error } = await sb()
+    .from('v0_org_settings')
+    .select('account')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+  // Defensief: zolang migratie 0048 nog niet is toegepast bestaat de kolom niet →
+  // val terug op géén overrides (de mock-/KNOWN_ORGS-waarden) zodat de account-
+  // pagina nooit breekt. Opslaan faalt dan netjes tot de migratie draait.
+  if (error) {
+    console.warn('[account] overrides-read faalde (migratie 0048 toegepast?):', error.message);
+    return {};
+  }
+  return parseAccountOverrides(data?.account);
+}
+
+/** Schrijf de klant-aanpasbare account-velden. Lege string = veld wissen (valt
+ *  terug op de mock-default). Validatie: lengte-cap + e-mailformaat. */
+export async function saveAccountInfo(
+  orgSlug: OrgSlug,
+  patch: AccountOverrides,
+): Promise<AccountOverrides> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const clean = (v: string | undefined): string | undefined => {
+    const t = (v ?? '').trim();
+    if (!t) return undefined; // wissen → mock-default
+    if (t.length > ACCOUNT_FIELD_MAX) {
+      throw new AppError('INPUT_INVALID', { message: `Veld is te lang (max ${ACCOUNT_FIELD_MAX} tekens).` });
+    }
+    return t;
+  };
+  // Merge over de bestaande overrides: alléén velden die in de patch zitten
+  // worden aangeraakt (lege string wist dat ene veld), zodat een gedeeltelijke
+  // patch de andere velden niet per ongeluk wegschrijft.
+  const next: AccountOverrides = { ...(await getAccountOverrides(orgSlug)) };
+  if ('companyName' in patch) {
+    const v = clean(patch.companyName);
+    if (v) next.companyName = v;
+    else delete next.companyName;
+  }
+  if ('contactPerson' in patch) {
+    const v = clean(patch.contactPerson);
+    if (v) next.contactPerson = v;
+    else delete next.contactPerson;
+  }
+  if ('email' in patch) {
+    const v = clean(patch.email);
+    if (v) {
+      if (!EMAIL_RE.test(v)) throw new AppError('INPUT_INVALID', { message: 'Vul een geldig e-mailadres in (of laat het leeg).' });
+      next.email = v;
+    } else {
+      delete next.email;
+    }
+  }
+  await sb()
+    .from('v0_org_settings')
+    .upsert({ organization_id: orgId, account: next }, { onConflict: 'organization_id' });
   return next;
 }

@@ -4,12 +4,14 @@
 // Billing/abonnementen is bewust niet gebouwd in v0 (zie prompt §18). Wel
 // een placeholder zodat de UX-flow zichtbaar is.
 
-import { Building2, Mail, User, ShieldCheck, Database, MessagesSquare } from 'lucide-react';
+import { Building2, ShieldCheck, Database, MessagesSquare } from 'lucide-react';
 import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { getOverviewMetrics } from '@/lib/v0/klantendashboard/server/metrics';
 import { getMockAccountInfo } from '@/lib/v0/klantendashboard/mock/account';
+import { getAccountOverrides } from '@/lib/v0/klantendashboard/server/settings';
 import type { AccountPlan } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from '../components/ui/page-head';
+import { AccountEditForm } from './components/account-edit-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +28,15 @@ export default async function AccountPage() {
     conversationsThisMonth: metrics.conversationsThisMonth.threads,
     documentsCount: metrics.sources.documents,
   });
+  const overrides = await getAccountOverrides(activeOrg.slug);
 
   const orgName = KNOWN_ORGS[activeOrg.slug].name;
+  // Override wint over de mock-/KNOWN_ORGS-waarde (Niels item 8).
+  const effective = {
+    companyName: overrides.companyName ?? orgName,
+    contactPerson: overrides.contactPerson ?? account.contactPerson,
+    email: overrides.email ?? account.email,
+  };
   const plan = PLAN_LABEL[account.plan];
 
   return (
@@ -50,14 +59,14 @@ export default async function AccountPage() {
         <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <h3 className="klant-section-title">Bedrijf</h3>
 
-          <Row icon={Building2} label="Bedrijfsnaam" value={orgName} />
-          <Row
-            icon={User}
-            label="Contactpersoon"
-            value={account.contactPerson}
-            edit
+          <AccountEditForm
+            initial={{
+              companyName: effective.companyName,
+              contactPerson: effective.contactPerson,
+              email: effective.email,
+            }}
           />
-          <Row icon={Mail} label="E-mailadres" value={account.email} edit />
+
           <Row
             icon={Building2}
             label="Website"
@@ -160,12 +169,10 @@ function Row({
   icon: Icon,
   label,
   value,
-  edit,
 }: {
   icon: typeof Building2;
   label: string;
   value: React.ReactNode;
-  edit?: boolean;
 }) {
   return (
     <div
@@ -205,11 +212,6 @@ function Row({
         </div>
         <div style={{ fontSize: 14, color: 'var(--klant-fg)' }}>{value}</div>
       </div>
-      {edit && (
-        <span style={{ fontSize: 11, color: 'var(--klant-fg-dim)', flexShrink: 0 }}>
-          Wijzigen volgt in V1
-        </span>
-      )}
     </div>
   );
 }
