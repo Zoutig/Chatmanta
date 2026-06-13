@@ -2369,7 +2369,17 @@ KRITISCHE FORMAT-REGELS:
   } else if (primaryLanguage !== 'nl') {
     languageDirective = namedLanguageDirective(primaryLanguage);
   }
-  const userPrompt = `${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
+  // WP4 (A2) — handmatige Q&A is gezaghebbend bij tegenstrijdigheid. Een
+  // klant-bijgewerkte Q&A wordt als 'Vraag: … Antwoord: …'-chunk ge-embed en kan
+  // naast een oudere gecrawlde chunk in de context belanden (bv. nieuwe vs oude
+  // openingstijden). Deze regel laat de LLM bij conflict de Q&A volgen. Alleen
+  // injecteren als de org überhaupt handmatige Q&A heeft → orgs zonder Q&A
+  // (incl. DEV_ORG eval) houden een byte-identieke prompt.
+  const manualQAAuthorityIntro =
+    input.manualQAItems && input.manualQAItems.length > 0
+      ? 'Let op: een bron in de vorm "Vraag: … Antwoord: …" is een handmatig door de klant toegevoegde Q&A en is gezaghebbend. Spreekt zo\'n Q&A een andere bron tegen (bijvoorbeeld andere openingstijden, prijzen of voorwaarden), volg dan de Q&A — die is bewust bijgewerkt.\n\n'
+      : '';
+  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.

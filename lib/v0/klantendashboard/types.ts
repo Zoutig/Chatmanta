@@ -130,6 +130,10 @@ export type ManualQA = {
   category?: string;
   active: boolean;
   updatedAt: string;
+  /** id van het via ingestText aangemaakte documents-record (WP4). Aanwezig zodra
+   *  de Q&A als kennisbank-chunk is ge-embed; optioneel voor backward-compat met
+   *  rijen van vóór de ingest-route en voor inactieve Q&A's (niet ge-embed). */
+  ingestedDocId?: string;
 };
 
 // ---------------------------------------------------------------------------
