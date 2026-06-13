@@ -14,6 +14,7 @@ import { StatusBadge } from '../../components/status-badge';
 import { Icon } from '../../components/ui/icons';
 import { CollapsibleSources } from '../../components/ui/collapsible-sources';
 import { ConversationActions } from './components/conversation-actions';
+import { ConversationId } from './components/conversation-id';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +76,8 @@ export default async function GesprekDetailPage({
         subtitle={`Gestart op ${formatDateTime(detail.thread.createdAt)}`}
         actions={<StatusBadge status={isUnanswered ? 'unanswered' : 'answered'} kind="conversation" />}
       />
+
+      <ConversationId id={id} />
 
       <section
         className="klant-stack-narrow"
