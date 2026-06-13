@@ -385,8 +385,18 @@ export async function saveAccountInfo(
   };
   // Merge over de bestaande overrides: alléén velden die in de patch zitten
   // worden aangeraakt (lege string wist dat ene veld), zodat een gedeeltelijke
-  // patch de andere velden niet per ongeluk wegschrijft.
-  const next: AccountOverrides = { ...(await getAccountOverrides(orgSlug)) };
+  // patch de andere velden niet per ongeluk wegschrijft. STRIKTE read (gooit bij
+  // fout) — niet de defensieve getAccountOverrides, anders zou een transiënte
+  // leesfout → {} de niet-gepatchte velden wissen (Codex item-8 #2).
+  const { data: cur, error: readErr } = await sb()
+    .from('v0_org_settings')
+    .select('account')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+  if (readErr) {
+    throw new AppError('INTERNAL', { message: `account-read faalde: ${readErr.message}` });
+  }
+  const next: AccountOverrides = { ...parseAccountOverrides(cur?.account) };
   if ('companyName' in patch) {
     const v = clean(patch.companyName);
     if (v) next.companyName = v;
@@ -406,8 +416,13 @@ export async function saveAccountInfo(
       delete next.email;
     }
   }
-  await sb()
+  const { error: writeErr } = await sb()
     .from('v0_org_settings')
     .upsert({ organization_id: orgId, account: next }, { onConflict: 'organization_id' });
+  // Codex item-8 #1: een genegeerde upsert-fout (bv. kolom bestaat nog niet vóór
+  // migratie 0048) zou "Opgeslagen" tonen zónder dat er iets persisteert.
+  if (writeErr) {
+    throw new AppError('INTERNAL', { message: `account opslaan faalde: ${writeErr.message}` });
+  }
   return next;
 }
