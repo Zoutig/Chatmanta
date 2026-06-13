@@ -38,11 +38,13 @@ import {
   getOrgSettings,
   saveChatbotSettings,
   saveTopQuestionsConfig,
+  saveAccountInfo,
   upsertQAItem,
   deleteQAItem,
   setQAActive,
 } from '@/lib/v0/klantendashboard/server/settings';
 import type {
+  AccountOverrides,
   ChatbotSettings,
   ManualQA,
   TopQuestionsConfig,
@@ -118,6 +120,20 @@ export async function saveChatbotSettingsAction(
     // direct zichtbaar zijn.
     revalidatePath('/widget', 'layout');
     return { chatbot };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Account-gegevens (Niels item 8) — klant-aanpasbare display-velden.
+// ---------------------------------------------------------------------------
+export async function saveAccountInfoAction(
+  patch: AccountOverrides,
+): Promise<ActionResult<{ account: AccountOverrides }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const account = await saveAccountInfo(activeOrg.slug, patch);
+    revalidatePath('/klantendashboard/account', 'page');
+    return { account };
   });
 }
 
