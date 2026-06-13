@@ -77,8 +77,6 @@ export default async function GesprekDetailPage({
         actions={<StatusBadge status={isUnanswered ? 'unanswered' : 'answered'} kind="conversation" />}
       />
 
-      <ConversationId id={id} />
-
       <section
         className="klant-stack-narrow"
         style={{
@@ -208,6 +206,8 @@ export default async function GesprekDetailPage({
           />
         </aside>
       </section>
+
+      <ConversationId id={id} />
     </>
   );
 }
