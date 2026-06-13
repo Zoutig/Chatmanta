@@ -78,6 +78,38 @@ export function buildOperatorEmail(item: FeedbackItem, opts: { orgName: string; 
   return { subject, html, text };
 }
 
+/** Operator-reactie naar de indiener (Niels antwoordt vanuit een melding).
+ *  Bevat UITSLUITEND de zelf-getypte reactietekst — nooit interne notities of
+ *  de event-historie. Voettekst legt uit waarom de ontvanger deze mail krijgt
+ *  (AVG-transparantie). `replyText` is operator-input, wordt geëscaped. */
+export function buildFeedbackReplyEmail(
+  item: FeedbackItem,
+  replyText: string,
+  opts: { orgName: string },
+): BuiltEmail {
+  const subject = `Reactie op je feedback · ${opts.orgName}`;
+  const greeting = item.submitterName ? `Hoi ${item.submitterName},` : 'Hoi,';
+  const footer = `Je ontvangt deze e-mail omdat je feedback hebt ingediend bij ${opts.orgName} via ChatManta.`;
+  const text = [
+    greeting,
+    '',
+    replyText.trim(),
+    '',
+    'Met vriendelijke groet,',
+    'Team ChatManta',
+    '',
+    footer,
+  ].join('\n');
+  const html = `
+    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px">
+      <p>${esc(greeting)}</p>
+      <div style="white-space:pre-wrap;line-height:1.5">${esc(replyText.trim())}</div>
+      <p style="margin-top:16px">Met vriendelijke groet,<br/>Team ChatManta</p>
+      <p style="color:#888;font-size:12px;margin-top:18px;border-top:1px solid #eee;padding-top:10px">${esc(footer)}</p>
+    </div>`.trim();
+  return { subject, html, text };
+}
+
 /** Optionele bevestiging naar de indiener (alleen bij geldig e-mailadres). */
 export function buildSubmitterEmail(item: FeedbackItem): BuiltEmail {
   const subject = 'We hebben je feedback ontvangen · ChatManta';

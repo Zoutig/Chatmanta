@@ -22,10 +22,12 @@ import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { formatDateNL, formatRelativeNL } from '@/lib/controlroom/format';
 import { buildFeedbackClaudePayload } from '@/lib/controlroom/feedback-claude-payload';
+import { isValidFeedbackEmail } from '@/lib/notifications/feedback-email';
 import { CopyButton } from '../../components/copy-button';
 import { FeedbackStatusActions } from './components/status-actions';
 import { FeedbackPriorityActions } from './components/priority-actions';
 import { FeedbackNoteForm } from './components/note-form';
+import { FeedbackReplyForm } from './components/reply-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -194,7 +196,22 @@ export default async function FeedbackDetail({ params }: { params: Promise<{ id:
       </Card>
 
       <Card style={{ marginBottom: 16 }}>
-        <div className="klant-section-title" style={{ marginBottom: 10 }}>Notitie of reactie toevoegen</div>
+        <div className="klant-section-title" style={{ marginBottom: 10 }}>Reageren naar de klant</div>
+        <FeedbackReplyForm
+          id={item.id}
+          submitterEmail={item.submitterEmail}
+          disabledReason={
+            !isValidFeedbackEmail(item.submitterEmail)
+              ? 'Deze melding heeft geen e-mailadres, dus je kunt er niet per mail op reageren.'
+              : !item.privacyAcceptedAt
+                ? 'De indiener heeft geen toestemming gegeven om gecontacteerd te worden.'
+                : null
+          }
+        />
+      </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <div className="klant-section-title" style={{ marginBottom: 10 }}>Interne notitie of reactie toevoegen</div>
         <FeedbackNoteForm id={item.id} />
       </Card>
 

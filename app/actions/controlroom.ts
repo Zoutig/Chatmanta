@@ -13,6 +13,7 @@ import { revalidatePath } from 'next/cache';
 import {
   KNOWN_ORGS,
   resolveOrgIdFromSlug,
+  resolveOrgSlugFromId,
   type OrgSlug,
 } from '@/lib/v0/server/active-org';
 import { upsertProfile } from '@/lib/controlroom/server/profiles';
@@ -24,7 +25,10 @@ import {
   setFeedbackPriority,
   addFeedbackEvent,
   deleteFeedback,
+  getFeedback,
 } from '@/lib/controlroom/server/feedback';
+import { buildFeedbackReplyEmail, isValidFeedbackEmail } from '@/lib/notifications/feedback-email';
+import { sendEmail } from '@/lib/notifications/email';
 import {
   FEEDBACK_STATUSES,
   FEEDBACK_PRIORITIES,
@@ -219,6 +223,58 @@ export async function addFeedbackNoteAction(
     await addFeedbackEvent(id, { kind, body: trimmed, author: 'operator' });
     revalidate();
     return { id };
+  });
+}
+
+/** Stuur een reactie per e-mail naar de indiener van een melding (Niels' item 3).
+ *  Verstuurt UITSLUITEND naar het opgegeven indiener-adres en alleen als de
+ *  privacyverklaring is geaccepteerd (AVG-grondslag). De reactie wordt als
+ *  comment-event gelogd (audit-spoor) en het verzendresultaat wordt teruggegeven
+ *  zodat de operator ziet of de mail daadwerkelijk vertrok (geen stil-slikken). */
+export async function sendFeedbackReplyAction(
+  id: string,
+  replyText: string,
+): Promise<ActionResult<{ id: string; sent: boolean; detail: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const trimmed = (replyText ?? '').trim();
+    if (trimmed.length === 0) fail('INPUT_INVALID', 'De reactie mag niet leeg zijn.');
+    if (trimmed.length > 4000) fail('INPUT_INVALID', 'De reactie is te lang (max 4000 tekens).');
+
+    const item = await getFeedback(id);
+    if (!item) fail('NOT_FOUND', 'Melding niet gevonden.');
+    if (!isValidFeedbackEmail(item.submitterEmail)) {
+      fail('INPUT_INVALID', 'Deze melding heeft geen geldig e-mailadres om op te reageren.');
+    }
+    if (!item.privacyAcceptedAt) {
+      fail('INPUT_INVALID', 'De indiener heeft geen toestemming gegeven om gecontacteerd te worden.');
+    }
+
+    const slug = resolveOrgSlugFromId(item.organizationId);
+    const orgName = slug ? KNOWN_ORGS[slug].name : item.organizationId;
+    const email = buildFeedbackReplyEmail(item, trimmed, { orgName });
+    const result = await sendEmail({
+      to: item.submitterEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    // Audit-spoor: leg vast dát en wát er naar de klant is gestuurd.
+    await addFeedbackEvent(id, {
+      kind: 'comment',
+      body: `Reactie gemaild naar ${item.submitterEmail}:\n${trimmed}`.slice(0, 4000),
+      author: 'operator',
+    });
+    revalidate();
+
+    if (result.ok) {
+      return { id, sent: true, detail: 'Reactie verzonden naar de klant.' };
+    }
+    if (result.skipped) {
+      return { id, sent: false, detail: 'E-mail niet verzonden: geen mailconfiguratie (RESEND_API_KEY ontbreekt). De reactie is wel in de historie vastgelegd.' };
+    }
+    return { id, sent: false, detail: `E-mail niet verzonden: ${result.error}. De reactie is wel in de historie vastgelegd.` };
   });
 }
 
