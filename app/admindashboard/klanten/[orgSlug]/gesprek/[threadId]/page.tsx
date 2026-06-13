@@ -7,12 +7,13 @@
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getConversationDetail } from '@/lib/v0/klantendashboard/server/conversations';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { Card } from '@/app/klantendashboard/components/ui/card';
 import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
+import { CollapsibleSources } from '@/app/klantendashboard/components/ui/collapsible-sources';
 import { ReloadButton } from '@/app/admindashboard/components/reload-button';
 
 export const dynamic = 'force-dynamic';
@@ -148,33 +149,7 @@ export default async function AdminGesprekDetailPage({
 
         {/* Gebruikte bronnen */}
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card>
-            <h3 className="klant-section-title" style={{ marginBottom: 10 }}>
-              <BookOpen size={15} strokeWidth={1.7} style={{ display: 'inline', marginRight: 6, verticalAlign: '-2px' }} />
-              Gebruikte bronnen
-            </h3>
-            {allSources.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--klant-fg-muted)', margin: 0 }}>
-                Geen bronnen — dit gesprek had geen relevante kennisbank-treffer.
-              </p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {allSources.slice(0, 10).map((s, i) => {
-                  const excerpt = s.parentExcerpt ?? s.contentExcerpt ?? '';
-                  return (
-                    <li key={i} style={{ padding: '8px 10px', background: 'var(--klant-surface-muted)', borderRadius: 'var(--klant-r-sm)', fontSize: 12 }}>
-                      <div style={{ color: 'var(--klant-fg)', fontWeight: 500 }}>{s.filename || 'Onbekend'}</div>
-                      {excerpt && (
-                        <div style={{ color: 'var(--klant-fg-muted)', marginTop: 2, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {excerpt}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
+          <CollapsibleSources sources={allSources} />
         </aside>
       </section>
     </>
