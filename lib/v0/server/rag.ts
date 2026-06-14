@@ -1590,9 +1590,11 @@ export async function* runRagQueryStreaming(input: {
     stopCache();
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
-      // Tone/length: gecachte rij is mogelijk geschreven onder andere stijl-
-      // toggles; we accepteren mismatch (zie spec) en zetten de huidige call's
-      // toggles op de response zodat logging klopt.
+      // Tone/length: de gecachte rij is mogelijk geschreven onder andere stijl-
+      // toggles; we accepteren die mismatch (zie spec) en BEHOUDEN de gecachte
+      // tone/length op de response — het antwoord ís in die toon, dus de
+      // telemetrie (Bot-prestaties, PR #173) moet de geserveerde toon loggen, niet
+      // de gevraagde (nacht-audit C7).
       //
       // V0.5 fix: vervang de gecachte phaseTimingsMs door de werkelijke cache-
       // hit timings. Zonder dit erft elke cache-hit de full-pipeline timings
@@ -1629,7 +1631,16 @@ export async function* runRagQueryStreaming(input: {
               },
             }
           : cacheServed;
-      const enriched: ChatResponse = { ...baseEnriched, tone, length, generalKnowledgeActual: null };
+      // Kost van een cache-hit = alléén de werkelijke marginale spend van DEZE
+      // call (lookup-embedding + eventuele preprocess), niet de volledige
+      // generatiekost van het oorspronkelijke antwoord uit response_json. Zónder
+      // deze override telt het dag-budget (budget.ts somt query_log.cost_usd)
+      // fantoom-spend en raakt een org te vroeg BUDGET_EXHAUSTED (nacht-audit SEC2).
+      const enriched: ChatResponse = {
+        ...baseEnriched,
+        generalKnowledgeActual: null,
+        totalCostUsd: preCacheEmbedCost + rewriteCost,
+      };
       yield {
         kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',
         response: enriched,
