@@ -1629,7 +1629,18 @@ export async function* runRagQueryStreaming(input: {
               },
             }
           : cacheServed;
-      const enriched: ChatResponse = { ...baseEnriched, tone, length, generalKnowledgeActual: null };
+      // Kost van een cache-hit = alléén de werkelijke marginale spend van DEZE
+      // call (lookup-embedding + eventuele preprocess), niet de volledige
+      // generatiekost van het oorspronkelijke antwoord uit response_json. Zónder
+      // deze override telt het dag-budget (budget.ts somt query_log.cost_usd)
+      // fantoom-spend en raakt een org te vroeg BUDGET_EXHAUSTED (nacht-audit SEC2).
+      const enriched: ChatResponse = {
+        ...baseEnriched,
+        tone,
+        length,
+        generalKnowledgeActual: null,
+        totalCostUsd: preCacheEmbedCost + rewriteCost,
+      };
       yield {
         kind: enriched.kind === 'answer' ? 'answer-done' : enriched.kind === 'fallback' ? 'fallback' : 'smalltalk',
         response: enriched,
