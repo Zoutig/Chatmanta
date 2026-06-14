@@ -2,9 +2,9 @@
 
 > Autonome audit op branch `feat/seb/nacht-audit` (basis: `origin/main` #187).
 > Prioriteit: **veiligheid → correctheid → versimpeling → performance**.
-> Status: **3 PR's GEMERGED** (#188, #191, #192 → main 2026-06-14). Keuzes beslist (1A/skip/V1). Vervolg: 1A-implementatie + review grotere correctheid-puntjes.
+> Status: **6 PR's GEMERGED** (#188, #191, #192, #193, #194 → main). Keuzes beslist (1A/skip/V1). Grotere correctheid-puntjes A/B/D gedaan; C uitgesteld.
 
-_Fases A–E compleet. 3 veilige fixes geshipt en gemerged. #191 vereiste een rebase op nieuwe main (#189 off-topic/v0.10 had `runRagQuery` óók aangepast — nog steeds dood, dus deletie geldig; #189's off-topic-logica leeft volledig in `runRagQueryStreaming`). Overige bevindingen: zie beslissingen + de grotere-correctheid-review hieronder._
+_Fases A–E compleet (nacht) + vervolgsessie. 6 fixes geshipt en gemerged. #191 vereiste een rebase op nieuwe main (#189 off-topic/v0.10 had `runRagQuery` óók aangepast — nog steeds dood, dus deletie geldig). Zie de "Vervolg-sessie" sectie onderaan voor A/B/D + de resterende follow-ups._
 
 ## Samenvatting
 
@@ -50,9 +50,26 @@ Kleinere/lagere bevindingen (multi-query quote-strip-regex C `rag.ts:668`, NUMBE
 
 - **PR #188** — `fix(klantendashboard): retention-sentinel uitfilteren + actieve-bron-consistentie` (C1 + C2). tsc + 64 unit tests + build groen. Niet gemerged.
 - **PR #191** — `refactor(rag): verwijder dood runRagQuery + fix cache-stat no-op` (V1 + C3). tsc + lint + build + Codex-cross-check + hard-eval v0.10 (59/59) groen. Niet gemerged.
-- **PR #192** — `refactor(crawler): verwijder dood 'ingest' CrawlEventType-lid` (Z1). tsc + build groen. Niet gemerged.
+- **PR #192** — `refactor(crawler): verwijder dood 'ingest' CrawlEventType-lid` (Z1). **GEMERGED.**
+- **PR #193** — `fix(rag): cache-hit echte marginale kost + gecachte toon` (1A/SEC2 + D/C7). **GEMERGED.**
+- **PR #194** — `fix(crawler): atomische ingest-claim + wall-clock crawl-timeout` (A + B). Codex 4-rondes-cross-checked. **GEMERGED.**
 
-_C4 (errors-default) is na verificatie **verworpen** als false-positief — zie de tabel._
+_Alle 6 PR's gemerged naar main. C4 (errors-default) is na verificatie **verworpen** als false-positief — zie de tabel._
+
+---
+
+## Vervolg-sessie (na de nacht) — grotere correctheid-puntjes
+
+Sebastiaan koos: fix **A + B + D**, **C** uitstellen. Allemaal gemerged.
+
+- **A — crawler double-ingest** (PR #194). Atomische ingest-claim (status-flip onder `.in(['pending','processing'])`; Postgres serialiseert) + guards (poll-update, rate-limit-recovery, `failJob`, `wonClaim`-vlag). **Codex (gpt-5.5) 4 rondes**, vond achtereenvolgens een poll-reopen-race, de `wonClaim`-distinctie en de eigen-`completed`-fail; alle gedicht → geen double-ingest/stale-overwrite meer.
+- **B — crawler poll-timeout** (PR #194). Wall-clock `MAX_CRAWL_DURATION_MS=30min` op `created_at` i.p.v. poll-telling (200 polls = ~13min bij 4s-tick). `created_at` toegevoegd aan `OpenJob` + alle 4 callers.
+- **D — cache cross-tone telemetrie** (PR #193). Cache-hit behoudt de gecachte tone/length → Bot-prestaties logt de geserveerde toon, niet de gevraagde.
+- **C — listConversations row-cap** → **UITGESTELD** (triggert niet bij V0-volume).
+
+### Nieuwe follow-ups uit deze sessie
+- **Crawler finalisatie-robuustheid (PRE-BESTAAND, door Codex gevonden):** de post-ingest updates (`processing_jobs`-finalize + `knowledge_sources`→`ready`) en `failJob` negeren een Supabase-fout. Bij een transiente DB-fout net ná een geslaagde ingest kan een bron `crawling` blijven (job `completed`, geen retry). Niet door PR #194 geïntroduceerd; aparte kleine robustness-PR waard.
+- **SEC2/D live-smoke (open):** één cache-hit-smoke om te bevestigen dat `query_log.cost_usd` ~0 wordt én de gelogde toon de gecachte is. Aanbevolen vóór je op de cache-telemetrie leunt.
 
 ---
 
