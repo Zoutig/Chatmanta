@@ -221,7 +221,7 @@ async function main(): Promise<void> {
   for (let tick = 0; tick < MAX_TICKS; tick++) {
     const { data: row } = await sb
       .from('processing_jobs')
-      .select('id, organization_id, target_id, external_job_id, attempts, status')
+      .select('id, organization_id, target_id, external_job_id, attempts, status, created_at')
       .eq('id', jobId)
       .single();
     if (!row) throw new Error('processing_job verdween tijdens polling.');
@@ -234,6 +234,7 @@ async function main(): Promise<void> {
       target_id: row.target_id as string,
       external_job_id: (row.external_job_id as string | null) ?? null,
       attempts: (row.attempts as number | null) ?? 0,
+      created_at: (row.created_at as string | null) ?? new Date().toISOString(),
     };
     await processCrawlJobs(sb, [openJob]);
 

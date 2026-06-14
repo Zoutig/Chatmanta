@@ -450,7 +450,7 @@ export async function adminProcessOpenCrawlsAction(): Promise<ActionResult<{ pro
     const sb = await getSystemJobClient({ reason: 'admin_process_open_crawls' });
     const { data: jobs, error } = await sb
       .from('processing_jobs')
-      .select('id, organization_id, target_id, external_job_id, attempts')
+      .select('id, organization_id, target_id, external_job_id, attempts, created_at')
       .eq('job_type', 'crawl_website')
       .in('status', ['pending', 'processing'])
       .order('created_at', { ascending: true })

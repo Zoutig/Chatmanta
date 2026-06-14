@@ -164,7 +164,7 @@ export async function tickCrawlIngestAction(): Promise<WebsiteSource[]> {
   const sb = await getSystemJobClient({ reason: 'process_crawls_tick' });
   const { data: jobs, error: jobsError } = await sb
     .from('processing_jobs')
-    .select('id, organization_id, target_id, external_job_id, attempts')
+    .select('id, organization_id, target_id, external_job_id, attempts, created_at')
     .eq('organization_id', activeOrg.id)
     .eq('job_type', 'crawl_website')
     .in('status', ['pending', 'processing'])
