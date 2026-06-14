@@ -82,14 +82,19 @@ export type UnansweredQuestion = {
   queryLogId?: string;
 };
 
+export const SETUP_STEP_IDS = [
+  'add_website',
+  'verify_sources',
+  'tone_of_voice',
+  'test_questions',
+  'install_widget',
+  'go_live',
+] as const;
+
+export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
+
 export type SetupStep = {
-  id:
-    | 'add_website'
-    | 'verify_sources'
-    | 'tone_of_voice'
-    | 'test_questions'
-    | 'install_widget'
-    | 'go_live';
+  id: SetupStepId;
   title: string;
   status: 'completed' | 'in_progress' | 'todo';
   href?: string;

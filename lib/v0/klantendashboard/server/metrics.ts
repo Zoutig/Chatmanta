@@ -323,7 +323,7 @@ const TEST_QUESTIONS_TARGET = 5;
 export async function getSetupChecklist(
   orgSlug: OrgSlug,
   metrics: OverviewMetrics,
-  opts?: { settingsSaved?: boolean; testMessagesCount?: number },
+  opts?: { settingsSaved?: boolean; testMessagesCount?: number; skippedIds?: string[] },
 ): Promise<SetupStep[]> {
   const hasWebsite = metrics.sources.websitePages > 0;
   const hasAnyContent = hasWebsite || metrics.sources.documents > 0 || metrics.sources.qaItems > 0;
@@ -377,5 +377,12 @@ export async function getSetupChecklist(
       href: '/klantendashboard/widget',
     },
   ];
-  return steps;
+
+  // Item 2: een handmatig overgeslagen stap telt als voltooid. Een echte
+  // voltooiing wint sowieso (beide → 'completed'), dus een simpele override.
+  const skipped = new Set(opts?.skippedIds ?? []);
+  if (skipped.size === 0) return steps;
+  return steps.map((s) =>
+    skipped.has(s.id) && s.status !== 'completed' ? { ...s, status: 'completed' as const } : s,
+  );
 }

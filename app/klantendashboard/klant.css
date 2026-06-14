@@ -964,3 +964,35 @@ html.dark[data-klant-accent='slate'] [data-klant-scope] {
 .crawl-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Setup-checklist "overslaan"-knop (item 2). Alleen zichtbaar op rij-hover of
+   wanneer de knop zelf focus krijgt (toetsenbord) — de reveal staat hier en niet
+   inline, want inline :hover wordt door de Tailwind v4 PostCSS-pipeline gedropt. */
+.klant-setup-step .klant-setup-skip {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease,
+    border-color 120ms ease;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--klant-muted);
+  background: var(--klant-surface-muted);
+  border: 1px solid var(--klant-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.klant-setup-step:hover .klant-setup-skip,
+.klant-setup-skip:focus-visible {
+  opacity: 1;
+}
+.klant-setup-skip:hover {
+  color: var(--klant-ink);
+  border-color: var(--klant-border-strong);
+  background: var(--klant-surface);
+}
+.klant-setup-skip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

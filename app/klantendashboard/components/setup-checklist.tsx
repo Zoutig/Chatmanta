@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Check, Circle, Loader2 } from 'lucide-react';
 import type { SetupStep } from '@/lib/v0/klantendashboard/types';
+import { SkipStepButton } from './skip-step-button';
 
 export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
   const doneCount = steps.filter((s) => s.status === 'completed').length;
@@ -128,13 +129,26 @@ function StepRow({ step }: { step: SetupStep }) {
     </div>
   );
 
-  if (!step.href || step.status === 'completed') {
-    return inner;
+  const linked =
+    !step.href || step.status === 'completed' ? (
+      inner
+    ) : (
+      <Link href={step.href} style={{ textDecoration: 'none', display: 'block' }}>
+        {inner}
+      </Link>
+    );
+
+  // Voltooide stappen krijgen geen overslaan-knop. Voor de rest onthult hover/
+  // focus een "Overslaan"-knop náást de klikbare rij (niet erin — anders zou
+  // klikken óók navigeren). De hover-reveal zit in klant.css (.klant-setup-step).
+  if (step.status === 'completed') {
+    return linked;
   }
   return (
-    <Link href={step.href} style={{ textDecoration: 'none', display: 'block' }}>
-      {inner}
-    </Link>
+    <div className="klant-setup-step" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>{linked}</div>
+      <SkipStepButton stepId={step.id} />
+    </div>
   );
 }
 
