@@ -12,7 +12,9 @@ import type { CrawledPage } from './firecrawl';
 
 type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
 
-export type CrawlEventType = 'start' | 'poll' | 'ingest' | 'complete' | 'fail';
+// Geen 'ingest'-event: de ingest-uitkomst wordt geschreven als eventType
+// 'complete' + decision 'ingested'. Een los 'ingest'-type werd nergens geëmit.
+export type CrawlEventType = 'start' | 'poll' | 'complete' | 'fail';
 
 /**
  * Beslissings-codes die de job-verwerker in `crawl_events.decision` schrijft.
