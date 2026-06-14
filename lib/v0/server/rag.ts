@@ -14,6 +14,7 @@ import { performance } from 'node:perf_hooks';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import type { BotConfig } from './bots';
+import { stripQuotes, parsePreProcessOutput } from './preprocess-parse';
 import { buildSystemPrompt } from '../style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
 import { costForModelUsd } from '../../ai/llm';
@@ -234,41 +235,12 @@ type PreProcessTokens = {
 
 type PreProcessResult =
   | ({ kind: 'smalltalk'; reply: string } & PreProcessTokens)
-  | ({ kind: 'search'; query: string } & PreProcessTokens);
+  | ({ kind: 'search'; query: string } & PreProcessTokens)
+  | ({ kind: 'off_topic' } & PreProcessTokens);
 
-function stripQuotes(s: string): string {
-  const t = s.trim();
-  if (t.length < 2) return t;
-  const first = t[0];
-  const last = t[t.length - 1];
-  if ((first === '"' && last === '"') || (first === '„' && last === '"') || (first === "'" && last === "'")) {
-    return t.slice(1, -1).trim();
-  }
-  return t;
-}
-
-/**
- * Parse the model's two-line output. Returns null on malformed reply so the
- * caller can fall back to default search behavior.
- */
-function parsePreProcessOutput(raw: string): { kind: 'smalltalk'; reply: string } | { kind: 'search'; query: string } | null {
-  const text = raw.trim();
-  const actionMatch = text.match(/^ACTION:\s*(smalltalk|search)\b/im);
-  if (!actionMatch) return null;
-  const action = actionMatch[1].toLowerCase();
-
-  if (action === 'smalltalk') {
-    const replyMatch = text.match(/^REPLY:\s*([\s\S]+?)$/im);
-    const reply = stripQuotes(replyMatch?.[1] ?? '').slice(0, 500);
-    if (!reply) return null;
-    return { kind: 'smalltalk', reply };
-  }
-
-  const queryMatch = text.match(/^QUERY:\s*([\s\S]+?)$/im);
-  const query = stripQuotes(queryMatch?.[1] ?? '').slice(0, 1000);
-  if (!query) return null;
-  return { kind: 'search', query };
-}
+// stripQuotes + parsePreProcessOutput zijn verplaatst naar ./preprocess-parse
+// (pure module, side-effect-vrij) zodat ze zonder env/OpenAI-SDK te testen zijn.
+// Geïmporteerd bovenaan dit bestand.
 
 // Beperk hoeveel turns we meegeven aan de LLM-calls. Meer = duurder en
 // kan de LLM verwarren met oude context die niet meer relevant is.
@@ -1281,6 +1253,7 @@ export async function runRagQuery({
   //    the knowledge base).
   let rewriteInfo: ChatRewriteInfo | null = null;
   let queryForEmbed = original;
+  let offTopicSuspected = false;
   if (enableRewrite) {
     // runRagQuery (non-streaming) is alleen de eval-pad — geen orgId-param,
     // dus we vallen terug op DEV_ORG persona. De live chat draait via
@@ -1298,14 +1271,28 @@ export async function runRagQuery({
         totalCostUsd: pp.costUsd,
       };
     }
-    rewriteInfo = {
-      original,
-      rewritten: pp.query,
-      inputTokens: pp.inputTokens,
-      outputTokens: pp.outputTokens,
-      costUsd: pp.costUsd,
-    };
-    queryForEmbed = pp.query;
+    if (pp.kind === 'off_topic') {
+      // Zacht signaal: geen rewrite (zoek op de originele vraag). De pp-cost
+      // boeken we via rewriteInfo (rewritten=origineel) zodat totalCostUsd klopt.
+      offTopicSuspected = bot.preProcessOffTopicDetection === true;
+      rewriteInfo = {
+        original,
+        rewritten: original,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = original;
+    } else {
+      rewriteInfo = {
+        original,
+        rewritten: pp.query,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = pp.query;
+    }
   }
 
   // 2. Optional multi-query expansion. Cost: extra LLM call when count > 1.
@@ -1333,20 +1320,29 @@ export async function runRagQuery({
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
   if (aboveThreshold.length === 0) {
+    // Corpus-veto: off_topic kwam alleen hier omdat retrieval óók leeg is →
+    // de classifier zat goed. Een in-scope vraag met treffers passeert dit blok
+    // en wordt gewoon beantwoord.
+    const evalPersonaForFallback = getPersonaById(DEV_ORG_ID);
     return {
       botVersion: bot.version,
       tone,
       length,
       generalKnowledgeActual: null,
       kind: 'fallback',
-      answer: FALLBACK_MESSAGE,
-      reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
+      answer: offTopicSuspected
+        ? `Ik help met vragen rondom ${evalPersonaForFallback.offTopicScope}. Wat wil je weten?`
+        : FALLBACK_MESSAGE,
+      reason: offTopicSuspected
+        ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
+        : `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
       topSimilarity: topSim,
       rewrite: rewriteInfo,
       sources: allSources,
       threshold,
       embedTokens,
       totalCostUsd: embedCost + rewriteCost + expansionCost,
+      ...(offTopicSuspected && bot.knowledgeGapLogging ? { gapKind: 'off_topic' as const } : {}),
     };
   }
 
@@ -1550,7 +1546,9 @@ export async function* runRagQueryStreaming(input: {
   // org kwamen. Unknown orgId → fallback DEV_ORG persona.
   const persona = getPersonaById(orgId);
   const hydeModeRequested: HydeModeRequest = input.hydeModeOverride ?? 'auto';
-  const hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
+  // `let` zodat de off_topic-branch hieronder HyDE kan uitzetten (HyDE's
+  // fabricatie-rescue ondermijnt anders het off-topic-signaal).
+  let hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
   // v0.5 general-knowledge toggle: gate combined with bot config. Default true
   // for backwards-compat (older clients/scripts without the field).
   const enableGeneralKnowledge = input.enableGeneralKnowledge !== false;
@@ -1701,6 +1699,7 @@ export async function* runRagQueryStreaming(input: {
   let queryForEmbed = original;
   let preCacheEmbedTokens = 0;
   let preCacheEmbedCost = 0;
+  let offTopicSuspected = false;
 
   const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history) : null;
   const cacheEmbedPromise = bot.cacheEnabled ? embedTexts([original]) : null;
@@ -1728,14 +1727,30 @@ export async function* runRagQueryStreaming(input: {
       };
       return;
     }
-    rewriteInfo = {
-      original,
-      rewritten: pp.query,
-      inputTokens: pp.inputTokens,
-      outputTokens: pp.outputTokens,
-      costUsd: pp.costUsd,
-    };
-    queryForEmbed = pp.query;
+    if (pp.kind === 'off_topic') {
+      // Zacht signaal met corpus-veto: geen rewrite, HyDE uit, en bij lege
+      // retrieval geeft de fallback hieronder de off-topic-tekst. Een in-scope
+      // vraag met treffers passeert en wordt gewoon beantwoord.
+      offTopicSuspected = bot.preProcessOffTopicDetection === true;
+      if (offTopicSuspected) hydeModeActual = 'off';
+      rewriteInfo = {
+        original,
+        rewritten: original,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = original;
+    } else {
+      rewriteInfo = {
+        original,
+        rewritten: pp.query,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      queryForEmbed = pp.query;
+    }
   }
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
 
@@ -2209,8 +2224,9 @@ KRITISCHE FORMAT-REGELS:
       return;
     }
 
-    // Legacy pad (v0.1-v0.4): vaste fallback zoals voorheen — maar wel met
-    // klant-override van fallbackMessage als die er is.
+    // Legacy pad: vaste fallback. Bij een bevestigd off_topic-signaal (pre-processor
+    // zei off_topic ÉN retrieval is leeg → corpus-veto akkoord) gebruiken we de nette
+    // off-topic-tekst i.p.v. de generieke fallback (anders klant-override fallbackMessage).
     yield {
       kind: 'fallback',
       response: {
@@ -2218,10 +2234,18 @@ KRITISCHE FORMAT-REGELS:
         tone,
         length,
         generalKnowledgeActual: false,
-        ...(bot.knowledgeGapLogging ? { gapKind: 'zero_hits' as const } : {}),
+        ...(offTopicSuspected && bot.knowledgeGapLogging
+          ? { gapKind: 'off_topic' as const }
+          : bot.knowledgeGapLogging
+            ? { gapKind: 'zero_hits' as const }
+            : {}),
         kind: 'fallback',
-        answer: fallbackMessage,
-        reason: `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
+        answer: offTopicSuspected
+          ? `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`
+          : fallbackMessage,
+        reason: offTopicSuspected
+          ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
+          : `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
         topSimilarity: topSim,
         rewrite: rewriteInfo,
         sources: allSources,
