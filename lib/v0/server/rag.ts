@@ -539,9 +539,12 @@ async function lookupCachedAnswer(
   console.info(
     `[cache] HIT — top_sim=${top.similarity.toFixed(3)} (≥${CACHE_HIT_THRESHOLD}) org=${organizationId} ver=${botVersion} id=${top.id}`,
   );
-  // Bump hit_count fire-and-forget.
+  // Stempel last_hit_at fire-and-forget. (hit_count werd hier ooit "opgehoogd"
+  // via `hit_count: undefined`, maar supabase-js stript undefined-keys, dus dat
+  // deed nooit iets — en niets in de codebase leest hit_count. Een echte ophoog
+  // vereist een atomische RPC; bewust niet gedaan, zie nacht-audit C3.)
   sb.from('answer_cache')
-    .update({ hit_count: undefined, last_hit_at: new Date().toISOString() })
+    .update({ last_hit_at: new Date().toISOString() })
     .eq('id', top.id)
     .then(() => undefined);
   return top.response_json;
@@ -895,7 +898,8 @@ async function hydrateParentContent(chunks: RetrievedChunk[]): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// runRagQuery — public entrypoint for chat server action
+// Response-shapes — gedeeld door het streaming-pad, de answer-cache en de
+// telemetrie-logging.
 // ---------------------------------------------------------------------------
 export type ChatSource = {
   /** chunk-id — gebruikt door claim-verification UI om claims naar hun
@@ -1211,190 +1215,6 @@ function toSource(c: RetrievedChunk, includeFullParent = false): ChatSource {
       : {}),
     parentIndex: c.parent_index ?? null,
     ...(c.source_url ? { url: c.source_url } : {}),
-  };
-}
-
-export async function runRagQuery({
-  question,
-  threshold,
-  enableRewrite,
-  bot,
-  tone = DEFAULT_TONE,
-  length = DEFAULT_LENGTH,
-}: {
-  question: string;
-  threshold: number;
-  enableRewrite: boolean;
-  bot: BotConfig;
-  tone?: Tone;
-  length?: Length;
-}): Promise<ChatResponse> {
-  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
-    throw new AppError('INPUT_INVALID', { message: 'threshold must be in [0, 1]' });
-  }
-  const original = question.trim();
-  if (original.length === 0) throw new AppError('INPUT_INVALID', { message: 'question is empty' });
-  if (original.length > 1000) {
-    throw new AppError('INPUT_INVALID', { message: 'question too long (max 1000 chars)' });
-  }
-
-  // Eval-pad: geen orgId beschikbaar → render met DEV_ORG persona (semantisch
-  // identiek aan de oude hard-coded V0.X prompts).
-  const evalPersona = getPersonaById(DEV_ORG_ID);
-  const styledSystemPrompt = buildSystemPrompt(
-    renderPersonaTemplate(bot.systemPrompt, evalPersona),
-    { tone, length },
-    bot.outputStyleVersion,
-  );
-
-  // 1. Optional pre-processor — classifies smalltalk vs search and rewrites
-  //    the query in one shot. Smalltalk is answered immediately without any
-  //    retrieval (the assistant should be able to say "hoi" without searching
-  //    the knowledge base).
-  let rewriteInfo: ChatRewriteInfo | null = null;
-  let queryForEmbed = original;
-  let offTopicSuspected = false;
-  if (enableRewrite) {
-    // runRagQuery (non-streaming) is alleen de eval-pad — geen orgId-param,
-    // dus we vallen terug op DEV_ORG persona. De live chat draait via
-    // runRagQueryStreaming en resolveert persona correct per org.
-    const pp = await preProcessInput(original, bot, getPersonaById(DEV_ORG_ID));
-    if (pp.kind === 'smalltalk') {
-      return {
-        botVersion: bot.version,
-        tone,
-        length,
-        generalKnowledgeActual: null,
-        kind: 'smalltalk',
-        answer: pp.reply,
-        preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
-        totalCostUsd: pp.costUsd,
-      };
-    }
-    if (pp.kind === 'off_topic') {
-      // Zacht signaal: geen rewrite (zoek op de originele vraag). De pp-cost
-      // boeken we via rewriteInfo (rewritten=origineel) zodat totalCostUsd klopt.
-      offTopicSuspected = bot.preProcessOffTopicDetection === true;
-      rewriteInfo = {
-        original,
-        rewritten: original,
-        inputTokens: pp.inputTokens,
-        outputTokens: pp.outputTokens,
-        costUsd: pp.costUsd,
-      };
-      queryForEmbed = original;
-    } else {
-      rewriteInfo = {
-        original,
-        rewritten: pp.query,
-        inputTokens: pp.inputTokens,
-        outputTokens: pp.outputTokens,
-        costUsd: pp.costUsd,
-      };
-      queryForEmbed = pp.query;
-    }
-  }
-
-  // 2. Optional multi-query expansion. Cost: extra LLM call when count > 1.
-  const mq = await generateMultiQueries(queryForEmbed, bot.multiQueryCount, bot);
-  const expansionCost = mq.costUsd;
-
-  // 3. Embed all queries (1 OpenAI call, batched).
-  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(mq.queries);
-
-  // 4. Retrieve per query, then dedup on chunk id keeping the highest
-  //    similarity seen across queries.
-  const bestById = new Map<string, RetrievedChunk>();
-  for (const v of vectors) {
-    const hits = await retrieveChunks(v, V0_RAG_DEFAULTS.TOP_K);
-    for (const h of hits) {
-      const prev = bestById.get(h.id);
-      if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
-    }
-  }
-  const merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
-  const allSources = merged.map((c) => toSource(c));
-  const topSim = merged[0]?.similarity ?? null;
-
-  // 5. Threshold filter.
-  const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
-  const rewriteCost = rewriteInfo?.costUsd ?? 0;
-  if (aboveThreshold.length === 0) {
-    // Corpus-veto: off_topic kwam alleen hier omdat retrieval óók leeg is →
-    // de classifier zat goed. Een in-scope vraag met treffers passeert dit blok
-    // en wordt gewoon beantwoord.
-    const evalPersonaForFallback = getPersonaById(DEV_ORG_ID);
-    return {
-      botVersion: bot.version,
-      tone,
-      length,
-      generalKnowledgeActual: null,
-      kind: 'fallback',
-      answer: offTopicSuspected
-        ? `Ik help met vragen rondom ${evalPersonaForFallback.offTopicScope}. Wat wil je weten?`
-        : FALLBACK_MESSAGE,
-      reason: offTopicSuspected
-        ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
-        : `Geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`,
-      topSimilarity: topSim,
-      rewrite: rewriteInfo,
-      sources: allSources,
-      threshold,
-      embedTokens,
-      totalCostUsd: embedCost + rewriteCost + expansionCost,
-      ...(offTopicSuspected && bot.knowledgeGapLogging ? { gapKind: 'off_topic' as const } : {}),
-    };
-  }
-
-  // 6. Optional LLM rerank — pick the best TOP_K from the above-threshold pool.
-  let rerankCost = 0;
-  let rerankInputTokens = 0;
-  let rerankOutputTokens = 0;
-  let final: RetrievedChunk[] = aboveThreshold.slice(0, V0_RAG_DEFAULTS.TOP_K);
-  if (bot.rerank === 'llm' && aboveThreshold.length > 1) {
-    const r = await rerankChunks(original, aboveThreshold, V0_RAG_DEFAULTS.TOP_K, bot);
-    final = r.ranked;
-    rerankCost = r.costUsd;
-    rerankInputTokens = r.inputTokens;
-    rerankOutputTokens = r.outputTokens;
-  }
-
-  // 7. Format context (cap at MAX_CONTEXT_CHARS).
-  let context = '';
-  let used = 0;
-  for (const c of final) {
-    const block = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]\n${c.content}\n\n`;
-    if (context.length + block.length > V0_RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
-    context += block;
-    used++;
-  }
-  // Use the ORIGINAL question in the answer prompt — model should answer the
-  // user's actual question, not the rewritten search-query form. The rewrite
-  // is purely an embedding-time tactic.
-  const userPrompt = `CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}`;
-
-  // 8. LLM call.
-  const chat = await chatComplete({
-    model: bot.chatModel,
-    system: styledSystemPrompt,
-    user: userPrompt,
-    temperature: bot.chatTemperature,
-  });
-
-  return {
-    botVersion: bot.version,
-    tone,
-    length,
-    generalKnowledgeActual: null,
-    kind: 'answer',
-    answer: chat.text.trim(),
-    rewrite: rewriteInfo,
-    sources: final.slice(0, used).map((c) => toSource(c)),
-    threshold,
-    embedTokens,
-    chatInputTokens: chat.inputTokens + rerankInputTokens,
-    chatOutputTokens: chat.outputTokens + rerankOutputTokens,
-    totalCostUsd: embedCost + chat.costUsd + rewriteCost + expansionCost + rerankCost,
   };
 }
 
