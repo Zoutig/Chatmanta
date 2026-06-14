@@ -30,6 +30,8 @@ export type CrawlDecision =
   | 'firecrawl-failed'
   | 'rate-limited'
   | 'ingested'
+  | 'finalize-retry'
+  | 'finalize-failed'
   | 'exception';
 
 /** Eén crawl-event-veld-set. organization_id + event_type verplicht; rest optioneel. */
