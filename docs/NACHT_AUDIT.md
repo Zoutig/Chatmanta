@@ -2,13 +2,13 @@
 
 > Autonome audit op branch `feat/seb/nacht-audit` (basis: `origin/main` #187).
 > Prioriteit: **veiligheid → correctheid → versimpeling → performance**.
-> Status: **IN UITVOERING** — dit rapport wordt continu bijgewerkt.
+> Status: **AFGEROND** — 3 PR's geopend (#188, #191, #192), 1 bevinding verworpen, rest report-only voor Sebastiaan.
 
-_Laatste update: Fase B compleet (6 read-only subagents + chatmanta-reviewer). Triage + fixes lopen._
+_Fases A–E compleet. 3 veilige hoog-zekere fixes geshipt (alle verificatie groen, niet gemerged). Alle overige bevindingen zijn report-only / open-vraag / deferred-V1 omdat ze security-gevoelige paden, migraties, budget-semantiek of eval-gevoelige RAG-prompts raken — bewust niet onbewaakt aangepast._
 
 ## Samenvatting
 
-- **Veiligheid:** de `chatmanta-reviewer` hard-rules-lens vond **geen HIGH en geen blokkerende MEDIUM** in de security-gevoelige paden. De V0-grens (embed-token fail-closed + constant-time + verify-before-parse, origin-lock, dual-auth, always-block-injection op het publieke pad, fail-safe rate-limit, fail-closed startup-assert, org+soft-delete-isolatie in de RPC) is consistent en correct. Wel één **terugkerend reëel hardening-thema** (door 3 onafhankelijke agents gemeld): **prompt-injection via chat-history én via gecrawlde content** komt ongefilterd in de LLM-context. Dat is geen V0-sandbox-artefact maar een echte (medium-exploiteerbaarheid) gap → report-only met concreet voorstel.
+- **Veiligheid:** de `chatmanta-reviewer` hard-rules-lens vond **geen HIGH en geen blokkerende MEDIUM** in de security-gevoelige paden. De V0-grens (embed-token fail-closed + constant-time + verify-before-parse, origin-lock, dual-auth, always-block-injection op het publieke pad, fail-safe rate-limit, fail-closed startup-assert, org+soft-delete-isolatie in de RPC) is consistent en correct. Wel één **terugkerend hardening-thema** (door 3 onafhankelijke agents gemeld): **prompt-injection via chat-history én via gecrawlde content** wordt niet door `detectInjection` gefilterd. Codex (gpt-5.5) nuanceerde dat er al mitigaties zijn (systeemprompt-instructie + structurele labels + post-gen-detectie), dus een **plausibel** defense-in-depth-gat, geen open gat → report-only (S1) met concreet voorstel.
 - **Correctheid:** een handvol echte bugs, meeste laag-impact bij V0-volume. Hoogste waarde: retention-sentinel lekt in recap/metrics (PR1), cache-`hit_count` bump is een silent no-op (PR2), cache-hit logt de volledige originele kost tegen het dag-budget (report — raakt budget-semantiek).
 - **Versimpeling:** `runRagQuery` (≈160 regels non-streaming pad) is **dood** (geen enkele caller) → PR2. Diverse bewuste V0-duplicaties (service-role-clients, `upsertWebsiteSource`, PII-regexes) zijn bekend V1-consolidatiewerk → report-only.
 - **Performance:** geen premature optimalisatie nodig; `getAllTimeUsage`/`listConversations` PostgREST 1000-row-cap onder-telt bij groei (report); overview-metrics fan-out is de duidelijkste V1-aggregatie-kandidaat.
@@ -28,8 +28,8 @@ Legenda status: **PR #n** = fix geopend · **report-only** = niet aangeraakt, aa
 | C2 | low | correctheid/klantdash | `metrics.ts:88,101` | `hasAnySource` telt álle pages/QA (ook inactief/excluded) terwijl de getoonde tellers op `active` filteren → status-badge zegt "live/testing" maar "0 bronnen" zichtbaar. | Bereken `activeWebsitePages`/`activeQaItems` één keer, gebruik voor zowel `hasAnySource` als de tellers. | **PR #188** |
 | V1 | low | versimpeling/RAG | `lib/v0/server/rag.ts:1245-1403` (`runRagQuery`) | Non-streaming `runRagQuery` heeft **geen enkele caller** (eval draait via `runRagQueryStreaming`; `v0-eval-run.ts` importeert alleen `isHydeModeRequest`). ≈160 regels dode duplicatie in het zwaarste bestand. Codex-bevestigd: geen live referentie, geen verweesde helper. | Verwijderd. Hard-eval v0.10 Laag-1 59/59, 0 catastrofaal. | **PR #191** |
 | C3 | medium→low | correctheid/RAG | `lib/v0/server/rag.ts:570-574` | `update({ hit_count: undefined, … })` — postgrest-js (`JSON.stringify`) stript `undefined`, dus `hit_count` werd nooit opgehoogd. Niets leest `hit_count`/`last_hit_at` (Codex-bevestigd, alleen kolomdeclaratie in migr 0004). | No-op key weg, `last_hit_at` behouden, comment eerlijk. Body identiek vóór/na. | **PR #191** |
-| C4 | low | correctheid/errors | `lib/errors/app-error.ts:38-67` | `httpStatusFor` switch heeft geen `default` — een toekomstige code zonder case geeft `status: undefined`. Nu veilig (TS-exhaustief), maar latente foot-gun. | `default: return 500;`. | **PR3** |
-| Z1 | low | dead-code/crawler | `lib/v0/crawler/crawlEvents.ts:15` | `CrawlEventType 'ingest'` wordt nergens geëmit (writers gebruiken start/poll/complete/fail). | Drop `'ingest'` uit de union. | **PR3** |
+| C4 | low | correctheid/errors | `lib/errors/app-error.ts:38-67` | ~~`httpStatusFor` switch heeft geen `default`~~ — **VERWORPEN na verificatie**: de switch declareert returntype `: number` zonder default → TS bewijst exhaustiveness, dus de functie compileert nú alleen omdat álle codes gedekt zijn. Een nieuwe `AppErrorCode` zónder case maakt het functie-einde bereikbaar → **compile-fout** (returntype bevat geen `undefined`). Een `default: return 500;` toevoegen zou die compile-time-bescherming juist wéghalen (nieuwe code → stil 500 i.p.v. tsc-fout). Geen runtime-`undefined`-risico. | Geen — huidige patroon is correct. | **verworpen** |
+| Z1 | low | dead-code/crawler | `lib/v0/crawler/crawlEvents.ts:15` | `CrawlEventType 'ingest'` wordt nergens geëmit (writers gebruiken start/poll/complete/fail; ingest = `complete`+decision `ingested`). Lees-kant leest `event_type as string`. | Drop `'ingest'` uit de union. | **PR #192** |
 | SEC1 | medium | security/rate-limit | `lib/v0/server/rate-limit.ts:281-311` | `getClientIp` neemt de **eerste** `x-forwarded-for`-waarde (client-controleerbaar) → per-IP-bucket-ontwijking. Op Vercel niet exploiteerbaar (platform normaliseert XFF) + per-org-bucket vangt het af. `getClientIpFromHeaders` dupliceert de fout. | Bij V1: `x-real-ip`/platform-IP i.p.v. linker-XFF; helper deduppen. | **report-only / deferred-V1** |
 | SEC2 | low | security/budget | `lib/v0/server/log.ts:353`, `budget.ts:75-101` | Cache-hit logt de **originele** `cost_usd` (uit `response_json`) terwijl de hit alleen een embed-lookup kost → het dag-budget telt fantoom-spend en kan te vroeg `BUDGET_EXHAUSTED` (402) geven. | `cost_usd=0` bij `fromCache`, óf `from_cache=true` uitsluiten in de budget-sum. Raakt budget-semantiek → bevestig intentie. | **report-only** |
 | SEC3 | medium | security/AVG | `lib/observability/redact.ts:10-26` | `redactPii` dekt alleen e-mail, NL-IBAN, NL-telefoon (start 0), bare 9-cijfer BSN. Mist: namen, adressen, postcodes, niet-NL/`00…`-telefoon. Docstring claimt volledige AVG-dekking → overstated. | Voeg NL-postcode + intl-telefoon-patroon toe; zwak docstring-claim af naar "best-effort structured-PII". Met test. | **report-only** (kandidaat-PR, mits geen over-masking) |
@@ -50,7 +50,9 @@ Kleinere/lagere bevindingen (multi-query quote-strip-regex C `rag.ts:668`, NUMBE
 
 - **PR #188** — `fix(klantendashboard): retention-sentinel uitfilteren + actieve-bron-consistentie` (C1 + C2). tsc + 64 unit tests + build groen. Niet gemerged.
 - **PR #191** — `refactor(rag): verwijder dood runRagQuery + fix cache-stat no-op` (V1 + C3). tsc + lint + build + Codex-cross-check + hard-eval v0.10 (59/59) groen. Niet gemerged.
-- _PR3 (errors/crawler dead-code) volgt._
+- **PR #192** — `refactor(crawler): verwijder dood 'ingest' CrawlEventType-lid` (Z1). tsc + build groen. Niet gemerged.
+
+_C4 (errors-default) is na verificatie **verworpen** als false-positief — zie de tabel._
 
 ---
 
@@ -79,8 +81,8 @@ Kleinere/lagere bevindingen (multi-query quote-strip-regex C `rag.ts:668`, NUMBE
 - **Fase A — Recon** ✅ smoke `v0:list` OK · structuur + LOC in kaart · baseline tsc/lint/unit groen.
 - **Fase B — Fan-out** ✅ 6 read-only subagents (RAG-kern, chat-route, crawler, server-actions/dashboards, errors/observability, hard-rules-lens) klaar; bevindingen hierboven geconsolideerd.
 - **Fase C — Codex-cross-check** ✅ (gpt-5.5) op PR #191 + S1: beide rag.ts-claims CONFIRMED; S1-"ongefilterd"-claim genuanceerd (mitigaties bestaan).
-- **Fase D — Fix** 🔄 PR #188 (dashboard-consistentie) ✅ · PR #191 (rag.ts opschoning) ✅ · PR3 (errors+crawler dead-code) bezig.
-- **Fase E — Rapport** 🔄 dit document, continu bijgewerkt.
+- **Fase D — Fix** ✅ PR #188 (dashboard-consistentie) · PR #191 (rag.ts opschoning) · PR #192 (crawler dead-enum). C4 verworpen na verificatie. Geen verdere veilige hoog-zekere fixes over — de rest raakt security-gevoelige/migration/budget/eval-gevoelige paden → report-only.
+- **Fase E — Rapport** ✅ dit document.
 
 ---
 
