@@ -340,7 +340,8 @@ export async function getSetupChecklist(
       id: 'add_website',
       title: 'Website toevoegen',
       status: hasWebsite ? 'completed' : 'todo',
-      href: '/klantendashboard/kennisbank',
+      // Deep-link naar de Website-subtab (anders land je op Documenten). Item 1.
+      href: '/klantendashboard/kennisbank?tab=website',
     },
     {
       id: 'verify_sources',
