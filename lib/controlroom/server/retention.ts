@@ -16,11 +16,10 @@
 import 'server-only';
 
 import { listKnownOrgs } from '@/lib/v0/server/active-org';
+import { RETENTION_REDACTED as REDACTED } from '@/lib/v0/retention-sentinel';
 import { PRIVACY_DEFAULTS } from '../types';
 import { sb } from './db';
 import { getPrivacy } from './privacy';
-
-const REDACTED = '[verwijderd — retention]';
 
 export type RetentionOrgResult = {
   orgSlug: string;
