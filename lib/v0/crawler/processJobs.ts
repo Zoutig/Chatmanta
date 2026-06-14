@@ -139,11 +139,35 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
       // Claim gewonnen → eenmalige ingest. Het 'complete'-event bewaart de getrimde
       // pagina-snapshot; bij data_count 0 terwijl total>0/has_next true is dát het signaal.
       const result = await ingestCrawlResults(sb, sourceId, orgId, status.pages);
+      // Bron op 'ready' = de finaliserende stap (de job is al 'completed' via de claim).
+      // Faalt die transient, laat de bron dan NIET stil op 'crawling' hangen: binnen het
+      // wall-clock-budget heropenen we voor automatische retry (de volgende tick re-ingest
+      // + re-finaliseert; de claim voorkomt dubbel werk), daarbuiten geven we op → 'failed'.
+      const { error: readyErr } = await sb
+        .from('knowledge_sources')
+        .update({ status: 'ready', updated_at: now() })
+        .eq('id', sourceId);
+      if (readyErr) {
+        if (crawlExpired()) {
+          await failJob(sb, jobId, sourceId, `Bron-finalisatie bleef falen: ${readyErr.message}`, true);
+          await recordCrawlEvent(sb, { ...base, eventType: 'fail', decision: 'finalize-failed', message: readyErr.message });
+          summary.push({ jobId, outcome: 'failed:finalize', completed: status.completed, total: status.total });
+        } else {
+          // Heropenen mag onvoorwaardelijk: wij wonnen de claim, dit is onze eigen 'completed'.
+          await sb
+            .from('processing_jobs')
+            .update({ status: 'processing', updated_at: now() })
+            .eq('id', jobId);
+          await recordCrawlEvent(sb, { ...base, eventType: 'poll', decision: 'finalize-retry', message: readyErr.message });
+          summary.push({ jobId, outcome: 'retry:finalize', completed: status.completed, total: status.total });
+        }
+        continue;
+      }
+      // Bron 'ready' → job definitief afronden.
       await sb
         .from('processing_jobs')
         .update({ finished_at: now(), error_message: null })
         .eq('id', jobId);
-      await sb.from('knowledge_sources').update({ status: 'ready', updated_at: now() }).eq('id', sourceId);
       const ingestMsg =
         `${result.pagesCrawled} gecrawld, ${result.pagesFailed} mislukt, ${result.pagesExcluded} leeg → ${result.chunks} chunks.` +
         (result.ingestErrors.length > 0 ? ` ${result.ingestErrors.length} pagina(s) faalden bij verwerking.` : '');
