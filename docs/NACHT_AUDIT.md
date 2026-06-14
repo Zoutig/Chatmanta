@@ -2,7 +2,7 @@
 
 > Autonome audit op branch `feat/seb/nacht-audit` (basis: `origin/main` #187).
 > Prioriteit: **veiligheid → correctheid → versimpeling → performance**.
-> Status: **6 PR's GEMERGED** (#188, #191, #192, #193, #194 → main). Keuzes beslist (1A/skip/V1). Grotere correctheid-puntjes A/B/D gedaan; C uitgesteld.
+> Status: **7 PR's GEMERGED** (#188, #191, #192, #193, #194, #196 → main). Keuzes beslist (1A/skip/V1). A/B/D + crawler-finalisatie gedaan; C uitgesteld. Cache-fix gevalideerd (statisch + prod-data).
 
 _Fases A–E compleet (nacht) + vervolgsessie. 6 fixes geshipt en gemerged. #191 vereiste een rebase op nieuwe main (#189 off-topic/v0.10 had `runRagQuery` óók aangepast — nog steeds dood, dus deletie geldig). Zie de "Vervolg-sessie" sectie onderaan voor A/B/D + de resterende follow-ups._
 
@@ -67,9 +67,14 @@ Sebastiaan koos: fix **A + B + D**, **C** uitstellen. Allemaal gemerged.
 - **D — cache cross-tone telemetrie** (PR #193). Cache-hit behoudt de gecachte tone/length → Bot-prestaties logt de geserveerde toon, niet de gevraagde.
 - **C — listConversations row-cap** → **UITGESTELD** (triggert niet bij V0-volume).
 
-### Nieuwe follow-ups uit deze sessie
-- **Crawler finalisatie-robuustheid (PRE-BESTAAND, door Codex gevonden):** de post-ingest updates (`processing_jobs`-finalize + `knowledge_sources`→`ready`) en `failJob` negeren een Supabase-fout. Bij een transiente DB-fout net ná een geslaagde ingest kan een bron `crawling` blijven (job `completed`, geen retry). Niet door PR #194 geïntroduceerd; aparte kleine robustness-PR waard.
-- **SEC2/D live-smoke (open):** één cache-hit-smoke om te bevestigen dat `query_log.cost_usd` ~0 wordt én de gelogde toon de gecachte is. Aanbevolen vóór je op de cache-telemetrie leunt.
+### Follow-ups uit deze sessie — afgehandeld
+- **Crawler finalisatie-robuustheid** → **PR #196 GEMERGED.** De post-ingest `knowledge_sources`→`ready` ving geen Supabase-fout → bron kon stil `crawling` blijven. Nu: binnen wall-clock-budget heropenen voor auto-retry (claim voorkomt dubbel werk), daarbuiten → `failed`; 2 diagnostische decisions (`finalize-retry`/`finalize-failed`). Codex-bevestigd bounded + race-safe. Resterende extreme-tail (óók de reopen-write faalt) vereist een reconciliatie-pass — losse grotere follow-up.
+- **SEC2/D cache-validatie** → **GEVALIDEERD (statisch + prod-data).** `logQuery` schrijft `cost_usd: response.totalCostUsd` (log.ts:305) en `tone: response.tone` (log.ts:306) — exact de velden die #193 op de cache-hit zet, dus de fix klopt by construction. Prod-data bevestigt de bug: **92/92 `from_cache=true`-rijen logden cost_usd > 0** (~$0,0012/stuk, totaal $0,092 fantoom-spend) i.p.v. ~0. Na **deploy** van #193 loggen cache-hits ~0 (1A) + de gecachte toon (D). Billable live-run overgeslagen (cost-model maakt ~0 al zeker).
+
+### Resterende open follow-ups
+- **Crawler reconciliatie-pass** (optioneel): periodiek `completed`-jobs met niet-`ready` bron opsporen → dicht de extreme-tail van de finalisatie-stuck volledig. Alleen nodig als de extreme dubbel-DB-fout in praktijk voorkomt.
+- **C — listConversations row-cap**: uitgesteld tot het volume groeit.
+- **SEC3 (PII-redactie)**: open keuze (overgeslagen in deze ronde).
 
 ---
 
