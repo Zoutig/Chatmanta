@@ -2,9 +2,9 @@
 
 > Autonome audit op branch `feat/seb/nacht-audit` (basis: `origin/main` #187).
 > Prioriteit: **veiligheid → correctheid → versimpeling → performance**.
-> Status: **AFGEROND** — 3 PR's geopend (#188, #191, #192), 1 bevinding verworpen, rest report-only voor Sebastiaan.
+> Status: **3 PR's GEMERGED** (#188, #191, #192 → main 2026-06-14). Keuzes beslist (1A/skip/V1). Vervolg: 1A-implementatie + review grotere correctheid-puntjes.
 
-_Fases A–E compleet. 3 veilige hoog-zekere fixes geshipt (alle verificatie groen, niet gemerged). Alle overige bevindingen zijn report-only / open-vraag / deferred-V1 omdat ze security-gevoelige paden, migraties, budget-semantiek of eval-gevoelige RAG-prompts raken — bewust niet onbewaakt aangepast._
+_Fases A–E compleet. 3 veilige fixes geshipt en gemerged. #191 vereiste een rebase op nieuwe main (#189 off-topic/v0.10 had `runRagQuery` óók aangepast — nog steeds dood, dus deletie geldig; #189's off-topic-logica leeft volledig in `runRagQueryStreaming`). Overige bevindingen: zie beslissingen + de grotere-correctheid-review hieronder._
 
 ## Samenvatting
 
@@ -56,13 +56,14 @@ _C4 (errors-default) is na verificatie **verworpen** als false-positief — zie 
 
 ---
 
-## OPEN VRAGEN voor Sebastiaan
+## OPEN VRAGEN voor Sebastiaan — BESLIST (2026-06-14)
 
-1. **Cache-kost vs budget (SEC2):** moet een cache-hit `cost_usd=0` loggen (echte spend) of bewust de volledige originele kost tegen het dag-budget tellen? Dit raakt wanneer een org `BUDGET_EXHAUSTED` raakt — daarom niet stilzwijgend aangepast.
-2. **Cache cross-tone serve (C7):** mag een visitor met tone=`persoonlijk` een gecacht `zakelijk`-antwoord krijgen (huidig gedrag, bewust per spec) terwijl de telemetrie de verkeerde toon logt? Tone in de cache-key zetten lost beide op maar verlaagt de hit-rate.
-3. **PII-redactie uitbreiden (SEC3):** wil je dat ik NL-postcode + internationale telefoon aan `redactPii` toevoeg (AVG-winst, klein risico op over-masking van legitieme getallen)? Ik heb het niet stilzwijgend gedaan omdat het redaction-gedrag op productie-logs verandert.
-4. **`runRagQuery` verwijderd (PR #191):** gedaan (dood pad, geen caller, Codex-bevestigd). Bevestig dat er geen externe/handmatige eval-tooling **buiten de repo** op `runRagQuery` leunt vóór je merget.
-5. **Prompt-injection-hardening (S1):** history-filtering + per-bron fencing is een defense-in-depth-verbetering maar raakt de RAG-prompt-structuur (eval-gevoelig) en het embed-pad (do-not-touch). Codex nuanceerde dat er al mitigaties zijn (systeemprompt-instructie + post-gen-detectie). Wil je dat ik hier een aparte, eval-gevalideerde PR voor maak, of blijft dit V1-hardening?
+1. **Cache-kost vs budget (SEC2): → BESLIST 1A** — cache-hit logt voortaan ~€0 (de echte marginale spend, alleen de lookup-embedding) i.p.v. de volledige originele kost. Wordt geïmplementeerd als aparte PR.
+2. **PII-redactie uitbreiden (SEC3): → BESLIST: overslaan** — geen wijziging aan `redactPii` nu. (De misleidende docstring-claim blijft staan; triviale toekomstige opschoning indien gewenst.)
+3. **Prompt-injection-hardening (S1): → BESLIST 3B: naar V1.** Bestaande mitigaties (systeemprompt + post-gen-detectie) volstaan voor V0; history-filtering + per-bron fencing landt bij V1-hardening.
+
+**Nog open (niet in de 3 keuzes):**
+- **Cache cross-tone serve (C7):** een cache-hit stempelt de huidige tone/length op een antwoord met de gecachte toon → Bot-prestaties-telemetrie logt de verkeerde toon. Tone/length in de cache-key zetten lost het op maar verlaagt de hit-rate. Hangt samen met de 1A-cache-PR — meenemen of apart?
 
 ---
 
