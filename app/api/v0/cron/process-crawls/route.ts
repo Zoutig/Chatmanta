@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const sb = await getSystemJobClient({ reason: 'process_crawls_cron' });
   const { data: jobs, error } = await sb
     .from('processing_jobs')
-    .select('id, organization_id, target_id, external_job_id, attempts')
+    .select('id, organization_id, target_id, external_job_id, attempts, created_at')
     .eq('job_type', 'crawl_website')
     .in('status', ['pending', 'processing'])
     .order('created_at', { ascending: true })

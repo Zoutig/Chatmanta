@@ -17,8 +17,11 @@ import { recordCrawlEvent, buildPagesPayload } from '@/lib/v0/crawler/crawlEvent
 
 type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
 
-/** Na zoveel polls zonder afronding geven we op (≈1u bij 1 poll/min; sneller bij 4s-tick). */
-export const MAX_ATTEMPTS = 200;
+/** Maximale wall-clock duur van een crawl vóór timeout. Bewust GEEN poll-telling
+ *  meer: de tick-snelheid varieert (4s client-tick vs 1min cron), waardoor 200
+ *  polls ~13min was bij 4s i.p.v. de bedoelde ~1u — een trage maar nog lopende
+ *  crawl werd zo onterecht 'failed' gezet (nacht-audit B). Wall-clock is tick-onafhankelijk. */
+export const MAX_CRAWL_DURATION_MS = 30 * 60 * 1000; // 30 min
 
 /** Hoeveel jobs per tick verwerkt worden — houdt één invocatie binnen de functietimeout. */
 export const JOBS_PER_TICK = 5;
@@ -29,6 +32,8 @@ export type OpenJob = {
   target_id: string;
   external_job_id: string | null;
   attempts: number;
+  /** Aanmaaktijd van de job — basis voor de wall-clock timeout (MAX_CRAWL_DURATION_MS). */
+  created_at: string;
 };
 
 export type JobOutcome = { jobId: string; outcome: string; completed: number; total: number };
@@ -42,6 +47,14 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
     const { id: jobId, target_id: sourceId, organization_id: orgId } = job;
     const crawlId = job.external_job_id;
     const attempts = job.attempts ?? 0;
+    // True zodra DEZE iteratie de ingest-claim won. Bepaalt of de rate-limit-recovery
+    // de job mag reopenen: na een eigen claim ('completed') is reopen=eigen retry; zonder
+    // claim mag een rate-limit (bv. op de status-call) andermans 'completed' niet reopenen.
+    let wonClaim = false;
+    const createdMs = new Date(job.created_at).getTime();
+    // NaN-guard: een ontbrekende/ongeldige created_at → nooit wall-clock-timeout
+    // (liever doorpollen dan een lopende crawl onterecht afbreken).
+    const crawlExpired = () => Number.isFinite(createdMs) && Date.now() - createdMs >= MAX_CRAWL_DURATION_MS;
 
     try {
       if (!crawlId) {
@@ -72,8 +85,9 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
       };
 
       if (status.status === 'scraping') {
-        if (attempts + 1 >= MAX_ATTEMPTS) {
-          const msg = `Crawl duurde te lang (timeout na ${MAX_ATTEMPTS} polls; Firecrawl-status '${status.rawStatus}').`;
+        if (crawlExpired()) {
+          const mins = Math.round(MAX_CRAWL_DURATION_MS / 60000);
+          const msg = `Crawl duurde te lang (timeout na ${mins} min; Firecrawl-status '${status.rawStatus}').`;
           await failJob(sb, jobId, sourceId, msg);
           await recordCrawlEvent(sb, { ...base, eventType: 'fail', decision: 'timeout', message: msg });
           summary.push({ jobId, outcome: 'failed:timeout', completed: status.completed, total: status.total });
@@ -81,7 +95,11 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
           await sb
             .from('processing_jobs')
             .update({ status: 'processing', attempts: attempts + 1, updated_at: now() })
-            .eq('id', jobId);
+            .eq('id', jobId)
+            // Status-guard: een poll mag een job die een andere tick intussen claimde
+            // ('completed') of afsloot ('failed') NIET terug naar 'processing' zetten —
+            // anders reopent dit de job en kan de ingest alsnog dubbel draaien.
+            .in('status', ['pending', 'processing']);
           await recordCrawlEvent(sb, { ...base, eventType: 'poll', decision: 'pending' });
           summary.push({ jobId, outcome: 'pending', completed: status.completed, total: status.total });
         }
@@ -96,12 +114,34 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
         continue;
       }
 
-      // completed → ingest. Het 'complete'-event bewaart de getrimde pagina-snapshot;
-      // bij data_count 0 terwijl total>0/has_next true is dát het zichtbare signaal.
+      // completed → ingest. Atomische claim VÓÓR de ingest: meerdere triggers
+      // (client-tick + cron + admin-knop) kunnen dezelfde voltooide job oppakken, en
+      // ingestCrawlResults doet delete-then-insert → gelijktijdig ingesten geeft dubbele
+      // pagina's/chunks + dubbele embed-kost. We flippen de job atomisch uit de open-status
+      // (Postgres serialiseert de row-update); alleen de winnaar ingest, de rest skipt.
+      // Tradeoff: bij een proces-crash ná de claim maar vóór ingest blijft de job
+      // 'completed' zonder data (bron niet 'ready' = zichtbaar signaal) — zeldzaam en
+      // herstelbaar via re-crawl; verkozen boven de frequentere dubbel-ingest (nacht-audit A).
+      const { data: claimed, error: claimErr } = await sb
+        .from('processing_jobs')
+        .update({ status: 'completed', attempts: attempts + 1, updated_at: now() })
+        .eq('id', jobId)
+        .in('status', ['pending', 'processing'])
+        .select('id');
+      // Een DB-fout op de claim mag NIET als "al geclaimd" gelden (dat zou de ingest
+      // stil overslaan → crawl klaar maar geen data). Gooi 'm → de catch retry't.
+      if (claimErr) throw new Error(`claim job ${jobId}: ${claimErr.message}`);
+      if (!claimed || claimed.length === 0) {
+        summary.push({ jobId, outcome: 'skipped:already-claimed', completed: status.completed, total: status.total });
+        continue;
+      }
+      wonClaim = true;
+      // Claim gewonnen → eenmalige ingest. Het 'complete'-event bewaart de getrimde
+      // pagina-snapshot; bij data_count 0 terwijl total>0/has_next true is dát het signaal.
       const result = await ingestCrawlResults(sb, sourceId, orgId, status.pages);
       await sb
         .from('processing_jobs')
-        .update({ status: 'completed', attempts: attempts + 1, finished_at: now(), updated_at: now(), error_message: null })
+        .update({ finished_at: now(), error_message: null })
         .eq('id', jobId);
       await sb.from('knowledge_sources').update({ status: 'ready', updated_at: now() }).eq('id', sourceId);
       const ingestMsg =
@@ -118,11 +158,16 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
       // de data blijft opvraagbaar. Hem als permanente mislukking behandelen gooide
       // een al-voltooide crawl weg (33 pagina's klaar, job toch 'failed'). Dus: job
       // op 'processing' houden en volgende tick opnieuw pollen tot de limiet reset.
-      if (isRateLimited(err) && attempts + 1 < MAX_ATTEMPTS) {
-        await sb
+      if (isRateLimited(err) && !crawlExpired()) {
+        // Reopen voor retry. Als WIJ de job claimden (ingest-rate-limit ná de claim) mag
+        // dat onvoorwaardelijk — het is onze 'completed'. Zonder claim (rate-limit op de
+        // status-call vóór de claim) guarden we, zodat we andermans claim niet reopenen.
+        let reopen = sb
           .from('processing_jobs')
           .update({ status: 'processing', attempts: attempts + 1, updated_at: now(), error_message: null })
           .eq('id', jobId);
+        if (!wonClaim) reopen = reopen.in('status', ['pending', 'processing']);
+        await reopen;
         await recordCrawlEvent(sb, {
           organizationId: orgId, eventType: 'poll', processingJobId: jobId,
           knowledgeSourceId: sourceId, externalJobId: crawlId, decision: 'rate-limited', message: msg,
@@ -130,7 +175,10 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
         summary.push({ jobId, outcome: 'pending:rate-limited', completed: 0, total: 0 });
         continue;
       }
-      await failJob(sb, jobId, sourceId, msg);
+      // ownedClaim=wonClaim: als WIJ de job al naar 'completed' claimden en de ingest
+      // daarna faalde, moet failJob onze eigen 'completed' alsnog naar 'failed' kunnen
+      // zetten (anders blijft de job permanent 'completed' zonder data).
+      await failJob(sb, jobId, sourceId, msg, wonClaim);
       await recordCrawlEvent(sb, {
         organizationId: orgId, eventType: 'fail', processingJobId: jobId,
         knowledgeSourceId: sourceId, externalJobId: crawlId, decision: 'exception', message: msg,
@@ -155,11 +203,26 @@ function isRateLimited(err: unknown): boolean {
   return typeof e.message === 'string' && /rate.?limit/i.test(e.message);
 }
 
-async function failJob(sb: Sb, jobId: string, sourceId: string, message: string): Promise<void> {
+async function failJob(
+  sb: Sb,
+  jobId: string,
+  sourceId: string,
+  message: string,
+  ownedClaim = false,
+): Promise<void> {
   const now = new Date().toISOString();
-  await sb
+  // Status-guard: normaal mag alleen een nog-OPEN job falen — zo overschrijft een trage/
+  // stale tick niet andermans 'completed'-claim (en markeert de bron niet onterecht 'failed'
+  // terwijl de ingest van een andere tick wél slaagde). Uitzondering: als WIJ de job zelf
+  // claimden ('completed') en de ingest daarna faalde, mogen we onze eigen 'completed' alsnog
+  // falen — anders blijft de job permanent 'completed' zonder data (nacht-audit A).
+  const fromStatuses = ownedClaim ? ['pending', 'processing', 'completed'] : ['pending', 'processing'];
+  const { data: failed } = await sb
     .from('processing_jobs')
     .update({ status: 'failed', error_message: message, finished_at: now, updated_at: now })
-    .eq('id', jobId);
+    .eq('id', jobId)
+    .in('status', fromStatuses)
+    .select('id');
+  if (!failed || failed.length === 0) return; // al geclaimd/afgesloten door een andere tick
   await sb.from('knowledge_sources').update({ status: 'failed', updated_at: now }).eq('id', sourceId);
 }
