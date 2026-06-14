@@ -39,6 +39,7 @@ import {
   saveChatbotSettings,
   saveTopQuestionsConfig,
   saveAccountInfo,
+  setSetupStepSkipped,
   upsertQAItem,
   deleteQAItem,
   setQAActive,
@@ -134,6 +135,21 @@ export async function saveAccountInfoAction(
     const account = await saveAccountInfo(activeOrg.slug, patch);
     revalidatePath('/klantendashboard/account', 'page');
     return { account };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Setup-checklist "overslaan" (item 2) — markeer een afgeleide stap als gedaan.
+// ---------------------------------------------------------------------------
+export async function setSetupStepSkippedAction(
+  stepId: string,
+  skipped: boolean = true,
+): Promise<ActionResult<{ skips: string[] }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const skips = await setSetupStepSkipped(activeOrg.slug, stepId, skipped);
+    revalidatePath('/klantendashboard', 'layout');
+    return { skips };
   });
 }
 

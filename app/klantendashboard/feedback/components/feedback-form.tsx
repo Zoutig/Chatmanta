@@ -24,6 +24,13 @@ const URGENCY_OPTIONS: { value: FeedbackUrgency; label: string; help: string }[]
   { value: 'high', label: 'Hoog', help: 'De chatbot werkt niet of geeft ernstig onjuiste info' },
 ];
 
+// Kleur per urgentie (item 7): laag = neutraal, normaal = info, hoog = danger.
+const URGENCY_TONE: Record<FeedbackUrgency, { bg: string; border: string; fg: string; dot: string }> = {
+  low: { bg: 'var(--klant-surface-muted)', border: 'var(--klant-border-strong)', fg: 'var(--klant-ink)', dot: 'var(--klant-muted)' },
+  normal: { bg: 'var(--klant-info-soft)', border: 'var(--klant-info)', fg: 'var(--klant-info)', dot: 'var(--klant-info)' },
+  high: { bg: 'var(--klant-danger-soft)', border: 'var(--klant-danger)', fg: 'var(--klant-danger)', dot: 'var(--klant-danger)' },
+};
+
 // Spiegelt de server-side EMAIL_RE in lib/controlroom/feedback-validate.ts.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,13 +44,19 @@ function Field({ label, hint, htmlFor, children }: { label: string; hint?: strin
   );
 }
 
-export function FeedbackForm() {
+export function FeedbackForm({
+  initialName = '',
+  initialEmail = '',
+}: {
+  initialName?: string;
+  initialEmail?: string;
+} = {}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState<FeedbackType | ''>('');
   const [urgency, setUrgency] = useState<FeedbackUrgency | ''>('');
   const [description, setDescription] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
   const [privacy, setPrivacy] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,40 +163,56 @@ export function FeedbackForm() {
       </Field>
 
       <Field label="Hoe urgent is dit?">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {URGENCY_OPTIONS.map((o) => (
-            <label
-              key={o.value}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 10,
-                padding: '9px 12px',
-                border: '1px solid var(--klant-border)',
-                borderRadius: 'var(--klant-r-md)',
-                cursor: 'pointer',
-                background: urgency === o.value ? 'var(--klant-accent-soft)' : undefined,
-                borderColor: urgency === o.value ? 'var(--klant-accent-border)' : undefined,
-              }}
-            >
-              <input
-                type="radio"
-                name="urgency"
-                value={o.value}
-                checked={urgency === o.value}
-                onChange={() => setUrgency(o.value)}
-                style={{ marginTop: 2 }}
-                required
-              />
-              <span style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--klant-ink)' }}>
-                  {o.label}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--klant-muted)' }}>{o.help}</span>
-              </span>
-            </label>
-          ))}
+        <div role="radiogroup" aria-label="Urgentie" style={{ display: 'flex', gap: 8 }}>
+          {URGENCY_OPTIONS.map((o) => {
+            const active = urgency === o.value;
+            const tone = URGENCY_TONE[o.value];
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setUrgency(o.value)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 7,
+                  padding: '10px 8px',
+                  borderRadius: 'var(--klant-r-md)',
+                  border: `1px solid ${active ? tone.border : 'var(--klant-border)'}`,
+                  background: active ? tone.bg : 'var(--klant-surface)',
+                  color: active ? tone.fg : 'var(--klant-fg-muted)',
+                  fontSize: 13.5,
+                  fontWeight: active ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'background 120ms ease, border-color 120ms ease, color 120ms ease',
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: active ? tone.dot : 'var(--klant-border-strong)',
+                    flexShrink: 0,
+                  }}
+                />
+                {o.label}
+              </button>
+            );
+          })}
         </div>
+        {/* Hidden field zodat urgency in de FormData-submit meegaat — de knoppen
+            zetten alleen React-state (canSubmit dwingt de keuze sowieso af). */}
+        <input type="hidden" name="urgency" value={urgency} />
+        <span className="klant-hint" style={{ marginTop: 2 }}>
+          {URGENCY_OPTIONS.find((o) => o.value === urgency)?.help ??
+            'Kies hoe snel dit opgepakt moet worden.'}
+        </span>
       </Field>
 
       <Field

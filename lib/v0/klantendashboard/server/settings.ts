@@ -18,11 +18,13 @@ import { getMockWidgetSettings } from '../mock/widget-settings';
 import { getMockChatbotSettings } from '../mock/chatbot-settings';
 import { getMockManualQA } from '../mock/manual-qa';
 import {
+  SETUP_STEP_IDS,
   TOP_QUESTIONS_DEFAULT,
   TOP_QUESTIONS_LIMITS,
   type AccountOverrides,
   type ChatbotSettings,
   type ManualQA,
+  type SetupStepId,
   type TopQuestionsConfig,
   type WidgetSettings,
 } from '../types';
@@ -423,6 +425,74 @@ export async function saveAccountInfo(
   // migratie 0048) zou "Opgeslagen" tonen zónder dat er iets persisteert.
   if (writeErr) {
     throw new AppError('INTERNAL', { message: `account opslaan faalde: ${writeErr.message}` });
+  }
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Setup-checklist "overslaan" (item 2) — klant markeert een afgeleide setup-stap
+// handmatig als "gedaan". Aparte jsonb-kolom (migr 0050) + dedicated 1-koloms-
+// upsert (zoals account): nooit via writeOrgSettings, zodat een skip nooit een
+// gelijktijdige widget/chatbot/qa-write clobbert. Defensief bij ontbrekende
+// kolom (migratie nog niet toegepast) → lege lijst, zodat het Overzicht nooit
+// breekt.
+// ---------------------------------------------------------------------------
+const SETUP_STEP_ID_SET = new Set<string>(SETUP_STEP_IDS);
+
+function parseSetupSkips(raw: unknown): SetupStepId[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SetupStepId[] = [];
+  for (const v of raw) {
+    if (typeof v === 'string' && SETUP_STEP_ID_SET.has(v) && !out.includes(v as SetupStepId)) {
+      out.push(v as SetupStepId);
+    }
+  }
+  return out;
+}
+
+export async function getSetupSkips(orgSlug: OrgSlug): Promise<SetupStepId[]> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const { data, error } = await sb()
+    .from('v0_org_settings')
+    .select('setup_skips')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+  if (error) {
+    console.warn('[setup-skips] read faalde (migratie 0050 toegepast?):', error.message);
+    return [];
+  }
+  return parseSetupSkips(data?.setup_skips);
+}
+
+/** Markeer een setup-stap als overgeslagen (skipped=true) of draai dat terug.
+ *  Idempotent. Onbekende step-id's → INPUT_INVALID. STRIKTE read (gooit bij
+ *  fout) zodat een transiënte leesfout niet stilletjes de lijst wist. */
+export async function setSetupStepSkipped(
+  orgSlug: OrgSlug,
+  stepId: string,
+  skipped: boolean,
+): Promise<SetupStepId[]> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  if (!SETUP_STEP_ID_SET.has(stepId)) {
+    throw new AppError('INPUT_INVALID', { message: `Onbekende setup-stap: ${stepId}` });
+  }
+  const { data: cur, error: readErr } = await sb()
+    .from('v0_org_settings')
+    .select('setup_skips')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+  if (readErr) {
+    throw new AppError('INTERNAL', { message: `setup-skips read faalde: ${readErr.message}` });
+  }
+  const set = new Set(parseSetupSkips(cur?.setup_skips));
+  if (skipped) set.add(stepId as SetupStepId);
+  else set.delete(stepId as SetupStepId);
+  const next = [...set];
+  const { error: writeErr } = await sb()
+    .from('v0_org_settings')
+    .upsert({ organization_id: orgId, setup_skips: next }, { onConflict: 'organization_id' });
+  if (writeErr) {
+    throw new AppError('INTERNAL', { message: `setup-skips opslaan faalde: ${writeErr.message}` });
   }
   return next;
 }

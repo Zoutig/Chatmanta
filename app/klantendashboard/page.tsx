@@ -11,7 +11,7 @@ import {
   getSetupChecklist,
   getUnansweredQuestions,
 } from '@/lib/v0/klantendashboard/server/metrics';
-import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import { getOrgSettings, getSetupSkips } from '@/lib/v0/klantendashboard/server/settings';
 import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from './components/ui/page-head';
@@ -58,15 +58,17 @@ export default async function OverviewPage() {
   const orgId = KNOWN_ORGS[activeOrg.slug].id;
 
   const metrics = await getOverviewMetrics(activeOrg.slug);
-  const [unanswered, settings, testMessages] = await Promise.all([
+  const [unanswered, settings, testMessages, setupSkips] = await Promise.all([
     getUnansweredQuestions(activeOrg.slug, 3),
     getOrgSettings(activeOrg.slug),
     countMessagesAllTime(orgId),
+    getSetupSkips(activeOrg.slug),
   ]);
   const [checklist, topQuestions] = await Promise.all([
     getSetupChecklist(activeOrg.slug, metrics, {
       settingsSaved: settings.updatedAt !== null,
       testMessagesCount: testMessages,
+      skippedIds: setupSkips,
     }),
     getTopQuestions(activeOrg.slug, settings.topQuestions),
   ]);
