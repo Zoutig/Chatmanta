@@ -89,6 +89,14 @@ export type ChatbotPromptOverrides = {
    */
   primaryLanguage: Language;
   autoDetectLanguage: boolean;
+  /**
+   * Mag de bot algemene-kennisvragen beantwoorden? Gebruikt door de chat-route om
+   * `enableGeneralKnowledge` af te leiden voor het widget-/embed- en klant-test-pad.
+   * Géén system-prompt-effect — dit stuurt de structurele zero-hit-gate in rag.ts
+   * (`generalKnowledgeActive = bot.generalKnowledgeEnabled && enableGeneralKnowledge`),
+   * niet een instructie. Genormaliseerd naar een echte boolean (fail-closed op uit).
+   */
+  answerGeneralKnowledge: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -200,5 +208,9 @@ export function buildChatbotOverrides(
     unknownAnswerMessage: settings.unknownAnswerMessage.trim(),
     primaryLanguage: settings.primaryLanguage,
     autoDetectLanguage: settings.autoDetectLanguage,
+    // Defensieve normalisatie: een handmatig in de jsonb gezette non-boolean
+    // (bv. de string "true") wordt fail-closed naar uit — alleen een echte
+    // boolean `true` zet algemene kennis aan.
+    answerGeneralKnowledge: settings.answerGeneralKnowledge === true,
   };
 }

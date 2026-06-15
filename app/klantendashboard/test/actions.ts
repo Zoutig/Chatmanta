@@ -65,6 +65,9 @@ export async function askTestQuestion(
       question: q,
       threshold: bot.similarityThreshold,
       enableRewrite: bot.enableRewriteByDefault,
+      // Spiegel de org-toggle zodat het Test-scherm exact toont wat de live widget
+      // doet — anders viel dit pad stil op de rag.ts-default (true).
+      enableGeneralKnowledge: chatbotOverrides.answerGeneralKnowledge,
       bot,
       organizationId: activeOrg.id,
       history: sanitizeHistory(history),
