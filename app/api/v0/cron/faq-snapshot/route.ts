@@ -2,9 +2,11 @@
 //
 // Herberekent per org de "Meest gestelde vragen"-snapshot (klant_faq_snapshot)
 // op een cadans (weekly|monthly), instelbaar via admin_config door de operator.
-// Vercel-cron draait dit wekelijks (zie vercel.json, ma 04:00); de cadans-gate
-// hieronder beslist of een org daadwerkelijk wordt herberekend (weekly = elke
-// run, monthly = alleen als de laatste snapshot > 30d oud is).
+// Vercel-cron draait dit DAGELIJKS (zie vercel.json, 04:00); de cadans-gate
+// hieronder beslist of een org daadwerkelijk wordt herberekend (snapshot ouder
+// dan ~7d bij weekly / ~30d bij monthly). Dagelijks i.p.v. wekelijks draaien
+// (Codex M4 #3) maakt de cadans-grens precies — een wekelijkse cron zou monthly
+// feitelijk ~35d maken — en is goedkoop: verse orgs worden meteen overgeslagen.
 //
 // Auth: Bearer CRON_SECRET — identiek aan app/api/v0/cron/retention. Vercel voegt
 // deze Authorization-header automatisch toe aan cron-invocaties zodra CRON_SECRET
