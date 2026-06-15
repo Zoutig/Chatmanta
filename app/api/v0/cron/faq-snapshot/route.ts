@@ -48,7 +48,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const cadence = await getFaqRefreshCadence();
-    const thresholdMs = cadence === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS;
+    // Tolerantie (Codex M4 #2): de cron draait wekelijks; een snapshot die net
+    // ná de vorige run is geschreven is bij de volgende run "bijna 7 dagen" oud.
+    // Zonder marge wordt 'm dan overgeslagen → weekly verschuift naar twee-
+    // wekelijks. Een halve dag aftrekken laat de wekelijkse run altijd herrekenen.
+    const TOLERANCE_MS = 12 * 60 * 60 * 1000;
+    const thresholdMs =
+      (cadence === 'monthly' ? 30 * DAY_MS : 7 * DAY_MS) - TOLERANCE_MS;
     const now = Date.now();
 
     const results: OrgResult[] = [];

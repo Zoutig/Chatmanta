@@ -27,6 +27,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { embedTexts } from '@/lib/v0/server/rag';
 import { dedupeExact, greedyCluster } from '@/lib/v0/server/faq-cluster';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
+import { TOP_QUESTIONS_LIMITS } from '@/lib/v0/klantendashboard/types';
 
 let _sb: SupabaseClient | null = null;
 function sb(): SupabaseClient {
@@ -44,10 +45,11 @@ function sb(): SupabaseClient {
 // Config / cost guards
 // ---------------------------------------------------------------------------
 
-/** Hoeveel clusters bewaren we per snapshot. Ruim boven de klant-default
- *  (TOP_QUESTIONS_DEFAULT.topN = 10) zodat de READ-tijd filter (minCount/topN
- *  in M5) nog ruimte heeft zonder de snapshot te hoeven herberekenen. */
-const TOP_N = 20;
+/** Hoeveel clusters bewaren we per snapshot. = topNMax (100) zodat ELKE geldige
+ *  klant-config (topN ≤ 100) genoeg items in de snapshot heeft; de READ-tijd
+ *  filter (minCount/topN in M5) slicet verder zonder herberekening. Eerder 20,
+ *  wat topN-waarden boven 20 stil afkapte (Codex M5 #5). */
+const TOP_N = TOP_QUESTIONS_LIMITS.topNMax;
 
 /** Volume-guard: harde cap op het aantal UNIEKE vragen dat we embedden per org
  *  per run. Bij overschrijding: neem de top-MAX_UNIQUE op count desc en log een
@@ -140,19 +142,31 @@ export async function computeKlantFaqSnapshot(
   const client = sb();
 
   // 1. ALLE kandidaat-rijen ophalen — geen bot_version-filter, geen 500-cap.
-  //    Sorteer DESC zodat we bij MAX_UNIQUE-overschrijding deterministisch
-  //    de meest recente kandidaten meenemen vóór de count-sortering.
-  const { data: rawRows, error } = await client
-    .from('query_log')
-    .select('question, kind, created_at, from_cache')
-    .eq('organization_id', orgId)
-    .in('kind', ['answer', 'fallback'])
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`query_log select: ${error.message}`);
+  //    PostgREST capt één SELECT op ~1000 rijen, wat de "alle gesprekken"-
+  //    telling stil zou afkappen (Codex M4 #1) → pagineer met .range() tot een
+  //    niet-volle pagina terugkomt. Secundaire sort op id maakt de paginering
+  //    stabiel bij gelijke created_at; MAX_ROWS is een veiligheidsklep.
+  const PAGE = 1000;
+  const MAX_ROWS = 200_000;
+  const rawRows: Array<RawRow & { from_cache?: boolean | null }> = [];
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    const { data: page, error } = await client
+      .from('query_log')
+      .select('question, kind, created_at, from_cache')
+      .eq('organization_id', orgId)
+      .in('kind', ['answer', 'fallback'])
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`query_log select: ${error.message}`);
+    if (!page || page.length === 0) break;
+    rawRows.push(...(page as Array<RawRow & { from_cache?: boolean | null }>));
+    if (page.length < PAGE) break;
+  }
 
   // Exclude from_cache=true (feedback-loop) + skip lege/RETENTION_REDACTED.
   // from_cache null is acceptabel (oude rijen) — alleen expliciet true weg.
-  const rows: RawRow[] = ((rawRows ?? []) as Array<RawRow & { from_cache?: boolean | null }>)
+  const rows: RawRow[] = rawRows
     .filter((r) => r.from_cache !== true)
     .filter((r) => {
       const q = String(r.question ?? '').trim();

@@ -471,8 +471,11 @@ export type QuestionConversationHit = {
 
 /** Hoeveel thread-ids we maximaal scannen (org-volumes zijn klein in V0). */
 const DRILLDOWN_THREAD_CAP = 1000;
-/** Hoeveel matchende message-rijen we maximaal ophalen vóór dedupe. */
-const DRILLDOWN_ROW_CAP = 100;
+/** Hoeveel recente user-messages we maximaal ophalen vóór de client-side match
+ *  + dedupe. Ruim (= PostgREST-paginagrootte) zodat in V0-volumes geen treffers
+ *  wegvallen door recency-bias; een te lage cap zou oudere treffers stil droppen
+ *  en de modal misleidend "geen gesprekken" laten tonen (Codex M5 #3). */
+const DRILLDOWN_ROW_CAP = 1000;
 /** Hoeveel unieke gesprekken we maximaal teruggeven. */
 const DRILLDOWN_RESULT_CAP = 50;
 

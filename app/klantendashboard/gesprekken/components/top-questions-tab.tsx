@@ -10,7 +10,7 @@
 //   3. een drilldown-modal naar de gesprekken waarin een vraag is gesteld
 // De "Maak Q&A"-flow (draft-modal → addQAFromTopQuestionAction) blijft intact.
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { MessagesSquare, Plus, Check, MessageSquare, X, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -67,6 +67,9 @@ export function TopQuestionsTab({
   const [drilldown, setDrilldown] = useState<KlantFaqRow | null>(null);
   const [hits, setHits] = useState<QuestionConversationHit[] | null>(null);
   const [drilldownPending, startDrilldown] = useTransition();
+  // Volgnummer om een trager binnenkomend antwoord van een vorige klik te negeren
+  // (race bij snel achter elkaar twee vragen openen — Codex M5 #4).
+  const drilldownReqRef = useRef(0);
 
   // Escape sluit de drilldown-modal (a11y). Listener alleen actief zolang open.
   useEffect(() => {
@@ -79,10 +82,13 @@ export function TopQuestionsTab({
   }, [drilldown]);
 
   function openDrilldown(row: KlantFaqRow) {
+    const reqId = ++drilldownReqRef.current;
     setDrilldown(row);
     setHits(null);
     startDrilldown(async () => {
       const res = await getConversationsForQuestionAction(row.memberQuestions);
+      // Negeer een trager binnenkomend antwoord van een eerdere klik.
+      if (drilldownReqRef.current !== reqId) return;
       setHits(res.ok ? res.hits : []);
     });
   }
