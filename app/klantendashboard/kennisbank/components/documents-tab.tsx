@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import {
   FileText,
   UploadCloud,
@@ -8,8 +8,11 @@ import {
   RefreshCw,
   File,
   FileType2,
+  Eye,
 } from 'lucide-react';
 import { StatusBadge } from '../../components/status-badge';
+import { SourceViewer } from './source-viewer';
+import { getKlantDocContentAction } from '../../actions';
 import type { DocumentSummary, DocumentStatus } from '@/lib/v0/klantendashboard/types';
 
 function formatBytes(bytes: number): string {
@@ -34,6 +37,22 @@ export function DocumentsTab({ initialDocs }: { initialDocs: DocumentSummary[] }
   const [docs, setDocs] = useState<DocumentSummary[]>(initialDocs);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Bronnen-lezer (item 10): klik op het oog → laad de inhoud in een modal.
+  const [viewing, setViewing] = useState<{ title: string; text: string } | null>(null);
+  const [viewBusyId, setViewBusyId] = useState<string | null>(null);
+  const [, startView] = useTransition();
+
+  function viewDoc(d: DocumentSummary) {
+    setViewBusyId(d.id);
+    setViewing({ title: d.name, text: '' });
+    startView(async () => {
+      const res = await getKlantDocContentAction(d.id);
+      setViewBusyId(null);
+      if (res.ok) setViewing({ title: d.name, text: res.text || '(leeg)' });
+      else setViewing({ title: d.name, text: `Kon de inhoud niet laden: ${res.error}` });
+    });
+  }
 
   function ingestFiles(files: FileList | File[]) {
     const list = Array.from(files);
@@ -233,6 +252,19 @@ export function DocumentsTab({ initialDocs }: { initialDocs: DocumentSummary[] }
                     <td style={{ color: 'var(--klant-fg-muted)' }}>{formatDate(d.lastProcessedAt)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: 4 }}>
+                        {!d.id.startsWith('local-') && (
+                          <button
+                            type="button"
+                            onClick={() => viewDoc(d)}
+                            className="klant-btn"
+                            data-variant="ghost"
+                            title="Inhoud bekijken"
+                            aria-label="Inhoud bekijken"
+                            style={{ padding: 6 }}
+                          >
+                            <Eye size={14} strokeWidth={1.7} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => reprocess(d.id)}
@@ -263,6 +295,14 @@ export function DocumentsTab({ initialDocs }: { initialDocs: DocumentSummary[] }
           </div>
         </div>
       )}
+
+      <SourceViewer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        loading={viewBusyId !== null}
+        title={viewing?.title ?? ''}
+        text={viewing?.text ?? ''}
+      />
     </section>
   );
 }

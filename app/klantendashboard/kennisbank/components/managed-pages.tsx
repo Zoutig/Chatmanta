@@ -1,12 +1,14 @@
 'use client';
 import { useState, useTransition, type CSSProperties } from 'react';
-import { RefreshCw, ChevronRight, Search } from 'lucide-react';
+import { RefreshCw, ChevronRight, Search, Eye } from 'lucide-react';
 import {
   setPageIncludedAction, retryPageAction, deleteWebsiteSourceAction, refreshWebsiteSources,
 } from '@/app/actions/crawl';
+import { getKlantPageContentAction } from '../../actions';
 import type { WebsiteSource } from '@/lib/v0/server/crawler';
 import { groupPagesForDisplay, pathLabel } from '@/lib/v0/klantendashboard/group-pages';
 import { StatusBadge } from '../../components/status-badge';
+import { SourceViewer } from './source-viewer';
 
 // Zichtbaar vinkje in dark mode: native checkboxes verdwijnen zonder accent-color.
 const checkbox: CSSProperties = { width: 16, height: 16, accentColor: 'var(--klant-accent)', cursor: 'pointer', flexShrink: 0 };
@@ -40,6 +42,29 @@ export function ManagedPages({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(groupKeys));
+
+  // Bronnen-lezer (item 10): klik op het oog → laad de gecrawlde inhoud in een modal.
+  const [viewing, setViewing] = useState<{ title: string; url?: string; text: string } | null>(null);
+  const [viewBusyId, setViewBusyId] = useState<string | null>(null);
+  const [, startView] = useTransition();
+
+  const viewPage = (id: string, fallbackTitle: string) => {
+    setViewBusyId(id);
+    setViewing({ title: fallbackTitle, text: '' });
+    startView(async () => {
+      const res = await getKlantPageContentAction(id);
+      setViewBusyId(null);
+      if (res.ok) {
+        setViewing({
+          title: res.title || res.url || fallbackTitle,
+          url: res.url,
+          text: res.text || '(geen tekst opgeslagen voor deze pagina)',
+        });
+      } else {
+        setViewing({ title: fallbackTitle, text: `Kon de inhoud niet laden: ${res.error}` });
+      }
+    });
+  };
 
   const q = query.trim().toLowerCase();
   const filtering = q !== '';
@@ -86,6 +111,13 @@ export function ManagedPages({
           )}
         </div>
         <StatusBadge status={p.status} kind="webpage" />
+        {p.status !== 'error' && (
+          <button type="button" className="klant-btn" data-variant="ghost"
+            onClick={() => viewPage(p.id, primary)} title="Inhoud bekijken" aria-label="Inhoud bekijken"
+            style={{ padding: '4px 9px', fontSize: 12, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Eye size={12} strokeWidth={1.8} />
+          </button>
+        )}
         {p.status === 'error' ? (
           <button type="button" className="klant-btn" data-variant="ghost" disabled={busy}
             onClick={() => retry(p.id)} style={{ padding: '4px 9px', fontSize: 12, flexShrink: 0 }}>
@@ -152,6 +184,15 @@ export function ManagedPages({
         style={{ alignSelf: 'flex-start', fontSize: 12 }}>
         Website-bron verwijderen
       </button>
+
+      <SourceViewer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        loading={viewBusyId !== null}
+        title={viewing?.title ?? ''}
+        url={viewing?.url}
+        text={viewing?.text ?? ''}
+      />
     </section>
   );
 }

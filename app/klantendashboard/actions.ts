@@ -10,6 +10,8 @@
 import { revalidatePath } from 'next/cache';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
+import { getSystemJobClient } from '@/lib/supabase/admin';
+import { reconstructFromChunks } from '@/lib/v0/server/reconstruct-chunks';
 import { requireV0Auth } from '@/app/actions/_auth';
 import { checkMutationLimit } from '@/lib/v0/server/rate-limit';
 import {
@@ -406,5 +408,71 @@ export async function submitQuizAnswerAction(
     }
     revalidatePath('/klantendashboard', 'layout');
     return { done, answered: answeredCount, total: active.length };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Bronnen-lezer (M3, item 10) — de klant opent een eigen bron (document of
+// gecrawlde website-pagina) en leest de volledige inhoud in een modal. Spiegelt
+// adminGetDocContentAction / adminGetPageContentAction, maar resolvet de org uit
+// de cookie (geen slug uit de client) i.p.v. de route-param + admin-gate. Reads
+// only: geen revalidatePath. Service-role-read (getSystemJobClient) is de
+// klant-read-conventie (zie lib/v0/server/crawler.ts getWebsiteSources); altijd
+// gefilterd op organization_id zodat een bron van een andere org onbereikbaar is.
+// ---------------------------------------------------------------------------
+
+/** Lees de inhoud van een eigen document terug (gereconstrueerd uit de chunks). */
+export async function getKlantDocContentAction(
+  docId: string,
+): Promise<ActionResult<{ filename: string; text: string }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const orgId = activeOrg.id;
+    const sb = await getSystemJobClient({ reason: 'klant_view_doc' });
+    const { data: doc } = await sb
+      .from('documents')
+      .select('filename')
+      .eq('id', docId)
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!doc) fail('NOT_FOUND', 'Document niet gevonden.');
+    const { data: rows, error } = await sb
+      .from('document_chunks')
+      .select('content, metadata')
+      .eq('document_id', docId)
+      .eq('organization_id', orgId);
+    if (error) throw new Error(`document_chunks read: ${error.message}`);
+    const ordered = (rows ?? [])
+      .map((r) => ({
+        idx: Number((r.metadata as { chunk_index?: number } | null)?.chunk_index ?? 0),
+        content: (r.content as string) ?? '',
+      }))
+      .sort((a, b) => a.idx - b.idx);
+    return { filename: doc.filename as string, text: reconstructFromChunks(ordered.map((o) => o.content)) };
+  });
+}
+
+/** Lees de gecrawlde inhoud van één eigen website-pagina terug (content_text). */
+export async function getKlantPageContentAction(
+  pageId: string,
+): Promise<ActionResult<{ title: string; url: string; text: string }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const orgId = activeOrg.id;
+    const sb = await getSystemJobClient({ reason: 'klant_view_page' });
+    const { data: pg } = await sb
+      .from('website_pages')
+      .select('title, url, content_text')
+      .eq('id', pageId)
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!pg) fail('NOT_FOUND', 'Pagina niet gevonden.');
+    return {
+      title: (pg.title as string | null) ?? '',
+      url: pg.url as string,
+      text: (pg.content_text as string | null) ?? '',
+    };
   });
 }
