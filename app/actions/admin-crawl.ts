@@ -27,6 +27,7 @@ import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 import { normalizeHost } from '@/lib/v0/crawler/normalizeHost';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
+import { reconstructFromChunks } from '@/lib/v0/server/reconstruct-chunks';
 import { requireV0Auth } from './_auth';
 
 type SbClient = Awaited<ReturnType<typeof getSystemJobClient>>;
@@ -113,29 +114,6 @@ function revalidate(slug: string) {
 
 /** Bovengrens voor een geüpload document (10 MB). */
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-
-/**
- * Reconstrueert leesbare tekst uit opgeslagen chunks (het origineel wordt in V0 niet
- * bewaard). chunkText laat opeenvolgende chunks ~200 tekens overlappen; we knippen de
- * grootste suffix-die-ook-prefix-is weg zodat de weergave niet dubbelt.
- */
-function reconstructFromChunks(chunks: string[]): string {
-  if (chunks.length === 0) return '';
-  let out = chunks[0];
-  for (let i = 1; i < chunks.length; i++) {
-    const next = chunks[i];
-    const max = Math.min(out.length, next.length, 500);
-    let overlap = 0;
-    for (let k = max; k > 20; k--) {
-      if (out.slice(out.length - k) === next.slice(0, k)) {
-        overlap = k;
-        break;
-      }
-    }
-    out += next.slice(overlap);
-  }
-  return out;
-}
 
 /**
  * Activeer/deactiveer een website-bron. Deactiveren = disabled_at zetten + alle
