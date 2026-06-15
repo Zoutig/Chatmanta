@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Pipette } from 'lucide-react';
-import { useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { COLOR_PRESETS, isPreset } from '@/lib/widget/color-presets';
 
 // Compacte kleurkiezer: een nette rij kleine ronde swatches (de presets) + een
@@ -34,6 +34,16 @@ export function PresetColorPicker({
   // de trigger zelf strak in de swatch-rij past (de native swatch is lelijk).
   const colorInputRef = useRef<HTMLInputElement>(null);
   const hexInputId = useId();
+
+  // Lokale draft voor het hex-veld: we tonen wat de gebruiker typt, maar
+  // propageren alléén een GELDIGE 6-cijferige hex naar boven (Codex M7 #5) —
+  // anders zou een half-getypte/ongeldige waarde in de opgeslagen widget-
+  // settings belanden (de server valideert kleuren niet). Sync mee als de waarde
+  // extern wijzigt (preset-klik / pipet).
+  const [hexDraft, setHexDraft] = useState(value);
+  useEffect(() => {
+    setHexDraft(value);
+  }, [value]);
 
   return (
     <div
@@ -176,8 +186,20 @@ export function PresetColorPicker({
         {/* Hex-veld — vrije invoer naast de swatches; smal en mono. */}
         <input
           id={hexInputId}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={hexDraft}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setHexDraft(raw);
+            // Alleen een geldige (optioneel #-loze) 6-cijferige hex propageren.
+            const m = raw.trim().match(/^#?([0-9a-f]{6})$/i);
+            if (m) onChange(`#${m[1].toLowerCase()}`);
+          }}
+          onBlur={() => {
+            // Half-getypte/ongeldige invoer bij blur terugzetten op de laatst
+            // geldige waarde zodat het veld nooit "kapot" blijft staan.
+            const m = hexDraft.trim().match(/^#?([0-9a-f]{6})$/i);
+            setHexDraft(m ? `#${m[1].toLowerCase()}` : value);
+          }}
           aria-label={`Hex-kleurcode voor ${label}`}
           spellCheck={false}
           className="klant-input"

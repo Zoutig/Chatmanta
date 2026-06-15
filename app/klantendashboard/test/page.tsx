@@ -64,6 +64,10 @@ export default async function TestPage() {
       />
 
       <PreviewFrame
+        // Key op org → bij een in-place org-switch remount de frame schoon (verse
+        // screenshot-resolve + verse widget-chatstate) i.p.v. de vorige org te
+        // tonen of de oude conversatie naar de nieuwe key te schrijven (Codex M7 #2/#3).
+        key={activeOrg.slug}
         orgSlug={activeOrg.slug}
         botVersion={LATEST_BOT_VERSION}
         welcomeMessage={settings.chatbot.welcomeMessage}

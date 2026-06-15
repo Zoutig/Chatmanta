@@ -693,9 +693,10 @@ export function WidgetForm({
               jouwwebsite.nl
             </div>
             <PreviewWidget
-              // key op de positie zodat de FAB-hoek schoon herpositioneert bij
-              // een links/rechts-wissel (paneel + FAB hangen aan dezelfde side).
-              key={w.position}
+              // Key op org+bot (NIET op positie): de FAB-positie reageert al op de
+              // widget-prop, dus een links/rechts-wissel hoeft het component niet te
+              // remounten — dat zou een lopend antwoord weggooien (Codex M7 #4).
+              key={`${orgSlug}:${botVersion}`}
               orgSlug={orgSlug}
               botVersion={botVersion as string}
               welcomeMessage={welcomeMessage}

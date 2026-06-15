@@ -16,7 +16,7 @@
 // De widget zelf is `position: absolute` binnen dit relatieve vlak en kan dus
 // nooit naar de echte viewport ontsnappen (hard requirement).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getWidgetPreviewAction,
   captureWidgetPreviewAction,
@@ -48,38 +48,38 @@ export function PreviewFrame({
   websiteHost: string;
 }) {
   const [backdrop, setBackdrop] = useState<BackdropState>({ phase: 'loading' });
-  // Guard zodat de (billable) capture maar één keer afgaat, ook bij re-renders
-  // of een dubbele effect-run in React StrictMode (dev).
-  const resolvedRef = useRef(false);
 
+  // Resolve de backdrop per org. GEEN client-side ref-guard meer: captureWidget-
+  // PreviewAction is server-side kosten-veilig (checkt eerst de cache; doet alleen
+  // bij een echte cache-miss een billable call), dus een StrictMode-dubbele aanroep
+  // is in de regel gratis. De `active`-flag zorgt dat alléén het nieuwste run-
+  // resultaat de state zet. Dit fixt (a) de StrictMode-stall waarbij een ref-guard
+  // + cancel de backdrop eeuwig op 'loading' liet, en (b) een in-place org-switch
+  // die anders de vorige org-screenshot bleef tonen (deps op orgSlug).
   useEffect(() => {
-    if (resolvedRef.current) return;
-    resolvedRef.current = true;
-
-    let cancelled = false;
+    let active = true;
+    setBackdrop({ phase: 'loading' });
     (async () => {
-      // 1. Cache-read (gratis, geen Firecrawl-call). ActionResult drukt de data
-      //    plat op de ok-branch (zie lib/errors/action.ts) → `res.url`.
+      // 1. Cache-read (gratis). ActionResult drukt de data plat op de ok-branch
+      //    (zie lib/errors/action.ts) → `res.url`.
       const cachedRes = await getWidgetPreviewAction();
+      if (!active) return;
       const cachedUrl = cachedRes.ok ? cachedRes.url : null;
-      if (cancelled) return;
       if (cachedUrl) {
         setBackdrop({ phase: 'screenshot', url: cachedUrl });
         return;
       }
-
-      // 2. Cache-miss → één billable capture-poging (server cachet het resultaat).
+      // 2. Cache-miss → billable capture-poging (server cachet het resultaat).
       const capturedRes = await captureWidgetPreviewAction();
+      if (!active) return;
       const capturedUrl = capturedRes.ok ? capturedRes.url : null;
-      if (cancelled) return;
       // 3. Nog steeds geen URL (geen website / capture-fout) → mockup.
       setBackdrop(capturedUrl ? { phase: 'screenshot', url: capturedUrl } : { phase: 'mockup' });
     })();
-
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, []);
+  }, [orgSlug]);
 
   const addressLabel = websiteHost || 'jouw-website.nl';
 

@@ -152,18 +152,32 @@ export function PreviewWidget({
     setMessages((m) => [...m, userMsg]);
     setInput('');
     startTransition(async () => {
-      const res = await askTestQuestion(q, historyForRag);
-      if (!res.ok) {
+      try {
+        const res = await askTestQuestion(q, historyForRag);
+        if (!res.ok) {
+          setMessages((m) => [
+            ...m,
+            { id: nextId('a'), role: 'assistant', content: `Er ging iets mis: ${res.error}` },
+          ]);
+          return;
+        }
         setMessages((m) => [
           ...m,
-          { id: nextId('a'), role: 'assistant', content: `Er ging iets mis: ${res.error}` },
+          { id: nextId('a'), role: 'assistant', content: res.response.answer },
         ]);
-        return;
+      } catch {
+        // Transport-/netwerkfout: de server-action zelf rejectte (geen ActionResult).
+        // Toon dezelfde nette foutbubble i.p.v. een unhandled rejection + een
+        // onbeantwoorde vraag.
+        setMessages((m) => [
+          ...m,
+          {
+            id: nextId('a'),
+            role: 'assistant',
+            content: 'Er ging iets mis bij het versturen. Probeer het opnieuw.',
+          },
+        ]);
       }
-      setMessages((m) => [
-        ...m,
-        { id: nextId('a'), role: 'assistant', content: res.response.answer },
-      ]);
     });
   }
 
