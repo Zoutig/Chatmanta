@@ -7,6 +7,7 @@
 
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import { LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import { DashboardWidgetSwitch } from '@/app/components/dashboard-widget-switch';
 import { PageHead } from '../components/ui/page-head';
 import { WidgetForm } from './components/widget-form';
@@ -34,6 +35,8 @@ export default async function WidgetPage() {
         chatbotName={settings.chatbotName}
         welcomeMessage={settings.welcomeMessage}
         orgSlug={activeOrg.slug}
+        botVersion={LATEST_BOT_VERSION}
+        starterQuestions={settings.starterQuestions}
       />
     </>
   );

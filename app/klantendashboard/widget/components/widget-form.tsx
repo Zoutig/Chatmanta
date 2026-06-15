@@ -23,6 +23,7 @@ import type { WidgetSettings } from '@/lib/v0/klantendashboard/types';
 import type { ActionResult } from '@/lib/errors/action';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { PresetColorPicker } from './preset-color-picker';
+import { PreviewWidget } from '../../test/components/preview-widget';
 
 // Max 200KB voor base64-data-URL — anders wordt de jsonb-row te zwaar.
 const MAX_LOGO_BYTES = 200 * 1024;
@@ -53,6 +54,8 @@ export function WidgetForm({
   checkAction = checkWidgetInstallationAction,
   demoHref = '/widget',
   showReset = false,
+  botVersion,
+  starterQuestions = [],
 }: {
   initial: WidgetSettings;
   chatbotName: string;
@@ -62,11 +65,24 @@ export function WidgetForm({
   checkAction?: CheckWidgetAction;
   demoHref?: string;
   showReset?: boolean;
+  /**
+   * Bot-versie + startsuggesties voor de interactieve live-preview. Optioneel:
+   * wordt alleen meegegeven door de klantendashboard-widgetpagina (cookie-org).
+   * Ontbreken ze (bv. admin-dashboard route-param-org), dan valt de Preview-
+   * sectie terug op de statische mockup zonder de chat-preview aan te bieden.
+   */
+  botVersion?: string;
+  starterQuestions?: string[];
 }) {
   const [w, setW] = useState<WidgetSettings>(initial);
   // baseline = laatst opgeslagen staat; "Terugzetten" herstelt de uiterlijk-velden hiernaartoe.
   const [baseline, setBaseline] = useState<WidgetSettings>(initial);
   const [openSection, setOpenSection] = useState<Section>('install');
+  // Live-preview aan/uit binnen de Preview-sectie. Aan = interactieve widget
+  // (FAB + chat-paneel) gevoed door de HUIDIGE, nog-niet-opgeslagen form-state;
+  // uit = de statische mockup. Alleen beschikbaar als botVersion meekomt.
+  const canLivePreview = Boolean(botVersion);
+  const [previewLive, setPreviewLive] = useState(false);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -609,11 +625,92 @@ export function WidgetForm({
         open={openSection === 'preview'}
         onToggle={() => setOpenSection(openSection === 'preview' ? 'status' : 'preview')}
       >
-        <WidgetMockup
-          settings={w}
-          chatbotName={chatbotName}
-          welcomeMessage={welcomeMessage}
-        />
+        {/* Live-preview-toggle — alleen tonen als we de chat-preview kunnen
+            voeden (botVersion aanwezig). De preview reflecteert je HUIDIGE,
+            nog-niet-opgeslagen wijzigingen live terwijl je hierboven aanpast. */}
+        {canLivePreview && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+              marginBottom: 14,
+              padding: '10px 12px',
+              background: 'var(--klant-surface)',
+              border: '1px solid var(--klant-border)',
+              borderRadius: 'var(--klant-r-md)',
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--klant-fg)' }}>
+                Live-preview
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--klant-fg-muted)', lineHeight: 1.5 }}>
+                Toont de échte widget {w.position === 'bottom-left' ? 'linksonder' : 'rechtsonder'} —
+                open hem en stel testvragen. Reflecteert je huidige, nog niet
+                opgeslagen wijzigingen.
+              </div>
+            </div>
+            <Toggle
+              checked={previewLive}
+              onChange={setPreviewLive}
+              label="Live-preview aan/uit"
+            />
+          </div>
+        )}
+
+        {previewLive && canLivePreview ? (
+          // Contained preview-vlak: position:relative + overflow:hidden zodat de
+          // PreviewWidget (position:absolute, nooit fixed) binnen dit kader
+          // blijft en de dashboard-chrome niet kan overlappen.
+          <div
+            style={{
+              position: 'relative',
+              minHeight: 460,
+              overflow: 'hidden',
+              borderRadius: 'var(--klant-r-md)',
+              border: '1px solid var(--klant-border)',
+              background:
+                'repeating-linear-gradient(45deg, var(--klant-surface) 0 10px, transparent 10px 20px)',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 14,
+                left: 14,
+                fontSize: 11,
+                color: 'var(--klant-fg-dim)',
+                background: 'var(--klant-bg)',
+                padding: '4px 10px',
+                borderRadius: 999,
+                border: '1px solid var(--klant-border)',
+                zIndex: 2,
+              }}
+            >
+              jouwwebsite.nl
+            </div>
+            <PreviewWidget
+              // key op de positie zodat de FAB-hoek schoon herpositioneert bij
+              // een links/rechts-wissel (paneel + FAB hangen aan dezelfde side).
+              key={w.position}
+              orgSlug={orgSlug}
+              botVersion={botVersion as string}
+              welcomeMessage={welcomeMessage}
+              starterQuestions={starterQuestions}
+              widget={w}
+              chatbotName={chatbotName}
+            />
+          </div>
+        ) : (
+          <WidgetMockup
+            settings={w}
+            chatbotName={chatbotName}
+            welcomeMessage={welcomeMessage}
+          />
+        )}
       </Collapsible>
 
       {/* Live-status */}
@@ -1087,6 +1184,54 @@ function LogoChoice({
           style={{ position: 'absolute', top: 10, right: 10, color: 'var(--klant-accent)' }}
         />
       )}
+    </button>
+  );
+}
+
+/** Compacte pill-switch (alleen de schakelaar). Spiegelt de stijl van de
+ *  Toggle in settings-form.tsx maar zonder ingebouwde label/help-layout. */
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      style={{
+        flexShrink: 0,
+        width: 42,
+        height: 24,
+        borderRadius: 999,
+        border: 'none',
+        background: checked ? 'var(--klant-accent)' : 'var(--klant-border-strong)',
+        position: 'relative',
+        cursor: 'pointer',
+        transition: 'background 120ms ease',
+        padding: 0,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: checked ? 20 : 2,
+          width: 20,
+          height: 20,
+          borderRadius: 999,
+          background: '#fff',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+          transition: 'left 120ms ease',
+        }}
+      />
     </button>
   );
 }
