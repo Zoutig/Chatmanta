@@ -184,7 +184,11 @@ export async function POST(req: Request) {
   const question = typeof body.question === 'string' ? body.question : '';
   const threshold = typeof body.threshold === 'number' ? body.threshold : 0.4;
   const enableRewrite = body.enableRewrite !== false;
-  const enableGeneralKnowledge = body.enableGeneralKnowledge !== false;
+  // Algemene-kennis: alleen een EXPLICIETE boolean uit de body (admin /admintool)
+  // telt als override. Stuurt de caller niets (widget/embed, klant-test-scherm),
+  // dan leiden we het ná de settings-load af uit de org-toggle (default uit).
+  const explicitGeneralKnowledge =
+    typeof body.enableGeneralKnowledge === 'boolean' ? body.enableGeneralKnowledge : undefined;
   const version = typeof body.version === 'string' ? body.version : '';
   const history = parseHistory(body.history);
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
@@ -358,6 +362,12 @@ export async function POST(req: Request) {
   // geven we de body-waardes alleen mee als de caller ze ook echt zond.
   const explicitTone = typeof body.tone === 'string' ? tone : undefined;
   const explicitLength = typeof body.length === 'string' ? length : undefined;
+
+  // Resolve-volgorde: expliciete body-waarde (admin) → org-toggle → uit. Bij
+  // onbekende org of een getOrgSettings-fout is `chatbotOverrides` undefined →
+  // fail-closed naar uit (conform anti-hallucinatie hard rule).
+  const enableGeneralKnowledge =
+    explicitGeneralKnowledge ?? chatbotOverrides?.answerGeneralKnowledge ?? false;
 
   const generator = runRagQueryStreaming({
     question,

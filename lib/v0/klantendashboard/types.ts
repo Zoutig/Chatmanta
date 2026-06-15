@@ -201,6 +201,14 @@ export type ChatbotSettings = {
   mayShareContact: boolean;
   sourceStrictness: SourceStrictness;
   honestAboutUnknown: boolean;
+  /**
+   * Mag de chatbot algemene-kennisvragen beantwoorden? Default `false`.
+   * Stuurt het zero-hit general-knowledge-pad: bij `false` gaat een vraag zonder
+   * relevante bron rechtstreeks naar de fallback; bij `true` mag de bot een kort
+   * algemeen antwoord met disclaimer geven (gated door `bot.generalKnowledgeEnabled`).
+   * Antwoorden mét bron-hits blijven altijd brongebaseerd.
+   */
+  answerGeneralKnowledge: boolean;
 
   // Fallback & contact
   fallbackMessage: string;

@@ -29,6 +29,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     mayShareContact: true,
     sourceStrictness: 'normal',
     honestAboutUnknown: true,
+    answerGeneralKnowledge: false,
     fallbackMessage:
       'Ik weet dit niet zeker op basis van de beschikbare informatie. Neem contact met ons op, dan helpen we je graag verder.',
     contactEmail: 'demo@chatmanta.nl',
@@ -58,6 +59,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     mayShareContact: true,
     sourceStrictness: 'normal',
     honestAboutUnknown: true,
+    answerGeneralKnowledge: false,
     fallbackMessage:
       'Ik weet dit niet zeker. Voor een betrouwbaar antwoord kunt u ons bellen op 020-1234567 of het contactformulier invullen.',
     contactEmail: 'info@dakwerkendeboer.nl',
@@ -87,6 +89,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     mayShareContact: true,
     sourceStrictness: 'strict',
     honestAboutUnknown: true,
+    answerGeneralKnowledge: false,
     fallbackMessage:
       'Daar kan ik niet zeker antwoord op geven. Wil je een afspraak inplannen? Bel ons op 030-9876543.',
     contactEmail: 'info@fysioplus-utrecht.nl',
@@ -116,6 +119,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     mayShareContact: true,
     sourceStrictness: 'strict',
     honestAboutUnknown: true,
+    answerGeneralKnowledge: false,
     fallbackMessage:
       'Ik kan dit niet zeker beantwoorden zonder uw specifieke situatie te kennen. Neem contact op met een van onze adviseurs.',
     contactEmail: 'info@bakkervermeer.nl',
@@ -145,6 +149,7 @@ const MOCK_SETTINGS: Record<OrgSlug, ChatbotSettings> = {
     mayShareContact: true,
     sourceStrictness: 'normal',
     honestAboutUnknown: true,
+    answerGeneralKnowledge: false,
     fallbackMessage:
       'Ik weet dit niet zeker op basis van de beschikbare informatie. Neem gerust contact met ons op, dan helpen we je graag verder.',
     contactEmail: '',

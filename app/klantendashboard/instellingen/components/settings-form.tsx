@@ -50,6 +50,8 @@ export function SettingsForm({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Bevestiging vóór het AANzetten van algemene kennis (uitzetten = direct).
+  const [gkConfirmOpen, setGkConfirmOpen] = useState(false);
 
   const dirty = JSON.stringify(s) !== JSON.stringify(baseline);
 
@@ -297,6 +299,16 @@ export function SettingsForm({
             />
           </Field>
         )}
+        <Toggle
+          label="Mag de chatbot algemene kennisvragen beantwoorden?"
+          help="Standaard uit. Aan: als je bronnen géén antwoord op een vraag bevatten, mag de bot een kort algemeen antwoord met disclaimer geven in plaats van 'dat weet ik niet'. Antwoorden mét bron blijven altijd op je bronnen gebaseerd."
+          value={s.answerGeneralKnowledge}
+          onChange={(v) => {
+            // Aanzetten vereist bevestiging; uitzetten gaat direct.
+            if (v) setGkConfirmOpen(true);
+            else update('answerGeneralKnowledge', false);
+          }}
+        />
       </Section>
 
       {/* Fallback & contact */}
@@ -387,6 +399,98 @@ export function SettingsForm({
           <Save size={14} strokeWidth={1.8} /> {pending ? 'Bezig…' : 'Instellingen opslaan'}
         </button>
       </div>
+
+      {/* Bevestiging vóór aanzetten van algemene kennis. Volgt het modal-patroon
+          van de Q&A-tab (fixed overlay + klant-card); knoppen type="button" zodat
+          het formulier niet voortijdig submit. */}
+      {gkConfirmOpen && (
+        <div
+          onClick={() => setGkConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            zIndex: 100,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20,
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Algemene kennisvragen toestaan"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="klant-card"
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              background: 'var(--klant-bg-elev)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 18,
+                fontWeight: 600,
+                fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+                color: 'var(--klant-fg)',
+              }}
+            >
+              Algemene kennisvragen toestaan?
+            </h3>
+            <div
+              style={{
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: 'var(--klant-fg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                <strong>Wat verandert er:</strong>{' '}Normaal antwoordt je chatbot alléén op basis
+                van jouw eigen bronnen (website, documenten, Q&amp;A). Staat er niets over in je
+                bronnen, dan zegt hij eerlijk dat hij het niet weet en verwijst hij door. Met deze
+                instelling aan mag de chatbot bij zulke vragen óók een kort, algemeen antwoord uit
+                eigen kennis geven — duidelijk herkenbaar, beginnend met{' '}
+                <em>&ldquo;dit valt buiten onze specifieke documentatie, maar in het algemeen…&rdquo;</em>.
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>Wat betekent dat:</strong>{' '}Voordeel — je chatbot blijft behulpzaam bij
+                algemene vragen rond je vakgebied in plaats van simpelweg &ldquo;dat weet ik
+                niet&rdquo;. Let op — die algemene antwoorden komen <em>niet</em> uit jouw bronnen
+                en kunnen minder precies of niet helemaal op jouw situatie van toepassing zijn.
+                Vragen waar je bronnen wél iets over zeggen blijven altijd brongebaseerd.
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+              <button
+                type="button"
+                className="klant-btn"
+                onClick={() => setGkConfirmOpen(false)}
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                className="klant-btn"
+                data-variant="primary"
+                onClick={() => {
+                  update('answerGeneralKnowledge', true);
+                  setGkConfirmOpen(false);
+                }}
+              >
+                Ja, toestaan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
