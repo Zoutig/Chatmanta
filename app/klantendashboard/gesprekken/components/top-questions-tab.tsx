@@ -68,6 +68,16 @@ export function TopQuestionsTab({
   const [hits, setHits] = useState<QuestionConversationHit[] | null>(null);
   const [drilldownPending, startDrilldown] = useTransition();
 
+  // Escape sluit de drilldown-modal (a11y). Listener alleen actief zolang open.
+  useEffect(() => {
+    if (!drilldown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrilldown(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drilldown]);
+
   function openDrilldown(row: KlantFaqRow) {
     setDrilldown(row);
     setHits(null);
