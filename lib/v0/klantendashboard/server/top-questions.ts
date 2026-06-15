@@ -14,6 +14,7 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
+import { getKlantFaqSnapshot, type KlantFaqItem } from './faq-klant';
 import type { TopQuestionsConfig } from '../types';
 
 let _sb: SupabaseClient | null = null;
@@ -110,4 +111,86 @@ export async function getTopQuestions(
   } catch {
     return { items: [], totalUnique: 0 };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot-gebaseerde read (M5) — VERVANGT de live-scan hierboven als bron
+// voor het dashboard. getTopQuestions() blijft bestaan voor backward-compat,
+// maar de UI leest sinds M5 de periodieke snapshot (klant_faq_snapshot) zodat
+// de tellingen overal consistent zijn en de semantische clustering meekomt.
+// ---------------------------------------------------------------------------
+
+/**
+ * Eén geclusterde rij voor het dashboard. Spiegelt KlantFaqItem maar met de
+ * UI-vriendelijke veldnamen die de bestaande TopQuestion-renderers gebruiken,
+ * aangevuld met de cluster-info (memberQuestions/paraphraseCount) voor de hint
+ * + drilldown.
+ */
+export type KlantFaqRow = {
+  question: string;
+  count: number;
+  lastAskedAt: string;
+  lastStatus: 'answered' | 'unanswered';
+  /** Alle exact-string varianten in de cluster (de representatieve vraag incl.). */
+  memberQuestions: string[];
+  /** Aantal extra formuleringen bovenop de representatieve vraag (= varianten - 1,
+   *  min 0). > 0 → toon de "+N formuleringen"-hint. */
+  paraphraseCount: number;
+};
+
+/**
+ * Result-shape voor de dashboard-consumenten (gesprekken-tab + overzicht-bars).
+ *   - items:        clusters ná read-time filter (count >= minCount, slice topN).
+ *   - totalUnique:  totaal aantal unieke vragen in de snapshot (vóór filter),
+ *                   zodat de UI "echt geen vragen" (0) van "geen vraag boven de
+ *                   drempel" (>0) kan onderscheiden.
+ *   - pending:      true zolang er nog GEEN snapshot is (cron heeft nog niet
+ *                   gedraaid). De UI toont dan de "wordt periodiek bijgewerkt"-
+ *                   melding i.p.v. een lege ranglijst.
+ *   - generatedAt:  wanneer de snapshot is berekend (null bij pending).
+ */
+export type KlantFaqResult = {
+  items: KlantFaqRow[];
+  totalUnique: number;
+  pending: boolean;
+  generatedAt: string | null;
+};
+
+function itemToRow(it: KlantFaqItem): KlantFaqRow {
+  return {
+    question: it.question,
+    count: it.count,
+    lastAskedAt: it.lastAskedAt,
+    lastStatus: it.lastStatus,
+    memberQuestions: it.memberQuestions,
+    paraphraseCount: Math.max(0, it.memberQuestions.length - 1),
+  };
+}
+
+/**
+ * Lees de meest recente FAQ-snapshot voor de org en pas de per-org config als
+ * READ-TIME filter toe (count >= minCount, daarna slice op topN). De snapshot
+ * bewaart tot 20 items op count desc, dus het filteren/slicen vereist geen
+ * herberekening. Null snapshot → pending-state (cron nog niet gedraaid).
+ */
+export async function getKlantFaqForDashboard(
+  orgSlug: OrgSlug,
+  config: TopQuestionsConfig,
+): Promise<KlantFaqResult> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const snapshot = await getKlantFaqSnapshot(orgId);
+  if (!snapshot) {
+    return { items: [], totalUnique: 0, pending: true, generatedAt: null };
+  }
+  // Snapshot-items zijn al op count desc gerankt; filter + slice volstaat.
+  const items = snapshot.items
+    .filter((it) => it.count >= config.minCount)
+    .slice(0, config.topN)
+    .map(itemToRow);
+  return {
+    items,
+    totalUnique: snapshot.totalUnique,
+    pending: false,
+    generatedAt: snapshot.generatedAt,
+  };
 }

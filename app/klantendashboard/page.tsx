@@ -12,7 +12,7 @@ import {
   getUnansweredQuestions,
 } from '@/lib/v0/klantendashboard/server/metrics';
 import { getOrgSettings, getSetupSkips } from '@/lib/v0/klantendashboard/server/settings';
-import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
+import { getKlantFaqForDashboard } from '@/lib/v0/klantendashboard/server/top-questions';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from './components/ui/page-head';
 import { Btn } from './components/ui/btn';
@@ -70,7 +70,7 @@ export default async function OverviewPage() {
       testMessagesCount: testMessages,
       skippedIds: setupSkips,
     }),
-    getTopQuestions(activeOrg.slug, settings.topQuestions),
+    getKlantFaqForDashboard(activeOrg.slug, settings.topQuestions),
   ]);
 
   // Quiz-banner: alleen als er een ACTIEVE quiz met openstaande vragen is. De

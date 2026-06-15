@@ -7,7 +7,9 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill } from '@/app/klantendashboard/components/ui/pill';
 import { PRIVACY_DEFAULTS } from '@/lib/controlroom/types';
 import { MONTHLY_CONVERSATION_LIMITS } from '@/lib/controlroom/usage-limits';
+import { getFaqRefreshCadence } from '@/lib/v0/server/admin-config';
 import { ReloadButton } from '../components/reload-button';
+import { FaqCadenceControl } from '../components/faq-cadence-control';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +26,11 @@ function KeyStatus({ present }: { present: boolean }) {
   return present ? <Pill tone="success" dot>Ingesteld</Pill> : <Pill tone="neutral" dot>Ontbreekt</Pill>;
 }
 
-export default function InstellingenPage() {
+export default async function InstellingenPage() {
   // Alleen aanwezigheid lezen — waardes worden NOOIT gerenderd.
   const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
+  // Bewerkbare operator-instelling: de FAQ-snapshot-refresh-cadans.
+  const faqCadence = await getFaqRefreshCadence();
   const keys = {
     OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
@@ -42,14 +46,22 @@ export default function InstellingenPage() {
         <div>
           <h1 className="klant-page-title">Instellingen</h1>
           <p className="klant-page-sub">
-            Globale technische configuratie — read-only. Secrets worden nooit getoond; modelkeuze en
-            keys wijzigen vereist code + versiebeheer.
+            Globale operator-configuratie. De FAQ-verversing is instelbaar; de technische config is
+            read-only — secrets worden nooit getoond, modelkeuze en keys wijzigen vereist code + versiebeheer.
           </p>
         </div>
         <ReloadButton />
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        <Card>
+          <div className="klant-section-title" style={{ marginBottom: 8 }}>FAQ-verversing</div>
+          <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: '0 0 10px' }}>
+            Bepaalt hoe vaak de ‘Meest gestelde vragen’-ranglijst van klanten automatisch wordt herberekend.
+          </p>
+          <FaqCadenceControl current={faqCadence} />
+        </Card>
+
         <Card>
           <div className="klant-section-title" style={{ marginBottom: 8 }}>Modellen</div>
           <Row label="Chat / preprocess" value="gpt-4o-mini" />
