@@ -453,6 +453,94 @@ export async function getKlantDocContentAction(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Meest-gestelde-vragen drilldown (M5, item 3) — open de gesprekken waarin een
+// geclusterde vraag is gesteld. De FAQ-snapshot komt uit query_log (geen FK naar
+// v0_threads), dus dit is een BENADERENDE tekst-match: we zoeken user-messages in
+// v0_thread_messages waarvan de (getrimde, lowercased) content exact overeenkomt
+// met één van de cluster-varianten. Org server-side uit de cookie; org-isolatie
+// via een JOIN op de eigen thread-ids (v0_thread_messages heeft zelf geen
+// organization_id). Read-only: geen revalidatePath.
+// ---------------------------------------------------------------------------
+
+export type QuestionConversationHit = {
+  threadId: string;
+  snippet: string;
+  askedAt: string;
+};
+
+/** Hoeveel thread-ids we maximaal scannen (org-volumes zijn klein in V0). */
+const DRILLDOWN_THREAD_CAP = 1000;
+/** Hoeveel matchende message-rijen we maximaal ophalen vóór dedupe. */
+const DRILLDOWN_ROW_CAP = 100;
+/** Hoeveel unieke gesprekken we maximaal teruggeven. */
+const DRILLDOWN_RESULT_CAP = 50;
+
+export async function getConversationsForQuestionAction(
+  memberQuestions: string[],
+): Promise<ActionResult<{ hits: QuestionConversationHit[] }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const orgId = activeOrg.id;
+
+    // Normaliseer de varianten (trim+lowercase) en dedupe. Lege lijst → geen werk.
+    const variants = [
+      ...new Set(
+        (memberQuestions ?? [])
+          .map((q) => String(q ?? '').trim().toLowerCase())
+          .filter((q) => q.length > 0),
+      ),
+    ];
+    if (variants.length === 0) return { hits: [] };
+
+    const sb = await getSystemJobClient({ reason: 'klant_faq_drilldown' });
+
+    // 1. Eigen, niet-verwijderde thread-ids (org-isolatie via deze JOIN — de
+    //    messages-tabel heeft geen organization_id).
+    const { data: threads, error: tErr } = await sb
+      .from('v0_threads')
+      .select('id')
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(DRILLDOWN_THREAD_CAP);
+    if (tErr) throw new Error(`v0_threads read: ${tErr.message}`);
+    const threadIds = (threads ?? []).map((t) => t.id as string);
+    if (threadIds.length === 0) return { hits: [] };
+
+    // 2. User-messages binnen die threads, recent-first. We matchen client-side
+    //    op trimmed+lowercased content (PostgREST heeft geen normalize-in-filter);
+    //    de row-cap houdt het geheugen onder controle.
+    const { data: rows, error: mErr } = await sb
+      .from('v0_thread_messages')
+      .select('thread_id, content, created_at')
+      .in('thread_id', threadIds)
+      .eq('role', 'user')
+      .order('created_at', { ascending: false })
+      .limit(DRILLDOWN_ROW_CAP);
+    if (mErr) throw new Error(`v0_thread_messages read: ${mErr.message}`);
+
+    const wanted = new Set(variants);
+    const seen = new Set<string>();
+    const hits: QuestionConversationHit[] = [];
+    for (const r of rows ?? []) {
+      const content = String(r.content ?? '');
+      const key = content.trim().toLowerCase();
+      if (!wanted.has(key)) continue;
+      const tid = String(r.thread_id ?? '');
+      if (!tid || seen.has(tid)) continue; // dedupe per thread (recent-first)
+      seen.add(tid);
+      hits.push({
+        threadId: tid,
+        snippet: content.trim().slice(0, 160),
+        askedAt: String(r.created_at ?? ''),
+      });
+      if (hits.length >= DRILLDOWN_RESULT_CAP) break;
+    }
+    return { hits };
+  });
+}
+
 /** Lees de gecrawlde inhoud van één eigen website-pagina terug (content_text). */
 export async function getKlantPageContentAction(
   pageId: string,

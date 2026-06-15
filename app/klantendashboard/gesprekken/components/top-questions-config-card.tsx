@@ -1,11 +1,14 @@
 'use client';
 
-// Instellingen-card: drempel + lijst-grootte voor "Meest gestelde vragen".
+// "Meest gestelde vragen"-config: drempel + lijst-grootte (M5 item 6).
 //
-// Twee number-inputs (minCount, topN) + save-knop. Patroon volgt SettingsForm
-// (useState + useTransition + "Opgeslagen ✓"-flash). Validatie is best-effort
-// client-side; saveTopQuestionsConfig in de server-action checkt nogmaals en
-// gooit AppError('INPUT_INVALID') bij overschrijding.
+// Verhuisd vanuit Instellingen naar de top-questions-tab zelf, zodat de klant de
+// drempel verandert op de plek waar hij het resultaat ziet. Twee number-inputs
+// (minCount, topN) + save-knop. Patroon volgt SettingsForm (useState +
+// useTransition + "Opgeslagen ✓"-flash). Validatie is best-effort client-side;
+// saveTopQuestionsConfig in de server-action checkt nogmaals en gooit
+// AppError('INPUT_INVALID') bij overschrijding. Na save herleest de
+// revalidatePath('/klantendashboard','layout') in de action de ranglijst.
 
 import { useState, useTransition } from 'react';
 import { Check, Save } from 'lucide-react';
@@ -53,7 +56,7 @@ export function TopQuestionsConfigCard({ initial }: { initial: TopQuestionsConfi
         save();
       }}
       className="klant-card"
-      style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 18 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
     >
       <div>
         <h3
@@ -65,10 +68,10 @@ export function TopQuestionsConfigCard({ initial }: { initial: TopQuestionsConfi
             color: 'var(--klant-fg)',
           }}
         >
-          Meest gestelde vragen
+          Ranglijst-instellingen
         </h3>
         <p className="klant-section-help" style={{ margin: '4px 0 0' }}>
-          Bepaal vanaf hoe vaak een vraag in de Top-lijst verschijnt en hoeveel
+          Bepaal vanaf hoe vaak een vraag in de lijst verschijnt en hoeveel
           vragen je maximaal wilt zien.
         </p>
       </div>

@@ -12,7 +12,7 @@ import {
   listNegativeFeedback,
   countRecentNegativeFeedback,
 } from '@/lib/v0/klantendashboard/server/feedback';
-import { getTopQuestions } from '@/lib/v0/klantendashboard/server/top-questions';
+import { getKlantFaqForDashboard } from '@/lib/v0/klantendashboard/server/top-questions';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import type { ConversationFilter } from '@/lib/v0/klantendashboard/types';
 import { PageHead } from '../components/ui/page-head';
@@ -59,13 +59,13 @@ export default async function GesprekkenPage({
 
   const activeOrg = await getActiveOrgFromCookies();
   // Settings eerst — topQuestions config bepaalt de drempel en lijst-grootte
-  // waarop getTopQuestions filtert. Daarna parallel de overige data-fetches
-  // (incl. de negatieve-feedback lijst en banner-counter).
+  // waarop getKlantFaqForDashboard read-time filtert. Daarna parallel de overige
+  // data-fetches (incl. de negatieve-feedback lijst en banner-counter).
   const settings = await getOrgSettings(activeOrg.slug);
   const [items, topQuestions, negativeFeedback, recentNegativeCount] =
     await Promise.all([
       listConversations(activeOrg.slug, filter),
-      getTopQuestions(activeOrg.slug, settings.topQuestions),
+      getKlantFaqForDashboard(activeOrg.slug, settings.topQuestions),
       listNegativeFeedback(activeOrg.slug),
       countRecentNegativeFeedback(activeOrg.slug, 7),
     ]);
@@ -101,6 +101,8 @@ export default async function GesprekkenPage({
         <TopQuestionsTab
           initial={topQuestions.items}
           totalUnique={topQuestions.totalUnique}
+          pending={topQuestions.pending}
+          generatedAt={topQuestions.generatedAt}
           config={settings.topQuestions}
           existingQAQuestions={existingQAQuestions}
         />

@@ -9,7 +9,6 @@ import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { PageHead } from '../components/ui/page-head';
 import { SettingsForm } from './components/settings-form';
-import { TopQuestionsConfigCard } from './components/top-questions-config-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +25,6 @@ export default async function InstellingenPage() {
       />
 
       <SettingsForm key={activeOrg.slug} initial={settings.chatbot} />
-      <TopQuestionsConfigCard key={`tq-${activeOrg.slug}`} initial={settings.topQuestions} />
     </>
   );
 }

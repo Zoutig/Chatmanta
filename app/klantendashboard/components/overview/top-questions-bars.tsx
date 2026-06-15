@@ -5,10 +5,10 @@
 import Link from 'next/link';
 import { Card } from '../ui/card';
 import { SectionHeader } from '../ui/section-header';
-import type { TopQuestionsResult } from '@/lib/v0/klantendashboard/server/top-questions';
+import type { KlantFaqResult } from '@/lib/v0/klantendashboard/server/top-questions';
 
-export function TopQuestionsBars({ result }: { result: TopQuestionsResult }) {
-  const { items, totalUnique } = result;
+export function TopQuestionsBars({ result }: { result: KlantFaqResult }) {
+  const { items, totalUnique, pending } = result;
   const max = items.length > 0 ? items[0].count : 1;
 
   return (
@@ -27,9 +27,11 @@ export function TopQuestionsBars({ result }: { result: TopQuestionsResult }) {
       />
       {items.length === 0 ? (
         <div style={{ padding: '20px 4px', fontSize: 13, color: 'var(--klant-dim)', lineHeight: 1.5 }}>
-          {totalUnique === 0
-            ? 'Nog geen vragen. Zodra bezoekers met je chatbot praten, zie je hier wat het vaakst gevraagd wordt.'
-            : 'Nog geen vraag die de drempel haalt. Pas de drempel aan in Gesprekken → Meest gesteld.'}
+          {pending
+            ? 'De ranglijst wordt periodiek automatisch bijgewerkt — kom binnenkort terug.'
+            : totalUnique === 0
+              ? 'Nog geen vragen. Zodra bezoekers met je chatbot praten, zie je hier wat het vaakst gevraagd wordt.'
+              : 'Nog geen vraag die de drempel haalt. Pas de drempel aan in Gesprekken → Meest gesteld.'}
         </div>
       ) : (
         <ul
