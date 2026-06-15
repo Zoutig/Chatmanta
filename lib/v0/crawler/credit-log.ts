@@ -28,7 +28,7 @@ function db(): SupabaseClient | null {
 
 /** Log Firecrawl-creditverbruik. Fail-safe — gooit nooit. */
 export async function logFirecrawlCredits(
-  operation: 'map' | 'sitemap' | 'scrape',
+  operation: 'map' | 'sitemap' | 'scrape' | 'screenshot',
   credits: number,
   orgId?: string | null,
 ): Promise<void> {

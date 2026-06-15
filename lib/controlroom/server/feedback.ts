@@ -280,6 +280,34 @@ export async function uploadAttachment(
   return { path, name };
 }
 
+/**
+ * Upload een widget-preview-screenshot (PNG-bytes) naar dezelfde private bucket
+ * onder een DETERMINISTISCH pad (widget-preview/<orgId>.png), upsert=true zodat
+ * een refresh de oude screenshot overschrijft i.p.v. te stapelen. Geeft een
+ * langlevende signed-URL terug die als sfeer-backdrop in de Preview-tab geladen
+ * kan worden — de bucket is privé (geen publieke URL), dus we signen lang (1 jaar)
+ * en bewaren die in de widget_preview-cache. Gooit op fout zodat de caller de
+ * capture als mislukt kan afhandelen (best-effort → backdrop-mockup).
+ */
+const WIDGET_PREVIEW_DIR = 'widget-preview';
+const WIDGET_PREVIEW_SIGN_TTL_SEC = 60 * 60 * 24 * 365; // 1 jaar
+
+export async function uploadWidgetPreview(
+  orgId: string,
+  bytes: Uint8Array,
+): Promise<{ url: string; path: string }> {
+  const path = `${WIDGET_PREVIEW_DIR}/${orgId}.png`;
+  const { error: upErr } = await sb()
+    .storage.from(BUCKET)
+    .upload(path, bytes, { contentType: 'image/png', upsert: true });
+  if (upErr) throw new Error(`uploadWidgetPreview: ${upErr.message}`);
+  const { data, error: signErr } = await sb()
+    .storage.from(BUCKET)
+    .createSignedUrl(path, WIDGET_PREVIEW_SIGN_TTL_SEC);
+  if (signErr || !data) throw new Error(`uploadWidgetPreview sign: ${signErr?.message ?? 'no url'}`);
+  return { url: data.signedUrl, path };
+}
+
 /** Kortlevende signed-URL (60s) voor de operator-detailpagina. Null bij fout. */
 export async function getAttachmentSignedUrl(path: string): Promise<string | null> {
   const { data, error } = await sb().storage.from(BUCKET).createSignedUrl(path, 60);

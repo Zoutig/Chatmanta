@@ -9,7 +9,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
-import { getActiveOrgFromCookies, KNOWN_ORGS } from '@/lib/v0/server/active-org';
+import { getActiveOrgFromCookies, KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getSystemJobClient } from '@/lib/supabase/admin';
 import { reconstructFromChunks } from '@/lib/v0/server/reconstruct-chunks';
 import { requireV0Auth } from '@/app/actions/_auth';
@@ -32,7 +32,10 @@ import {
   uploadAttachment,
   setFeedbackAttachment,
   addFeedbackEvent,
+  uploadWidgetPreview,
 } from '@/lib/controlroom/server/feedback';
+import { screenshotSite } from '@/lib/v0/crawler/firecrawl';
+import { getMockAccountInfo } from '@/lib/v0/klantendashboard/mock/account';
 import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
 import { notifyNewFeedback } from '@/lib/notifications/feedback-notify';
 import {
@@ -45,6 +48,8 @@ import {
   upsertQAItem,
   deleteQAItem,
   setQAActive,
+  getWidgetPreview,
+  saveWidgetPreview,
 } from '@/lib/v0/klantendashboard/server/settings';
 import type {
   AccountOverrides,
@@ -137,6 +142,70 @@ export async function saveAccountInfoAction(
     const account = await saveAccountInfo(activeOrg.slug, patch);
     revalidatePath('/klantendashboard/account', 'page');
     return { account };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Widget-preview screenshot (M6) — de "Preview Chatbot"-tab toont de widget over
+// een screenshot van de échte klant-site als sfeer-backdrop. De capture is een
+// BILLABLE Firecrawl-call (~1 credit), dus:
+//   - we doen 'm AUTOMATISCH bij de éérste preview-open en CACHEN het resultaat;
+//     een al-gecachede preview → meteen terug ZONDER Firecrawl-call (kosten-rem);
+//   - mutation-rate-limit erop (de eerste capture is duur/abuse-gevoelig);
+//   - elke fout → { url: null } → de UI valt terug op een mockup-backdrop.
+// Org server-side uit de cookie (nooit client-payload).
+// ---------------------------------------------------------------------------
+
+/** Resolveer de website-URL van de actieve org. De websiteUrl is (nog) geen
+ *  klant-aanpasbaar account-override-veld (AccountOverrides dekt alleen
+ *  companyName/contactPerson/email), dus de mock-profielen zijn de bron-van-
+ *  waarheid. '' (bv. demo-nieuw) → null = "geen screenshot, val terug op mockup". */
+async function resolveOrgWebsiteUrl(slug: OrgSlug): Promise<string | null> {
+  const mock = getMockAccountInfo(slug, { conversationsThisMonth: 0, documentsCount: 0 });
+  const url = (mock.websiteUrl ?? '').trim();
+  return url.length > 0 ? url : null;
+}
+
+export async function getWidgetPreviewAction(): Promise<ActionResult<{ url: string | null }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const cached = await getWidgetPreview(activeOrg.slug);
+    return { url: cached?.url ?? null };
+  });
+}
+
+export async function captureWidgetPreviewAction(): Promise<ActionResult<{ url: string | null }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+
+    // (a) Kosten-rem: een al-gecachede preview → meteen terug, GEEN Firecrawl-call.
+    const cached = await getWidgetPreview(activeOrg.slug);
+    if (cached) return { url: cached.url };
+
+    // Pas hier de rate-limit-poort: alleen het pad dat écht een billable capture
+    // doet wordt begrensd (cache-hits hierboven blijven gratis/onbeperkt).
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+
+    // (b) Geen website-URL (bv. demo-nieuw) → geen screenshot; UI → mockup.
+    const url = await resolveOrgWebsiteUrl(activeOrg.slug);
+    if (!url) return { url: null };
+
+    // (c) Billable best-effort capture. screenshotSite gooit nooit → null bij fout.
+    const bytes = await screenshotSite(url);
+    if (!bytes) return { url: null };
+
+    // Upload + cache. Een upload/save-fout mag de flow niet 500'en — de capture
+    // is sfeer, geen kritiek pad; de UI valt terug op de mockup.
+    try {
+      const { url: previewUrl } = await uploadWidgetPreview(activeOrg.id, bytes);
+      await saveWidgetPreview(activeOrg.slug, { url: previewUrl, capturedAt: new Date().toISOString() });
+      revalidatePath('/klantendashboard/widget', 'page');
+      return { url: previewUrl };
+    } catch (e) {
+      console.error('[captureWidgetPreview] upload/save faalde', (e as Error).message);
+      return { url: null };
+    }
   });
 }
 
