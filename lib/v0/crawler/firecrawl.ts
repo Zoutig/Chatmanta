@@ -182,6 +182,61 @@ export async function mapSite(url: string, limit: number = MAX_DISCOVER_PAGES): 
   return merged.slice(0, limit);
 }
 
+/** Timeout (ms) voor de screenshot-scrape — een screenshot-render duurt langer
+ *  dan een markdown-scrape, dus ruimer dan de poll-tick maar nog steeds gecapt. */
+const SCREENSHOT_TIMEOUT_MS = 20_000;
+
+/**
+ * Maak een homepage-screenshot van `url` en geef de PNG-bytes terug.
+ *
+ * Billable best-effort (~1 credit per call): deze functie gooit NOOIT — bij élke
+ * fout (geen key, timeout, geen screenshot-veld, fetch-fout) → null. De caller
+ * cachet het resultaat zodat we deze call hooguit één keer per org doen.
+ *
+ * Firecrawl SDK v4.25: `scrape(url, { formats: ['screenshot'] })` → `doc.screenshot`
+ * is een string. Standaard een gehoste URL naar de PNG; bij sommige configs een
+ * base64 data-URL (`data:image/...;base64,...`). We dekken beide: data-URL →
+ * decode in-process; anders → fetch de URL naar bytes.
+ */
+export async function screenshotSite(url: string): Promise<Uint8Array | null> {
+  try {
+    const doc = await withTimeout(
+      getClient().scrape(url, { formats: ['screenshot'], maxAge: SCREENSHOT_MAX_AGE_MS }),
+      SCREENSHOT_TIMEOUT_MS,
+    );
+    // Elke screenshot-scrape kost ~1 credit, ongeacht slagen/falen verderop.
+    await logFirecrawlCredits('screenshot', 1);
+
+    const shot = (doc as FirecrawlDocument).screenshot;
+    if (typeof shot !== 'string' || shot.length === 0) return null;
+
+    // Geval 1: base64 data-URL → in-process decoden, geen extra fetch.
+    const dataUrlMatch = /^data:[^;,]*;base64,(.*)$/.exec(shot);
+    if (dataUrlMatch) {
+      return new Uint8Array(Buffer.from(dataUrlMatch[1], 'base64'));
+    }
+
+    // Geval 2: gehoste URL → ophalen naar bytes (eigen timeout zodat een trage
+    // CDN de action niet laat hangen).
+    const res = await withTimeout(fetch(shot), SCREENSHOT_TIMEOUT_MS);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch {
+    // Bewust stil: een screenshot is best-effort sfeer (backdrop). De UI valt
+    // terug op een mockup. Nooit de Preview-flow breken op een billable extra.
+    return null;
+  }
+}
+
+/** maxAge voor de screenshot-scrape. Mag royaler dan content-scrapes: een
+ *  homepage-screenshot voor een sfeer-backdrop hoeft niet kakelvers te zijn, en
+ *  de app-laag cachet de uitkomst toch al per org (één call tot expliciete
+ *  refresh). 0 zou onnodig elke keer een verse render forceren als de SDK-cache
+ *  warm is — maar de app-cache voorkomt herhaalde calls sowieso, dus we laten 'm
+ *  vers (0) voor consistentie met de andere scrape-paden. */
+const SCREENSHOT_MAX_AGE_MS = 0;
+
 /** Synchrone scrape van één pagina (C1: losse import). maxAge=0 → altijd vers. */
 export async function scrapeOne(url: string): Promise<CrawledPage> {
   const doc = await getClient().scrape(url, { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS });

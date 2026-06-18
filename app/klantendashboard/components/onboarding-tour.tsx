@@ -46,8 +46,8 @@ const DEFAULT_STEPS: TourStep[] = [
   {
     selector: 'a[href="/klantendashboard/test"]',
     placement: 'right',
-    title: 'Test chatbot',
-    body: 'Stel hier zelf vragen om te checken of de antwoorden kloppen, vóór je live gaat.',
+    title: 'Preview Chatbot',
+    body: 'Zie je chatbot zoals een bezoeker hem op je eigen site ziet, en stel zelf testvragen vóór je live gaat.',
   },
   {
     selector: 'a[href="/klantendashboard/widget"]',

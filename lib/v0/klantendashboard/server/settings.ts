@@ -496,3 +496,59 @@ export async function setSetupStepSkipped(
   }
   return next;
 }
+
+// ---------------------------------------------------------------------------
+// Widget-preview screenshot-cache (M6) — de "Preview Chatbot"-tab gebruikt een
+// screenshot van de échte klant-site als sfeer-backdrop. De capture is een
+// BILLABLE Firecrawl-call (~1 credit), dus we bewaren de uitkomst { url,
+// capturedAt } in een aparte jsonb-kolom (migr 0052) + dedicated 1-koloms-
+// upsert (zoals account/setup-skips): nooit via writeOrgSettings, zodat een
+// capture nooit een gelijktijdige widget/chatbot/qa-write clobbert. Defensief
+// bij ontbrekende kolom (migratie nog niet toegepast) → null, zodat de Preview-
+// tab nooit breekt (de UI valt dan terug op een mockup).
+// ---------------------------------------------------------------------------
+export type WidgetPreview = { url: string; capturedAt: string };
+
+function parseWidgetPreview(raw: unknown): WidgetPreview | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as Record<string, unknown>;
+  const url = typeof obj.url === 'string' ? obj.url.trim() : '';
+  const capturedAt = typeof obj.capturedAt === 'string' ? obj.capturedAt.trim() : '';
+  if (!url || !capturedAt) return null;
+  return { url, capturedAt };
+}
+
+export async function getWidgetPreview(orgSlug: OrgSlug): Promise<WidgetPreview | null> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const { data, error } = await sb()
+    .from('v0_org_settings')
+    .select('widget_preview')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+  // Defensief: zolang migratie 0052 nog niet is toegepast bestaat de kolom niet →
+  // val terug op géén cache (null), zodat de Preview-tab nooit breekt. Een capture
+  // faalt dan netjes (saveWidgetPreview gooit) tot de migratie draait.
+  if (error) {
+    console.warn('[widget-preview] read faalde (migratie 0052 toegepast?):', error.message);
+    return null;
+  }
+  return parseWidgetPreview(data?.widget_preview);
+}
+
+/** Schrijf de screenshot-cache. Dedicated 1-koloms-upsert (zie account/setup-
+ *  skips). Gooit bij fout zodat de capture-action niet stilletjes "geslaagd"
+ *  meldt terwijl er niets persisteert (bv. kolom bestaat nog niet vóór 0052). */
+export async function saveWidgetPreview(
+  orgSlug: OrgSlug,
+  preview: WidgetPreview,
+): Promise<WidgetPreview> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const next: WidgetPreview = { url: preview.url, capturedAt: preview.capturedAt };
+  const { error: writeErr } = await sb()
+    .from('v0_org_settings')
+    .upsert({ organization_id: orgId, widget_preview: next }, { onConflict: 'organization_id' });
+  if (writeErr) {
+    throw new AppError('INTERNAL', { message: `widget-preview opslaan faalde: ${writeErr.message}` });
+  }
+  return next;
+}

@@ -103,7 +103,7 @@ export function Sidebar({
         <NavItem href="/klantendashboard/kennisbank" label="Kennisbank">
           <Library size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/test" label="Test chatbot">
+        <NavItem href="/klantendashboard/test" label="Preview Chatbot">
           <MessageSquareText size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/klantendashboard/instellingen" label="Instellingen">

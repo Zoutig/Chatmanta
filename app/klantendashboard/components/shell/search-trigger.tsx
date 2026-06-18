@@ -10,7 +10,7 @@ import { Search } from 'lucide-react';
 const ROUTES: { href: string; label: string; hint: string }[] = [
   { href: '/klantendashboard', label: 'Overzicht', hint: 'Dashboard & triage' },
   { href: '/klantendashboard/kennisbank', label: 'Kennisbank', hint: "Pagina's, documenten, Q&A" },
-  { href: '/klantendashboard/test', label: 'Test chatbot', hint: 'Praat met je chatbot' },
+  { href: '/klantendashboard/test', label: 'Preview Chatbot', hint: 'Zie je chatbot op je eigen site' },
   { href: '/klantendashboard/instellingen', label: 'Instellingen', hint: 'Toon, gedrag, fallback' },
   { href: '/klantendashboard/widget', label: 'Widget', hint: 'Uiterlijk & embed-code' },
   { href: '/klantendashboard/gesprekken', label: 'Gesprekken', hint: 'Alle conversaties' },

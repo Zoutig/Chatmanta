@@ -14,7 +14,7 @@ import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 const SECTION_LABELS: { match: (p: string) => boolean; label: string }[] = [
   { match: (p) => p === '/klantendashboard', label: 'Overzicht' },
   { match: (p) => p.startsWith('/klantendashboard/kennisbank'), label: 'Kennisbank' },
-  { match: (p) => p.startsWith('/klantendashboard/test'), label: 'Test chatbot' },
+  { match: (p) => p.startsWith('/klantendashboard/test'), label: 'Preview Chatbot' },
   { match: (p) => p.startsWith('/klantendashboard/instellingen'), label: 'Instellingen' },
   { match: (p) => p.startsWith('/klantendashboard/widget'), label: 'Widget' },
   { match: (p) => p.startsWith('/klantendashboard/gesprekken'), label: 'Gesprekken' },
