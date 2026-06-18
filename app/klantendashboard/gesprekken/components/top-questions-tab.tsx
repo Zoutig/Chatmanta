@@ -19,6 +19,7 @@ import {
   type QuestionConversationHit,
 } from '../../actions';
 import { StatusBadge } from '../../components/status-badge';
+import { CurrentBotAnswer } from '../../kennisbank/components/current-bot-answer';
 import { TopQuestionsConfigCard } from './top-questions-config-card';
 import type { KlantFaqRow } from '@/lib/v0/klantendashboard/server/top-questions';
 import type { TopQuestionsConfig } from '@/lib/v0/klantendashboard/types';
@@ -491,8 +492,9 @@ export function TopQuestionsTab({
                 Voeg deze vraag toe aan je Q&amp;A
               </h3>
               <p className="klant-section-help" style={{ margin: '4px 0 0' }}>
-                Schrijf het antwoord dat je chatbot moet geven. Vanaf dat moment beantwoordt
-                hij vergelijkbare vragen meteen — geen retrieval nodig.
+                Hier herschrijf je het antwoord dat de AI geeft. Bekijk eerst wat je chatbot
+                nu zegt en pas het aan waar nodig — vanaf dat moment beantwoordt hij
+                vergelijkbare vragen meteen met jouw tekst, geen retrieval nodig.
               </p>
             </div>
             <div>
@@ -503,13 +505,14 @@ export function TopQuestionsTab({
                 onChange={(e) => setDrafting({ ...drafting, question: e.target.value })}
               />
             </div>
-            <div>
-              <label className="klant-label">Antwoord</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="klant-label">Antwoord dat je chatbot moet geven</label>
+              <CurrentBotAnswer question={drafting.question} />
               <textarea
                 className="klant-textarea"
                 value={drafting.answer}
                 onChange={(e) => setDrafting({ ...drafting, answer: e.target.value })}
-                placeholder="Schrijf hier het antwoord dat je chatbot moet geven."
+                placeholder="Schrijf hier het antwoord dat je chatbot voortaan moet geven."
                 rows={4}
                 autoFocus
               />

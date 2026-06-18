@@ -7,6 +7,7 @@ import {
   setQAActiveAction,
   upsertQAItemAction,
 } from '../../actions';
+import { CurrentBotAnswer } from './current-bot-answer';
 import type { ManualQA } from '@/lib/v0/klantendashboard/types';
 
 type DraftQA = Omit<ManualQA, 'id' | 'updatedAt'> & { id?: string };
@@ -92,8 +93,9 @@ export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
         <div>
           <h3 className="klant-section-title">Handmatige Q&amp;A</h3>
           <p className="klant-section-help">
-            Voeg veelgestelde vragen toe waar je zelf het antwoord op formuleert.
-            Handig voor onderwerpen waar je chatbot anders het juiste antwoord niet zou geven.
+            Hiermee herschrijf je het antwoord dat de AI op een vraag geeft. Je voegt geen
+            losse feiten toe — je bepaalt precies wat je chatbot voortaan zegt. Handig voor
+            onderwerpen waar je chatbot anders niet het juiste antwoord zou geven.
           </p>
         </div>
         <button type="button" onClick={openNew} className="klant-btn" data-variant="primary">
@@ -313,13 +315,20 @@ export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
                 autoFocus
               />
             </div>
-            <div>
-              <label className="klant-label">Antwoord</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div>
+                <label className="klant-label">Antwoord dat je chatbot moet geven</label>
+                <p className="klant-section-help" style={{ margin: '2px 0 0' }}>
+                  Hier herschrijf je het antwoord dat de AI geeft. Bekijk eerst wat je chatbot
+                  nu zegt en pas het aan waar nodig.
+                </p>
+              </div>
+              <CurrentBotAnswer question={editing.question} />
               <textarea
                 className="klant-textarea"
                 value={editing.answer}
                 onChange={(e) => setEditing({ ...editing, answer: e.target.value })}
-                placeholder="Schrijf hier het antwoord dat je chatbot moet geven."
+                placeholder="Schrijf hier het antwoord dat je chatbot voortaan moet geven."
                 rows={4}
               />
             </div>
