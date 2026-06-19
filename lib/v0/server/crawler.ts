@@ -45,6 +45,28 @@ export function toUiPageStatus(db: string, included: boolean): WebsitePageStatus
   return 'active';
 }
 
+/** Lichtgewicht: de root-URL van de primaire (eerste, bij voorkeur niet-uitgeschakelde)
+ *  website-bron van een org — of null als er geen gecrawlde site is. Eén kleine query
+ *  (géén jobs/events/pagina's zoals getWebsiteSources). Gebruikt door de widget-preview-
+ *  screenshot zodat élke org die een site crawlde een echte URL heeft om te capturen,
+ *  los van de hardgecodeerde mock-profielen. Org-gescopet via organization_id. */
+export async function getPrimaryWebsiteRootUrl(organizationId: string): Promise<string | null> {
+  const sb = await getSystemJobClient({ reason: 'resolve_website_url' });
+  const { data } = await sb
+    .from('knowledge_sources')
+    .select('root_url, disabled_at')
+    .eq('organization_id', organizationId)
+    .eq('type', 'website')
+    .is('deleted_at', null)
+    .not('root_url', 'is', null)
+    .order('created_at', { ascending: true });
+  if (!data || data.length === 0) return null;
+  // Voorkeur voor een actieve (niet-uitgeschakelde) bron; anders de oudste met een URL.
+  const chosen = data.find((s) => s.disabled_at == null) ?? data[0];
+  const url = ((chosen.root_url as string | null) ?? '').trim();
+  return url.length > 0 ? url : null;
+}
+
 /** Alle website-bronnen van een org met laatste job + diagnostiek-events + pagina's.
  *  Bulk-queries (sources / laatste job per source / events van die jobs / pagina's),
  *  in JS geassembleerd — geen N+1. */

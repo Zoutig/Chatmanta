@@ -35,6 +35,7 @@ import {
   uploadWidgetPreview,
 } from '@/lib/controlroom/server/feedback';
 import { screenshotSite } from '@/lib/v0/crawler/firecrawl';
+import { getPrimaryWebsiteRootUrl } from '@/lib/v0/server/crawler';
 import { getMockAccountInfo } from '@/lib/v0/klantendashboard/mock/account';
 import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
 import { notifyNewFeedback } from '@/lib/notifications/feedback-notify';
@@ -161,9 +162,19 @@ export async function saveAccountInfoAction(
  *  companyName/contactPerson/email), dus de mock-profielen zijn de bron-van-
  *  waarheid. '' (bv. demo-nieuw) → null = "geen screenshot, val terug op mockup". */
 async function resolveOrgWebsiteUrl(slug: OrgSlug): Promise<string | null> {
+  // 1. De échte gecrawlde root-URL is de site die de klant scrapte — exact wat de
+  //    Preview-backdrop hoort te tonen ("screenshot van de gescrapte website"). We
+  //    proberen die EERST, want de mock-`websiteUrl` van de demo-orgs is vaak een
+  //    fictief domein (dakwerkendeboer.nl, fysioplus-utrecht.nl, …) dat niet bestaat
+  //    → Firecrawl-screenshot faalt → mockup. Een gecrawlde root-URL bestaat
+  //    gegarandeerd (er kwamen pagina's uit).
+  const crawled = await getPrimaryWebsiteRootUrl(KNOWN_ORGS[slug].id);
+  if (crawled) return crawled;
+  // 2. Terugval op het mock-profiel (demo-orgs zonder echte crawl). '' (bv.
+  //    demo-nieuw) → null = "geen screenshot, val terug op mockup".
   const mock = getMockAccountInfo(slug, { conversationsThisMonth: 0, documentsCount: 0 });
-  const url = (mock.websiteUrl ?? '').trim();
-  return url.length > 0 ? url : null;
+  const mockUrl = (mock.websiteUrl ?? '').trim();
+  return mockUrl.length > 0 ? mockUrl : null;
 }
 
 export async function getWidgetPreviewAction(): Promise<ActionResult<{ url: string | null }>> {

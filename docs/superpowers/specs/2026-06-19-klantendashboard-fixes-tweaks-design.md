@@ -58,7 +58,18 @@ uit → vaste fallback terug.
 
 ### #2 — Instellingen niet "gelijk" zichtbaar in de widget
 
-**Status:** hypothese, vereist prod-reproductie vóór fix (geen blinde gok).
+**Status (2026-06-19, na prod-onderzoek):** géén server-side cache-bug gevonden.
+Curl op prod toont: `/embed/<slug>` → `Cache-Control: private, no-cache, no-store`
++ `X-Vercel-Cache: MISS` (vers per request, `force-dynamic`); `/widget.js` →
+`max-age=0, must-revalidate` (revalideert via ETag). `widget.js` bouwt de iframe
+zonder config-caching/localStorage. **De server levert dus al verse config bij elke
+host-pagina-load.** Resterende oorzaken zijn client-side: (a) een al-geopende
+iframe update niet live (vereist host-pagina-herlaad — inherent aan iframes), of
+(b) browser-cache aan klantzijde. **→ Uit PR1 gehaald; wacht op een concrete
+reproductie van Sebastiaan** (welke instelling, waar gekeken, host-pagina herladen?).
+Geen blinde fix.
+
+**Oorspronkelijke hypothese (behouden voor context):**
 
 Bekend uit de code:
 - De echte embed `app/embed/[slug]/page.tsx` is `export const dynamic = 'force-dynamic'`
@@ -96,9 +107,18 @@ werken — wat wijst op:
 **Fix (twee delen):**
 1. **Ops:** verifieer `FIRECRAWL_API_KEY` op Vercel prod (via Vercel-MCP/Vercel-UI);
    ontbreekt 'ie → zetten + redeploy (env-wijziging werkt pas na redeploy).
-2. **Durable:** `resolveOrgWebsiteUrl` valt terug op de gecrawlde `website_sources.root_url`
-   (meest recente actieve source) wanneer het mock-`websiteUrl` leeg is. Zo krijgt
-   élke org die een site crawlde een screenshot, los van de mock-profielen.
+2. **Durable (geïmplementeerd):** `resolveOrgWebsiteUrl` probeert nu **eerst** de
+   gecrawlde `knowledge_sources.root_url` (nieuwe lichte helper `getPrimaryWebsiteRootUrl`),
+   en pas daarna het mock-`websiteUrl`. Reden: de mock-URLs van de demo-orgs zijn
+   vaak fictieve domeinen (dakwerkendeboer.nl, fysioplus-utrecht.nl, …) die niet
+   bestaan → Firecrawl-screenshot faalt. De gecrawlde root-URL is de site die de
+   klant écht scrapte ("screenshot van de gescrapte website") en bestaat gegarandeerd.
+
+   **Geverifieerd op prod (read-only):** alleen *Demo Nieuw* (mock-URL leeg, crawl
+   `v0-demo1-website.vercel.app`) en *Dev Org* hebben een echte crawl; géén org had
+   een gecachte preview (alle `widget_preview` null) — dus niemand kreeg ooit een
+   geslaagde capture, consistent met de fictieve mock-URLs. Na deploy levert het
+   openen van de Preview-tab voor Demo Nieuw een echte screenshot.
 
 **Verificatie.** Open de Preview-tab voor een org met een gecrawlde site → screenshot
 verschijnt (cache-hit op de tweede open, geen extra Firecrawl-call). Prod-check via

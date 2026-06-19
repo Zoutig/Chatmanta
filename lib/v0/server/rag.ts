@@ -1369,10 +1369,16 @@ export async function* runRagQueryStreaming(input: {
   // `let` zodat de off_topic-branch hieronder HyDE kan uitzetten (HyDE's
   // fabricatie-rescue ondermijnt anders het off-topic-signaal).
   let hydeModeActual: HydeModeResolved = resolveHydeMode(bot, hydeModeRequested);
-  // v0.5 general-knowledge toggle: gate combined with bot config. Default true
-  // for backwards-compat (older clients/scripts without the field).
-  const enableGeneralKnowledge = input.enableGeneralKnowledge !== false;
-  const generalKnowledgeActive = bot.generalKnowledgeEnabled && enableGeneralKnowledge;
+  // General-knowledge gate. Een EXPLICIETE org-/admin-opt-in
+  // (input.enableGeneralKnowledge true/false) is autoritatief en wint van de
+  // versie-default — zo werkt de klantendashboard-toggle ("mag de bot algemene
+  // kennisvragen beantwoorden?") óók op een bot-versie die GK standaard uit heeft
+  // (v0.10 = LATEST), zónder die versie-snapshot te muteren (append-only blijft
+  // intact). Callers die het veld NIET sturen (eval, oudere scripts) → undefined →
+  // terugval op de versie-default bot.generalKnowledgeEnabled, dus eval-baselines
+  // blijven exact gelijk. Fail-closed: de chat-route levert false zodra de org niet
+  // heeft opt-in'd (route.ts: `... ?? chatbotOverrides?.answerGeneralKnowledge ?? false`).
+  const generalKnowledgeActive = input.enableGeneralKnowledge ?? bot.generalKnowledgeEnabled;
   const history = (input.history ?? []).slice(-MAX_HISTORY_TURNS);
   // V0.6.2 config-aware retrieval-sizing. Bij undefined → V0_RAG_DEFAULTS
   // (v0.1-v0.6.1 ongewijzigd). V0.6.2 zet TOP_K=8, rerankInputMax=20, en
