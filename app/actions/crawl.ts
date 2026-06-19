@@ -22,6 +22,7 @@ import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
 import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v0/crawler/firecrawl';
 import { ingestSinglePage } from '@/lib/v0/crawler/processCrawl';
 import { getWebsiteSources, type WebsiteSource } from '@/lib/v0/server/crawler';
+import { purgeAnswerCache } from '@/lib/v0/server/rag';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
 import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/processJobs';
 import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
@@ -143,6 +144,8 @@ export async function deleteWebsiteSourceAction(sourceId: string): Promise<Actio
       .eq('organization_id', activeOrg.id);
     if (error) throw new Error(`knowledge_sources delete: ${error.message}`);
 
+    // Bron + pagina's + chunks weg (CASCADE) → answer-cache van deze org invalideren.
+    await purgeAnswerCache(activeOrg.id);
     revalidatePath(KENNISBANK_PATH);
     return {};
   });
@@ -188,6 +191,8 @@ export async function setPageIncludedAction(pageId: string, included: boolean): 
       .eq('id', pageId)
       .eq('organization_id', activeOrg.id);
     if (error) throw new Error(`website_pages toggle: ${error.message}`);
+    // Pagina in/uit retrieval → wat de bot vindt verandert, dus answer-cache invalideren.
+    await purgeAnswerCache(activeOrg.id);
     revalidatePath(KENNISBANK_PATH);
     return {};
   });

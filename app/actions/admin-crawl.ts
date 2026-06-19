@@ -19,7 +19,7 @@
 import { revalidatePath } from 'next/cache';
 import { KNOWN_ORGS, resolveOrgIdFromSlug } from '@/lib/v0/server/active-org';
 import { getSystemJobClient } from '@/lib/supabase/admin';
-import { ingestText, deleteDoc } from '@/lib/v0/server/rag';
+import { ingestText, deleteDoc, purgeAnswerCache } from '@/lib/v0/server/rag';
 import { extractDocText, isAllowedDocExt } from '@/lib/v0/server/doc-parse';
 import { mapSite, startBatchScrape, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v0/crawler/firecrawl';
 import { validateCrawlUrl } from '@/lib/v0/crawler/validateCrawlUrl';
@@ -144,6 +144,8 @@ export async function adminSetWebsiteSourceActiveAction(
       .eq('knowledge_source_id', sourceId)
       .eq('organization_id', orgId);
     if (pgErr) throw new Error(`website_pages bulk include: ${pgErr.message}`);
+    // Bron (de)geactiveerd → wat de bot vindt verandert, dus answer-cache invalideren.
+    await purgeAnswerCache(orgId);
     revalidate(orgSlug);
     return {};
   });
@@ -165,6 +167,8 @@ export async function adminSetPageIncludedAction(
       .eq('id', pageId)
       .eq('organization_id', orgId);
     if (error) throw new Error(`website_pages toggle: ${error.message}`);
+    // Pagina in/uit retrieval → answer-cache van deze org invalideren.
+    await purgeAnswerCache(orgId);
     revalidate(orgSlug);
     return {};
   });
@@ -194,6 +198,8 @@ export async function adminDeleteWebsiteSourceAction(
       .eq('id', sourceId)
       .eq('organization_id', orgId);
     if (error) throw new Error(`knowledge_sources delete: ${error.message}`);
+    // Bron + pagina's + chunks weg (CASCADE) → answer-cache van deze org invalideren.
+    await purgeAnswerCache(orgId);
     revalidate(orgSlug);
     return {};
   });

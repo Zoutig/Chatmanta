@@ -360,10 +360,19 @@ export async function precacheTopN(
     const item = targets[i];
     const embedding = vectors[i];
 
-    // Skip als al gecached binnen deze snapshot.
+    // Skip alleen als de gecachte rij ECHT nog bestaat. Een eerdere
+    // purgeAnswerCache (bv. na een kennisbank-/instellings-/Q&A-wijziging) kan de
+    // rij hebben verwijderd terwijl cachedAnswerId in de snapshot bleef staan —
+    // blind skippen zou het FAQ-antwoord dan permanent kwijt laten (een nieuwe
+    // pre-cache-run herstelt 'm nooit). Bestaat de rij niet meer, dan ruimen we de
+    // stale id op en cachen we opnieuw via het pad hieronder.
     if (item.cachedAnswerId) {
-      skipped += 1;
-      continue;
+      const stillExists = await cacheRowExists(client, item.cachedAnswerId, snapshot.organizationId);
+      if (stillExists) {
+        skipped += 1;
+        continue;
+      }
+      updatedItems[i] = { ...item, cachedAnswerId: null, judgeReason: undefined };
     }
 
     // 2. Hergebruik bestaande answer_cache rij als sim ≥ 0.93 voor (org, bot).
@@ -540,6 +549,27 @@ async function updateSnapshotItems(
     })
     .eq('id', id);
   if (error) throw new Error(`faq_snapshot update: ${error.message}`);
+}
+
+/** Bestaat de gerefereerde answer_cache-rij nog (binnen deze org)? Een eerdere
+ *  purgeAnswerCache kan 'm hebben verwijderd terwijl de snapshot z'n id bewaarde.
+ *  Bij een leesfout: conservatief `true` (liever skippen dan een dubbele insert). */
+async function cacheRowExists(
+  client: SupabaseClient,
+  id: string,
+  organizationId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('answer_cache')
+    .select('id')
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (error) {
+    console.warn('[faq-precache] cacheRowExists check faalde:', error.message);
+    return true;
+  }
+  return data !== null;
 }
 
 async function findExistingCacheId(
