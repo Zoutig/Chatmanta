@@ -36,7 +36,7 @@ export default async function WidgetPage() {
         welcomeMessage={settings.welcomeMessage}
         orgSlug={activeOrg.slug}
         botVersion={LATEST_BOT_VERSION}
-        starterQuestions={settings.starterQuestions}
+        starterQuestions={settings.showStarterQuestions === false ? [] : settings.starterQuestions}
       />
     </>
   );

@@ -31,7 +31,10 @@ export default async function EmbedPage({ params, searchParams }: PageProps) {
   const baseSkin = getSkin(slug);
   const orgSettings = await getOrgSettings(slug as OrgSlug);
   const skin = applyWidgetOverrides(baseSkin, {
-    starterQuestions: orgSettings.chatbot.starterQuestions,
+    // Toggle "Startsuggesties tonen" uit → lege lijst → de widget rendert geen
+    // suggestie-chips (de starterQuestions-lijst zelf blijft bewaard in settings).
+    starterQuestions:
+      orgSettings.chatbot.showStarterQuestions === false ? [] : orgSettings.chatbot.starterQuestions,
   });
   const w = orgSettings.widget;
 

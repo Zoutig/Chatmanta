@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Check, RotateCcw, Save } from 'lucide-react';
+import { Check, RotateCcw, Save, Sparkles } from 'lucide-react';
 import { saveChatbotSettingsAction } from '../../actions';
 import type { ActionResult } from '@/lib/errors/action';
 import type {
@@ -39,10 +39,21 @@ export function SettingsForm({
   initial,
   action = saveChatbotSettingsAction,
   showReset = false,
+  onGenerateStarters,
+  onGenerateFallback,
+  onAutofillContact,
 }: {
   initial: ChatbotSettings;
   action?: SaveChatbotAction;
   showReset?: boolean;
+  // AI-genereer-knoppen. Optioneel/injecteerbaar (zoals `action`): de klant-
+  // pagina geeft de cookie-org-actions mee; contexten die ze niet meegeven
+  // (bv. het admin-dashboard) tonen de knoppen simpelweg niet.
+  onGenerateStarters?: () => Promise<ActionResult<{ questions: string[] }>>;
+  onGenerateFallback?: () => Promise<ActionResult<{ message: string }>>;
+  onAutofillContact?: () => Promise<
+    ActionResult<{ contactEmail: string; contactPhone: string; contactPageUrl: string }>
+  >;
 }) {
   const [s, setS] = useState<ChatbotSettings>(initial);
   // baseline = laatst opgeslagen staat; "Terugzetten" herstelt hiernaartoe.
@@ -119,7 +130,7 @@ export function SettingsForm({
             rows={2}
           />
         </Field>
-        <Field label="Startsuggesties" hint="Voorbeeldvragen die de bezoeker direct kan klikken.">
+        <Field label="Startsuggesties" hint="Voorbeeldvragen die de bezoeker direct kan klikken — één per regel.">
           <textarea
             className="klant-textarea"
             value={s.starterQuestions.join('\n')}
@@ -132,7 +143,23 @@ export function SettingsForm({
             placeholder="Eén vraag per regel"
             rows={3}
           />
+          {onGenerateStarters && (
+            <div style={{ marginTop: 8 }}>
+              <GenerateButton
+                label="Genereer suggesties"
+                pendingLabel="Genereren…"
+                action={onGenerateStarters}
+                onResult={(d) => update('starterQuestions', d.questions)}
+              />
+            </div>
+          )}
         </Field>
+        <Toggle
+          label="Startsuggesties tonen"
+          help="Aan: de widget toont klikbare voorbeeldvragen bij een leeg gesprek. Uit: geen suggestie-chips (je vragen blijven bewaard)."
+          value={s.showStarterQuestions !== false}
+          onChange={(v) => update('showStarterQuestions', v)}
+        />
       </Section>
 
       {/* Taal */}
@@ -320,7 +347,34 @@ export function SettingsForm({
             onChange={(e) => update('fallbackMessage', e.target.value)}
             rows={3}
           />
+          {onGenerateFallback && (
+            <div style={{ marginTop: 8 }}>
+              <GenerateButton
+                label="Genereer fallback"
+                pendingLabel="Genereren…"
+                action={onGenerateFallback}
+                onResult={(d) => update('fallbackMessage', d.message)}
+              />
+            </div>
+          )}
         </Field>
+        {onAutofillContact && (
+          <div>
+            <GenerateButton
+              label="Vul contactgegevens automatisch in"
+              pendingLabel="Bezig met ophalen…"
+              action={onAutofillContact}
+              onResult={(d) => {
+                if (d.contactEmail) update('contactEmail', d.contactEmail);
+                if (d.contactPhone) update('contactPhone', d.contactPhone);
+                if (d.contactPageUrl) update('contactPageUrl', d.contactPageUrl);
+              }}
+            />
+            <div className="klant-hint" style={{ marginTop: 6 }}>
+              Leest je gecrawlde contactpagina’s en vult onderstaande velden voor je in. Controleer ze en sla op.
+            </div>
+          </div>
+        )}
         <Field label="Contact e-mailadres">
           <input
             type="email"
@@ -590,5 +644,49 @@ function Toggle({
         <div style={{ fontSize: 12, color: 'var(--klant-fg-muted)', marginTop: 2 }}>{help}</div>
       </div>
     </label>
+  );
+}
+
+/** Kleine ✨-knop die een AI-genereer-action draait en het resultaat aan de
+ *  caller teruggeeft (die het in het formulier-state zet). Eigen busy-/fout-state
+ *  per knop; gebruikt geen startTransition zodat een save niet wordt geblokkeerd. */
+function GenerateButton<T extends Record<string, unknown>>({
+  label,
+  pendingLabel,
+  action,
+  onResult,
+}: {
+  label: string;
+  pendingLabel: string;
+  action: () => Promise<ActionResult<T>>;
+  onResult: (data: T) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <button
+        type="button"
+        className="klant-btn"
+        data-variant="ghost"
+        disabled={busy}
+        onClick={async () => {
+          setErr(null);
+          setBusy(true);
+          try {
+            const res = await action();
+            if (res.ok) onResult(res);
+            else setErr(res.error);
+          } catch {
+            setErr('Er ging iets mis. Probeer het opnieuw.');
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <Sparkles size={14} strokeWidth={1.8} /> {busy ? pendingLabel : label}
+      </button>
+      {err && <span style={{ fontSize: 12, color: 'var(--klant-danger)' }}>{err}</span>}
+    </div>
   );
 }
