@@ -3079,6 +3079,12 @@ export async function ingestText({
 
   await sb.from('documents').update({ status: 'ready' }).eq('id', docId);
 
+  // Kennisbank gewijzigd → answer-cache van deze org invalideren. De cache-key
+  // bevat geen KB-revisie, dus een gecacht antwoord zou anders het oude document
+  // blijven serveren. Niet-throwend (purgeAnswerCache vangt eigen fouten) zodat een
+  // geslaagde ingest nooit op een purge-fout omvalt.
+  await purgeAnswerCache(organizationId);
+
   return {
     docId,
     chunks: chunks.length,
@@ -3098,4 +3104,6 @@ export async function deleteDoc(docId: string, organizationId: string): Promise<
     .eq('organization_id', organizationId)
     .eq('id', docId);
   if (error) throw new Error(`deleteDoc: ${error.message}`);
+  // Kennisbank-content verwijderd → answer-cache van deze org invalideren (zie ingestText).
+  await purgeAnswerCache(organizationId);
 }

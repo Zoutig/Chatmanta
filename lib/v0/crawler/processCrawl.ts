@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 // (`scripts/v0-crawl-eval.ts`, draait onder --conditions=react-server) dit
 // échte pad importeren zonder de tsx-runner te laten crashen.
 import type { getSystemJobClient } from '@/lib/supabase/admin';
-import { chunkText, embedTexts } from '@/lib/v0/server/rag';
+import { chunkText, embedTexts, purgeAnswerCache } from '@/lib/v0/server/rag';
 import type { CrawledPage } from './firecrawl';
 
 type Sb = Awaited<ReturnType<typeof getSystemJobClient>>;
@@ -182,6 +182,10 @@ export async function ingestCrawlResults(
     },
   ]);
 
+  // Kennisbank gewijzigd (crawl-ingest: oude pagina's vervangen door nieuwe) →
+  // answer-cache van deze org invalideren. Eén keer per crawl, niet per pagina.
+  await purgeAnswerCache(organizationId);
+
   return result;
 }
 
@@ -200,6 +204,10 @@ export async function ingestSinglePage(
     .delete()
     .eq('knowledge_source_id', knowledgeSourceId)
     .eq('url', page.url);
+
+  // Oude pagina-rij weg + nieuwe ingest volgt → KB-content gewijzigd, dus de
+  // answer-cache van deze org invalideren (dekt álle exit-paden hieronder).
+  await purgeAnswerCache(organizationId);
 
   const status = pageStatus(page);
   const errorMessage =
