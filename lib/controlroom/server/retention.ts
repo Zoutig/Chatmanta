@@ -1,17 +1,25 @@
-// Control Room — AVG retention-cleanup (MD §14.8). GEDOCUMENTEERDE SERVICE,
-// bewust NIET aan een cron gekoppeld in V0 (besloten: alleen config + zicht).
+// Control Room — AVG retention-cleanup (MD §14.8).
 //
-// Anonimiseert gespreks-INHOUD ouder dan de per-org chat-retentietermijn, maar
-// behoudt de METADATA (org, datum, kind, tokens, kosten) zodat usage-cijfers
-// kloppen — conform MD §14.4. Default = DRY-RUN: telt alleen. Pas met
-// `apply: true` (CLI-flag --apply) worden rijen daadwerkelijk geanonimiseerd.
+// Draait dagelijks via de Vercel-cron (app/api/v0/cron/retention/route.ts roept
+// runRetentionCleanup). Twee soorten cleanup per org:
+//   1. Chat-INHOUD ouder dan de per-org chat-retentietermijn → geANONIMISEERD
+//      (question/answer/content → '[verwijderd]'), METADATA blijft (org, datum,
+//      kind, tokens, kosten) zodat usage-cijfers kloppen — conform MD §14.4.
+//   2. Contactverzoeken (v0_contact_requests) ouder dan 90 dagen → HARD VERWIJDERD
+//      (volledige .delete(), niet anonimiseren — die rijen bevatten bezoekers-PII
+//      en de AVG eist volledige verwijdering). Eigen vaste 90d-cutoff, los van de
+//      per-org chatRetentionDays. Zie migr 0053.
+//
+// Default = DRY-RUN: telt alleen. Pas met `apply: true` (CLI-flag --apply, of de
+// cron zonder ?dryRun=1) wordt er daadwerkelijk gemuteerd/verwijderd.
 //
 // Draai handmatig via: npm run controlroom:retention   (dry-run)
 //                       npm run controlroom:retention -- --apply
 //
 // ⚠️ Destructief met --apply: query_log.question/answer en
-// v0_thread_messages.content worden overschreven met '[verwijderd]'. Niet
-// terug te draaien. Daarom dry-run als default en een expliciete flag.
+// v0_thread_messages.content worden overschreven met '[verwijderd]', en
+// contactverzoeken > 90 dagen worden fysiek verwijderd. Niet terug te draaien.
+// Daarom dry-run als default en een expliciete flag.
 
 import 'server-only';
 
@@ -29,14 +37,43 @@ export type RetentionOrgResult = {
   fullLoggingEnabled: boolean;
   queryLogCandidates: number;
   messageCandidates: number;
+  /** Contactverzoeken > 90 dagen die (zouden) worden HARD verwijderd (migr 0053). */
+  contactRequestCandidates: number;
   applied: boolean;
 };
+
+// Vaste retentietermijn voor contactverzoeken — bewust LOS van de per-org
+// chatRetentionDays (PII vereist een eigen, niet-configureerbare grens). Cutoff op
+// created_at (niet updated_at: een statuswijziging mag de klok niet resetten).
+const CONTACT_REQUEST_RETENTION_DAYS = 90;
 
 function cutoffIso(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
+}
+
+// Hard-delete van contactverzoeken ouder dan 90 dagen (op created_at). Geen
+// anonimisering zoals bij chat-rijen: de AVG eist volledige verwijdering van de
+// bezoekers-PII (naam/e-mail/telefoon). dryRun telt alleen. Org-gescoped.
+async function processContactRequests(orgId: string, apply: boolean): Promise<number> {
+  const cutoff = cutoffIso(CONTACT_REQUEST_RETENTION_DAYS);
+  const { count } = await sb()
+    .from('v0_contact_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', orgId)
+    .lt('created_at', cutoff);
+
+  if (apply) {
+    await sb()
+      .from('v0_contact_requests')
+      .delete()
+      .eq('organization_id', orgId)
+      .lt('created_at', cutoff);
+  }
+
+  return count ?? 0;
 }
 
 async function processOrg(
@@ -94,6 +131,10 @@ async function processOrg(
     }
   }
 
+  // Contactverzoeken kennen een eigen, vaste 90-daagse harde-delete-grens (los van
+  // de chat-anonimisering hierboven).
+  const contactRequestCandidates = await processContactRequests(orgId, apply);
+
   return {
     orgSlug: slug,
     orgName: name,
@@ -102,6 +143,7 @@ async function processOrg(
     fullLoggingEnabled: privacy.fullConversationLogging,
     queryLogCandidates: qlCount ?? 0,
     messageCandidates: msgCount,
+    contactRequestCandidates,
     applied: apply,
   };
 }
