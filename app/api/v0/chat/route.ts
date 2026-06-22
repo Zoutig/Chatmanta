@@ -29,6 +29,7 @@ import { getActiveOrgId, resolveOrgSlugFromId, KNOWN_ORGS } from '@/lib/v0/serve
 import { checkOrgDailyBudget } from '@/lib/v0/server/budget';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { buildContactOfferEvent } from '@/lib/v0/server/contact-offer';
+import { detectContactIntent } from '@/lib/v0/server/contact-intent';
 import {
   buildChatbotOverrides,
   type ChatbotPromptOverrides,
@@ -455,16 +456,46 @@ export async function POST(req: Request) {
           controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
         }
 
-        // M1 (contactverzoeken-skelet): ná een succesvolle drain en alleen bij
-        // een echt answer-pad een hard-coded contact-offer event yielden, achter
-        // de per-org toggle. Géén LLM — M7 vervangt dit door detectContactIntent()
-        // en vult dan de prefill. Bewust hier (route.ts) en ná answer-done, NOOIT
-        // in rag.ts: zo blijft de eval-baseline byte-identiek. Faalt de generator,
-        // dan is finalResponse geen 'answer' en/of vangt de catch — geen aanbod.
+        // M7 (contactverzoeken): ná een succesvolle drain en alleen bij een
+        // echt answer-pad een contact-offer event yielden — achter de per-org
+        // toggle én alleen als de bezoeker écht menselijk contact wil. De
+        // detectie is een goedkope, fail-safe gpt-4o-mini-call (conversatie-
+        // gericht, NIET #204's bedrijfs-extractie) die de prefill levert.
+        // Bewust hier (route.ts) en ná answer-done, NOOIT in rag.ts: zo blijft
+        // de eval-baseline byte-identiek. Faalt de generator, dan is
+        // finalResponse geen 'answer' en/of vangt de buitenste catch — geen
+        // aanbod. De smalltalk/fallback/injection-paden hebben een ander kind,
+        // dus de gate borgt dat de detectie alléén op het answer-pad draait.
         if (enableContactOffer && finalResponse?.kind === 'answer') {
-          controller.enqueue(
-            encoder.encode(JSON.stringify(buildContactOfferEvent(offerCompanyName)) + '\n'),
-          );
+          // Eigen try/catch: een detectie-fout of -hang mag NOOIT
+          // controller.close() blokkeren of de stream open laten staan. De
+          // detectie heeft zelf al een harde timeout, maar deze guard is de
+          // vangnet-laag. Kosten/tokens gaan bewust NIET naar query_log.
+          let intent: Awaited<ReturnType<typeof detectContactIntent>> = {
+            wantsContact: false,
+            prefill: {},
+          };
+          try {
+            intent = await detectContactIntent({
+              question,
+              answer: finalResponse.answer,
+              history,
+            });
+          } catch (intentErr) {
+            console.warn(
+              '[chat stream] contact-intent guard ving fout:',
+              requestId,
+              intentErr instanceof Error ? intentErr.message : intentErr,
+            );
+            intent = { wantsContact: false, prefill: {} };
+          }
+          if (intent.wantsContact) {
+            controller.enqueue(
+              encoder.encode(
+                JSON.stringify(buildContactOfferEvent(offerCompanyName, intent.prefill)) + '\n',
+              ),
+            );
+          }
         }
       } catch (err) {
         const appErr = toAppError(err);
