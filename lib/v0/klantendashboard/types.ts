@@ -408,3 +408,49 @@ export type AccountOverrides = {
   contactPerson?: string;
   email?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Contactverzoeken (bezoeker → ondernemer) — migr 0053
+// ---------------------------------------------------------------------------
+
+/** Hoe wil de bezoeker dat er contact wordt opgenomen? Stuurt welk veld
+ *  (telefoon vs e-mail) verplicht is bij submit. */
+export type PreferredContact = 'call' | 'email';
+
+/** Werkstroom-status in de Contactverzoeken-tab. */
+export type ContactRequestStatus = 'nieuw' | 'opgepakt' | 'afgehandeld';
+
+/**
+ * Eén contactverzoek-rij (v0_contact_requests). Bevat ECHTE bezoekers-PII —
+ * zie de PII-noot in migratie 0053 + de AGENTS.md V0-sandbox-disclaimer.
+ * `threadId` mag NULL zijn (zie migratie-comment: eerste-turn-race).
+ */
+export type ContactRequest = {
+  id: string;
+  threadId: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  preferredContact: PreferredContact;
+  subject: string | null;
+  toelichting: string | null;
+  status: ContactRequestStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Per-org instelling voor de contactverzoeken-functie (v0_org_settings.contact_requests).
+ * `enabled` default false (opt-in). `notificationEmail` optioneel — leeg = val
+ * terug op het account-e-mailadres in de meldings-keten.
+ */
+export type ContactRequestsSettings = {
+  enabled: boolean;
+  notificationEmail: string | null;
+};
+
+export const CONTACT_REQUESTS_DEFAULT: ContactRequestsSettings = {
+  enabled: false,
+  notificationEmail: null,
+};

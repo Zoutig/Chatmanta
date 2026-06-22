@@ -18,11 +18,13 @@ import { getMockWidgetSettings } from '../mock/widget-settings';
 import { getMockChatbotSettings } from '../mock/chatbot-settings';
 import { getMockManualQA } from '../mock/manual-qa';
 import {
+  CONTACT_REQUESTS_DEFAULT,
   SETUP_STEP_IDS,
   TOP_QUESTIONS_DEFAULT,
   TOP_QUESTIONS_LIMITS,
   type AccountOverrides,
   type ChatbotSettings,
+  type ContactRequestsSettings,
   type ManualQA,
   type SetupStepId,
   type TopQuestionsConfig,
@@ -53,6 +55,10 @@ export type OrgSettings = {
   chatbot: ChatbotSettings;
   qa: ManualQA[];
   topQuestions: TopQuestionsConfig;
+  /** Per-org contactverzoeken-instelling (toggle + meldingsadres). Meegelezen in
+   *  de bestaande single round-trip zodat de chat-route enableContactRequests
+   *  zonder extra DB-read kan lezen (F3). */
+  contactRequests: ContactRequestsSettings;
   updatedAt: string | null;
 };
 
@@ -79,6 +85,20 @@ function parseTopQuestions(raw: unknown): TopQuestionsConfig {
   return { minCount, topN };
 }
 
+// Defensieve parser voor de `contact_requests` jsonb-kolom (migr 0053). Bij
+// ontbrekende kolom (migratie nog niet toegepast), corrupte of lege jsonb val
+// terug op de opt-in-veilige default {enabled:false, notificationEmail:null}.
+function parseContactRequestsSettings(raw: unknown): ContactRequestsSettings {
+  if (!raw || typeof raw !== 'object') return CONTACT_REQUESTS_DEFAULT;
+  const obj = raw as Record<string, unknown>;
+  const enabled = obj.enabled === true;
+  const notificationEmail =
+    typeof obj.notificationEmail === 'string' && obj.notificationEmail.trim()
+      ? obj.notificationEmail.trim()
+      : null;
+  return { enabled, notificationEmail };
+}
+
 // ---------------------------------------------------------------------------
 // Read: merge DB-row met mock-defaults
 // ---------------------------------------------------------------------------
@@ -93,13 +113,13 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
   try {
     const { data, error } = await sb()
       .from('v0_org_settings')
-      .select('widget, chatbot, qa, top_questions, updated_at')
+      .select('widget, chatbot, qa, top_questions, contact_requests, updated_at')
       .eq('organization_id', orgId)
       .maybeSingle();
     if (error) throw error;
 
     if (!data) {
-      return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, updatedAt: null };
+      return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, contactRequests: CONTACT_REQUESTS_DEFAULT, updatedAt: null };
     }
 
     // Partial-merge: alleen velden die in jsonb staan overschrijven; rest blijft default.
@@ -115,6 +135,7 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
       // qa heeft geen "merge"-semantiek — als de array bestaat, gebruik 'm; anders default.
       qa: Array.isArray(data.qa) && data.qa.length > 0 ? (data.qa as ManualQA[]) : defaults.qa,
       topQuestions: parseTopQuestions(data.top_questions),
+      contactRequests: parseContactRequestsSettings(data.contact_requests),
       updatedAt: data.updated_at as string,
     };
   } catch (err) {
@@ -122,7 +143,7 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[getOrgSettings] DB read failed, using mock defaults', err);
     }
-    return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, updatedAt: null };
+    return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, contactRequests: CONTACT_REQUESTS_DEFAULT, updatedAt: null };
   }
 }
 
@@ -551,4 +572,66 @@ export async function saveWidgetPreview(
     throw new AppError('INTERNAL', { message: `widget-preview opslaan faalde: ${writeErr.message}` });
   }
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Contactverzoeken-instelling (migr 0053) — per-org toggle + optioneel
+// meldingsadres in de `contact_requests` jsonb-kolom. Dedicated 1-koloms-upsert
+// (zoals account/setup_skips/widget_preview): NOOIT via writeOrgSettings, zodat
+// het aanzetten van contactverzoeken nooit een gelijktijdige widget/chatbot/qa-
+// write clobbert (en andersom). De chat-route leest de toggle uit de bredere
+// getOrgSettings-read (geen extra DB-read); deze getter is voor de Instellingen-
+// UI die alléén de contact-instelling nodig heeft. Defensief bij ontbrekende
+// kolom (migratie nog niet toegepast) → opt-in-veilige default.
+// ---------------------------------------------------------------------------
+export async function getContactRequestsSettings(
+  orgSlug: OrgSlug,
+): Promise<ContactRequestsSettings> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const { data, error } = await sb()
+    .from('v0_org_settings')
+    .select('contact_requests')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+  if (error) {
+    console.warn('[contact-requests] read faalde (migratie 0053 toegepast?):', error.message);
+    return CONTACT_REQUESTS_DEFAULT;
+  }
+  return parseContactRequestsSettings(data?.contact_requests);
+}
+
+/** Schrijf de contactverzoeken-instelling. Lege/whitespace notificationEmail →
+ *  null (val terug op account-e-mail in de meldings-keten). Gooit bij fout zodat
+ *  de UI niet stilletjes "Opgeslagen" meldt terwijl er niets persisteert. */
+export async function saveContactRequestsSettings(
+  orgSlug: OrgSlug,
+  patch: Partial<ContactRequestsSettings>,
+): Promise<ContactRequestsSettings> {
+  const orgId = KNOWN_ORGS[orgSlug].id;
+  const current = await getContactRequestsSettings(orgSlug);
+  const next: ContactRequestsSettings = {
+    enabled: patch.enabled ?? current.enabled,
+    notificationEmail:
+      'notificationEmail' in patch
+        ? normalizeNotificationEmail(patch.notificationEmail ?? null)
+        : current.notificationEmail,
+  };
+  const { error: writeErr } = await sb()
+    .from('v0_org_settings')
+    .upsert({ organization_id: orgId, contact_requests: next }, { onConflict: 'organization_id' });
+  if (writeErr) {
+    throw new AppError('INTERNAL', { message: `contactverzoeken-instelling opslaan faalde: ${writeErr.message}` });
+  }
+  return next;
+}
+
+/** Valideer + normaliseer het optionele meldingsadres. Leeg → null. Ongeldig
+ *  formaat → AppError (de UI toont dat). */
+function normalizeNotificationEmail(value: string | null): string | null {
+  const t = (value ?? '').trim();
+  if (!t) return null;
+  if (!EMAIL_RE.test(t)) {
+    throw new AppError('INPUT_INVALID', { message: 'Vul een geldig meldings-e-mailadres in (of laat het leeg).' });
+  }
+  return t;
 }

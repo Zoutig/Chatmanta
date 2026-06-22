@@ -25,9 +25,10 @@ import {
   INJECTION_BLOCKED_MESSAGE,
 } from '@/lib/v0/server/injection';
 import { getClientIp, getRateLimiter, getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
-import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
+import { getActiveOrgId, resolveOrgSlugFromId, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { checkOrgDailyBudget } from '@/lib/v0/server/budget';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import { buildContactOfferEvent } from '@/lib/v0/server/contact-offer';
 import {
   buildChatbotOverrides,
   type ChatbotPromptOverrides,
@@ -66,6 +67,7 @@ type Body = {
   threshold?: unknown;
   enableRewrite?: unknown;
   enableGeneralKnowledge?: unknown;
+  enableContactRequests?: unknown;
   version?: unknown;
   history?: unknown;
   tone?: unknown;
@@ -189,6 +191,10 @@ export async function POST(req: Request) {
   // dan leiden we het ná de settings-load af uit de org-toggle (default uit).
   const explicitGeneralKnowledge =
     typeof body.enableGeneralKnowledge === 'boolean' ? body.enableGeneralKnowledge : undefined;
+  // Contactverzoeken-toggle override (admin/test-panel). Widget/embed stuurt niets
+  // → afgeleid ná de settings-load uit de per-org toggle (default uit).
+  const explicitContactRequests =
+    typeof body.enableContactRequests === 'boolean' ? body.enableContactRequests : undefined;
   const version = typeof body.version === 'string' ? body.version : '';
   const history = parseHistory(body.history);
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
@@ -345,11 +351,13 @@ export async function POST(req: Request) {
   const orgSlug = resolveOrgSlugFromId(organizationId);
   let manualQAItems: ManualQA[] = [];
   let chatbotOverrides: ChatbotPromptOverrides | undefined;
+  let contactRequestsEnabled = false;
   if (orgSlug) {
     try {
       const settings = await getOrgSettings(orgSlug);
       manualQAItems = settings.qa.filter((q) => q.active);
       chatbotOverrides = buildChatbotOverrides(settings.chatbot);
+      contactRequestsEnabled = settings.contactRequests.enabled;
     } catch {
       // getOrgSettings throws zelden — alleen als zowel DB als de mock-fallback
       // falen. Pipeline draait gewoon door zonder overrides en zonder Q&A.
@@ -368,6 +376,13 @@ export async function POST(req: Request) {
   // fail-closed naar uit (conform anti-hallucinatie hard rule).
   const enableGeneralKnowledge =
     explicitGeneralKnowledge ?? chatbotOverrides?.answerGeneralKnowledge ?? false;
+
+  // Contactverzoeken: aanbod-gate. Body-override (admin/test) → per-org toggle →
+  // uit. Bepaalt of de chat ná het antwoord een `contact-offer` event yieldt.
+  // Raakt het antwoordpad NIET (event komt ná de drain, vóór close) — zo blijft
+  // de eval-baseline byte-identiek.
+  const enableContactOffer = explicitContactRequests ?? contactRequestsEnabled;
+  const offerCompanyName = (orgSlug ? KNOWN_ORGS[orgSlug]?.name : null) ?? 'dit bedrijf';
 
   const generator = runRagQueryStreaming({
     question,
@@ -438,6 +453,18 @@ export async function POST(req: Request) {
           const enriched =
             event.kind === 'error' ? { ...event, requestId } : event;
           controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
+        }
+
+        // M1 (contactverzoeken-skelet): ná een succesvolle drain en alleen bij
+        // een echt answer-pad een hard-coded contact-offer event yielden, achter
+        // de per-org toggle. Géén LLM — M7 vervangt dit door detectContactIntent()
+        // en vult dan de prefill. Bewust hier (route.ts) en ná answer-done, NOOIT
+        // in rag.ts: zo blijft de eval-baseline byte-identiek. Faalt de generator,
+        // dan is finalResponse geen 'answer' en/of vangt de catch — geen aanbod.
+        if (enableContactOffer && finalResponse?.kind === 'answer') {
+          controller.enqueue(
+            encoder.encode(JSON.stringify(buildContactOfferEvent(offerCompanyName)) + '\n'),
+          );
         }
       } catch (err) {
         const appErr = toAppError(err);
