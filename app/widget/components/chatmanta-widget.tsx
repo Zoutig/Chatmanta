@@ -18,6 +18,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ChatResponse } from '@/lib/v0/server/rag';
+// Alleen het TYPE — het contact-offer event-payload (incl. consentText) komt via
+// de stream binnen, géén runtime-import. Zie lib/v0/server/contact-offer.ts.
+import type { ContactOfferPrefill } from '@/lib/v0/server/contact-offer';
 // C4 (v0.10) — canonieke code→leesbare-NL-melding mapping. Pure modules (geen
 // server-only), dus veilig in de client/embed-bundle.
 import { fromWire } from '@/lib/errors/app-error';
@@ -45,6 +48,11 @@ type Message =
       queryLogId?: string;
       feedbackState?: FeedbackState;
       feedbackComment?: string;
+      // Contactverzoeken (M2): bij een 'contact-offer' stream-event zetten we dit
+      // op de antwoord-bubble. Eerst tonen we een aanbod-bubble met "Ja"-knop;
+      // bij "Ja" rendert ÉÉN ContactFormCard. BEWUST één variant — geen generieke
+      // card-discriminator (scope-pin, zie SPEC "buiten scope").
+      contactCard?: { prefill: ContactOfferPrefill; consentText: string };
     };
 
 export type ChatMantaWidgetProps = {
@@ -382,6 +390,66 @@ export function ChatMantaWidget({
       return null;
     }
   }, [orgSlug]);
+
+  // Contactverzoeken (M2): submit het formulier-kaartje naar de M3-route. Spiegelt
+  // EXACT de chat-fetch: zelfde org-slug (?org=), zelfde headers x-chatmanta-embed
+  // (token) + x-chatmanta-visitor (visitor-id), en dezelfde 401→token-refresh→1×-
+  // retry zodat een verlopen 30-min-token een trage invuller niet de lead kost.
+  // Geeft een grof resultaat terug; de ContactFormCard vertaalt het naar UI-state.
+  const submitContactRequest = useCallback(
+    async (payload: {
+      name: string;
+      email: string | null;
+      phone: string | null;
+      preferredContact: 'call' | 'email';
+      subject: string | null;
+      toelichting: string | null;
+      // Honeypot — leeg bij echte bezoekers; gaat één-op-één mee naar de route.
+      company_url: string;
+    }): Promise<'ok' | 'error'> => {
+      // Zelfde visitor-identiteit als de chat (zie runChat): cookie-onafhankelijk,
+      // werkt in een third-party iframe waar de Lax-cookie geblokkeerd is.
+      const visitorId =
+        visitorIdRef.current ?? (visitorIdRef.current = getOrCreateVisitorId());
+
+      // POST-helper — herbruikt voor de retry ná een token-refresh (idem runChat).
+      const postRequest = (token: string | undefined) =>
+        fetch(`/api/v0/contact-request?org=${encodeURIComponent(orgSlug)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'x-chatmanta-embed': token } : {}),
+            ...(visitorId ? { 'x-chatmanta-visitor': visitorId } : {}),
+          },
+          body: JSON.stringify({
+            name: payload.name,
+            email: payload.email,
+            phone: payload.phone,
+            preferredContact: payload.preferredContact,
+            subject: payload.subject,
+            toelichting: payload.toelichting,
+            consentGiven: true,
+            visitorId,
+            company_url: payload.company_url,
+          }),
+        });
+
+      try {
+        let res = await postRequest(embedTokenRef.current);
+        // Verlopen embed-token (lang openstaand formulier) → eenmalig vers token +
+        // herhalen. Zelfde flow als de chat-fetch.
+        if ((res.status === 401 || res.status === 403) && embedTokenRef.current) {
+          const fresh = await refreshEmbedToken();
+          if (fresh) res = await postRequest(fresh);
+        }
+        // 200 (idempotent / honeypot-stil-ok) én 201 (nieuw) tellen als succes.
+        return res.ok ? 'ok' : 'error';
+      } catch {
+        return 'error';
+      }
+    },
+    [orgSlug, refreshEmbedToken],
+  );
 
   // C9 (v0.10) — AVG-verwijderpad: de bezoeker wist zijn eigen gesprekken. De
   // visitor-id gaat als header mee (zelfde identiteit als de chat) zodat de server
@@ -1092,6 +1160,19 @@ export function ChatMantaWidget({
                       onSkipComment={() => void submitFeedback(m.id, 'down')}
                     />
                   )}
+                  {/* Contactverzoeken (M2): contact-offer event hing een kaartje aan
+                      deze bubble. Het aanbod + formulier krijgen hun eigen "ja-
+                      geklikt"-state ín ContactOffer (geen ephemerale vlag op het
+                      Message-type). */}
+                  {m.contactCard && (
+                    <ContactOffer
+                      headerColor={c.header}
+                      companyName={companyName}
+                      prefill={m.contactCard.prefill}
+                      consentText={m.contactCard.consentText}
+                      onSubmit={submitContactRequest}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -1344,6 +1425,23 @@ function handleEvent(
     return;
   }
 
+  // Contactverzoeken (M2): yield ná answer-done (zie contact-offer.ts). Hangt het
+  // formulier-aanbod aan de zojuist afgeronde antwoord-bubble. consentText + prefill
+  // komen kant-en-klaar uit het event — alleen platte-tekst, nooit als HTML.
+  if (e.kind === 'contact-offer') {
+    const ev = e as { prefill?: ContactOfferPrefill; consentText?: unknown };
+    const consentText = typeof ev.consentText === 'string' ? ev.consentText : '';
+    if (!consentText) return; // zonder consent-zin geen formulier (fail-closed)
+    const p = ev.prefill ?? {};
+    const prefill: ContactOfferPrefill = {
+      name: typeof p.name === 'string' ? p.name : undefined,
+      subject: typeof p.subject === 'string' ? p.subject : undefined,
+      toelichting: typeof p.toelichting === 'string' ? p.toelichting : undefined,
+    };
+    updateAssistant(setMessages, assistantId, { contactCard: { prefill, consentText } });
+    return;
+  }
+
   if (e.kind === 'error') {
     // C4: map de echte AppError-code op een leesbare NL-melding (fromWire normaliseert
     // onbekende codes → INTERNAL). Vangt RATE_LIMIT (was de dode 'RATE_LIMITED'-tak),
@@ -1372,6 +1470,368 @@ function updateAssistant(
     next[idx] = { ...cur, ...patch };
     return next;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Contactverzoeken (M2) — aanbod-bubble + formulier-kaartje.
+//
+// BEWUST inline-gestyled met de widget-kleurtokens (c.header / bestForegroundOn /
+// withAlpha) — NIET via klant.css / var(--klant-*), want die bestaan niet in de
+// embed-iframe (zie feedback-form.tsx → kapotte kaart). Eén vaste vorm, geen
+// generieke card-infra.
+// ---------------------------------------------------------------------------
+
+// Client-side spiegels van de server-validatie in /api/v0/contact-request:
+//   email: dezelfde EEN-@-EEN-punt-regel; phone: /^[\d+\s()\/.-]{5,20}$/.
+// Lokale kopie i.p.v. een import uit lib/notifications (server-module → embed-
+// bundle vies). De server blijft sowieso de hard-gate; dit is alleen UX.
+const CONTACT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CONTACT_PHONE_RE = /^[\d+\s()\/.-]{5,20}$/;
+
+// Het contact-aanbod: eerst een nette bot-bubble met een "Ja"-knop. Bij "Ja"
+// verschijnt ÉÉN ContactFormCard; geen klik = de bezoeker chat gewoon verder.
+function ContactOffer({
+  headerColor,
+  companyName,
+  prefill,
+  consentText,
+  onSubmit,
+}: {
+  headerColor: string;
+  companyName: string;
+  prefill: ContactOfferPrefill;
+  consentText: string;
+  onSubmit: (payload: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    preferredContact: 'call' | 'email';
+    subject: string | null;
+    toelichting: string | null;
+    company_url: string;
+  }) => Promise<'ok' | 'error'>;
+}) {
+  // 'offer' = aanbod-bubble met Ja-knop; 'form' = formulier open; 'done' = verstuurd.
+  const [phase, setPhase] = useState<'offer' | 'form' | 'done'>('offer');
+  const naam = companyName.trim() || 'dit bedrijf';
+
+  if (phase === 'done') {
+    return (
+      <div style={{ marginTop: 8 }}>
+        <BotBubble color={headerColor}>
+          Bedankt! {naam} neemt zo snel mogelijk contact met je op.
+        </BotBubble>
+      </div>
+    );
+  }
+
+  if (phase === 'form') {
+    return (
+      <div style={{ marginTop: 8 }}>
+        <ContactFormCard
+          headerColor={headerColor}
+          prefill={prefill}
+          consentText={consentText}
+          onSubmit={onSubmit}
+          onDone={() => setPhase('done')}
+        />
+      </div>
+    );
+  }
+
+  // phase === 'offer'
+  return (
+    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <BotBubble color={headerColor}>
+        Wil je dat we contact met je opnemen? Laat je gegevens achter, dan neemt {naam}{' '}
+        contact met je op.
+      </BotBubble>
+      <button
+        type="button"
+        onClick={() => setPhase('form')}
+        style={{
+          alignSelf: 'flex-start',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          background: headerColor,
+          color: bestForegroundOn(headerColor),
+          border: 'none',
+          borderRadius: 10,
+          padding: '8px 14px',
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        Ja, neem contact op
+      </button>
+    </div>
+  );
+}
+
+// Het formulier-kaartje zelf. Exact 5 zichtbare velden (naam, voorkeur-radio,
+// e-mail, telefoon, onderwerp/toelichting) + consent-checkbox + verborgen
+// honeypot. prefill vult naam/onderwerp/toelichting voor (platte tekst, value=…
+// → nooit als HTML/markdown). De bezoeker kan alles aanpassen.
+function ContactFormCard({
+  headerColor,
+  prefill,
+  consentText,
+  onSubmit,
+  onDone,
+}: {
+  headerColor: string;
+  prefill: ContactOfferPrefill;
+  consentText: string;
+  onSubmit: (payload: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    preferredContact: 'call' | 'email';
+    subject: string | null;
+    toelichting: string | null;
+    company_url: string;
+  }) => Promise<'ok' | 'error'>;
+  onDone: () => void;
+}) {
+  const [name, setName] = useState(prefill.name ?? '');
+  const [preferred, setPreferred] = useState<'call' | 'email'>('email');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  // Onderwerp + toelichting samengevoegd tot één veld in de UI (Q4: "onderwerp/
+  // toelichting"); we sturen de waarde als `toelichting` mee. Onderwerp uit de
+  // prefill prependen we als context zodat de bot-voorvulling niet verloren gaat.
+  const initialToelichting =
+    [prefill.subject?.trim(), prefill.toelichting?.trim()].filter(Boolean).join('\n').trim();
+  const [toelichting, setToelichting] = useState(initialToelichting);
+  const [consent, setConsent] = useState(false);
+  // Honeypot — leeg laten; alleen bots vullen 'm. Echte hidden-techniek (off-screen
+  // + aria-hidden + tabIndex -1), NIET display:none-only, zodat bots 'm wél zien.
+  const [companyUrl, setCompanyUrl] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const emailOk = CONTACT_EMAIL_RE.test(email.trim());
+  const phoneOk = CONTACT_PHONE_RE.test(phone.trim());
+  // Client-side spiegel van de server-validatie: naam verplicht; voorkeur bepaalt
+  // welk contactveld verplicht + geldig moet zijn; consent verplicht aangevinkt.
+  const canSubmit =
+    name.trim().length > 0 &&
+    consent &&
+    (preferred === 'call' ? phoneOk : emailOk) &&
+    !pending;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setError(null);
+    setPending(true);
+    const result = await onSubmit({
+      name: name.trim(),
+      // Stuur beide velden mee indien ingevuld; de route filtert een ongeldig
+      // niet-voorkeursveld zelf weg (DB eist alleen ÉÉN van e-mail/telefoon).
+      email: email.trim() || null,
+      phone: phone.trim() || null,
+      preferredContact: preferred,
+      subject: null,
+      toelichting: toelichting.trim() || null,
+      company_url: companyUrl,
+    });
+    setPending(false);
+    if (result === 'ok') {
+      onDone();
+    } else {
+      setError('Versturen is niet gelukt. Probeer het zo nog eens.');
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: `1px solid ${withAlpha(headerColor, 0.28)}`,
+    fontSize: 13,
+    fontFamily: 'inherit',
+    color: '#0e1014',
+    background: '#ffffff',
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#374151',
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        background: '#ffffff',
+        border: `1px solid ${withAlpha(headerColor, 0.2)}`,
+        borderRadius: 12,
+        padding: 14,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 11,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        maxWidth: '92%',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <label style={labelStyle} htmlFor="cm-cr-name">Naam *</label>
+        <input
+          id="cm-cr-name"
+          style={inputStyle}
+          value={name}
+          onChange={(ev) => setName(ev.target.value)}
+          autoComplete="name"
+          placeholder="Je naam"
+          required
+        />
+      </div>
+
+      {/* Voorkeur-radio: bepaalt welk veld verplicht is (bellen→telefoon,
+          mailen→e-mail). Spiegelt de server-side dynamische validatie. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={labelStyle}>Hoe wil je dat we contact opnemen? *</span>
+        <div role="radiogroup" aria-label="Voorkeur contact" style={{ display: 'flex', gap: 8 }}>
+          {([
+            { value: 'email', label: 'Mailen' },
+            { value: 'call', label: 'Bellen' },
+          ] as const).map((o) => {
+            const active = preferred === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setPreferred(o.value)}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${active ? headerColor : withAlpha(headerColor, 0.28)}`,
+                  background: active ? withAlpha(headerColor, 0.1) : '#ffffff',
+                  color: active ? headerColor : '#6b7280',
+                  fontSize: 13,
+                  fontWeight: active ? 600 : 500,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <label style={labelStyle} htmlFor="cm-cr-email">
+          E-mailadres{preferred === 'email' ? ' *' : ' (optioneel)'}
+        </label>
+        <input
+          id="cm-cr-email"
+          type="email"
+          inputMode="email"
+          style={inputStyle}
+          value={email}
+          onChange={(ev) => setEmail(ev.target.value)}
+          autoComplete="email"
+          placeholder="jij@voorbeeld.nl"
+          required={preferred === 'email'}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <label style={labelStyle} htmlFor="cm-cr-phone">
+          Telefoonnummer{preferred === 'call' ? ' *' : ' (optioneel)'}
+        </label>
+        <input
+          id="cm-cr-phone"
+          type="tel"
+          inputMode="tel"
+          style={inputStyle}
+          value={phone}
+          onChange={(ev) => setPhone(ev.target.value)}
+          autoComplete="tel"
+          placeholder="06 12 34 56 78"
+          required={preferred === 'call'}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <label style={labelStyle} htmlFor="cm-cr-toel">Waar gaat het over?</label>
+        <textarea
+          id="cm-cr-toel"
+          style={{ ...inputStyle, resize: 'vertical', minHeight: 64, lineHeight: 1.45 }}
+          rows={3}
+          value={toelichting}
+          onChange={(ev) => setToelichting(ev.target.value)}
+          placeholder="Korte toelichting (optioneel)"
+        />
+      </div>
+
+      {/* Verborgen honeypot — off-screen + aria-hidden + niet-focusbaar. NIET
+          display:none, zodat bots het invullen en wij ze kunnen weren. */}
+      <input
+        type="text"
+        name="company_url"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        value={companyUrl}
+        onChange={(ev) => setCompanyUrl(ev.target.value)}
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          width: 1,
+          height: 1,
+          opacity: 0,
+          pointerEvents: 'none',
+        }}
+      />
+
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: '#374151', lineHeight: 1.4 }}>
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(ev) => setConsent(ev.target.checked)}
+          style={{ marginTop: 2, flexShrink: 0 }}
+          required
+        />
+        <span>{consentText}</span>
+      </label>
+
+      {error && (
+        <div role="alert" style={{ fontSize: 12.5, color: '#b91c1c' }}>
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!canSubmit}
+        style={{
+          alignSelf: 'flex-end',
+          background: canSubmit ? headerColor : withAlpha(headerColor, 0.4),
+          color: bestForegroundOn(headerColor),
+          border: 'none',
+          borderRadius: 10,
+          padding: '8px 16px',
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: canSubmit ? 'pointer' : 'not-allowed',
+          fontFamily: 'inherit',
+        }}
+      >
+        {pending ? 'Bezig…' : 'Versturen'}
+      </button>
+    </form>
+  );
 }
 
 // ---------------------------------------------------------------------------

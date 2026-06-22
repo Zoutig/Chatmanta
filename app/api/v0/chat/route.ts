@@ -25,9 +25,11 @@ import {
   INJECTION_BLOCKED_MESSAGE,
 } from '@/lib/v0/server/injection';
 import { getClientIp, getRateLimiter, getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
-import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
+import { getActiveOrgId, resolveOrgSlugFromId, KNOWN_ORGS } from '@/lib/v0/server/active-org';
 import { checkOrgDailyBudget } from '@/lib/v0/server/budget';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
+import { buildContactOfferEvent } from '@/lib/v0/server/contact-offer';
+import { detectContactIntent } from '@/lib/v0/server/contact-intent';
 import {
   buildChatbotOverrides,
   type ChatbotPromptOverrides,
@@ -66,6 +68,7 @@ type Body = {
   threshold?: unknown;
   enableRewrite?: unknown;
   enableGeneralKnowledge?: unknown;
+  enableContactRequests?: unknown;
   version?: unknown;
   history?: unknown;
   tone?: unknown;
@@ -189,6 +192,15 @@ export async function POST(req: Request) {
   // dan leiden we het ná de settings-load af uit de org-toggle (default uit).
   const explicitGeneralKnowledge =
     typeof body.enableGeneralKnowledge === 'boolean' ? body.enableGeneralKnowledge : undefined;
+  // Contactverzoeken-toggle override — ALLEEN voor cookie-geauthenticeerde callers
+  // (admin/test-panel). Een publieke embed-caller mag de override NIET sturen: dat
+  // zou de gpt-4o-mini-intentiecall + het aanbod kunnen forceren terwijl de org-
+  // toggle uit staat (onnodig kostenoppervlak + schending van de toggle-uit-
+  // invariant). Publiek/embed → afgeleid uit de per-org toggle (default uit).
+  const explicitContactRequests =
+    isCookieAuthed(req) && typeof body.enableContactRequests === 'boolean'
+      ? body.enableContactRequests
+      : undefined;
   const version = typeof body.version === 'string' ? body.version : '';
   const history = parseHistory(body.history);
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });
@@ -345,11 +357,13 @@ export async function POST(req: Request) {
   const orgSlug = resolveOrgSlugFromId(organizationId);
   let manualQAItems: ManualQA[] = [];
   let chatbotOverrides: ChatbotPromptOverrides | undefined;
+  let contactRequestsEnabled = false;
   if (orgSlug) {
     try {
       const settings = await getOrgSettings(orgSlug);
       manualQAItems = settings.qa.filter((q) => q.active);
       chatbotOverrides = buildChatbotOverrides(settings.chatbot);
+      contactRequestsEnabled = settings.contactRequests.enabled;
     } catch {
       // getOrgSettings throws zelden — alleen als zowel DB als de mock-fallback
       // falen. Pipeline draait gewoon door zonder overrides en zonder Q&A.
@@ -368,6 +382,13 @@ export async function POST(req: Request) {
   // fail-closed naar uit (conform anti-hallucinatie hard rule).
   const enableGeneralKnowledge =
     explicitGeneralKnowledge ?? chatbotOverrides?.answerGeneralKnowledge ?? false;
+
+  // Contactverzoeken: aanbod-gate. Body-override (admin/test) → per-org toggle →
+  // uit. Bepaalt of de chat ná het antwoord een `contact-offer` event yieldt.
+  // Raakt het antwoordpad NIET (event komt ná de drain, vóór close) — zo blijft
+  // de eval-baseline byte-identiek.
+  const enableContactOffer = explicitContactRequests ?? contactRequestsEnabled;
+  const offerCompanyName = (orgSlug ? KNOWN_ORGS[orgSlug]?.name : null) ?? 'dit bedrijf';
 
   const generator = runRagQueryStreaming({
     question,
@@ -438,6 +459,48 @@ export async function POST(req: Request) {
           const enriched =
             event.kind === 'error' ? { ...event, requestId } : event;
           controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
+        }
+
+        // M7 (contactverzoeken): ná een succesvolle drain en alleen bij een
+        // echt answer-pad een contact-offer event yielden — achter de per-org
+        // toggle én alleen als de bezoeker écht menselijk contact wil. De
+        // detectie is een goedkope, fail-safe gpt-4o-mini-call (conversatie-
+        // gericht, NIET #204's bedrijfs-extractie) die de prefill levert.
+        // Bewust hier (route.ts) en ná answer-done, NOOIT in rag.ts: zo blijft
+        // de eval-baseline byte-identiek. Faalt de generator, dan is
+        // finalResponse geen 'answer' en/of vangt de buitenste catch — geen
+        // aanbod. De smalltalk/fallback/injection-paden hebben een ander kind,
+        // dus de gate borgt dat de detectie alléén op het answer-pad draait.
+        if (enableContactOffer && finalResponse?.kind === 'answer') {
+          // Eigen try/catch: een detectie-fout of -hang mag NOOIT
+          // controller.close() blokkeren of de stream open laten staan. De
+          // detectie heeft zelf al een harde timeout, maar deze guard is de
+          // vangnet-laag. Kosten/tokens gaan bewust NIET naar query_log.
+          let intent: Awaited<ReturnType<typeof detectContactIntent>> = {
+            wantsContact: false,
+            prefill: {},
+          };
+          try {
+            intent = await detectContactIntent({
+              question,
+              answer: finalResponse.answer,
+              history,
+            });
+          } catch (intentErr) {
+            console.warn(
+              '[chat stream] contact-intent guard ving fout:',
+              requestId,
+              intentErr instanceof Error ? intentErr.message : intentErr,
+            );
+            intent = { wantsContact: false, prefill: {} };
+          }
+          if (intent.wantsContact) {
+            controller.enqueue(
+              encoder.encode(
+                JSON.stringify(buildContactOfferEvent(offerCompanyName, intent.prefill)) + '\n',
+              ),
+            );
+          }
         }
       } catch (err) {
         const appErr = toAppError(err);

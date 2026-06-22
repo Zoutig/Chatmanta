@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { Check, RotateCcw, Save, Sparkles } from 'lucide-react';
-import { saveChatbotSettingsAction } from '../../actions';
+import { saveChatbotSettingsAction, saveContactRequestsSettingsAction } from '../../actions';
 import type { ActionResult } from '@/lib/errors/action';
 import type {
   AnswerLength,
   ChatbotSettings,
+  ContactRequestsSettings,
   Language,
   SourceStrictness,
   ToneOfVoice,
@@ -546,6 +547,201 @@ export function SettingsForm({
         </div>
       )}
     </form>
+  );
+}
+
+/** Contactverzoeken-instelling (migr 0053). Eigen sectie + eigen save-action
+ *  (saveContactRequestsSettingsAction), bewust LOS van het chatbot-settings-
+ *  formulier hierboven: de toggle schrijft een aparte jsonb-kolom en mag een
+ *  gelijktijdige chatbot-save niet clobberen. Volgt het #199-patroon: aanzetten
+ *  vraagt bevestiging (de bot gaat dan PII van bezoekers verzamelen), uitzetten
+ *  gaat direct. Optioneel meldingsadres — leeg = val terug op het account-e-mail. */
+export function ContactRequestsSection({
+  initial,
+  action = saveContactRequestsSettingsAction,
+}: {
+  initial: ContactRequestsSettings;
+  action?: (
+    patch: Partial<ContactRequestsSettings>,
+  ) => Promise<ActionResult<{ contactRequests: ContactRequestsSettings }>>;
+}) {
+  const [enabled, setEnabled] = useState(initial.enabled);
+  const [email, setEmail] = useState(initial.notificationEmail ?? '');
+  const [baselineEmail, setBaselineEmail] = useState(initial.notificationEmail ?? '');
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const emailDirty = email.trim() !== baselineEmail.trim();
+
+  function persist(patch: Partial<ContactRequestsSettings>) {
+    setSaved(false);
+    setError(null);
+    startTransition(async () => {
+      const res = await action(patch);
+      if (res.ok) {
+        setEnabled(res.contactRequests.enabled);
+        const nextEmail = res.contactRequests.notificationEmail ?? '';
+        setEmail(nextEmail);
+        setBaselineEmail(nextEmail);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  function toggle(next: boolean) {
+    // Aanzetten vereist bevestiging (PII-verzameling); uitzetten gaat direct.
+    if (next) {
+      setConfirmOpen(true);
+    } else {
+      persist({ enabled: false });
+    }
+  }
+
+  return (
+    <Section
+      title="Contactverzoeken"
+      help="Laat je chatbot bezoekers met een contactvraag een kort terugbel- of mailverzoek achterlaten. Verzoeken verschijnen in de tab Contactverzoeken; je krijgt er een e-mail van."
+    >
+      <Toggle
+        label="Contactverzoeken inschakelen"
+        help="Standaard uit. Aan: merkt de chatbot dat een bezoeker contact wil (terugbellen, offerte), dan biedt hij ná het antwoord een kort formulier aan."
+        value={enabled}
+        onChange={toggle}
+      />
+      {enabled && (
+        <Field
+          label="Meldings-e-mailadres (optioneel)"
+          hint="Naar welk adres gaan nieuwe contactverzoeken? Laat leeg om het account-e-mailadres te gebruiken."
+        >
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="email"
+              className="klant-input"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setSaved(false);
+              }}
+              placeholder="bijv. info@jouwbedrijf.nl"
+              style={{ maxWidth: 320 }}
+            />
+            <button
+              type="button"
+              className="klant-btn"
+              data-variant="primary"
+              disabled={pending || !emailDirty}
+              onClick={() => persist({ notificationEmail: email.trim() || null })}
+            >
+              {pending ? 'Bezig…' : 'Opslaan'}
+            </button>
+          </div>
+        </Field>
+      )}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 18 }}>
+        {error && <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>}
+        {saved && (
+          <span
+            style={{
+              fontSize: 13,
+              color: 'var(--klant-success)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <Check size={14} /> Opgeslagen
+          </span>
+        )}
+      </div>
+
+      {/* Bevestiging vóór aanzetten (PII-verzameling) — zelfde modal-patroon als
+          de algemene-kennis-toggle (#199). */}
+      {confirmOpen && (
+        <div
+          onClick={() => setConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            zIndex: 100,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20,
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Contactverzoeken inschakelen"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="klant-card"
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              background: 'var(--klant-bg-elev)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 18,
+                fontWeight: 600,
+                fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+                color: 'var(--klant-fg)',
+              }}
+            >
+              Contactverzoeken inschakelen?
+            </h3>
+            <div
+              style={{
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: 'var(--klant-fg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                <strong>Wat verandert er:</strong>{' '}Merkt je chatbot dat een bezoeker contact met
+                een mens wil, dan biedt hij ná zijn antwoord aan om je te laten terugbellen of
+                mailen. Zegt de bezoeker ja, dan vult die een kort formulier in (naam, contact,
+                korte toelichting, toestemming).
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>Wat betekent dat:</strong>{' '}Je verzamelt dan persoonsgegevens van
+                bezoekers. Die landen in de tab Contactverzoeken en worden na 90 dagen automatisch
+                verwijderd. Zorg dat je deze gegevens conform de AVG verwerkt.
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+              <button type="button" className="klant-btn" onClick={() => setConfirmOpen(false)}>
+                Annuleren
+              </button>
+              <button
+                type="button"
+                className="klant-btn"
+                data-variant="primary"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  persist({ enabled: true });
+                }}
+              >
+                Ja, inschakelen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 

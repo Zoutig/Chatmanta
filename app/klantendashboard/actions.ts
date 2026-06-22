@@ -58,10 +58,12 @@ import {
   setQAActive,
   getWidgetPreview,
   saveWidgetPreview,
+  saveContactRequestsSettings,
 } from '@/lib/v0/klantendashboard/server/settings';
 import type {
   AccountOverrides,
   ChatbotSettings,
+  ContactRequestsSettings,
   ManualQA,
   TopQuestionsConfig,
   WidgetSettings,
@@ -136,6 +138,24 @@ export async function saveChatbotSettingsAction(
     // direct zichtbaar zijn.
     revalidatePath('/widget', 'layout');
     return { chatbot };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Contactverzoeken-instelling (migr 0053) — per-org toggle + optioneel
+// meldingsadres. Eigen 1-koloms-upsert (saveContactRequestsSettings), los van de
+// chatbot-settings-form: aanzetten clobbert geen gelijktijdige widget/chatbot/qa-
+// write. Org server-side uit de cookie (nooit client-payload). 'layout'-revalidatie
+// dekt zowel de Instellingen-pagina als de sidebar-NavItem/badge.
+// ---------------------------------------------------------------------------
+export async function saveContactRequestsSettingsAction(
+  patch: Partial<ContactRequestsSettings>,
+): Promise<ActionResult<{ contactRequests: ContactRequestsSettings }>> {
+  return actionTry(async () => {
+    const activeOrg = await getActiveOrgFromCookies();
+    const contactRequests = await saveContactRequestsSettings(activeOrg.slug, patch);
+    revalidatePath('/klantendashboard', 'layout');
+    return { contactRequests };
   });
 }
 
