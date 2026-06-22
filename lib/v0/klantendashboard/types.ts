@@ -186,6 +186,12 @@ export type ChatbotSettings = {
   companyDescription: string;
   welcomeMessage: string;
   starterQuestions: string[];
+  /**
+   * Toont de widget de startsuggestie-chips? Optioneel — `undefined`/`true` =
+   * tonen (backwards-compat met bestaande rijen/mocks), `false` = verbergen. De
+   * `starterQuestions`-lijst zelf blijft bewaard, zodat weer aanzetten ze herstelt.
+   */
+  showStarterQuestions?: boolean;
 
   // Taal
   primaryLanguage: Language;

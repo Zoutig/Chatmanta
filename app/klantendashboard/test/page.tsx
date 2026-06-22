@@ -71,7 +71,7 @@ export default async function TestPage() {
         orgSlug={activeOrg.slug}
         botVersion={LATEST_BOT_VERSION}
         welcomeMessage={settings.chatbot.welcomeMessage}
-        starterQuestions={settings.chatbot.starterQuestions}
+        starterQuestions={settings.chatbot.showStarterQuestions === false ? [] : settings.chatbot.starterQuestions}
         widget={settings.widget}
         chatbotName={settings.chatbot.chatbotName}
         websiteHost={websiteHost}

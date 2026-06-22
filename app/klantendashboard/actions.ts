@@ -36,6 +36,13 @@ import {
 } from '@/lib/controlroom/server/feedback';
 import { screenshotSite } from '@/lib/v0/crawler/firecrawl';
 import { getPrimaryWebsiteRootUrl } from '@/lib/v0/server/crawler';
+import {
+  generateStarterQuestions,
+  generateFallbackMessage,
+  extractContactInfo,
+  type ExtractedContact,
+} from '@/lib/v0/klantendashboard/server/generate';
+import { getKlantFaqSnapshot } from '@/lib/v0/klantendashboard/server/faq-klant';
 import { getMockAccountInfo } from '@/lib/v0/klantendashboard/mock/account';
 import { parseFeedbackForm, assertValidAttachment } from '@/lib/controlroom/feedback-validate';
 import { notifyNewFeedback } from '@/lib/notifications/feedback-notify';
@@ -646,4 +653,101 @@ export async function getKlantPageContentAction(
       text: (pg.content_text as string | null) ?? '',
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// AI-genereer-knoppen (Instellingen) — drie kleine, klant-getriggerde gpt-4o-mini
+// calls die helpen de settings in te vullen. Defense-in-depth + cost-rem:
+// requireV0Auth + mutation-rate-limit + org server-side uit de cookie. De
+// generate-helpers zijn best-effort (gooien niet, geven leeg terug) — we mappen
+// een leeg resultaat naar een nette action-error zodat de UI feedback geeft.
+// ---------------------------------------------------------------------------
+
+/** #4 — genereer startsuggesties uit bedrijfsomschrijving + meest-gestelde vragen. */
+export async function generateStarterQuestionsAction(): Promise<ActionResult<{ questions: string[] }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+
+    const activeOrg = await getActiveOrgFromCookies();
+    const settings = await getOrgSettings(activeOrg.slug);
+    const snap = await getKlantFaqSnapshot(activeOrg.id);
+    const topQuestions = (snap?.items ?? []).slice(0, 8).map((i) => i.question);
+
+    const questions = await generateStarterQuestions({
+      chatbotName: settings.chatbot.chatbotName,
+      companyDescription: settings.chatbot.companyDescription,
+      primaryLanguage: settings.chatbot.primaryLanguage,
+      topQuestions,
+    });
+    if (questions.length === 0) fail('INTERNAL', 'Kon geen suggesties genereren. Probeer het zo nog eens.');
+    return { questions };
+  });
+}
+
+/** #5 — genereer een fallbackbericht toegesneden op het bedrijf + toon + contact. */
+export async function generateFallbackMessageAction(): Promise<ActionResult<{ message: string }>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+
+    const activeOrg = await getActiveOrgFromCookies();
+    const c = (await getOrgSettings(activeOrg.slug)).chatbot;
+    const message = await generateFallbackMessage({
+      chatbotName: c.chatbotName,
+      companyDescription: c.companyDescription,
+      toneOfVoice: c.toneOfVoice,
+      contactEmail: c.contactEmail,
+      contactPhone: c.contactPhone,
+      contactPageUrl: c.contactPageUrl,
+      primaryLanguage: c.primaryLanguage,
+    });
+    if (!message) fail('INTERNAL', 'Kon geen fallbackbericht genereren. Probeer het zo nog eens.');
+    return { message };
+  });
+}
+
+/** #6 — extraheer contactgegevens uit de gecrawlde contact-/over-ons-pagina's. */
+export async function extractContactInfoAction(): Promise<ActionResult<ExtractedContact>> {
+  return actionTry(async () => {
+    await requireV0Auth();
+    const limit = await checkMutationLimit();
+    if (!limit.allowed) fail('RATE_LIMIT', limit.message, limit.retryAfterSec);
+
+    const activeOrg = await getActiveOrgFromCookies();
+    const pagesText = await collectContactPagesText(activeOrg.id);
+    if (!pagesText) {
+      fail('NOT_FOUND', 'Geen gecrawlde pagina’s gevonden. Crawl eerst je website in de Kennisbank.');
+    }
+    const info = await extractContactInfo({ pagesText });
+    if (!info.contactEmail && !info.contactPhone && !info.contactPageUrl) {
+      fail('NOT_FOUND', 'Geen contactgegevens gevonden op je gecrawlde pagina’s. Vul ze handmatig in.');
+    }
+    return info;
+  });
+}
+
+/** Verzamel de tekst van de meest contact-relevante gecrawlde pagina's (org-
+ *  gescopet service-role-read, zoals getKlantPageContentAction). Prefereert
+ *  contact-/over-ons-pagina's; anders een kleine sample. Begrensd zodat de
+ *  LLM-prompt klein blijft. */
+async function collectContactPagesText(orgId: string): Promise<string> {
+  const sb = await getSystemJobClient({ reason: 'extract_contact_info' });
+  const { data } = await sb
+    .from('website_pages')
+    .select('url, title, content_text')
+    .eq('organization_id', orgId)
+    .is('deleted_at', null)
+    .limit(200);
+  const pages = (data ?? []).filter((p) => ((p.content_text as string | null) ?? '').trim().length > 0);
+  if (pages.length === 0) return '';
+  const CONTACT_RE = /contact|over-?ons|about|colofon|bereik/i;
+  const preferred = pages.filter((p) => CONTACT_RE.test(`${p.url ?? ''} ${p.title ?? ''}`));
+  const chosen = (preferred.length > 0 ? preferred : pages).slice(0, 5);
+  return chosen
+    .map((p) => `URL: ${p.url ?? ''}\n${((p.content_text as string) ?? '').slice(0, 4000)}`)
+    .join('\n\n---\n\n')
+    .slice(0, 16000);
 }
