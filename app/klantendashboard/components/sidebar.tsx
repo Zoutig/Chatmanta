@@ -8,6 +8,7 @@ import {
   MessagesSquare,
   CircleUserRound,
   MessageSquarePlus,
+  PhoneCall,
 } from 'lucide-react';
 import { NavItem } from './nav-item';
 import { OrgSwitcher } from './org-switcher';
@@ -18,11 +19,17 @@ export function Sidebar({
   activeOrg,
   orgs,
   unansweredCount = 0,
+  showContactRequests = false,
+  contactRequestsCount = 0,
 }: {
   activeOrg: { slug: OrgSlug; name: string };
   orgs: KnownOrg[];
   /** Onbeantwoorde vragen → badge op Gesprekken. */
   unansweredCount?: number;
+  /** Toggle aan → de Contactverzoeken-NavItem tonen (default uit, opt-in). */
+  showContactRequests?: boolean;
+  /** Aantal "Nieuw" → badge op Contactverzoeken. */
+  contactRequestsCount?: number;
 }) {
   return (
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
@@ -115,6 +122,15 @@ export function Sidebar({
         <NavItem href="/klantendashboard/gesprekken" label="Gesprekken" badge={unansweredCount}>
           <MessagesSquare size={17} strokeWidth={1.7} />
         </NavItem>
+        {showContactRequests && (
+          <NavItem
+            href="/klantendashboard/contactverzoeken"
+            label="Contactverzoeken"
+            badge={contactRequestsCount}
+          >
+            <PhoneCall size={17} strokeWidth={1.7} />
+          </NavItem>
+        )}
         <NavItem href="/klantendashboard/account" label="Account">
           <CircleUserRound size={17} strokeWidth={1.7} />
         </NavItem>

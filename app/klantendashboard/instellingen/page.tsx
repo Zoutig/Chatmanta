@@ -8,7 +8,7 @@
 import { getActiveOrgFromCookies } from '@/lib/v0/server/active-org';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { PageHead } from '../components/ui/page-head';
-import { SettingsForm } from './components/settings-form';
+import { SettingsForm, ContactRequestsSection } from './components/settings-form';
 import {
   generateStarterQuestionsAction,
   generateFallbackMessageAction,
@@ -29,13 +29,16 @@ export default async function InstellingenPage() {
         subtitle="Naam, taal, toon en gedrag — en wat je chatbot doet als hij een antwoord niet weet. Wijzigingen gelden zodra je opslaat."
       />
 
-      <SettingsForm
-        key={activeOrg.slug}
-        initial={settings.chatbot}
-        onGenerateStarters={generateStarterQuestionsAction}
-        onGenerateFallback={generateFallbackMessageAction}
-        onAutofillContact={extractContactInfoAction}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <SettingsForm
+          key={activeOrg.slug}
+          initial={settings.chatbot}
+          onGenerateStarters={generateStarterQuestionsAction}
+          onGenerateFallback={generateFallbackMessageAction}
+          onAutofillContact={extractContactInfoAction}
+        />
+        <ContactRequestsSection key={`cr-${activeOrg.slug}`} initial={settings.contactRequests} />
+      </div>
     </>
   );
 }

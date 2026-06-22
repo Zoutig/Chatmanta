@@ -12,6 +12,8 @@ import { getMockChatbotSettings } from '@/lib/v0/klantendashboard/mock/chatbot-s
 import { getMockWidgetSettings } from '@/lib/v0/klantendashboard/mock/widget-settings';
 import { countUnansweredThreads } from '@/lib/v0/klantendashboard/server/conversations';
 import { countRecentNegativeFeedback } from '@/lib/v0/klantendashboard/server/feedback';
+import { getContactRequestsSettings } from '@/lib/v0/klantendashboard/server/settings';
+import { countContactRequestsNew } from '@/lib/v0/klantendashboard/server/contact-requests-read';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { Sidebar } from './components/sidebar';
 import { Topbar } from './components/topbar';
@@ -50,9 +52,15 @@ export default async function KlantendashboardLayout({
   const orgs = listKnownOrgs();
   const widget = getMockWidgetSettings(activeOrg.slug);
   const settings = getMockChatbotSettings(activeOrg.slug);
-  const [unanswered, negativeFeedbackCount] = await Promise.all([
+  // Contactverzoeken-toggle bepaalt of de NavItem + badge zichtbaar zijn. Alleen
+  // bij toggle aan halen we de "Nieuw"-count op (geen overbodige query als uit).
+  const contactRequestsSettings = await getContactRequestsSettings(activeOrg.slug);
+  const [unanswered, negativeFeedbackCount, contactRequestsCount] = await Promise.all([
     countUnansweredThreads(activeOrg.slug),
     countRecentNegativeFeedback(activeOrg.slug),
+    contactRequestsSettings.enabled
+      ? countContactRequestsNew(activeOrg.slug)
+      : Promise.resolve(0),
   ]);
 
   // Approximation: heeft de org chatbot-name + welcome → mag in "testing".
@@ -63,7 +71,13 @@ export default async function KlantendashboardLayout({
 
   return (
     <div data-klant-scope className="klant-shell">
-      <Sidebar activeOrg={activeOrg} orgs={orgs} unansweredCount={unanswered.count} />
+      <Sidebar
+        activeOrg={activeOrg}
+        orgs={orgs}
+        unansweredCount={unanswered.count}
+        showContactRequests={contactRequestsSettings.enabled}
+        contactRequestsCount={contactRequestsCount}
+      />
       <Topbar
         orgName={activeOrg.name}
         chatbotStatus={chatbotStatus}

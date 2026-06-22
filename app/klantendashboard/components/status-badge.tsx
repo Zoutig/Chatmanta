@@ -4,6 +4,7 @@ import type {
   WebsitePageStatus,
   DocumentStatus,
   ConversationStatus,
+  ContactRequestStatus,
 } from '@/lib/v0/klantendashboard/types';
 
 type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
@@ -40,12 +41,19 @@ const CONV_LABEL: Record<ConversationStatus, { label: string; tone: Tone }> = {
   feedback: { label: 'Feedback', tone: 'info' },
 };
 
+const CONTACT_REQUEST_LABEL: Record<ContactRequestStatus, { label: string; tone: Tone }> = {
+  nieuw: { label: 'Nieuw', tone: 'warning' },
+  opgepakt: { label: 'Opgepakt', tone: 'info' },
+  afgehandeld: { label: 'Afgehandeld', tone: 'success' },
+};
+
 type StatusBadgeProps =
   | { status: ChatbotStatus; kind?: 'chatbot' }
   | { status: WidgetStatus; kind: 'widget' }
   | { status: WebsitePageStatus; kind: 'webpage' }
   | { status: DocumentStatus; kind: 'document' }
   | { status: ConversationStatus; kind: 'conversation' }
+  | { status: ContactRequestStatus; kind: 'contactRequest' }
   | { label: string; tone: Tone; kind: 'custom' };
 
 export function StatusBadge(props: StatusBadgeProps) {
@@ -63,6 +71,8 @@ export function StatusBadge(props: StatusBadgeProps) {
     ({ label, tone } = DOC_LABEL[props.status]);
   } else if (props.kind === 'conversation') {
     ({ label, tone } = CONV_LABEL[props.status]);
+  } else if (props.kind === 'contactRequest') {
+    ({ label, tone } = CONTACT_REQUEST_LABEL[props.status]);
   } else {
     ({ label, tone } = CHATBOT_LABEL[props.status]);
   }
