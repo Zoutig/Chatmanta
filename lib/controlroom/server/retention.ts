@@ -24,6 +24,7 @@
 import 'server-only';
 
 import { listKnownOrgs } from '@/lib/v0/server/active-org';
+import { CONTACT_RETENTION_DAYS } from '@/lib/v0/server/contact-offer';
 import { RETENTION_REDACTED as REDACTED } from '@/lib/v0/retention-sentinel';
 import { PRIVACY_DEFAULTS } from '../types';
 import { sb } from './db';
@@ -42,10 +43,12 @@ export type RetentionOrgResult = {
   applied: boolean;
 };
 
-// Vaste retentietermijn voor contactverzoeken — bewust LOS van de per-org
+// Retentietermijn voor contactverzoeken — bewust LOS van de per-org
 // chatRetentionDays (PII vereist een eigen, niet-configureerbare grens). Cutoff op
 // created_at (niet updated_at: een statuswijziging mag de klok niet resetten).
-const CONTACT_REQUEST_RETENTION_DAYS = 90;
+// ÉÉN bron-van-waarheid met de AVG-consent-zin in de widget: geïmporteerd uit
+// contact-offer.ts, zodat de "na N dagen verwijderd"-belofte nooit kan afwijken
+// van de echte harde-delete-grens.
 
 function cutoffIso(days: number): string {
   const d = new Date();
@@ -58,7 +61,7 @@ function cutoffIso(days: number): string {
 // anonimisering zoals bij chat-rijen: de AVG eist volledige verwijdering van de
 // bezoekers-PII (naam/e-mail/telefoon). dryRun telt alleen. Org-gescoped.
 async function processContactRequests(orgId: string, apply: boolean): Promise<number> {
-  const cutoff = cutoffIso(CONTACT_REQUEST_RETENTION_DAYS);
+  const cutoff = cutoffIso(CONTACT_RETENTION_DAYS);
   const { count, error: countErr } = await sb()
     .from('v0_contact_requests')
     .select('id', { count: 'exact', head: true })
