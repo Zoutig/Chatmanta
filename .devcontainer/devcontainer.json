@@ -1,0 +1,52 @@
+// ChatManta dev-container.
+//
+// Wat dit is: een afgesloten, reproduceerbare ontwikkelomgeving. Wie dit project
+// op een nieuwe PC opent (Docker + VS Code "Reopen in Container"), krijgt exact
+// dezelfde Node-versie, tools en dependencies — zonder handmatig installeren.
+//
+// Uitleg voor beginners + de stappen op een nieuwe PC staan in docs/DEVCONTAINER.md.
+//
+// Format-referentie: https://containers.dev/implementors/json_reference/
+{
+  "name": "ChatManta (Next.js 16 + Node 20)",
+
+  // Microsoft's kant-en-klare image: bevat Node 20, npm, git en een non-root
+  // 'node'-gebruiker. Node 20 matcht de projectbaseline (zie docs/ONBOARDING.md
+  // "Node.js 20+"). Wil je later naar de Vercel-runtime mee? Bump naar 22-bookworm.
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20-bookworm",
+
+  // Extra gereedschap bovenop de image.
+  "features": {
+    // GitHub CLI (`gh`) — gebruikt voor PR's maken/mergen.
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  // BEWUST GEEN egress-firewall. De app praat over HTTPS met OpenAI, Supabase,
+  // Firecrawl, Upstash en Vercel. Een dichtgetimmerd netwerk zou de RAG-flow,
+  // evals en `npm run migrate` stilletjes breken. Niet toevoegen zonder reden.
+
+  // Dev-server doorzetten naar de host-browser.
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "Next.js dev server", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",        // ESLint
+        "bradlc.vscode-tailwindcss",     // Tailwind IntelliSense
+        "anthropic.claude-code"          // Claude Code-extensie (CLI zit ook in de container, zie onder)
+      ]
+    }
+  },
+
+  // Draait éénmalig nadat de container is aangemaakt:
+  //  1. `npm ci`  — dependencies exact volgens package-lock.json installeren.
+  //  2. globale CLI's — Claude Code (meteen klaar in de container) + Vercel CLI
+  //     (voor `vercel env pull`, zie de geheimen-stap in docs/DEVCONTAINER.md).
+  "postCreateCommand": "npm ci && npm install -g @anthropic-ai/claude-code vercel",
+
+  // Draai als de non-root gebruiker uit de image (veiliger + npm-global werkt).
+  "remoteUser": "node"
+}
