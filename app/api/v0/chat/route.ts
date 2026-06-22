@@ -192,10 +192,15 @@ export async function POST(req: Request) {
   // dan leiden we het ná de settings-load af uit de org-toggle (default uit).
   const explicitGeneralKnowledge =
     typeof body.enableGeneralKnowledge === 'boolean' ? body.enableGeneralKnowledge : undefined;
-  // Contactverzoeken-toggle override (admin/test-panel). Widget/embed stuurt niets
-  // → afgeleid ná de settings-load uit de per-org toggle (default uit).
+  // Contactverzoeken-toggle override — ALLEEN voor cookie-geauthenticeerde callers
+  // (admin/test-panel). Een publieke embed-caller mag de override NIET sturen: dat
+  // zou de gpt-4o-mini-intentiecall + het aanbod kunnen forceren terwijl de org-
+  // toggle uit staat (onnodig kostenoppervlak + schending van de toggle-uit-
+  // invariant). Publiek/embed → afgeleid uit de per-org toggle (default uit).
   const explicitContactRequests =
-    typeof body.enableContactRequests === 'boolean' ? body.enableContactRequests : undefined;
+    isCookieAuthed(req) && typeof body.enableContactRequests === 'boolean'
+      ? body.enableContactRequests
+      : undefined;
   const version = typeof body.version === 'string' ? body.version : '';
   const history = parseHistory(body.history);
   const { tone, length } = normalizeStyle({ tone: body.tone, length: body.length });

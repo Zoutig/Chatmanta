@@ -59,18 +59,26 @@ function cutoffIso(days: number): string {
 // bezoekers-PII (naam/e-mail/telefoon). dryRun telt alleen. Org-gescoped.
 async function processContactRequests(orgId: string, apply: boolean): Promise<number> {
   const cutoff = cutoffIso(CONTACT_REQUEST_RETENTION_DAYS);
-  const { count } = await sb()
+  const { count, error: countErr } = await sb()
     .from('v0_contact_requests')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId)
     .lt('created_at', cutoff);
+  // Luid loggen i.p.v. stil 0 teruggeven (bv. als migr 0053 niet is toegepast) —
+  // consistent met de rest van de retentie-/dashboard-laag.
+  if (countErr) {
+    console.error('[retention] contactverzoeken-telling faalde org=%s: %s', orgId, countErr.message);
+  }
 
   if (apply) {
-    await sb()
+    const { error: delErr } = await sb()
       .from('v0_contact_requests')
       .delete()
       .eq('organization_id', orgId)
       .lt('created_at', cutoff);
+    if (delErr) {
+      console.error('[retention] contactverzoeken-delete faalde org=%s: %s', orgId, delErr.message);
+    }
   }
 
   return count ?? 0;
