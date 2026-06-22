@@ -111,12 +111,29 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
   };
 
   try {
-    const { data, error } = await sb()
+    // Hoofd-read INCL. contact_requests (F3: één round-trip, zodat de chat-route
+    // de toggle leest zonder extra query). Defensief tegen het migrate-vóór-deploy-
+    // venster: bestaat de kolom nog niet (migr 0053 nog niet toegepast), dan faalt
+    // de select OP die kolom — herhaal dan ZONDER contact_requests, zodat bestaande
+    // widget/chatbot/qa-settings NIET org-breed naar mock terugvallen. Spiegelt de
+    // defensieve losse reads van account/setup_skips/widget_preview.
+    let data: Record<string, unknown> | null;
+    const primary = await sb()
       .from('v0_org_settings')
       .select('widget, chatbot, qa, top_questions, contact_requests, updated_at')
       .eq('organization_id', orgId)
       .maybeSingle();
-    if (error) throw error;
+    if (primary.error) {
+      const fallback = await sb()
+        .from('v0_org_settings')
+        .select('widget, chatbot, qa, top_questions, updated_at')
+        .eq('organization_id', orgId)
+        .maybeSingle();
+      if (fallback.error) throw fallback.error;
+      data = fallback.data as Record<string, unknown> | null;
+    } else {
+      data = primary.data as Record<string, unknown> | null;
+    }
 
     if (!data) {
       return { ...defaults, topQuestions: TOP_QUESTIONS_DEFAULT, contactRequests: CONTACT_REQUESTS_DEFAULT, updatedAt: null };
