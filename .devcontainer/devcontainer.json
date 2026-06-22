@@ -45,7 +45,10 @@
   //  1. `npm ci`  — dependencies exact volgens package-lock.json installeren.
   //  2. globale CLI's — Claude Code (meteen klaar in de container) + Vercel CLI
   //     (voor `vercel env pull`, zie de geheimen-stap in docs/DEVCONTAINER.md).
-  "postCreateCommand": "npm ci && npm install -g @anthropic-ai/claude-code vercel",
+  // Het echo aan het eind is je "klaar"-signaal: zolang je dit nog niet in de
+  // postCreate-log ziet, is de container nog aan het installeren — wacht daarop
+  // voor je `claude`/`vercel` test (anders lijken ze nog te ontbreken).
+  "postCreateCommand": "npm ci && npm install -g @anthropic-ai/claude-code vercel && echo '== Dev-container klaar: Node + Claude Code + Vercel CLI geinstalleerd =='",
 
   // Draai als de non-root gebruiker uit de image (veiliger + npm-global werkt).
   "remoteUser": "node"
