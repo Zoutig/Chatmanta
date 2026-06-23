@@ -16,19 +16,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 
 export type LatencyWindow = '24h' | '7d' | 'all';
 
@@ -153,7 +141,7 @@ export async function getLatencySnapshot(
   organizationId: string,
   window: LatencyWindow = '7d',
 ): Promise<LatencySnapshot> {
-  const client = sb();
+  const client = getServiceRoleClient();
   const since: string | null =
     window === '24h'
       ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()

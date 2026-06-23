@@ -10,23 +10,8 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import { DEV_ORG_ID, type ChatResponse } from './rag';
-
-// ---------------------------------------------------------------------------
-// Lazy client (private, mirrors rag.ts pattern — V0 is wegwerp, duplicate is ok)
-// ---------------------------------------------------------------------------
-let _supabase: SupabaseClient | null = null;
-function db(): SupabaseClient {
-  if (_supabase) return _supabase;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _supabase = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _supabase;
-}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -83,7 +68,7 @@ function deriveTitle(firstUserMessage: string): string {
 // v0.4 multi-org: scope op actieve org. Default DEV_ORG voor backward compat.
 // ---------------------------------------------------------------------------
 export async function listThreads(organizationId: string = DEV_ORG_ID): Promise<ThreadSummary[]> {
-  const sb = db();
+  const sb = getServiceRoleClient();
   const { data: threads, error } = await sb
     .from('v0_threads')
     .select('id, bot_version, title, created_at, updated_at')
@@ -124,7 +109,7 @@ export async function getThread(
   threadId: string,
   organizationId: string = DEV_ORG_ID,
 ): Promise<ThreadDetail | null> {
-  const sb = db();
+  const sb = getServiceRoleClient();
   const { data: t, error: tErr } = await sb
     .from('v0_threads')
     .select('id, bot_version, title, created_at, updated_at')
@@ -200,7 +185,7 @@ export async function commitTurn(opts: {
   visitorId?: string;
 }): Promise<{ summary: ThreadSummary }> {
   const orgId = opts.organizationId ?? DEV_ORG_ID;
-  const sb = db();
+  const sb = getServiceRoleClient();
   const trimmedUser = opts.userContent.trim();
   if (trimmedUser.length === 0) {
     throw new Error('commitTurn: userContent is empty');
@@ -339,7 +324,7 @@ export async function findRecentThreadByVisitor(
   visitorId: string,
   idleHours = 24,
 ): Promise<string | null> {
-  const sb = db();
+  const sb = getServiceRoleClient();
   const sinceIso = new Date(Date.now() - idleHours * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb
     .from('v0_threads')
@@ -363,7 +348,7 @@ export async function deleteThread(
   threadId: string,
   organizationId: string = DEV_ORG_ID,
 ): Promise<void> {
-  const sb = db();
+  const sb = getServiceRoleClient();
   const { error } = await sb
     .from('v0_threads')
     .update({ deleted_at: new Date().toISOString() })
@@ -390,7 +375,7 @@ export async function deleteVisitorData(
 ): Promise<{ threadsDeleted: number; messagesDeleted: number }> {
   if (!organizationId) throw new Error('deleteVisitorData: organizationId verplicht');
   if (!visitorId) return { threadsDeleted: 0, messagesDeleted: 0 };
-  const sb = db();
+  const sb = getServiceRoleClient();
 
   // 1. Thread-ids van deze visitor BINNEN deze org (de org-grens).
   const { data: threads, error: selErr } = await sb

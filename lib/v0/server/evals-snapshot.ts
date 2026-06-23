@@ -18,24 +18,12 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import { DEV_ORG_ID, type PhaseTimings } from './rag';
 
 // Re-export zodat UI-componenten PhaseTimings via deze module kunnen importeren
 // zonder direct in server-internals (./rag) te reiken.
 export type { PhaseTimings };
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 export type EvalSnapshotQuestion = {
   id: string;
@@ -124,7 +112,7 @@ function safeStageTimings(raw: unknown): PhaseTimings | null {
 }
 
 export async function getEvalSnapshot(): Promise<EvalSnapshot> {
-  const client = sb();
+  const client = getServiceRoleClient();
 
   // 1. eval_questions
   const { data: qRows, error: qErr } = await client

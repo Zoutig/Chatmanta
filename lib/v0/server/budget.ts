@@ -17,7 +17,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 
 // Ruime default zodat legitiem gebruik (incl. interne test-tool) er praktisch nooit
 // tegenaan loopt — ~$2/dag ≈ duizenden gpt-4o-mini-vragen. Override via env voor een
@@ -45,18 +45,6 @@ export function startOfUtcDayIso(now: Date): string {
   ).toISOString();
 }
 
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
-
 /** Som van query_log.cost_usd voor `organizationId` sinds UTC-middernacht. Fail-open:
  *  bij een lees-/DB-fout → 0 (de cap mag de bot niet platleggen bij een transiente
  *  fout), maar log luid zodat het niet onopgemerkt blijft. */
@@ -78,7 +66,7 @@ export async function getOrgSpendTodayUsd(organizationId: string): Promise<numbe
     let sum = 0;
     for (let page = 0; page < MAX_PAGES; page++) {
       const from = page * PAGE_SIZE;
-      const { data, error } = await sb()
+      const { data, error } = await getServiceRoleClient()
         .from('query_log')
         .select('cost_usd')
         .eq('organization_id', organizationId)

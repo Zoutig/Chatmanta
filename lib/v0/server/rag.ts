@@ -11,8 +11,8 @@
 import 'server-only';
 
 import { performance } from 'node:perf_hooks';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import type { BotConfig } from './bots';
 import { stripQuotes, parsePreProcessOutput } from './preprocess-parse';
 import { buildSystemPrompt } from '../style';
@@ -101,18 +101,6 @@ function openai(): OpenAI {
   if (!key) throw new AppError('INTERNAL', { message: 'OPENAI_API_KEY missing' });
   _openai = new OpenAI({ apiKey: key });
   return _openai;
-}
-
-let _supabase: SupabaseClient | null = null;
-function supabase(): SupabaseClient {
-  if (_supabase) return _supabase;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new AppError('INTERNAL', { message: 'Supabase env vars missing' });
-  _supabase = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _supabase;
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +428,7 @@ async function retrieveChunksHybrid(
   /** v0.4 multi-org: scope retrieval naar deze org. Verplicht (PR-1) — geen stille DEV_ORG-fallback. */
   organizationId: string,
 ): Promise<RetrievedChunk[]> {
-  const sb = supabase();
+  const sb = getServiceRoleClient();
   const { data, error } = await sb.rpc('match_chunks_hybrid', {
     p_organization_id: organizationId,
     query_embedding: queryVector,
@@ -458,7 +446,7 @@ async function retrieveChunksHybrid(
   if (rows.length === 0) return [];
 
   // Hydrate filenames (zelfde als retrieveChunks).
-  const sb2 = supabase();
+  const sb2 = getServiceRoleClient();
   const docIds = Array.from(
     new Set(rows.map((c) => c.document_id).filter((v): v is string => !!v)),
   );
@@ -514,7 +502,7 @@ async function lookupCachedAnswer(
   botVersion: string,
   organizationId: string,
 ): Promise<ChatResponse | null> {
-  const sb = supabase();
+  const sb = getServiceRoleClient();
   const { data, error } = await sb.rpc('lookup_cached_answer', {
     p_organization_id: organizationId,
     p_bot_version: botVersion,
@@ -558,7 +546,7 @@ async function writeCachedAnswer(
   organizationId: string,
 ): Promise<void> {
   try {
-    const sb = supabase();
+    const sb = getServiceRoleClient();
     await sb.from('answer_cache').insert({
       organization_id: organizationId,
       bot_version: botVersion,
@@ -591,7 +579,7 @@ export async function purgeAnswerCache(organizationId: string): Promise<number |
     throw new Error('purgeAnswerCache: organizationId is verplicht');
   }
   try {
-    const sb = supabase();
+    const sb = getServiceRoleClient();
     const { count, error } = await sb
       .from('answer_cache')
       .delete({ count: 'exact' })
@@ -826,7 +814,7 @@ async function retrieveChunks(
   /** v0.4 multi-org: scope retrieval naar deze org. Verplicht (PR-1) — geen stille DEV_ORG-fallback. */
   organizationId: string,
 ): Promise<RetrievedChunk[]> {
-  const sb = supabase();
+  const sb = getServiceRoleClient();
   const rpcName = withParents ? 'match_chunks_with_parents' : 'match_chunks';
   const { data, error } = await sb.rpc(rpcName, {
     p_organization_id: organizationId,
@@ -870,7 +858,7 @@ async function hydrateParentContent(chunks: RetrievedChunk[]): Promise<void> {
   );
   if (needsHydration.length === 0) return;
   const parentIds = Array.from(new Set(needsHydration.map((c) => c.parent_chunk_id as string)));
-  const sb = supabase();
+  const sb = getServiceRoleClient();
   const { data, error } = await sb
     .from('parent_chunks')
     .select('id, content, parent_index')
@@ -2982,7 +2970,7 @@ export type DocSummary = {
 };
 
 export async function listDocs(organizationId: string): Promise<DocSummary[]> {
-  const sb = supabase();
+  const sb = getServiceRoleClient();
   const { data: docs, error } = await sb
     .from('documents')
     .select('id, filename, status, created_at')
@@ -3039,7 +3027,7 @@ export async function ingestText({
     throw new AppError('INGEST_READ_FAILED', { message: 'document is empty after trimming' });
   }
 
-  const sb = supabase();
+  const sb = getServiceRoleClient();
 
   const { data: doc, error: docErr } = await sb
     .from('documents')
@@ -3103,7 +3091,7 @@ export async function deleteDoc(docId: string, organizationId: string): Promise<
   // CASCADE op document_chunks.document_id ruimt chunks automatisch.
   // organizationId is verplicht: zonder org-scope kan een delete uit de
   // verkeerde org's data lopen (zie codex adversarial review 2026-05-13).
-  const sb = supabase();
+  const sb = getServiceRoleClient();
   const { error } = await sb
     .from('documents')
     .delete()

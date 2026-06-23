@@ -10,19 +10,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 
 // ---------------------------------------------------------------------------
 // FAQ-refresh-cadans
@@ -44,7 +32,7 @@ function isCadence(v: unknown): v is FaqRefreshCadence {
  */
 export async function getFaqRefreshCadence(): Promise<FaqRefreshCadence> {
   try {
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('admin_config')
       .select('value')
       .eq('key', FAQ_CADENCE_KEY)
@@ -67,7 +55,7 @@ export async function setFaqRefreshCadence(cadence: FaqRefreshCadence): Promise<
   if (!isCadence(cadence)) {
     throw new Error(`invalid FAQ refresh cadence: ${String(cadence)}`);
   }
-  const { error } = await sb()
+  const { error } = await getServiceRoleClient()
     .from('admin_config')
     .upsert(
       { key: FAQ_CADENCE_KEY, value: cadence },
