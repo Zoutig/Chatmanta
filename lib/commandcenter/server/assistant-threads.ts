@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import type {
   AssistantMessage,
   AssistantRole,
@@ -14,23 +14,6 @@ import type {
   AssistantToolCall,
   AssistantToolResult,
 } from '../types';
-
-let _sb: SupabaseClient | null = null;
-
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error(
-      'Assistant storage requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
-    );
-  }
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // ---------------------------------------------------------------------------
 // Row mapping
@@ -107,7 +90,7 @@ function truncateTitle(raw: string): string {
 // Verwijdert de oudste actieve threads zodat er hooguit `keep` overblijven.
 // Sorteert op updated_at ASC (oudste eerst) en delete in één call via .in().
 async function pruneToMax(keep: number): Promise<void> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_threads')
     .select('id, updated_at')
     .is('archived_at', null)
@@ -116,7 +99,7 @@ async function pruneToMax(keep: number): Promise<void> {
   const rows = data ?? [];
   if (rows.length <= keep) return;
   const toDelete = rows.slice(0, rows.length - keep).map((r) => r.id as string);
-  const { error: delErr } = await sb()
+  const { error: delErr } = await getServiceRoleClient()
     .from('cc_assistant_threads')
     .delete()
     .in('id', toDelete);
@@ -127,7 +110,7 @@ export async function createThread(titleHint: string): Promise<AssistantThread> 
   const title = truncateTitle(titleHint);
   // Ruimte maken vóór insert zodat we na de insert exact MAX_ACTIVE_THREADS hebben.
   await pruneToMax(MAX_ACTIVE_THREADS - 1);
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_threads')
     .insert({ title })
     .select('*')
@@ -137,7 +120,7 @@ export async function createThread(titleHint: string): Promise<AssistantThread> 
 }
 
 export async function listThreads(opts: { includeArchived?: boolean } = {}): Promise<AssistantThread[]> {
-  let query = sb()
+  let query = getServiceRoleClient()
     .from('cc_assistant_threads')
     .select('*')
     .order('updated_at', { ascending: false });
@@ -150,7 +133,7 @@ export async function listThreads(opts: { includeArchived?: boolean } = {}): Pro
 }
 
 export async function getThread(id: string): Promise<AssistantThread | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_threads')
     .select('*')
     .eq('id', id)
@@ -161,7 +144,7 @@ export async function getThread(id: string): Promise<AssistantThread | null> {
 
 export async function renameThread(id: string, title: string): Promise<AssistantThread> {
   const clean = truncateTitle(title);
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_threads')
     .update({ title: clean })
     .eq('id', id)
@@ -172,7 +155,7 @@ export async function renameThread(id: string, title: string): Promise<Assistant
 }
 
 export async function archiveThread(id: string): Promise<void> {
-  const { error } = await sb()
+  const { error } = await getServiceRoleClient()
     .from('cc_assistant_threads')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', id);
@@ -180,7 +163,7 @@ export async function archiveThread(id: string): Promise<void> {
 }
 
 export async function deleteThread(id: string): Promise<void> {
-  const { error } = await sb().from('cc_assistant_threads').delete().eq('id', id);
+  const { error } = await getServiceRoleClient().from('cc_assistant_threads').delete().eq('id', id);
   if (error) throw new Error(`deleteThread failed: ${error.message}`);
 }
 
@@ -216,7 +199,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<Assistan
     output_tokens: input.outputTokens ?? null,
     cost_usd: input.costUsd ?? null,
   };
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_messages')
     .insert(row)
     .select('*')
@@ -226,7 +209,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<Assistan
 }
 
 export async function listMessages(threadId: string): Promise<AssistantMessage[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_messages')
     .select('*')
     .eq('thread_id', threadId)
@@ -236,7 +219,7 @@ export async function listMessages(threadId: string): Promise<AssistantMessage[]
 }
 
 export async function getMessage(id: string): Promise<AssistantMessage | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_assistant_messages')
     .select('*')
     .eq('id', id)
@@ -253,7 +236,7 @@ export async function markMessageUndone(id: string): Promise<void> {
     ...(existing.toolResult ?? { ok: true }),
     undone: true,
   };
-  const { error } = await sb()
+  const { error } = await getServiceRoleClient()
     .from('cc_assistant_messages')
     .update({ tool_result: newResult })
     .eq('id', id);

@@ -7,7 +7,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import {
   TASK_DEFAULTS,
   type Task,
@@ -15,23 +15,6 @@ import {
   type TaskPatch,
 } from '../types';
 import { SEED_TASKS } from '../seed-data';
-
-let _sb: SupabaseClient | null = null;
-
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error(
-      'Command Center storage requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
-    );
-  }
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // ---------------------------------------------------------------------------
 // Row mapping
@@ -123,7 +106,7 @@ function patchToRow(patch: TaskPatch): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 
 export async function listTasks(): Promise<Task[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_tasks')
     .select('*')
     .order('created_at', { ascending: false });
@@ -132,7 +115,7 @@ export async function listTasks(): Promise<Task[]> {
 }
 
 export async function getTask(id: string): Promise<Task | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_tasks')
     .select('*')
     .eq('id', id)
@@ -143,7 +126,7 @@ export async function getTask(id: string): Promise<Task | null> {
 
 export async function createTask(input: TaskInput): Promise<Task> {
   const row = inputToRow(input);
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_tasks')
     .insert(row)
     .select('*')
@@ -159,7 +142,7 @@ export async function updateTask(id: string, patch: TaskPatch): Promise<Task> {
     if (!existing) throw new Error(`updateTask: task ${id} not found`);
     return existing;
   }
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_tasks')
     .update(row)
     .eq('id', id)
@@ -170,7 +153,7 @@ export async function updateTask(id: string, patch: TaskPatch): Promise<Task> {
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const { error } = await sb().from('cc_tasks').delete().eq('id', id);
+  const { error } = await getServiceRoleClient().from('cc_tasks').delete().eq('id', id);
   if (error) throw new Error(`deleteTask failed: ${error.message}`);
 }
 
@@ -193,7 +176,7 @@ export async function ensureSeeded(): Promise<{ seeded: boolean; count: number }
   if (process.env.CC_ENABLE_SEED !== 'true') return { seeded: false, count: -1 };
   if (_tasksSeeded) return { seeded: false, count: -1 };
 
-  const { count, error } = await sb()
+  const { count, error } = await getServiceRoleClient()
     .from('cc_tasks')
     .select('id', { count: 'exact', head: true });
   if (error) throw new Error(`ensureSeeded count failed: ${error.message}`);
@@ -203,7 +186,7 @@ export async function ensureSeeded(): Promise<{ seeded: boolean; count: number }
   }
 
   const rows = SEED_TASKS.map((t) => inputToRow(t));
-  const { error: insertErr, count: inserted } = await sb()
+  const { error: insertErr, count: inserted } = await getServiceRoleClient()
     .from('cc_tasks')
     .insert(rows, { count: 'exact' });
   if (insertErr) throw new Error(`ensureSeeded insert failed: ${insertErr.message}`);

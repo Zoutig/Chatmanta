@@ -2,7 +2,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import {
   CUSTOMER_DEFAULTS,
   type TestCustomer,
@@ -10,20 +10,6 @@ import {
   type TestCustomerPatch,
 } from '../types';
 import { SEED_CUSTOMERS } from '../seed-customers';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('Customers storage requires Supabase env vars');
-  }
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 type CustomerRow = {
   id: string;
@@ -100,7 +86,7 @@ function patchToRow(patch: TestCustomerPatch): Record<string, unknown> {
 }
 
 export async function listCustomers(): Promise<TestCustomer[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_test_customers')
     .select('*')
     .order('created_at', { ascending: false });
@@ -109,7 +95,7 @@ export async function listCustomers(): Promise<TestCustomer[]> {
 }
 
 export async function getCustomer(id: string): Promise<TestCustomer | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_test_customers')
     .select('*')
     .eq('id', id)
@@ -119,7 +105,7 @@ export async function getCustomer(id: string): Promise<TestCustomer | null> {
 }
 
 export async function createCustomer(input: TestCustomerInput): Promise<TestCustomer> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_test_customers')
     .insert(inputToRow(input))
     .select('*')
@@ -138,7 +124,7 @@ export async function updateCustomer(
     if (!existing) throw new Error(`updateCustomer: ${id} not found`);
     return existing;
   }
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_test_customers')
     .update(row)
     .eq('id', id)
@@ -149,7 +135,7 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
-  const { error } = await sb().from('cc_test_customers').delete().eq('id', id);
+  const { error } = await getServiceRoleClient().from('cc_test_customers').delete().eq('id', id);
   if (error) throw new Error(`deleteCustomer failed: ${error.message}`);
 }
 
@@ -157,14 +143,14 @@ export async function ensureCustomersSeeded(): Promise<{
   seeded: boolean;
   count: number;
 }> {
-  const { count, error } = await sb()
+  const { count, error } = await getServiceRoleClient()
     .from('cc_test_customers')
     .select('id', { count: 'exact', head: true });
   if (error) throw new Error(`ensureCustomersSeeded count failed: ${error.message}`);
   if ((count ?? 0) > 0) return { seeded: false, count: count ?? 0 };
 
   const rows = SEED_CUSTOMERS.map((c) => inputToRow(c));
-  const { error: insertErr, count: inserted } = await sb()
+  const { error: insertErr, count: inserted } = await getServiceRoleClient()
     .from('cc_test_customers')
     .insert(rows, { count: 'exact' });
   if (insertErr)
