@@ -44,7 +44,15 @@ test('geen ad-hoc service-role-client buiten lib/supabase/admin.ts', () => {
     for (const file of walk(join(repoRoot, root))) {
       const rel = relative(repoRoot, file);
       if (rel === ADMIN) continue;
-      if (readFileSync(file, 'utf8').includes(NEEDLE)) offenders.push(rel);
+      const src = readFileSync(file, 'utf8');
+      // Offender = bouwt ZÉLF een service-role-client: leest de key ÉN roept
+      // `createClient(` aan. Een kale presence-check (bv.
+      // `!!process.env.SUPABASE_SERVICE_ROLE_KEY` in admindashboard/instellingen
+      // voor de read-only "API-key aanwezig?"-card) bouwt geen client en is dus
+      // geen ad-hoc service-role-client → bewust niet geflagd. De latere §3
+      // namespace-split herziet de env-var-naming (incl. zo'n presence-check)
+      // apart; PR-2 consolideert alléén de client-CONSTRUCTIE.
+      if (src.includes(NEEDLE) && src.includes('createClient(')) offenders.push(rel);
     }
   }
   assert.deepEqual(
