@@ -7,21 +7,9 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import type { NegativeFeedbackItem } from '../types';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // ---------------------------------------------------------------------------
 // listNegativeFeedback — feedback met rating='down', recent eerst.
@@ -35,7 +23,7 @@ export async function listNegativeFeedback(
     // PostgREST nested select: pakt question/answer/kind uit query_log in
     // dezelfde call. Service-role bypasst RLS — org-isolatie zit in de
     // organization_id-filter.
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('v0_feedback')
       .select(
         'id, query_log_id, thread_id, rating, comment, created_at, query_log!inner(question, answer, kind)',
@@ -86,7 +74,7 @@ export async function countRecentNegativeFeedback(
   try {
     const since = new Date();
     since.setDate(since.getDate() - windowDays);
-    const { count, error } = await sb()
+    const { count, error } = await getServiceRoleClient()
       .from('v0_feedback')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId)

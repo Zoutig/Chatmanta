@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
@@ -22,18 +22,6 @@ import type {
   ConversationsWeekDelta,
   WeeklyAnswerSplit,
 } from '../types';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 function startOfMonthIso(): string {
   const d = new Date();
@@ -127,7 +115,7 @@ export async function getOverviewMetrics(orgSlug: OrgSlug): Promise<OverviewMetr
  */
 export async function countMessagesAllTime(orgId: string): Promise<number> {
   try {
-    const { count, error } = await sb()
+    const { count, error } = await getServiceRoleClient()
       .from('query_log')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId);
@@ -144,13 +132,13 @@ async function countConversationsThisMonth(
   try {
     const since = startOfMonthIso();
     const [threadRes, msgRes] = await Promise.all([
-      sb()
+      getServiceRoleClient()
         .from('v0_threads')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', orgId)
         .is('deleted_at', null)
         .gte('created_at', since),
-      sb()
+      getServiceRoleClient()
         .from('query_log')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', orgId)
@@ -175,13 +163,13 @@ export async function getConversationsWeekDelta(orgId: string): Promise<Conversa
     const thisWeekStart = startOfWeekIso(0);
     const lastWeekStart = startOfWeekIso(1);
     const [twRes, lwRes] = await Promise.all([
-      sb()
+      getServiceRoleClient()
         .from('v0_threads')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', orgId)
         .is('deleted_at', null)
         .gte('created_at', thisWeekStart),
-      sb()
+      getServiceRoleClient()
         .from('v0_threads')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', orgId)
@@ -209,7 +197,7 @@ export async function getConversationsTrend(orgId: string, days = 14): Promise<n
     const since = new Date();
     since.setDate(since.getDate() - (days - 1));
     since.setHours(0, 0, 0, 0);
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('query_log')
       .select('created_at')
       .eq('organization_id', orgId)
@@ -241,7 +229,7 @@ export async function getWeeklyAnswerSplit(orgId: string): Promise<WeeklyAnswerS
     const since = new Date();
     since.setDate(since.getDate() - 6);
     since.setHours(0, 0, 0, 0);
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('query_log')
       .select('kind')
       .eq('organization_id', orgId)
@@ -275,7 +263,7 @@ export async function getUnansweredQuestions(
     const since = new Date();
     since.setDate(since.getDate() - (sinceDays - 1));
     since.setHours(0, 0, 0, 0);
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('query_log')
       .select('id, question, created_at')
       .eq('organization_id', orgId)

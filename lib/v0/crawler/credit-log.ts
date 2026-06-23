@@ -14,17 +14,7 @@
 // gelezen (niet NEXT_PUBLIC → uit de client-bundle gestript → db() = no-op client-side,
 // geen key-lek), dus dit is veilig.
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
-let _sb: SupabaseClient | null = null;
-function db(): SupabaseClient | null {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  _sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  return _sb;
-}
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 
 /** Log Firecrawl-creditverbruik. Fail-safe — gooit nooit. */
 export async function logFirecrawlCredits(
@@ -34,7 +24,7 @@ export async function logFirecrawlCredits(
 ): Promise<void> {
   try {
     if (!Number.isFinite(credits) || credits <= 0) return;
-    const sb = db();
+    const sb = getServiceRoleClient();
     if (!sb) return;
     await sb.from('firecrawl_credit_log').insert({ operation, credits, organization_id: orgId ?? null });
   } catch {

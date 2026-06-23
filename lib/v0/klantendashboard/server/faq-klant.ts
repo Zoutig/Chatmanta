@@ -23,23 +23,12 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import { embedTexts } from '@/lib/v0/server/rag';
 import { dedupeExact, greedyCluster } from '@/lib/v0/server/faq-cluster';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
 import { TOP_QUESTIONS_LIMITS } from '@/lib/v0/klantendashboard/types';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // ---------------------------------------------------------------------------
 // Config / cost guards
@@ -107,7 +96,7 @@ export async function getKlantFaqSnapshot(
   orgId: string,
 ): Promise<KlantFaqSnapshot | null> {
   try {
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('klant_faq_snapshot')
       .select('id, organization_id, generated_at, items, total_unique, total_queries, embed_cost_usd')
       .eq('organization_id', orgId)
@@ -139,7 +128,7 @@ type StatusByQuestion = Map<string, { status: KlantFaqStatus; lastAsked: string 
 export async function computeKlantFaqSnapshot(
   orgId: string,
 ): Promise<KlantFaqSnapshot> {
-  const client = sb();
+  const client = getServiceRoleClient();
 
   // 1. ALLE kandidaat-rijen ophalen — geen bot_version-filter, geen 500-cap.
   //    PostgREST capt één SELECT op ~1000 rijen, wat de "alle gesprekken"-

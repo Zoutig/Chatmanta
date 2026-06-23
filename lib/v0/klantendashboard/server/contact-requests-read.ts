@@ -13,25 +13,9 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import type { ContactRequest, ContactRequestStatus, PreferredContact } from '../types';
-
-// ---------------------------------------------------------------------------
-// Lazy supabase client (zelfde patroon als settings.ts/threads.ts)
-// ---------------------------------------------------------------------------
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // Vaste cap op notitie-lengte — spiegelt de DB-CHECK (notes <= 4000) zodat een
 // te lange notitie al vóór de write een nette fout geeft i.p.v. een 23514.
@@ -63,7 +47,7 @@ function rowToContactRequest(r: Record<string, unknown>): ContactRequest {
 /** Alle niet-soft-deleted verzoeken van deze org, recent eerst. */
 export async function listContactRequests(orgSlug: OrgSlug): Promise<ContactRequest[]> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_contact_requests')
     .select(SELECT_COLS)
     .eq('organization_id', orgId)
@@ -80,7 +64,7 @@ export async function getContactRequest(
   id: string,
 ): Promise<ContactRequest | null> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_contact_requests')
     .select(SELECT_COLS)
     .eq('organization_id', orgId)
@@ -100,7 +84,7 @@ export async function updateContactRequestStatus(
   status: ContactRequestStatus,
 ): Promise<ContactRequest | null> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_contact_requests')
     .update({ status })
     .eq('organization_id', orgId)
@@ -122,7 +106,7 @@ export async function updateContactRequestNotes(
   const orgId = KNOWN_ORGS[orgSlug].id;
   const trimmed = (notes ?? '').trim();
   const next = trimmed.length > 0 ? trimmed.slice(0, NOTES_MAX) : null;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_contact_requests')
     .update({ notes: next })
     .eq('organization_id', orgId)
@@ -139,7 +123,7 @@ export async function updateContactRequestNotes(
  *  onomkeerbare verwijdering gebeurt pas door de 90-daagse retentie-cron. */
 export async function softDeleteContactRequest(orgSlug: OrgSlug, id: string): Promise<void> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { error } = await sb()
+  const { error } = await getServiceRoleClient()
     .from('v0_contact_requests')
     .update({ deleted_at: new Date().toISOString() })
     .eq('organization_id', orgId)
@@ -153,7 +137,7 @@ export async function softDeleteContactRequest(orgSlug: OrgSlug, id: string): Pr
  *  layout/sidebar nooit breekt op een ontbrekende tabel/migratie. */
 export async function countContactRequestsNew(orgSlug: OrgSlug): Promise<number> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { count, error } = await sb()
+  const { count, error } = await getServiceRoleClient()
     .from('v0_contact_requests')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId)
