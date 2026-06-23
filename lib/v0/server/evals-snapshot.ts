@@ -18,7 +18,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { DEV_ORG_ID, type PhaseTimings } from './rag';
 
 // Re-export zodat UI-componenten PhaseTimings via deze module kunnen importeren

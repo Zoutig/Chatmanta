@@ -12,7 +12,7 @@ import 'server-only';
 
 import { performance } from 'node:perf_hooks';
 import OpenAI from 'openai';
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import type { BotConfig } from './bots';
 import { stripQuotes, parsePreProcessOutput } from './preprocess-parse';
 import { buildSystemPrompt } from '../style';

@@ -14,7 +14,7 @@
 // gelezen (niet NEXT_PUBLIC → uit de client-bundle gestript → db() = no-op client-side,
 // geen key-lek), dus dit is veilig.
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 /** Log Firecrawl-creditverbruik. Fail-safe — gooit nooit. */
 export async function logFirecrawlCredits(

@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { listDocs } from '@/lib/v0/server/rag';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';

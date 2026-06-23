@@ -3,7 +3,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import type { CheckIn, CheckInInput, CheckInPatch } from '../types';
 
 type CheckInRow = {

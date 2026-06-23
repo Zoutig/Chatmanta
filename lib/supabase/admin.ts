@@ -1,44 +1,25 @@
-// Service-role Supabase client — bypasses ALL Row-Level Security policies.
+// Auth-gated service-role wrappers — see ./service-role.ts for the raw factory.
 //
 // SECURITY (Blueprint Security Addendum SA-5):
-// The raw service-role client must NEVER be exported or imported directly
-// outside this module. All consumers must go through the wrapper functions
-// below, which enforce an explicit authorization check before handing out
-// the privileged client.
+// These wrappers enforce an explicit authorization check before handing out the
+// privileged (RLS-bypassing) service-role client. Use them from request-context
+// code (Server Components, Server Actions, Route Handlers) that must verify the
+// caller first.
 //
-// Code review rule: a `grep` for `_serviceRoleClient` outside this file is
-// a security bug. Use the named wrappers — pick the one whose precondition
-// matches the caller's context.
+// The raw client itself lives in ./service-role.ts (getServiceRoleClient) so it
+// can be imported by tsx scripts and client-reachable modules WITHOUT dragging
+// in @/lib/auth → next/navigation / next/headers. Keep this file's @/lib/auth
+// import confined to the request-context wrappers below; do not let the raw
+// factory re-couple to that chain.
 //
 // Do NOT use these wrappers for ordinary user-scoped queries. Use
 // `lib/supabase/server.ts` (RLS-bound) instead, and reach for service-role
 // only when you genuinely need to bypass RLS (system jobs, cross-org admin
 // reads, batch cleanup).
 
-import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from './service-role';
 import { requireJorionAdmin, requireOrgMember } from '@/lib/auth';
-
-let _cached: SupabaseClient | null = null;
-
-function _serviceRoleClient(): SupabaseClient {
-  if (_cached) return _cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error(
-      'Service-role client requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
-    );
-  }
-  _cached = createSupabaseClient(url, key, {
-    auth: {
-      // No session persistence — service-role acts as a system identity,
-      // not a logged-in user.
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-  return _cached;
-}
 
 /**
  * Service-role client for routes that require Jorion-admin access (the
@@ -47,7 +28,7 @@ function _serviceRoleClient(): SupabaseClient {
  */
 export async function getJorionAdminClient(): Promise<SupabaseClient> {
   await requireJorionAdmin();
-  return _serviceRoleClient();
+  return getServiceRoleClient();
 }
 
 /**
@@ -61,7 +42,7 @@ export async function getJorionAdminClient(): Promise<SupabaseClient> {
  */
 export async function getOrgScopedAdminClient(orgId: string): Promise<SupabaseClient> {
   await requireOrgMember(orgId);
-  return _serviceRoleClient();
+  return getServiceRoleClient();
 }
 
 /**
@@ -81,25 +62,5 @@ export async function getSystemJobClient(opts: { reason: string }): Promise<Supa
   // Intentionally not using requireJorionAdmin/requireOrgMember here —
   // system jobs run without a user session.
   console.log(`[admin] getSystemJobClient invoked: reason=${opts.reason}`);
-  return _serviceRoleClient();
-}
-
-/**
- * Service-role client voor interne (V0-)modules die al binnen een vertrouwde
- * grens draaien — geen per-request user-identiteit — en die vóór PR-2 elk hun
- * eigen `createClient(...SERVICE_ROLE_KEY...)` bouwden. Gedrag-identiek aan die
- * lokale fabrieken: lazy-cached, geen sessie-persistentie, GEEN auth-check.
- *
- * Anders dan getJorionAdminClient/getOrgScopedAdminClient doet deze GEEN
- * autorisatie — het is bewust de consolidatie-bestemming voor code die er geen
- * had (V0 handhaaft SA-5 niet; zie AGENTS.md V0-sandbox-disclaimer). Het
- * bestaansrecht: er is nu ÉÉN plek die SUPABASE_SERVICE_ROLE_KEY leest, die de
- * latere V0/V1-namespace-split (kickoff-spec §3) in tweeën kan knippen i.p.v.
- * opnieuw ~27 bestanden te moeten bewerken.
- *
- * Synchroon (geen await) zodat de bestaande synchrone call-sites
- * (`sb().from(...)`) niet async hoeven te worden.
- */
-export function getServiceRoleClient(): SupabaseClient {
-  return _serviceRoleClient();
+  return getServiceRoleClient();
 }

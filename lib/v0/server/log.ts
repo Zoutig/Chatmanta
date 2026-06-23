@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { DEV_ORG_ID } from './rag';
 import type { ChatResponse, HydeModeRequest, HydeModeResolved } from './rag';
 import { redactPii } from '@/lib/observability/redact';

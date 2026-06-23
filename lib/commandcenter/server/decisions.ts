@@ -2,7 +2,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import {
   DECISION_DEFAULTS,
   type Decision,

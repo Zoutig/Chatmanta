@@ -26,7 +26,7 @@
 import 'server-only';
 
 import { type SupabaseClient } from '@supabase/supabase-js';
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { embedTexts } from './rag';
 import { DEFAULT_LENGTH, DEFAULT_TONE } from '../style-types';
 import { judgeBestAnswer } from './faq-judge';

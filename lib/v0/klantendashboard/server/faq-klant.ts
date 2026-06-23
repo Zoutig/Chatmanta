@@ -24,7 +24,7 @@
 import 'server-only';
 
 import { type SupabaseClient } from '@supabase/supabase-js';
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { embedTexts } from '@/lib/v0/server/rag';
 import { dedupeExact, greedyCluster } from '@/lib/v0/server/faq-cluster';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';

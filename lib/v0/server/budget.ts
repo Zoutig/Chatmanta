@@ -17,7 +17,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 // Ruime default zodat legitiem gebruik (incl. interne test-tool) er praktisch nooit
 // tegenaan loopt — ~$2/dag ≈ duizenden gpt-4o-mini-vragen. Override via env voor een

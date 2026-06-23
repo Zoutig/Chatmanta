@@ -11,7 +11,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { purgeAnswerCache, ingestText, deleteDoc } from '@/lib/v0/server/rag';
 import { getMockWidgetSettings } from '../mock/widget-settings';

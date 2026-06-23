@@ -19,7 +19,7 @@ import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
 import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 export const runtime = 'nodejs';
 

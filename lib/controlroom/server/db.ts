@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 // Behoud de bestaande `sb()`-API voor consumers (bv. lib/v0/server/error-capture.ts).
 export const sb = getServiceRoleClient;

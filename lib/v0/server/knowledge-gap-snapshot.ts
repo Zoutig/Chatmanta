@@ -27,7 +27,7 @@
 
 import 'server-only';
 
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 export type KnowledgeGapWindow = '24h' | '7d' | 'all';
 

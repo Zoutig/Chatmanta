@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { getPhaseInfo, type PhaseStatus } from '../roadmap-phases';
 import { SEED_MILESTONES } from '../seed-milestones';
-import { getServiceRoleClient } from '@/lib/supabase/admin';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 // ---------------------------------------------------------------------------
 // Milestone CRUD

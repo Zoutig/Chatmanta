@@ -26,7 +26,13 @@ const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
 // Token gesplitst zodat dit testbestand zichzelf niet als overtreder telt.
 const NEEDLE = 'SUPABASE_SERVICE_ROLE_' + 'KEY';
-const ADMIN = join('lib', 'supabase', 'admin.ts');
+// De legitieme service-role-fabriek-bestanden: service-role.ts bouwt de client
+// (createClient + key); admin.ts host de auth-gated wrappers er omheen. Beide
+// uitgesloten — al het andere onder lib/+app/ moet via getServiceRoleClient.
+const FACTORY_FILES = new Set([
+  join('lib', 'supabase', 'service-role.ts'),
+  join('lib', 'supabase', 'admin.ts'),
+]);
 
 function walk(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -43,7 +49,7 @@ test('geen ad-hoc service-role-client buiten lib/supabase/admin.ts', () => {
   for (const root of ['lib', 'app']) {
     for (const file of walk(join(repoRoot, root))) {
       const rel = relative(repoRoot, file);
-      if (rel === ADMIN) continue;
+      if (FACTORY_FILES.has(rel)) continue;
       const src = readFileSync(file, 'utf8');
       // Offender = bouwt ZÉLF een service-role-client: leest de key ÉN roept
       // `createClient(` aan. Een kale presence-check (bv.
