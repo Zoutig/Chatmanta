@@ -5,14 +5,16 @@
 // Batch-crawl-credits komen uit crawl_events.credits_used (daar afgeleid).
 //
 // FAIL-SAFE: een log-fout mag een crawl NOOIT breken — alles in een try/catch die
-// stil slikt. Eigen lazy service-role client (de Firecrawl-wrappers krijgen geen
-// sb mee). Geen org-context nodig: de overview-metric is account-breed.
+// stil slikt. Service-role client via de gedeelde getServiceRoleClient()-factory
+// (de Firecrawl-wrappers krijgen geen sb mee). Geen org-context nodig: de
+// overview-metric is account-breed.
 //
 // Géén `import 'server-only'`: firecrawl.ts (die deze helper importeert) deelt z'n
 // constants met client-componenten (kennisbank website-tab), dus een server-only
-// guard hier zou de client-build breken. De SERVICE_ROLE_KEY wordt pas runtime
-// gelezen (niet NEXT_PUBLIC → uit de client-bundle gestript → db() = no-op client-side,
-// geen key-lek), dus dit is veilig.
+// guard hier zou de client-build breken. getServiceRoleClient leest de key pas
+// runtime (niet NEXT_PUBLIC → uit de client-bundle gestript) en importeert géén
+// @/lib/auth/next — client-side gooit de factory hooguit, en die throw wordt door
+// de try/catch hieronder stil geslikt. Geen key-lek, geen client-build-breuk.
 
 import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
@@ -25,7 +27,6 @@ export async function logFirecrawlCredits(
   try {
     if (!Number.isFinite(credits) || credits <= 0) return;
     const sb = getServiceRoleClient();
-    if (!sb) return;
     await sb.from('firecrawl_credit_log').insert({ operation, credits, organization_id: orgId ?? null });
   } catch {
     // bewust stil: usage-logging is nooit het kritieke pad.
