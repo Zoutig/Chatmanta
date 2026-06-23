@@ -330,6 +330,18 @@ type CaseResult = {
 async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const bot = resolveBot(version);
   const orgId = ORG_ID_BY_SLUG[c.orgSlug];
+  // ORG_ID_BY_SLUG is een Record<string,string> en de fixture-JSON wordt
+  // ongevalideerd gecast → een onbekende/nieuwe orgSlug levert hier runtime
+  // `undefined` op zonder dat tsc dat ziet. Sinds PR-1 eist runRagQueryStreaming
+  // een verplichte organizationId (geen stille DEV_ORG-fallback meer), dus laat
+  // dit hard en duidelijk falen i.p.v. `undefined` door te schuiven (wat anders
+  // de multi-org-eval stil tegen de verkeerde org zou draaien).
+  if (!orgId) {
+    throw new Error(
+      `Onbekende orgSlug "${c.orgSlug}" in hard-eval fixture — geen mapping in ORG_ID_BY_SLUG. ` +
+        `Voeg de slug toe of corrigeer eval-fixtures/hard-dimension-cases.json.`,
+    );
+  }
   const history = c.conversationHistory as ChatHistoryTurn[] | undefined;
   // Multi-run: stabiliteit waar het telt. De CONSISTENCY-dimensie draait multi-run
   // op ÁLLE versies (eval-fix B1 — symmetrie: die check is een hard veto, dus de
