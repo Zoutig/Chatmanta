@@ -437,8 +437,8 @@ async function retrieveChunksHybrid(
   topK: number,
   /** v0.4: hydrateer parent_content na de hybrid-fusion (RPC kent geen parent join). */
   withParents = false,
-  /** v0.4 multi-org: scope retrieval naar deze org. Default DEV_ORG voor backward compat. */
-  organizationId: string = DEV_ORG_ID,
+  /** v0.4 multi-org: scope retrieval naar deze org. Verplicht (PR-1) — geen stille DEV_ORG-fallback. */
+  organizationId: string,
 ): Promise<RetrievedChunk[]> {
   const sb = supabase();
   const { data, error } = await sb.rpc('match_chunks_hybrid', {
@@ -512,7 +512,7 @@ const CACHE_HIT_THRESHOLD = 0.93;
 async function lookupCachedAnswer(
   queryVector: number[],
   botVersion: string,
-  organizationId: string = DEV_ORG_ID,
+  organizationId: string,
 ): Promise<ChatResponse | null> {
   const sb = supabase();
   const { data, error } = await sb.rpc('lookup_cached_answer', {
@@ -555,7 +555,7 @@ async function writeCachedAnswer(
   queryVector: number[],
   botVersion: string,
   response: ChatResponse,
-  organizationId: string = DEV_ORG_ID,
+  organizationId: string,
 ): Promise<void> {
   try {
     const sb = supabase();
@@ -823,8 +823,8 @@ async function retrieveChunks(
   topK: number,
   /** v0.4: gebruik match_chunks_with_parents zodat parent_content meekomt. */
   withParents = false,
-  /** v0.4 multi-org: scope retrieval naar deze org. Default DEV_ORG voor backward compat. */
-  organizationId: string = DEV_ORG_ID,
+  /** v0.4 multi-org: scope retrieval naar deze org. Verplicht (PR-1) — geen stille DEV_ORG-fallback. */
+  organizationId: string,
 ): Promise<RetrievedChunk[]> {
   const sb = supabase();
   const rpcName = withParents ? 'match_chunks_with_parents' : 'match_chunks';
@@ -1292,8 +1292,8 @@ export async function* runRagQueryStreaming(input: {
   history?: ChatHistoryTurn[];
   tone?: Tone;
   length?: Length;
-  /** v0.4 multi-org: scope retrieval+cache naar deze org. Default DEV_ORG. */
-  organizationId?: string;
+  /** v0.4 multi-org: scope retrieval+cache naar deze org. Verplicht (PR-1) — geen DEV_ORG-fallback. */
+  organizationId: string;
   /**
    * Eval-flag: sla de answer-cache volledig over (geen lookup, geen write).
    * De answer-cache is per bot_version-STRING; bij een code-wijziging binnen
@@ -1357,7 +1357,7 @@ export async function* runRagQueryStreaming(input: {
     input.chatbotOverrides?.fallbackMessage && input.chatbotOverrides.fallbackMessage.length > 0
       ? input.chatbotOverrides.fallbackMessage
       : FALLBACK_MESSAGE;
-  const orgId = input.organizationId ?? DEV_ORG_ID;
+  const orgId = input.organizationId; // PR-1: verplicht, geen stille DEV_ORG-fallback meer
   // V0.6 persona-laag: resolveer hier één keer en gebruik door de hele
   // pipeline (preProcess, main answer, general-knowledge prompt, off-topic
   // refusal). Voorheen waren de prompts hard-coded op DEV_ORG identiteit,
