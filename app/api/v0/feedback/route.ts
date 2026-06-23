@@ -12,7 +12,6 @@
 //      success voor de gebruiker.
 
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppError, toAppError, toWire } from '@/lib/errors/app-error';
 import { newRequestId } from '@/lib/errors/request-id';
 import { captureError } from '@/lib/v0/server/error-capture';
@@ -20,6 +19,7 @@ import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
 import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
+import { getServiceRoleClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 
@@ -55,18 +55,6 @@ type Body = {
   rating?: unknown;
   comment?: unknown;
 };
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -151,7 +139,7 @@ export async function POST(req: Request) {
     // Service-role bypasst RLS dus deze check is hier de enige isolatie tegen
     // cross-org feedback (= ook in V0 belangrijk: anders kan een widget op
     // org A feedback geven op een chat-row van org B).
-    const { data: logRow, error: logErr } = await sb()
+    const { data: logRow, error: logErr } = await getServiceRoleClient()
       .from('query_log')
       .select('id, organization_id')
       .eq('id', queryLogId)
@@ -168,7 +156,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const { error: insErr } = await sb().from('v0_feedback').insert({
+    const { error: insErr } = await getServiceRoleClient().from('v0_feedback').insert({
       organization_id: organizationId,
       query_log_id: queryLogId,
       rating,
