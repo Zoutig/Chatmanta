@@ -7,7 +7,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { getThread } from '@/lib/v0/server/threads';
 import type {
@@ -16,18 +16,6 @@ import type {
   ConversationStatus,
   HelpfulnessRate,
 } from '../types';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 function sinceFilter(filter: ConversationFilter): string | null {
   const d = new Date();
@@ -58,7 +46,7 @@ export async function listConversations(
   const orgId = KNOWN_ORGS[orgSlug].id;
 
   try {
-    let q = sb()
+    let q = getServiceRoleClient()
       .from('v0_threads')
       .select('id, title, created_at, updated_at')
       .eq('organization_id', orgId)
@@ -78,12 +66,12 @@ export async function listConversations(
     // Eerste user-message + totaal aantal messages + laatste assistant-response
     // (voor de status-afleiding) — alles in één query per relatie.
     const [msgRows, firstMsgs] = await Promise.all([
-      sb()
+      getServiceRoleClient()
         .from('v0_thread_messages')
         .select('thread_id, role, content, position, response')
         .in('thread_id', ids)
         .order('position', { ascending: true }),
-      sb()
+      getServiceRoleClient()
         .from('v0_thread_messages')
         .select('thread_id, content')
         .in('thread_id', ids)
@@ -216,7 +204,7 @@ export async function getConversationSuccessRate(orgSlug: OrgSlug): Promise<Help
     const since = startOfMonthIso();
 
     // 1. Alle gesprekken van deze maand (de noemer).
-    const { data: threads, error } = await sb()
+    const { data: threads, error } = await getServiceRoleClient()
       .from('v0_threads')
       .select('id')
       .eq('organization_id', orgId)
@@ -231,12 +219,12 @@ export async function getConversationSuccessRate(orgSlug: OrgSlug): Promise<Help
 
     // 2. Laatste assistant-antwoord per thread + down-vote thread-ids, parallel.
     const [msgRes, downRes] = await Promise.all([
-      sb()
+      getServiceRoleClient()
         .from('v0_thread_messages')
         .select('thread_id, role, position, response')
         .in('thread_id', ids)
         .order('position', { ascending: false }),
-      sb()
+      getServiceRoleClient()
         .from('v0_feedback')
         .select('thread_id')
         .eq('organization_id', orgId)

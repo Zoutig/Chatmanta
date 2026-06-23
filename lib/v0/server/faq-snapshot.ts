@@ -25,7 +25,8 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { embedTexts } from './rag';
 import { DEFAULT_LENGTH, DEFAULT_TONE } from '../style-types';
 import { judgeBestAnswer } from './faq-judge';
@@ -41,18 +42,6 @@ import {
 // Re-export client-safe types so callers can keep importing from this module.
 export { FAQ_BOT_VERSIONS };
 export type { FaqBotVersion, FaqItem, FaqSnapshot, FaqWindow };
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // ---------------------------------------------------------------------------
 // Clustering config
@@ -84,7 +73,7 @@ export async function getFaqSnapshot(
   botVersion: FaqBotVersion,
   window: FaqWindow,
 ): Promise<FaqSnapshot | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('faq_snapshot')
     .select('id, organization_id, bot_version, time_window, generated_at, items, total_unique, total_queries, embed_cost_usd, judge_cost_usd')
     .eq('organization_id', organizationId)
@@ -107,7 +96,7 @@ export async function computeFaqSnapshot(
   botVersion: FaqBotVersion,
   window: FaqWindow,
 ): Promise<FaqSnapshot> {
-  const client = sb();
+  const client = getServiceRoleClient();
   const since = windowSinceIso(window);
 
   // 1. Kandidaat-rijen ophalen.
@@ -339,7 +328,7 @@ export async function precacheTopN(
   snapshotId: string,
   topN: number = 5,
 ): Promise<PrecacheResult> {
-  const client = sb();
+  const client = getServiceRoleClient();
   const snapshot = await readSnapshotById(client, snapshotId);
   if (!snapshot) throw new Error(`faq_snapshot ${snapshotId} not found`);
 
@@ -475,7 +464,7 @@ export async function invalidateFaqItem(
   snapshotId: string,
   rank: number,
 ): Promise<InvalidateResult> {
-  const client = sb();
+  const client = getServiceRoleClient();
   const snapshot = await readSnapshotById(client, snapshotId);
   if (!snapshot) throw new Error(`faq_snapshot ${snapshotId} not found`);
 

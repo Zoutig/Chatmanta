@@ -3,7 +3,6 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   MILESTONE_DEFAULTS,
   ROADMAP_PHASES,
@@ -14,20 +13,7 @@ import {
 } from '../types';
 import { getPhaseInfo, type PhaseStatus } from '../roadmap-phases';
 import { SEED_MILESTONES } from '../seed-milestones';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('Milestones storage requires Supabase env vars');
-  }
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 
 // ---------------------------------------------------------------------------
 // Milestone CRUD
@@ -91,7 +77,7 @@ function patchToRow(patch: MilestonePatch): Record<string, unknown> {
 }
 
 export async function listMilestones(): Promise<Milestone[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_milestones')
     .select('*')
     .order('created_at', { ascending: false });
@@ -100,7 +86,7 @@ export async function listMilestones(): Promise<Milestone[]> {
 }
 
 export async function getMilestone(id: string): Promise<Milestone | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_milestones')
     .select('*')
     .eq('id', id)
@@ -110,7 +96,7 @@ export async function getMilestone(id: string): Promise<Milestone | null> {
 }
 
 export async function createMilestone(input: MilestoneInput): Promise<Milestone> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_milestones')
     .insert(inputToRow(input))
     .select('*')
@@ -129,7 +115,7 @@ export async function updateMilestone(
     if (!existing) throw new Error(`updateMilestone: ${id} not found`);
     return existing;
   }
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_milestones')
     .update(row)
     .eq('id', id)
@@ -140,7 +126,7 @@ export async function updateMilestone(
 }
 
 export async function deleteMilestone(id: string): Promise<void> {
-  const { error } = await sb().from('cc_milestones').delete().eq('id', id);
+  const { error } = await getServiceRoleClient().from('cc_milestones').delete().eq('id', id);
   if (error) throw new Error(`deleteMilestone failed: ${error.message}`);
 }
 
@@ -153,7 +139,7 @@ export async function ensureMilestonesSeeded(): Promise<{ seeded: boolean; count
   if (process.env.CC_ENABLE_SEED !== 'true') return { seeded: false, count: -1 };
   if (_milestonesSeeded) return { seeded: false, count: -1 };
 
-  const { count, error } = await sb()
+  const { count, error } = await getServiceRoleClient()
     .from('cc_milestones')
     .select('id', { count: 'exact', head: true });
   if (error) throw new Error(`ensureMilestonesSeeded count failed: ${error.message}`);
@@ -163,7 +149,7 @@ export async function ensureMilestonesSeeded(): Promise<{ seeded: boolean; count
   }
 
   const rows = SEED_MILESTONES.map((m) => inputToRow(m));
-  const { error: insertErr, count: inserted } = await sb()
+  const { error: insertErr, count: inserted } = await getServiceRoleClient()
     .from('cc_milestones')
     .insert(rows, { count: 'exact' });
   if (insertErr)
@@ -185,7 +171,7 @@ export type PhaseStatusEntry = {
 };
 
 export async function listPhaseStatus(): Promise<PhaseStatusEntry[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_phase_status')
     .select('phase, status, updated_at');
   if (error) throw new Error(`listPhaseStatus failed: ${error.message}`);
@@ -216,7 +202,7 @@ export async function setPhaseStatus(
   phase: RoadmapPhase,
   status: PhaseStatus,
 ): Promise<void> {
-  const { error } = await sb()
+  const { error } = await getServiceRoleClient()
     .from('cc_phase_status')
     .upsert({ phase, status }, { onConflict: 'phase' });
   if (error) throw new Error(`setPhaseStatus failed: ${error.message}`);

@@ -11,7 +11,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { purgeAnswerCache, ingestText, deleteDoc } from '@/lib/v0/server/rag';
 import { getMockWidgetSettings } from '../mock/widget-settings';
@@ -31,21 +31,6 @@ import {
   type WidgetSettings,
 } from '../types';
 import { AppError } from '@/lib/errors/app-error';
-
-// ---------------------------------------------------------------------------
-// Lazy supabase client (zelfde patroon als lib/v0/server/threads.ts)
-// ---------------------------------------------------------------------------
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -118,13 +103,13 @@ export async function getOrgSettings(orgSlug: OrgSlug): Promise<OrgSettings> {
     // widget/chatbot/qa-settings NIET org-breed naar mock terugvallen. Spiegelt de
     // defensieve losse reads van account/setup_skips/widget_preview.
     let data: Record<string, unknown> | null;
-    const primary = await sb()
+    const primary = await getServiceRoleClient()
       .from('v0_org_settings')
       .select('widget, chatbot, qa, top_questions, contact_requests, updated_at')
       .eq('organization_id', orgId)
       .maybeSingle();
     if (primary.error) {
-      const fallback = await sb()
+      const fallback = await getServiceRoleClient()
         .from('v0_org_settings')
         .select('widget, chatbot, qa, top_questions, updated_at')
         .eq('organization_id', orgId)
@@ -180,7 +165,7 @@ async function writeOrgSettings(
   },
 ): Promise<void> {
   // Lees huidige row om de andere velden te bewaren bij partial-write.
-  const { data: current, error: readErr } = await sb()
+  const { data: current, error: readErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('widget, chatbot, qa, top_questions')
     .eq('organization_id', orgId)
@@ -197,7 +182,7 @@ async function writeOrgSettings(
     // updated_at wordt door de DB-trigger geüpdatet
   };
 
-  const { error: writeErr } = await sb()
+  const { error: writeErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .upsert(next, { onConflict: 'organization_id' });
   if (writeErr) throw new Error(`writeOrgSettings upsert: ${writeErr.message}`);
@@ -393,7 +378,7 @@ function parseAccountOverrides(raw: unknown): AccountOverrides {
 
 export async function getAccountOverrides(orgSlug: OrgSlug): Promise<AccountOverrides> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('account')
     .eq('organization_id', orgId)
@@ -428,7 +413,7 @@ export async function saveAccountInfo(
   // patch de andere velden niet per ongeluk wegschrijft. STRIKTE read (gooit bij
   // fout) — niet de defensieve getAccountOverrides, anders zou een transiënte
   // leesfout → {} de niet-gepatchte velden wissen (Codex item-8 #2).
-  const { data: cur, error: readErr } = await sb()
+  const { data: cur, error: readErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('account')
     .eq('organization_id', orgId)
@@ -456,7 +441,7 @@ export async function saveAccountInfo(
       delete next.email;
     }
   }
-  const { error: writeErr } = await sb()
+  const { error: writeErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .upsert({ organization_id: orgId, account: next }, { onConflict: 'organization_id' });
   // Codex item-8 #1: een genegeerde upsert-fout (bv. kolom bestaat nog niet vóór
@@ -490,7 +475,7 @@ function parseSetupSkips(raw: unknown): SetupStepId[] {
 
 export async function getSetupSkips(orgSlug: OrgSlug): Promise<SetupStepId[]> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('setup_skips')
     .eq('organization_id', orgId)
@@ -514,7 +499,7 @@ export async function setSetupStepSkipped(
   if (!SETUP_STEP_ID_SET.has(stepId)) {
     throw new AppError('INPUT_INVALID', { message: `Onbekende setup-stap: ${stepId}` });
   }
-  const { data: cur, error: readErr } = await sb()
+  const { data: cur, error: readErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('setup_skips')
     .eq('organization_id', orgId)
@@ -526,7 +511,7 @@ export async function setSetupStepSkipped(
   if (skipped) set.add(stepId as SetupStepId);
   else set.delete(stepId as SetupStepId);
   const next = [...set];
-  const { error: writeErr } = await sb()
+  const { error: writeErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .upsert({ organization_id: orgId, setup_skips: next }, { onConflict: 'organization_id' });
   if (writeErr) {
@@ -558,7 +543,7 @@ function parseWidgetPreview(raw: unknown): WidgetPreview | null {
 
 export async function getWidgetPreview(orgSlug: OrgSlug): Promise<WidgetPreview | null> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('widget_preview')
     .eq('organization_id', orgId)
@@ -582,7 +567,7 @@ export async function saveWidgetPreview(
 ): Promise<WidgetPreview> {
   const orgId = KNOWN_ORGS[orgSlug].id;
   const next: WidgetPreview = { url: preview.url, capturedAt: preview.capturedAt };
-  const { error: writeErr } = await sb()
+  const { error: writeErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .upsert({ organization_id: orgId, widget_preview: next }, { onConflict: 'organization_id' });
   if (writeErr) {
@@ -605,7 +590,7 @@ export async function getContactRequestsSettings(
   orgSlug: OrgSlug,
 ): Promise<ContactRequestsSettings> {
   const orgId = KNOWN_ORGS[orgSlug].id;
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('v0_org_settings')
     .select('contact_requests')
     .eq('organization_id', orgId)
@@ -633,7 +618,7 @@ export async function saveContactRequestsSettings(
         ? normalizeNotificationEmail(patch.notificationEmail ?? null)
         : current.notificationEmail,
   };
-  const { error: writeErr } = await sb()
+  const { error: writeErr } = await getServiceRoleClient()
     .from('v0_org_settings')
     .upsert({ organization_id: orgId, contact_requests: next }, { onConflict: 'organization_id' });
   if (writeErr) {

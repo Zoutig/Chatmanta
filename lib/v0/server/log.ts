@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { DEV_ORG_ID } from './rag';
 import type { ChatResponse, HydeModeRequest, HydeModeResolved } from './rag';
 import { redactPii } from '@/lib/observability/redact';
@@ -21,18 +21,6 @@ export type HydeMeta = {
   requested: HydeModeRequest;
   actual: HydeModeResolved | null;
 };
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 type QueryLogRow = {
   // V0.7+: optioneel pre-gegenereerde id zodat de streaming-API de id al
@@ -151,7 +139,7 @@ export async function getAllTimeUsage(
     // all-time totalen onder-tellen dan. Display-telemetrie (niet kostenkritisch),
     // dus pre-existing en bewust niet in v0.10 herschreven; de kostenrem-som
     // (budget.ts) is wél gepagineerd. Volledige fix = DB-side aggregate (aparte PR).
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('query_log')
       .select(
         'embed_tokens, chat_in_tokens, chat_out_tokens, pre_in_tokens, pre_out_tokens, cost_usd',
@@ -390,7 +378,7 @@ export async function logQuery(
     // Insert query_log + retourneer id zodat we claim_verifications kunnen
     // koppelen. Bij fout: log en stop — claim_verifications zonder query_log_id
     // is nutteloos.
-    const { data: inserted, error } = await sb()
+    const { data: inserted, error } = await getServiceRoleClient()
       .from('query_log')
       .insert(row)
       .select('id')
@@ -414,7 +402,7 @@ export async function logQuery(
         best_chunk_id: c.bestChunkId,
         threshold_used: verificationThreshold,
       }));
-      const { error: cvErr } = await sb().from('claim_verifications').insert(cvRows);
+      const { error: cvErr } = await getServiceRoleClient().from('claim_verifications').insert(cvRows);
       if (cvErr) console.error('[claim_verifications] insert failed:', cvErr.message);
     }
   } catch (err) {
@@ -490,7 +478,7 @@ export async function logBlockedQuery(input: {
       gap_kind: null,
       adaptive_decision: null,
     };
-    const { error } = await sb().from('query_log').insert(row);
+    const { error } = await getServiceRoleClient().from('query_log').insert(row);
     if (error) console.error('[query_log blocked] insert failed:', error.message);
   } catch (err) {
     console.error('[query_log blocked] unexpected error:', err);

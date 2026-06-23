@@ -3,22 +3,8 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import type { CheckIn, CheckInInput, CheckInPatch } from '../types';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('CheckIns storage requires Supabase env vars');
-  }
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 type CheckInRow = {
   id: string;
@@ -100,7 +86,7 @@ function patchToRow(patch: CheckInPatch): Record<string, unknown> {
 }
 
 export async function listCheckIns(): Promise<CheckIn[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_checkins')
     .select('*')
     .order('date', { ascending: false });
@@ -109,7 +95,7 @@ export async function listCheckIns(): Promise<CheckIn[]> {
 }
 
 export async function getCheckIn(id: string): Promise<CheckIn | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_checkins')
     .select('*')
     .eq('id', id)
@@ -119,7 +105,7 @@ export async function getCheckIn(id: string): Promise<CheckIn | null> {
 }
 
 export async function createCheckIn(input: CheckInInput): Promise<CheckIn> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_checkins')
     .insert(inputToRow(input))
     .select('*')
@@ -138,7 +124,7 @@ export async function updateCheckIn(
     if (!existing) throw new Error(`updateCheckIn: ${id} not found`);
     return existing;
   }
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_checkins')
     .update(row)
     .eq('id', id)
@@ -149,6 +135,6 @@ export async function updateCheckIn(
 }
 
 export async function deleteCheckIn(id: string): Promise<void> {
-  const { error } = await sb().from('cc_checkins').delete().eq('id', id);
+  const { error } = await getServiceRoleClient().from('cc_checkins').delete().eq('id', id);
   if (error) throw new Error(`deleteCheckIn failed: ${error.message}`);
 }

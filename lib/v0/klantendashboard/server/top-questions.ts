@@ -11,23 +11,11 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import { KNOWN_ORGS, type OrgSlug } from '@/lib/v0/server/active-org';
 import { RETENTION_REDACTED } from '@/lib/v0/retention-sentinel';
 import { getKlantFaqSnapshot, type KlantFaqItem } from './faq-klant';
 import type { TopQuestionsConfig } from '../types';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase env vars missing');
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 export type TopQuestion = {
   question: string;
@@ -63,7 +51,7 @@ export async function getTopQuestions(
 ): Promise<TopQuestionsResult> {
   const orgId = KNOWN_ORGS[orgSlug].id;
   try {
-    const { data, error } = await sb()
+    const { data, error } = await getServiceRoleClient()
       .from('query_log')
       .select('question, kind, created_at')
       .eq('organization_id', orgId)

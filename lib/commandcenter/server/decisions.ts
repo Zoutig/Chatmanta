@@ -2,7 +2,7 @@
 
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import {
   DECISION_DEFAULTS,
   type Decision,
@@ -10,20 +10,6 @@ import {
   type DecisionPatch,
 } from '../types';
 import { SEED_DECISIONS } from '../seed-decisions';
-
-let _sb: SupabaseClient | null = null;
-function sb(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('Decisions storage requires Supabase env vars');
-  }
-  _sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return _sb;
-}
 
 type DecisionRow = {
   id: string;
@@ -82,7 +68,7 @@ function patchToRow(patch: DecisionPatch): Record<string, unknown> {
 }
 
 export async function listDecisions(): Promise<Decision[]> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_decisions')
     .select('*')
     .order('date', { ascending: false });
@@ -91,7 +77,7 @@ export async function listDecisions(): Promise<Decision[]> {
 }
 
 export async function getDecision(id: string): Promise<Decision | null> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_decisions')
     .select('*')
     .eq('id', id)
@@ -101,7 +87,7 @@ export async function getDecision(id: string): Promise<Decision | null> {
 }
 
 export async function createDecision(input: DecisionInput): Promise<Decision> {
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_decisions')
     .insert(inputToRow(input))
     .select('*')
@@ -120,7 +106,7 @@ export async function updateDecision(
     if (!existing) throw new Error(`updateDecision: ${id} not found`);
     return existing;
   }
-  const { data, error } = await sb()
+  const { data, error } = await getServiceRoleClient()
     .from('cc_decisions')
     .update(row)
     .eq('id', id)
@@ -131,7 +117,7 @@ export async function updateDecision(
 }
 
 export async function deleteDecision(id: string): Promise<void> {
-  const { error } = await sb().from('cc_decisions').delete().eq('id', id);
+  const { error } = await getServiceRoleClient().from('cc_decisions').delete().eq('id', id);
   if (error) throw new Error(`deleteDecision failed: ${error.message}`);
 }
 
@@ -139,14 +125,14 @@ export async function ensureDecisionsSeeded(): Promise<{
   seeded: boolean;
   count: number;
 }> {
-  const { count, error } = await sb()
+  const { count, error } = await getServiceRoleClient()
     .from('cc_decisions')
     .select('id', { count: 'exact', head: true });
   if (error) throw new Error(`ensureDecisionsSeeded count failed: ${error.message}`);
   if ((count ?? 0) > 0) return { seeded: false, count: count ?? 0 };
 
   const rows = SEED_DECISIONS.map((d) => inputToRow(d));
-  const { error: insertErr, count: inserted } = await sb()
+  const { error: insertErr, count: inserted } = await getServiceRoleClient()
     .from('cc_decisions')
     .insert(rows, { count: 'exact' });
   if (insertErr)
