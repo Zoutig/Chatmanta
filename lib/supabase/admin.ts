@@ -83,3 +83,23 @@ export async function getSystemJobClient(opts: { reason: string }): Promise<Supa
   console.log(`[admin] getSystemJobClient invoked: reason=${opts.reason}`);
   return _serviceRoleClient();
 }
+
+/**
+ * Service-role client voor interne (V0-)modules die al binnen een vertrouwde
+ * grens draaien — geen per-request user-identiteit — en die vóór PR-2 elk hun
+ * eigen `createClient(...SERVICE_ROLE_KEY...)` bouwden. Gedrag-identiek aan die
+ * lokale fabrieken: lazy-cached, geen sessie-persistentie, GEEN auth-check.
+ *
+ * Anders dan getJorionAdminClient/getOrgScopedAdminClient doet deze GEEN
+ * autorisatie — het is bewust de consolidatie-bestemming voor code die er geen
+ * had (V0 handhaaft SA-5 niet; zie AGENTS.md V0-sandbox-disclaimer). Het
+ * bestaansrecht: er is nu ÉÉN plek die SUPABASE_SERVICE_ROLE_KEY leest, die de
+ * latere V0/V1-namespace-split (kickoff-spec §3) in tweeën kan knippen i.p.v.
+ * opnieuw ~27 bestanden te moeten bewerken.
+ *
+ * Synchroon (geen await) zodat de bestaande synchrone call-sites
+ * (`sb().from(...)`) niet async hoeven te worden.
+ */
+export function getServiceRoleClient(): SupabaseClient {
+  return _serviceRoleClient();
+}
