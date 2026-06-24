@@ -6,8 +6,18 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_COOKIE, verifyAuthCookieValue } from '@/lib/v0/auth-cookie';
+import { updateSession } from '@/lib/supabase/v1/middleware';
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
+  // V1-routes (Supabase Auth) draaien NIET door de V0-demo-wachtwoord-gate.
+  // In plaats daarvan ververst de Supabase SSR-middleware hier de sessie-cookie;
+  // de eigenlijke toegangscontrole gebeurt per-pagina via requireAuth/
+  // requireOrgMember (lib/auth.ts). Zo blijft de V0-gate intact voor al het
+  // andere, en valt /v1/* erbuiten (analoog aan de /embed-exemptie).
+  if (req.nextUrl.pathname.startsWith('/v1')) {
+    return updateSession(req);
+  }
+
   const cookie = req.cookies.get(AUTH_COOKIE.name)?.value;
   if (verifyAuthCookieValue(cookie)) {
     return NextResponse.next();

@@ -13,12 +13,16 @@ import { AppError } from '@/lib/errors/app-error';
 
 /**
  * Require the request to come from an authenticated user.
- * Redirects to /login if not authenticated.
+ * Redirects to /v1/login if not authenticated.
+ *
+ * NB: dit is de V1-auth-laag (Supabase Auth tegen het V1-project). `/v1/login`
+ * is de V1-login — NIET de V0-demo-wachtwoord-`/login`. De provisionele route
+ * verandert mogelijk bij de kernel-graduatie.
  */
 export async function requireAuth(): Promise<User> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (!user) redirect('/v1/login');
   return user;
 }
 
