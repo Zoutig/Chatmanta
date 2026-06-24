@@ -23,7 +23,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Vanaf lib/supabase/__tests__/<dit-bestand> is ../../.. de repo-root.
@@ -88,12 +88,19 @@ test('V1 service-role key alleen in de V1-factory', () => {
   assert.deepEqual(offenders, [], `V1 service-role-key buiten lib/supabase/v1/service-role.ts:\n${offenders.join('\n')}`);
 });
 
-test('lib/v0 (+ commandcenter/controlroom) importeert geen V1-clients', () => {
+test('alleen de V1-allowlist mag lib/supabase/v1/* importeren', () => {
   const v1Import = /from ['"]@\/lib\/supabase\/v1\//;
+  // Wie LEGITIEM een V1-client mag importeren. Alles daarbuiten dat v1 importeert
+  // = potentieel cross-DB-lek (V0-code die per ongeluk het V1-prod-project raakt).
+  // Bij §4 (PR-4) komen hier app/v1/** bij; v1/** mag zichzelf importeren.
+  const V1_IMPORT_ALLOWED = (rel: string) =>
+    rel === join('lib', 'auth.ts') ||
+    rel === join('lib', 'supabase', 'admin.ts') ||
+    rel.startsWith(join('lib', 'supabase', 'v1') + sep);
   const offenders = allFiles()
-    .filter((f) => /^lib[\\/](v0|commandcenter|controlroom)[\\/]/.test(f.rel) && v1Import.test(f.src))
+    .filter((f) => v1Import.test(f.src) && !V1_IMPORT_ALLOWED(f.rel))
     .map((f) => f.rel);
-  assert.deepEqual(offenders, [], `V0-code importeert een V1-client:\n${offenders.join('\n')}`);
+  assert.deepEqual(offenders, [], `Niet-toegestane import van lib/supabase/v1/*:\n${offenders.join('\n')}`);
 });
 
 test('V1-auth-laag importeert niet de V0 service-role-factory', () => {
