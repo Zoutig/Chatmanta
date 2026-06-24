@@ -92,11 +92,14 @@ test('alleen de V1-allowlist mag lib/supabase/v1/* importeren', () => {
   const v1Import = /from ['"]@\/lib\/supabase\/v1\//;
   // Wie LEGITIEM een V1-client mag importeren. Alles daarbuiten dat v1 importeert
   // = potentieel cross-DB-lek (V0-code die per ongeluk het V1-prod-project raakt).
-  // Bij §4 (PR-4) komen hier app/v1/** bij; v1/** mag zichzelf importeren.
+  // V1-oppervlak: de auth-laag, de V1-route-group app/v1/**, de admin-wrappers en
+  // de v1-namespace zelf. (proxy.ts staat in de repo-root en valt buiten deze
+  // lib/+app/-scan; die importeert de V1-middleware bewust.)
   const V1_IMPORT_ALLOWED = (rel: string) =>
     rel === join('lib', 'auth.ts') ||
     rel === join('lib', 'supabase', 'admin.ts') ||
-    rel.startsWith(join('lib', 'supabase', 'v1') + sep);
+    rel.startsWith(join('lib', 'supabase', 'v1') + sep) ||
+    rel.startsWith(join('app', 'v1') + sep);
   const offenders = allFiles()
     .filter((f) => v1Import.test(f.src) && !V1_IMPORT_ALLOWED(f.rel))
     .map((f) => f.rel);
