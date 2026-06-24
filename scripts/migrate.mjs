@@ -69,13 +69,16 @@ try {
   process.exit(1);
 }
 
-// Tracking-tabel — geen org_id of RLS, dit is meta-laag (zoals
-// pgmigrations / flyway_schema_history).
+// Tracking-tabel — meta-laag (zoals pgmigrations / flyway_schema_history), geen
+// org_id. RLS staat AAN zonder policies: anon/authenticated zien niets, de runner
+// (owner-connection) en service-role bypassen RLS toch. Voorkomt de Supabase
+// "RLS disabled in public"-advisor op een productieproject. Idempotent.
 await client.query(`
   create table if not exists public._migrations (
     id          text        primary key,
     applied_at  timestamptz not null default now()
   );
+  alter table public._migrations enable row level security;
 `);
 
 const { rows: applied } = await client.query(
