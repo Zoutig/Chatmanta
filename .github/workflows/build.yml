@@ -1,16 +1,17 @@
 name: build
 
 # C1 — schone verificatie-build. Bewijst dat de app op een verse runner compileert
-# en bouwt (geen dev-server, geen lint/coverage): tsc-typecheck + next build.
+# en bouwt (geen dev-server, geen lint/coverage): tsc-typecheck + unit-tests + next build.
 #
 # LET OP (HANDOFF — repo-secrets vereist): `next build` draait generateStaticParams
-# voor de SSG-widget-pagina's (`/widget/[slug]/[page]`), die Supabase queryt. Zet
-# daarom in GitHub → Settings → Secrets and variables → Actions deze repo-secrets:
-#   - NEXT_PUBLIC_SUPABASE_URL
-#   - NEXT_PUBLIC_SUPABASE_ANON_KEY
-#   - SUPABASE_SERVICE_ROLE_KEY
-# Dit zijn de keys van het V0-sandbox-Supabase-project (alléén fake demo-data, geen
-# prod-klantdata). Zonder deze secrets faalt de SSG-stap van de build. Zie HANDOFF.md.
+# voor de SSG-widget-pagina's (`/widget/[slug]/[page]`), die Supabase queryt. Sinds de
+# V0/V1-namespace-split (kickoff §3) heten de keys V0_* / V1_*. Zet in GitHub →
+# Settings → Secrets and variables → Actions deze repo-secrets:
+#   - V0_SUPABASE_URL
+#   - V0_SUPABASE_SERVICE_ROLE_KEY   (V0-sandbox: alléén fake demo-data, geen prod-klantdata)
+#   - NEXT_PUBLIC_V1_SUPABASE_URL    (nodig voor de /v1/login client-bundle vanaf PR-4)
+#   - NEXT_PUBLIC_V1_SUPABASE_ANON_KEY
+# Zonder de V0-secrets faalt de SSG-stap van de build. Zie HANDOFF.md.
 
 on:
   push:
@@ -35,9 +36,14 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      # Unit-tests incl. de service-role/V0-V1 grep-gate (no-adhoc-service-client).
+      # Draaide voorheen nergens automatisch — nu een harde merge-gate.
+      - name: Unit tests
+        run: npm run test:unit
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          V0_SUPABASE_URL: ${{ secrets.V0_SUPABASE_URL }}
+          V0_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.V0_SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_V1_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_V1_SUPABASE_URL }}
+          NEXT_PUBLIC_V1_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_V1_SUPABASE_ANON_KEY }}
