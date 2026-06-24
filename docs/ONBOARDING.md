@@ -18,6 +18,11 @@ We zitten in de pre-build / V1-fase. Eerst MVP, daarna 2-3 testklanten, daarna p
 
 ## Eerste keer setup
 
+> **Liever zonder zelf installeren?** Er is een dev-container (Docker): één keer
+> Docker Desktop + VS Code, en de hele omgeving staat klaar — handig om op een
+> nieuwe PC snel te starten. Zie [`DEVCONTAINER.md`](DEVCONTAINER.md). De stappen
+> hieronder zijn de klassieke, handmatige route.
+
 ### 1. Wat je nodig hebt
 - Node.js 20+ ([download](https://nodejs.org/))
 - Git (komt mee met Git for Windows)
