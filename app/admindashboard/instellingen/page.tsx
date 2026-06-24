@@ -35,7 +35,7 @@ export default async function InstellingenPage() {
     OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
     FIRECRAWL_API_KEY: !!process.env.FIRECRAWL_API_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    V0_SUPABASE_SERVICE_ROLE_KEY: !!process.env.V0_SUPABASE_SERVICE_ROLE_KEY,
     EMBED_TOKEN_SECRET: !!process.env.EMBED_TOKEN_SECRET,
     V0_COOKIE_SECRET: !!process.env.V0_COOKIE_SECRET,
   };
