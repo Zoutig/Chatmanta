@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/v1/server';
 import type { User } from '@supabase/supabase-js';
 import { AppError } from '@/lib/errors/app-error';
 
@@ -7,7 +7,7 @@ import { AppError } from '@/lib/errors/app-error';
 // every Server Component, Server Action, and Route Handler that needs an
 // authenticated user.
 //
-// These helpers read the user's session from cookies (via `lib/supabase/server.ts`)
+// These helpers read the user's session from cookies (via `lib/supabase/v1/server.ts`)
 // — subject to RLS, no service-role bypass. For privileged service-role work
 // after these checks pass, use the wrappers in `lib/supabase/admin.ts`.
 

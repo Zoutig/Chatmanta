@@ -1,4 +1,4 @@
-// Raw service-role Supabase client factory — bypasses ALL Row-Level Security.
+// Raw V0 service-role Supabase client factory — bypasses ALL Row-Level Security.
 //
 // Deliberately has ZERO dependency on `@/lib/auth` (and thus on next/navigation
 // / next/headers). That keeps it importable from:
@@ -10,9 +10,10 @@
 //     read at runtime only (not NEXT_PUBLIC) so it is stripped from the client
 //     bundle and the factory is effectively a no-op there.
 //
-// This is the SINGLE place in the app that reads SUPABASE_SERVICE_ROLE_KEY to
-// build a client (PR-2 consolidatie). The V0/V1-namespace-split (kickoff §3)
-// splits THIS factory per database.
+// This is the SINGLE place in the app that reads V0_SUPABASE_SERVICE_ROLE_KEY to
+// build a client. The V0/V1-namespace-split (kickoff §3) splits the factory per
+// database: this is the V0 factory (V0_* env); the V1 counterpart lives in
+// lib/supabase/v1/service-role.ts (V1_* env).
 //
 // NOTE: this factory does NO authorization — V0 does not enforce SA-5 (zie de
 // V0-sandbox-disclaimer in AGENTS.md). For request-context code that must gate
@@ -31,11 +32,11 @@ let _cached: SupabaseClient | null = null;
  */
 export function getServiceRoleClient(): SupabaseClient {
   if (_cached) return _cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.V0_SUPABASE_URL;
+  const key = process.env.V0_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error(
-      'Service-role client requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
+      'V0 service-role client requires V0_SUPABASE_URL and V0_SUPABASE_SERVICE_ROLE_KEY',
     );
   }
   _cached = createClient(url, key, {

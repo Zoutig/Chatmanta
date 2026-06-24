@@ -1,4 +1,5 @@
-// Auth-gated service-role wrappers — see ./service-role.ts for the raw factory.
+// Auth-gated service-role wrappers — see ./service-role.ts (V0) and
+// ./v1/service-role.ts (V1) for the raw factories.
 //
 // SECURITY (Blueprint Security Addendum SA-5):
 // These wrappers enforce an explicit authorization check before handing out the
@@ -6,19 +7,27 @@
 // code (Server Components, Server Actions, Route Handlers) that must verify the
 // caller first.
 //
-// The raw client itself lives in ./service-role.ts (getServiceRoleClient) so it
-// can be imported by tsx scripts and client-reachable modules WITHOUT dragging
-// in @/lib/auth → next/navigation / next/headers. Keep this file's @/lib/auth
+// DELIBERATE V0/V1 MIX (kickoff §3): the two user-auth-gated wrappers
+// (getJorionAdminClient / getOrgScopedAdminClient) run behind the V1 auth layer
+// (requireJorionAdmin / requireOrgMember → V1 session) and therefore return the
+// V1 service-role client (getV1ServiceRoleClient). getSystemJobClient runs
+// without a user session for V0 cron/background jobs and stays on the V0 factory
+// (getServiceRoleClient). This split is intentional — do not unify them.
+//
+// The raw clients live in ./service-role.ts / ./v1/service-role.ts so they can
+// be imported by tsx scripts and client-reachable modules WITHOUT dragging in
+// @/lib/auth → next/navigation / next/headers. Keep this file's @/lib/auth
 // import confined to the request-context wrappers below; do not let the raw
-// factory re-couple to that chain.
+// factories re-couple to that chain.
 //
 // Do NOT use these wrappers for ordinary user-scoped queries. Use
-// `lib/supabase/server.ts` (RLS-bound) instead, and reach for service-role
+// `lib/supabase/v1/server.ts` (RLS-bound) instead, and reach for service-role
 // only when you genuinely need to bypass RLS (system jobs, cross-org admin
 // reads, batch cleanup).
 
 import { type SupabaseClient } from '@supabase/supabase-js';
-import { getServiceRoleClient } from './service-role';
+import { getServiceRoleClient } from './service-role';            // V0
+import { getV1ServiceRoleClient } from './v1/service-role';        // V1
 import { requireJorionAdmin, requireOrgMember } from '@/lib/auth';
 
 /**
@@ -28,7 +37,7 @@ import { requireJorionAdmin, requireOrgMember } from '@/lib/auth';
  */
 export async function getJorionAdminClient(): Promise<SupabaseClient> {
   await requireJorionAdmin();
-  return getServiceRoleClient();
+  return getV1ServiceRoleClient();
 }
 
 /**
@@ -42,7 +51,7 @@ export async function getJorionAdminClient(): Promise<SupabaseClient> {
  */
 export async function getOrgScopedAdminClient(orgId: string): Promise<SupabaseClient> {
   await requireOrgMember(orgId);
-  return getServiceRoleClient();
+  return getV1ServiceRoleClient();
 }
 
 /**

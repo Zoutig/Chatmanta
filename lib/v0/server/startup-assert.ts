@@ -44,6 +44,23 @@ export function checkProductionEnv(env: StartupEnv): StartupCheck {
     }
   }
 
+  // V0/V1-namespace-split (kickoff §3): sinds de env-rename leest de app de
+  // Supabase-clients via V0_*/V1_*. Een ontbrekende var faalt anders pas bij de
+  // eerste request (V0 service-role-throw) of stil op een leeg V1-project — dus
+  // hier fail-loud bij boot. (V1_DATABASE_URL valt buiten: alleen voor migrate:v1.)
+  const requiredSupabase = [
+    'V0_SUPABASE_URL',
+    'V0_SUPABASE_SERVICE_ROLE_KEY',
+    'NEXT_PUBLIC_V1_SUPABASE_URL',
+    'NEXT_PUBLIC_V1_SUPABASE_ANON_KEY',
+    'V1_SUPABASE_SERVICE_ROLE_KEY',
+  ];
+  for (const name of requiredSupabase) {
+    if (!env[name]) {
+      errors.push(`${name} ontbreekt — vereist sinds de V0/V1-namespace-split (kickoff §3).`);
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 

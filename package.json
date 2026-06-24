@@ -52,6 +52,8 @@
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "migrate:status": "node --env-file=.env.local scripts/migrate.mjs status",
     "migrate:bootstrap": "node --env-file=.env.local scripts/migrate.mjs bootstrap",
+    "migrate:v1": "node --env-file=.env.local scripts/migrate.mjs --v1",
+    "migrate:v1:status": "node --env-file=.env.local scripts/migrate.mjs status --v1",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "dependencies": {

@@ -21,9 +21,17 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import pg from 'pg';
 
-const url = process.env.DATABASE_URL;
+// Doel-selectie. Default = V0 (`npm run migrate` draait byte-voor-byte als
+// voorheen). Met `--v1` (zie `migrate:v1` in package.json) draait hij tegen de
+// V1-stroom: supabase/migrations-v1/ + V1_DATABASE_URL. MIGRATE_DIR/MIGRATE_DB_URL
+// overriden beide expliciet als je een ander doel wilt.
+const isV1 = process.argv.includes('--v1');
+const url =
+  process.env.MIGRATE_DB_URL ||
+  (isV1 ? process.env.V1_DATABASE_URL : process.env.DATABASE_URL);
 if (!url) {
-  console.error('✗ DATABASE_URL ontbreekt in env.');
+  const want = isV1 ? 'V1_DATABASE_URL' : 'DATABASE_URL';
+  console.error(`✗ ${want} (of MIGRATE_DB_URL) ontbreekt in env.`);
   console.error('  Voeg toe aan .env.local — zie Supabase dashboard → Database → Connection string.');
   process.exit(1);
 }
@@ -34,7 +42,9 @@ const mode = process.argv[2] === 'status'
     ? 'bootstrap'
     : 'apply';
 
-const migrationsDir = resolve('supabase/migrations');
+const migrationsDir = resolve(
+  process.env.MIGRATE_DIR || (isV1 ? 'supabase/migrations-v1' : 'supabase/migrations'),
+);
 const files = readdirSync(migrationsDir)
   .filter((f) => f.endsWith('.sql'))
   .sort();
@@ -59,13 +69,16 @@ try {
   process.exit(1);
 }
 
-// Tracking-tabel — geen org_id of RLS, dit is meta-laag (zoals
-// pgmigrations / flyway_schema_history).
+// Tracking-tabel — meta-laag (zoals pgmigrations / flyway_schema_history), geen
+// org_id. RLS staat AAN zonder policies: anon/authenticated zien niets, de runner
+// (owner-connection) en service-role bypassen RLS toch. Voorkomt de Supabase
+// "RLS disabled in public"-advisor op een productieproject. Idempotent.
 await client.query(`
   create table if not exists public._migrations (
     id          text        primary key,
     applied_at  timestamptz not null default now()
   );
+  alter table public._migrations enable row level security;
 `);
 
 const { rows: applied } = await client.query(

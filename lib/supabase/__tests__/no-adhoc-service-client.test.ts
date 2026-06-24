@@ -1,32 +1,29 @@
-// PR-2-guard: geen enkele runtime-module onder lib/ of app/ mag nog zelf de
-// service-role-key naar een Supabase-client schrijven — alles moet via de
-// centrale factory getServiceRoleClient() in lib/supabase/service-role.ts.
+// Grep-gate: dwingt de V0/V1-namespace-split af op de SA-5-grens (lib/ + app/).
+//
+// Geen enkele runtime-module mag ad-hoc de service-role-key naar een Supabase-
+// client schrijven — dat moet via de centrale factories:
+//   - V0 → getServiceRoleClient() in lib/supabase/service-role.ts (V0_*-env)
+//   - V1 → getV1ServiceRoleClient() in lib/supabase/v1/service-role.ts (V1_*-env)
 // Scope is bewust lib/+app/ (de runtime/SA-5-grens); scripts/ blijven buiten
 // scope (die draaien buiten Next.js met --conditions=react-server en zijn geen
 // onderdeel van de runtime-grens).
 //
-// Deze test is de scharnierpin-enabler voor de latere V0/V1-namespace-split:
-// zolang er ÉÉN plek is die SUPABASE_SERVICE_ROLE_KEY naar een client schrijft,
-// kan die in tweeën.
-//
 // Heuristiek: een bestand is een overtreder als het ZOWEL de key-string ÁLS de
 // substring `createClient` bevat. Dat vangt de realistische regressie (iemand
 // plakt het oude `createClient(url, SERVICE_ROLE_KEY, …)`-patroon terug) ÉN de
-// aliased-import-ontwijking die de PR-2-review noemde
-// (`import { createClient as x }` — die import-regel bevat `createClient`).
-// We eisen `createClient` (geen kale key-needle) zodat een bestand dat de key
-// alléén in een COMMENT noemt (bv. controlroom/server/db.ts dat de factory
-// her-exporteert) géén false-positive geeft. Bewust geaccepteerde grens: een
-// client bouwen zonder ergens `createClient` te noemen (volledig geïndirecteerde
-// constructor) ontwijkt deze tripwire — perfecte statische detectie is
-// onbeslisbaar; de echte vangrail tegen accidentele her-introductie is dit + tsc.
+// aliased-import-ontwijking (`import { createClient as x }` — die import-regel
+// bevat `createClient`). We eisen `createClient` (geen kale key-needle) zodat een
+// bestand dat de key alléén in een COMMENT noemt géén false-positive geeft.
+// Bewust geaccepteerde grens: een client bouwen zonder ergens `createClient` te
+// noemen (volledig geïndirecteerde constructor) ontwijkt deze tripwire — perfecte
+// statische detectie is onbeslisbaar; de echte vangrail is dit + tsc.
 //
 // Run: node --import tsx --test lib/supabase/__tests__/no-adhoc-service-client.test.ts
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Vanaf lib/supabase/__tests__/<dit-bestand> is ../../.. de repo-root.
@@ -36,17 +33,6 @@ import { fileURLToPath } from 'node:url';
 // allowlist-match (cross-platform correct: relative + join geven dezelfde
 // separator-stijl).
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
-
-// Token gesplitst zodat dit testbestand zichzelf niet als overtreder telt.
-const NEEDLE = 'SUPABASE_SERVICE_ROLE_' + 'KEY';
-
-// Allowlist: het ENIGE bestand dat de key legitiem naar een client mag schrijven.
-// (De read-only presence-check in app/admindashboard/instellingen/page.tsx en de
-// her-export in lib/controlroom/server/db.ts hoeven hier NIET in: zij bevatten
-// geen `createClient` en worden dus sowieso niet geflagd.)
-const ALLOWED = new Set([
-  join('lib', 'supabase', 'service-role.ts'),
-]);
 
 function walk(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -58,19 +44,70 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-test('SUPABASE_SERVICE_ROLE_KEY alleen in de factory + allowlist, nergens ad-hoc', () => {
-  const offenders: string[] = [];
+// V0 = de bestaande factory; V1 = de nieuwe namespaced factories.
+const V0_NEEDLE = 'V0_SUPABASE_SERVICE_ROLE_' + 'KEY';
+const V1_NEEDLE = 'V1_SUPABASE_SERVICE_ROLE_' + 'KEY';
+
+const V0_SERVICE_ROLE = join('lib', 'supabase', 'service-role.ts');
+const V1_SERVICE_ROLE = join('lib', 'supabase', 'v1', 'service-role.ts');
+
+const V0_KEY_ALLOWED = new Set([V0_SERVICE_ROLE]);
+const V1_KEY_ALLOWED = new Set([V1_SERVICE_ROLE]);
+
+function allFiles(): { rel: string; src: string }[] {
+  const out: { rel: string; src: string }[] = [];
   for (const root of ['lib', 'app']) {
     for (const file of walk(join(repoRoot, root))) {
-      const rel = relative(repoRoot, file);
-      if (ALLOWED.has(rel)) continue;
-      const src = readFileSync(file, 'utf8');
-      if (src.includes(NEEDLE) && src.includes('createClient')) offenders.push(rel);
+      out.push({ rel: relative(repoRoot, file), src: readFileSync(file, 'utf8') });
     }
   }
-  assert.deepEqual(
-    offenders,
-    [],
-    `Service-role-key wordt buiten de factory/allowlist gelezen:\n${offenders.join('\n')}`,
+  return out;
+}
+
+// Red→green-driver: faalt zolang de V0-factory de KALE legacy-key leest (vóór A5),
+// slaagt zodra hij de V0-geprefixte naam gebruikt. Dit is de test die A4 rood maakt.
+test('V0-factory leest de V0-geprefixte service-role-key', () => {
+  const src = readFileSync(join(repoRoot, 'lib', 'supabase', 'service-role.ts'), 'utf8');
+  assert.ok(
+    src.includes('V0_SUPABASE_SERVICE_ROLE_' + 'KEY'),
+    'lib/supabase/service-role.ts moet V0_SUPABASE_SERVICE_ROLE_KEY lezen (V0/V1-split)',
   );
+});
+
+test('V0 service-role key alleen in de V0-factory', () => {
+  const offenders = allFiles()
+    .filter((f) => !V0_KEY_ALLOWED.has(f.rel) && f.src.includes(V0_NEEDLE) && f.src.includes('createClient'))
+    .map((f) => f.rel);
+  assert.deepEqual(offenders, [], `V0 service-role-key buiten lib/supabase/service-role.ts:\n${offenders.join('\n')}`);
+});
+
+test('V1 service-role key alleen in de V1-factory', () => {
+  const offenders = allFiles()
+    .filter((f) => !V1_KEY_ALLOWED.has(f.rel) && f.src.includes(V1_NEEDLE) && f.src.includes('createClient'))
+    .map((f) => f.rel);
+  assert.deepEqual(offenders, [], `V1 service-role-key buiten lib/supabase/v1/service-role.ts:\n${offenders.join('\n')}`);
+});
+
+test('alleen de V1-allowlist mag lib/supabase/v1/* importeren', () => {
+  const v1Import = /from ['"]@\/lib\/supabase\/v1\//;
+  // Wie LEGITIEM een V1-client mag importeren. Alles daarbuiten dat v1 importeert
+  // = potentieel cross-DB-lek (V0-code die per ongeluk het V1-prod-project raakt).
+  // Bij §4 (PR-4) komen hier app/v1/** bij; v1/** mag zichzelf importeren.
+  const V1_IMPORT_ALLOWED = (rel: string) =>
+    rel === join('lib', 'auth.ts') ||
+    rel === join('lib', 'supabase', 'admin.ts') ||
+    rel.startsWith(join('lib', 'supabase', 'v1') + sep);
+  const offenders = allFiles()
+    .filter((f) => v1Import.test(f.src) && !V1_IMPORT_ALLOWED(f.rel))
+    .map((f) => f.rel);
+  assert.deepEqual(offenders, [], `Niet-toegestane import van lib/supabase/v1/*:\n${offenders.join('\n')}`);
+});
+
+test('V1-auth-laag importeert niet de V0 service-role-factory', () => {
+  const v0Import = /from ['"]@\/lib\/supabase\/service-role['"]/;
+  // lib/auth.ts is V1; admin.ts mag wél (getSystemJobClient blijft V0) → uitgezonderd.
+  const offenders = allFiles()
+    .filter((f) => f.rel === join('lib', 'auth.ts') && v0Import.test(f.src))
+    .map((f) => f.rel);
+  assert.deepEqual(offenders, [], `V1-auth importeert de V0 service-role-factory:\n${offenders.join('\n')}`);
 });
