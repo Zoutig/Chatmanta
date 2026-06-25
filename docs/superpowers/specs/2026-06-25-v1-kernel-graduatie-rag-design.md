@@ -120,7 +120,7 @@ Ingest schrijft naar dezelfde tabellen; mogelijk een extra index/kolom. Detail b
 
 ### PR-3 — `0004_v1_website.sql` + `0005_v1_cache.sql`
 8. **`website_pages`** (+ `knowledge_sources`, `included`-kolom) — port V0 `0032`/`0035`. RLS aan; `organization_id`/`chatbot_id NOT NULL`. De match-RPC krijgt de `website_pages`-JOIN terug.
-9. **`answer_cache`** (+ `lookup_cached_answer`-RPC) — port V0 `0004`. ⚠️ **Landmijn:** `answer_cache` is sinds #198 óók de FAQ-pre-cache-deliverystore ([[answer_cache_removal_analysis]]) — bij het porten meenemen dat de cache twee rollen heeft.
+9. **`answer_cache`** (+ `lookup_cached_answer`-RPC) — port V0 `0004`. ⚠️ **Landmijn 1:** `answer_cache` is sinds #198 óók de FAQ-pre-cache-deliverystore ([[answer_cache_removal_analysis]]) — bij het porten meenemen dat de cache twee rollen heeft. ⚠️ **Landmijn 2 (gevonden in PR-1a-review):** de cache-key is `(organization_id, bot_version)` — **niet** `chatbot_id`. Zodra V1 meerdere chatbots per org heeft die dezelfde `bot_version` delen (bv. beide op LATEST) zou chatbot A het gecachte antwoord van chatbot B serveren terwijl retrieval wél per-chatbot scoopt. **Voeg `chatbot_id` toe aan de cache-key** (`answer_cache`-tabel + `lookup_cached_answer`-RPC + `lookupCachedAnswer`/`writeCachedAnswer` in de engine) wanneer de cache naar V1 komt. In V0 (één bot per org) is org+version correct → geen PR-1a-bug.
 
 **Volgende veilige nummers (geverifieerd 2026-06-25):** V0 → `0054`; V1 → `0002`.
 
