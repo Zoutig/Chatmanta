@@ -7,6 +7,8 @@
 // RagPersona is the canonical persona shape for org-level prompt-token injection.
 // V0 keeps a back-compat alias: `OrgPersona = RagPersona` in lib/v0/server/persona.ts.
 
+import type { Tone, Length } from './style-types';
+
 export type RagConfig = {
   /** Stable identifier in URLs and storage (e.g. 'v0.1'). */
   version: string;
@@ -453,3 +455,36 @@ export type ManualQA = {
    *  rijen van vóór de ingest-route en voor inactieve Q&A's (niet ge-embed). */
   ingestedDocId?: string;
 };
+
+/**
+ * Neutrale subset van de klant-dashboard prompt-overrides die de RAG-engine
+ * (lib/rag/run-rag-query.ts) daadwerkelijk leest. Bewust V0/V1-agnostisch en
+ * los van de V0-laag: de V0 `ChatbotPromptOverrides`
+ * (lib/v0/klantendashboard/server/build-chatbot-overrides.ts) heeft al deze
+ * velden (plus enkele extra die alléén de chat-route gebruikt, zoals
+ * answerGeneralKnowledge) en is daarom structureel toewijsbaar aan dit type —
+ * de V0-adapter geeft hem ongewijzigd door.
+ *
+ * Alle velden optioneel: de engine leest ze defensief via `?.` met defaults.
+ */
+export type RagChatbotOverrides = {
+  /** Resolved tone voor de STIJL-suffix (buildSystemPrompt). */
+  tone?: Tone;
+  /** Resolved length voor de STIJL-suffix. */
+  length?: Length;
+  /** Extra system-prompt-regels boven de STIJL-suffix. */
+  extraSystemInstructions?: string;
+  /** Klant-fallback-tekst; lege string telt als "niet ingevuld" → engine-default. */
+  fallbackMessage?: string;
+  /** Doeltaal-instelling; stuurt de USER-turn taal-directive. */
+  primaryLanguage?: RagLanguage;
+  /** true → spiegel de bezoeker-taal; false → altijd primaryLanguage. */
+  autoDetectLanguage?: boolean;
+};
+
+/**
+ * Taal-codes die de engine-taaldirective kent. Spiegelt de V0 `Language`-union
+ * (lib/v0/klantendashboard/types.ts) zodat `ChatbotPromptOverrides` toewijsbaar
+ * blijft aan RagChatbotOverrides.
+ */
+export type RagLanguage = 'nl' | 'en' | 'de' | 'fr' | 'es';
