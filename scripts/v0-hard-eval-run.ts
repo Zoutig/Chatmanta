@@ -256,7 +256,14 @@ const CACHE_SCHEMA = 'v2';
 //   antwoorden ZONDER de fingerprint te raken. Wis `eval-out/hard/.cache/` na een
 //   corpus-wijziging, of draai zonder --cache.
 const PIPELINE_SOURCES = [
-  'lib/v0/server/rag.ts',
+  'lib/v0/server/rag.ts', // V0-adapter (dun) — injecteert client/persona en delegeert
+  'lib/rag/run-rag-query.ts', // de gegradueerde engine (de hele pipeline-body)
+  'lib/rag/embeddings.ts',
+  'lib/rag/preprocess-parse.ts',
+  'lib/rag/reclassify.ts',
+  'lib/rag/reclassify-pure.ts',
+  'lib/rag/history-entities.ts',
+  'lib/rag/hard-eval-checks.ts',
   'lib/v0/server/bots.ts',
   'lib/v0/server/persona.ts',
   'lib/rag/hard-facts.ts',
