@@ -47,73 +47,10 @@ const ORG_SLUG_TO_ID: Record<OrgSlug, string> = {
   'demo-nieuw': '00000000-0000-0000-0000-0000000000a4',
 };
 
-export type OrgPersona = {
-  /**
-   * Naam zoals de bot zichzelf noemt. Wordt in {{COMPANY}} ingelezen.
-   * DEV_ORG: "ChatManta". Anders: bedrijfsnaam ("Dakwerken De Boer").
-   */
-  company: string;
+import type { RagPersona } from '@/lib/rag/types';
 
-  /**
-   * Optionele aanvulling op de bedrijfsnaam. Bij DEV_ORG: " — een product
-   * van Jorion Solutions" (incl. leading punctuation). Bij anderen: "".
-   * Wordt direct na {{COMPANY}} geplakt zodat één template beide vormen
-   * (parent / standalone) dekt.
-   */
-  companySuffix: string;
-
-  /**
-   * Beschrijving van de typische gesprekspartner — staat na "Je
-   * gesprekspartners zijn ". DEV_ORG: "meestal mensen die het project leren
-   * kennen: vrienden van de founders, geïnteresseerden, en de founders
-   * zelf". Anders org-specifiek.
-   */
-  audience: string;
-
-  /**
-   * Pedagogische voorbeelden in de inline-citaties-uitleg van V0.3+ system
-   * prompts. Twee voorbeelden zodat we de "[1]" en "[2][3]"-patronen kunnen
-   * blijven tonen. Org-specifiek, anders leest de LLM "ChatManta gebruikt
-   * pgvector" terwijl hij accountancy-content moet citeren.
-   */
-  citationExample1: string;
-  citationExample2: string;
-
-  /**
-   * Smalltalk-voorbeeld voor `"hey"` in de preProcessSystem. DEV_ORG:
-   * "Hoi! Leuk dat je er bent. Wat wil je weten over ChatManta?". Anders
-   * passend bij de org-naam.
-   */
-  smalltalkGreeting: string;
-
-  /**
-   * Smalltalk-voorbeeld voor `"wat kan je?"` in de preProcessSystem.
-   * Beschrijft kort welke onderwerpen de bot kan toelichten.
-   */
-  smalltalkHelpScope: string;
-
-  /**
-   * Domein-keywords voor (a) de general-knowledge prompt ("vraag binnen ons
-   * domein: ..."), (b) de DOMAIN_ALLOWLIST in reclassify-pure.ts, en (c)
-   * de off-topic refusal-zin. DEV_ORG: ["MKB", "SaaS", "AI", "RAG",
-   * "chatbots", "klantcontact", "ondernemerschap", "marketing"].
-   */
-  domainKeywords: string[];
-
-  /**
-   * Sluitzin van het general-knowledge antwoord (na GENERAL_OPENING + LLM-
-   * core). DEV_ORG: " Wil je weten hoe ChatManta hier specifiek mee omgaat?
-   * Vraag gerust." — wordt 1-op-1 achter de core geplakt.
-   */
-  generalKnowledgeClosing: string;
-
-  /**
-   * Korte beschrijving voor de off-topic refusal — staat na "Ik help met
-   * vragen rondom ". DEV_ORG: "ChatManta en aanverwante onderwerpen — denk
-   * aan MKB-tech, chatbots, klantcontact".
-   */
-  offTopicScope: string;
-};
+// Back-compat alias — RagPersona is the canonical type home in lib/rag/types.ts.
+export type OrgPersona = RagPersona;
 
 // ---------------------------------------------------------------------------
 // Personas — één per OrgSlug.
