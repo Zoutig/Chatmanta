@@ -149,6 +149,7 @@ Mapping naar de harde regels: **SA-1** (object-level access via `requireOrgMembe
 ## 7. Big-ship-opdeling — 3 PR's met checkpoints
 
 ### PR-1 — Kernel-graduatie + dunne retrieval-keten bewezen achter login
+> **Uitvoering: gesplitst in PR-1a + PR-1b** (twee subsystemen). **PR-1a** = de kernel-graduatie (V0-only refactor, motor → `lib/rag/`, V0 bewezen identiek) — plan: `docs/superpowers/plans/2026-06-25-v1-pr1a-kernel-graduatie.md`. **PR-1b** = het V1-retrieval-pad (migratie `0002` + seed + `/v1/app` echte RAG + e2e), branch van `main` ná 1a-merge (afhankelijk van het bestaan van `lib/rag/`). **Implementatiedetail:** `chatbotId` is verplicht op de neutrale signatuur, maar de retrieval-RPC krijgt `p_chatbot_id` alléén als `config.chatbotScoped === true` (V1) → V0's RPC's/DB blijven onaangeraakt (geen V0-migratie).
 - `lib/rag/` extractie: client + `RagConfig` + `RagPersona` geïnjecteerd; `chatbotId` verplicht; neutrale helpers verhuisd; grep-gate uitgebreid.
 - V0-adapter + **test-eerst bewijs dat V0 identiek blijft** (smoke + hard-eval).
 - Klein opruimpunt: de stale comment in `lib/auth.ts:11` (wijst service-role-werk nog naar `admin.ts`) uitlijnen op de V1-service-role-factory (`getV1ServiceRoleClient`).
