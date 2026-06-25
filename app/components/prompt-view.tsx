@@ -6,8 +6,8 @@
 
 import { useState } from 'react';
 import { Icon } from './svg-icons';
-import { buildStyleSuffix, buildSystemPrompt, type OutputStyleVersion } from '@/lib/v0/style';
-import type { Length, Tone } from '@/lib/v0/style-types';
+import { buildStyleSuffix, buildSystemPrompt, type OutputStyleVersion } from '@/lib/rag/style';
+import type { Length, Tone } from '@/lib/rag/style-types';
 import { STYLE_LABELS } from './style-labels';
 
 export function PromptView({

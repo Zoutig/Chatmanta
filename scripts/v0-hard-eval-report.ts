@@ -21,7 +21,7 @@ import type {
   HardDimension,
   HardCaseFile,
   StatusFlip,
-} from '../lib/v0/server/hard-eval-checks';
+} from '../lib/rag/hard-eval-checks';
 import {
   finalCaseStatus,
   computeProductionGate,
@@ -32,7 +32,7 @@ import {
   SAFETY_DIMENSIONS,
   QUALITY_DIMENSIONS,
   UNDER_REFUSAL_MIN_N,
-} from '../lib/v0/server/hard-eval-checks';
+} from '../lib/rag/hard-eval-checks';
 import { resolveBot } from '../lib/v0/server/bots';
 
 // Display-volgorde: alle veiligheidsdimensies, daarna de kwaliteitsdimensie.

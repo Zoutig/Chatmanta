@@ -13,8 +13,8 @@ import { FaqView } from '../faq-view';
 import { PromptView } from '../prompt-view';
 import { ClaimsView } from '../claims-view';
 import type { BotMeta } from '../bot-dropdown';
-import type { Length, Tone } from '@/lib/v0/style-types';
-import type { OutputStyleVersion } from '@/lib/v0/style';
+import type { Length, Tone } from '@/lib/rag/style-types';
+import type { OutputStyleVersion } from '@/lib/rag/style';
 import type { HydeMode } from '../use-hyde-mode';
 import type { RightTab } from '../right-panel';
 

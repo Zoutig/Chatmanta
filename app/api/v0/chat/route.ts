@@ -17,7 +17,7 @@ import {
 } from '@/lib/v0/server/rag';
 import { resolveBot } from '@/lib/v0/server/bots';
 import { logQuery, logBlockedQuery, type HydeMeta } from '@/lib/v0/server/log';
-import { normalizeStyle } from '@/lib/v0/style';
+import { normalizeStyle } from '@/lib/rag/style';
 import {
   detectInjection,
   getInjectionMode,

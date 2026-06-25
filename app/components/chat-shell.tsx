@@ -26,7 +26,7 @@ import { EmptyState } from './empty-state';
 import { AssistantMessage, UserMessage, ErrorMessage } from './messages';
 import { RightPanel, type RightTab } from './right-panel';
 import type { BotMeta } from './bot-dropdown';
-import type { OutputStyleVersion } from '@/lib/v0/style';
+import type { OutputStyleVersion } from '@/lib/rag/style';
 import { useStyle } from './use-style';
 import { useHydeMode } from './use-hyde-mode';
 import { useStyleMode } from '@/lib/v0/hooks/use-style-mode';

@@ -20,7 +20,7 @@
 
 import 'server-only';
 
-import type { ManualQA } from '@/lib/v0/klantendashboard/types';
+import type { ManualQA } from '@/lib/rag/types';
 
 // ---------------------------------------------------------------------------
 // Tokenizer + stop-words

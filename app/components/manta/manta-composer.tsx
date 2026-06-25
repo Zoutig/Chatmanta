@@ -5,7 +5,7 @@ import { ArrowUp } from 'lucide-react';
 import { Icon } from '../svg-icons';
 import { Button as Button1 } from '../ui/button-1';
 import { ClassicLoader } from '../ui/loader';
-import type { Length, Tone } from '@/lib/v0/style-types';
+import type { Length, Tone } from '@/lib/rag/style-types';
 
 const MAX_CHARS = 1000;
 const PRESETS: { value: number; label: string }[] = [

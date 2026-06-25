@@ -434,3 +434,22 @@ export type RagPersona = {
    */
   offTopicScope: string;
 };
+
+/**
+ * Manual Q&A item — een door de klant in de kennisbank ingevoerd vraag/antwoord-
+ * paar dat de RAG-engine (via manual-qa.ts) als fast-path kan matchen. Canonical
+ * home in lib/rag/types.ts; lib/v0/klantendashboard/types.ts re-exporteert dit
+ * voor back-compat met de bestaande dashboard-importers.
+ */
+export type ManualQA = {
+  id: string;
+  question: string;
+  answer: string;
+  category?: string;
+  active: boolean;
+  updatedAt: string;
+  /** id van het via ingestText aangemaakte documents-record (WP4). Aanwezig zodra
+   *  de Q&A als kennisbank-chunk is ge-embed; optioneel voor backward-compat met
+   *  rijen van vóór de ingest-route en voor inactieve Q&A's (niet ge-embed). */
+  ingestedDocId?: string;
+};

@@ -25,7 +25,7 @@ import {
 } from './rag';
 import { resolveBot, type BotConfig } from './bots';
 import { getPersonaForOrgId, formatPersonaSection } from './eval-personas';
-import { containsHardFacts } from './hard-facts';
+import { containsHardFacts } from '@/lib/rag/hard-facts';
 
 // ---------------------------------------------------------------------------
 // Constants

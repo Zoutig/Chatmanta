@@ -17,7 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { redactPii } from '../lib/observability/redact';
-import { selectHarvestCandidates, type HarvestInput, type HardOrgSlug } from '../lib/v0/server/hard-eval-checks';
+import { selectHarvestCandidates, type HarvestInput, type HardOrgSlug } from '../lib/rag/hard-eval-checks';
 
 const ORG_SLUG_BY_ID: Readonly<Record<string, HardOrgSlug>> = Object.freeze({
   '00000000-0000-0000-0000-0000000000d0': 'dev-org',

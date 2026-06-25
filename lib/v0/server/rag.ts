@@ -14,30 +14,33 @@ import { performance } from 'node:perf_hooks';
 import OpenAI from 'openai';
 import { getServiceRoleClient } from '@/lib/supabase/service-role';
 import type { BotConfig } from './bots';
-import { stripQuotes, parsePreProcessOutput } from './preprocess-parse';
-import { buildSystemPrompt } from '../style';
-import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '../style-types';
+import { embedTexts, type EmbedResult } from '@/lib/rag/embeddings';
+import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
+import { buildSystemPrompt } from '@/lib/rag/style';
+import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
 import { costForModelUsd } from '../../ai/llm';
 import { AppError, type AppErrorCode } from '../../errors/app-error';
+// Pure persona-rendering woont nu in @/lib/rag/persona; getPersonaById (V0-org-
+// registry) blijft in ./persona.
 import {
   buildGeneralClosingStripRegex,
   composeBotPrompts,
-  getPersonaById,
   renderPersonaTemplate,
   type OrgPersona,
-} from './persona';
+} from '@/lib/rag/persona';
+import { getPersonaById } from './persona';
 import {
   shouldDeterministicallyRefuseHardFact,
   containsEmergencyHandoff,
   containsCodeOutput,
-} from './hard-facts';
+} from '@/lib/rag/hard-facts';
 // v0.9.3 — hergebruik dezelfde taal-detectie als de eval-check (detectLanguage),
 // zodat de taal-spiegel-fix en de language-dimensie exact dezelfde taalnotie
 // delen. hard-eval-checks.ts is puur (imports alleen ./hard-facts) → veilig.
-import { detectLanguage } from './hard-eval-checks';
-import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from './source-links';
-import { findMatchingManualQA } from './manual-qa';
-import type { ManualQA } from '../klantendashboard/types';
+import { detectLanguage } from '@/lib/rag/hard-eval-checks';
+import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from '@/lib/rag/source-links';
+import { findMatchingManualQA } from '@/lib/rag/manual-qa';
+import type { ManualQA } from '@/lib/rag/types';
 import type { ChatbotPromptOverrides } from '../klantendashboard/server/build-chatbot-overrides';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
@@ -58,11 +61,6 @@ function classifyLlmError(err: unknown): 'LLM_TIMEOUT' | 'LLM_UNAVAILABLE' {
 // Constants
 // ---------------------------------------------------------------------------
 export const DEV_ORG_ID = '00000000-0000-0000-0000-0000000000d0';
-
-const EMBED_MODEL = 'text-embedding-3-small';
-const EMBED_DIM = 1536;
-const EMBED_COST_PER_M_USD = 0.02;
-const EMBED_BATCH_SIZE = 100;
 
 // Cost rates voor gpt-4o-mini (USD per 1M tokens). Wanneer een toekomstige
 // bot-versie naar een ander chat-model gaat, moet dit een lookup-tabel
@@ -122,51 +120,13 @@ export function chunkText(text: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Embeddings
+// Embeddings — verplaatst naar @/lib/rag/embeddings (neutrale RAG-laag).
+// embedTexts/EmbedResult worden bovenaan geïmporteerd voor intern gebruik en
+// hier re-geëxporteerd voor back-compat met de bestaande importers van dit pad
+// (crawler/processCrawl, faq-snapshot, faq-klant, quiz-analysis, scripts).
 // ---------------------------------------------------------------------------
-export type EmbedResult = {
-  vectors: number[][];
-  tokens: number;
-  costUsd: number;
-};
-
-// V0.4 latency-cap: per-batch timeout 4s + max 1 retry. OpenAI SDK v6 doet de
-// retry zelf met exponential backoff op 429/5xx en op aborted timeouts. Zonder
-// timeout zagen we p99=5.4s en max=6.0s op embedding-calls, helemaal binnen
-// het kritieke pad. 4s + 1 retry = absolute worst-case ~8s, maar p99 zal naar
-// ~4-5s zakken (SDK retried snel op transiente fouten).
-const EMBED_TIMEOUT_MS = 4000;
-const EMBED_MAX_RETRIES = 1;
-
-export async function embedTexts(strings: string[]): Promise<EmbedResult> {
-  if (strings.length === 0) return { vectors: [], tokens: 0, costUsd: 0 };
-  const vectors: number[][] = [];
-  let totalTokens = 0;
-  for (let i = 0; i < strings.length; i += EMBED_BATCH_SIZE) {
-    const batch = strings.slice(i, i + EMBED_BATCH_SIZE);
-    const resp = await openai().embeddings.create(
-      {
-        model: EMBED_MODEL,
-        input: batch,
-      },
-      { timeout: EMBED_TIMEOUT_MS, maxRetries: EMBED_MAX_RETRIES },
-    );
-    for (const item of resp.data) {
-      if (item.embedding.length !== EMBED_DIM) {
-        throw new AppError('EMBED_FAILED', {
-          message: `expected ${EMBED_DIM}-dim, got ${item.embedding.length}`,
-        });
-      }
-      vectors.push(item.embedding);
-    }
-    totalTokens += resp.usage?.total_tokens ?? 0;
-  }
-  return {
-    vectors,
-    tokens: totalTokens,
-    costUsd: (totalTokens / 1_000_000) * EMBED_COST_PER_M_USD,
-  };
-}
+export { embedTexts };
+export type { EmbedResult };
 
 // ---------------------------------------------------------------------------
 // Chat
@@ -276,7 +236,7 @@ async function preProcessInput(
   // condittie skip, v0.6.1-gedrag behouden.
   let useMultiTurnAddon = hasHistory && bot.preProcessMultiTurnAddon.length > 0;
   if (useMultiTurnAddon && bot.adaptiveHistoryResolution === true) {
-    const { needsHistoryResolution } = await import('./rag-decision');
+    const { needsHistoryResolution } = await import('@/lib/rag/rag-decision');
     useMultiTurnAddon = needsHistoryResolution(original);
   }
   // Persona-rendering: het bot-prompt template bevat {{COMPANY}} / {{AUDIENCE}}
@@ -1658,7 +1618,7 @@ export async function* runRagQueryStreaming(input: {
   // (v0.9.1-gedrag).
   let decomposeGateAllows = true;
   if (bot.queryDecomposition && bot.decomposeHeuristicGate) {
-    const { looksMultiHop } = await import('./rag-decision');
+    const { looksMultiHop } = await import('@/lib/rag/rag-decision');
     // Toets zowel de originele als de herschreven vraag: de rewrite poetst soms
     // de multi-hop-structuur ("...en hoeveel...") weg. Conservatief — decompose
     // blijft draaien als één van beide multi-hop oogt.
@@ -1765,7 +1725,7 @@ export async function* runRagQueryStreaming(input: {
   // returnt de helper shouldUseHyDE=true zodat de bestaande selective-HyDE
   // conditie leidend blijft. We berekenen later nog een post-HyDE decision
   // voor rerank/cascade/verify gating.
-  const { decideRagStrategy } = await import('./rag-decision');
+  const { decideRagStrategy } = await import('@/lib/rag/rag-decision');
   const decisionPreHyDE = decideRagStrategy({
     bot,
     originalQuestion: original,
@@ -1834,7 +1794,7 @@ export async function* runRagQueryStreaming(input: {
     // gedragen we ons exact zoals v0.1-v0.4: vaste FALLBACK_MESSAGE, geen
     // LLM-call.
     if (generalKnowledgeActive) {
-      const { reclassifyAfterZeroHits } = await import('./reclassify');
+      const { reclassifyAfterZeroHits } = await import('@/lib/rag/reclassify');
       const rc = await reclassifyAfterZeroHits(original, bot, persona);
       const reclassifyTokensIn = rc.inputTokens;
       const reclassifyTokensOut = rc.outputTokens;
@@ -2408,7 +2368,7 @@ KRITISCHE FORMAT-REGELS:
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
     try {
-      const { verifyClaims } = await import('./claims');
+      const { verifyClaims } = await import('@/lib/rag/claims');
       const chunkInputs = final.slice(0, used).map((c) => ({
         id: c.id,
         text: c.parent_content ?? c.content,
@@ -2452,7 +2412,7 @@ KRITISCHE FORMAT-REGELS:
   let adoptedHistoryEntities: string[] = [];
   if (bot.historyEntityVerification === true && history.length > 0) {
     try {
-      const { detectAdoptedHistoryEntities } = await import('./history-entities');
+      const { detectAdoptedHistoryEntities } = await import('@/lib/rag/history-entities');
       const historyUserContents = history
         .filter((t) => t.role === 'user')
         .map((t) => t.content);
@@ -2763,7 +2723,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       }
 
       try {
-        const { verifyClaims } = await import('./claims');
+        const { verifyClaims } = await import('@/lib/rag/claims');
         const chunkInputs2 = final.slice(0, used).map((c) => ({
           id: c.id,
           text: c.parent_content ?? c.content,

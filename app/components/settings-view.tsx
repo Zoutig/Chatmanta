@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Icon } from './svg-icons';
 import type { BotMeta } from './bot-dropdown';
 import { StyleSegmented } from './style-segmented';
-import type { Length, Tone } from '@/lib/v0/style-types';
+import type { Length, Tone } from '@/lib/rag/style-types';
 import type { HydeMode } from './use-hyde-mode';
 import { SegmentedRadio } from './ui/segmented-radio';
 
