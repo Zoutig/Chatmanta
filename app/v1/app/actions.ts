@@ -1,0 +1,77 @@
+'use server';
+
+import { requireOrgMember } from '@/lib/auth';
+import { isAppError } from '@/lib/errors/app-error';
+import { createClient } from '@/lib/supabase/v1/server';
+import { runRagQuery } from '@/lib/rag/run-rag-query';
+import { V1_RAG_DEFAULTS, buildV1Persona, getOrgChatbot } from './rag-config';
+
+export type AskV1Result =
+  | { ok: true; answer: string; sources: { title: string }[]; kind: string }
+  | { ok: false; error: 'CONFIG' | 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' };
+
+export async function askV1(question: string): Promise<AskV1Result> {
+  const orgId = process.env.V1_SEED_ORG_ID;
+  if (!orgId) return { ok: false, error: 'CONFIG' };
+  if (!question || question.trim().length === 0) return { ok: false, error: 'FAILED' };
+
+  // SA-1: org NIET uit client-input — uit de getrouwde sessie. requireOrgMember
+  // gooit AppError('AUTH_FORBIDDEN') bij niet-lid. Bij geen/verlopen sessie gooit
+  // requireAuth een NEXT_REDIRECT (geen AppError) → laten propageren zodat de
+  // client naar /v1/login gaat (spiegelt page.tsx; niet alles op FORBIDDEN mappen).
+  try {
+    await requireOrgMember(orgId);
+  } catch (e) {
+    if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') return { ok: false, error: 'FORBIDDEN' };
+    throw e;
+  }
+
+  // createClient + chatbot-resolutie + de RAG-loop in één try: élke onverwachte
+  // fout (DB/RLS-hapering op de chatbots-select, getOrgChatbot die throwt, engine-
+  // fout) → nette FAILED i.p.v. een rejected promise die de UI op 'Bezig…' laat
+  // hangen. NEXT_REDIRECT komt alleen uit requireOrgMember hierboven (al
+  // afgehandeld + doorgegooid), niet uit dit blok.
+  try {
+    const supabase = await createClient(); // session-client → RLS afgedwongen
+    const chatbot = await getOrgChatbot(supabase, orgId);
+    if (!chatbot) return { ok: false, error: 'NO_CHATBOT' };
+
+    const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
+    const persona = buildV1Persona(chatbot.name);
+
+    // Terminale StreamEvents dragen de volledige ChatResponse in `ev.response`.
+    // 'replacement' (claim-regenerate / deterministische weiger) wint van een
+    // eerdere answer-done. `answer` zit op alle drie ChatResponse-varianten;
+    // `sources` alléén op 'answer'/'fallback' (NIET 'smalltalk') → `'sources' in r`.
+    let final: { answer: string; sources: { title: string }[]; kind: string } | null = null;
+    for await (const ev of runRagQuery(supabase, {
+      question: question.trim(),
+      threshold: config.similarityThreshold,
+      enableRewrite: config.enableRewriteByDefault,
+      config,
+      persona,
+      organizationId: orgId,
+      chatbotId: chatbot.id,
+      disableCache: true,
+    })) {
+      if (
+        ev.kind === 'answer-done' ||
+        ev.kind === 'fallback' ||
+        ev.kind === 'smalltalk' ||
+        ev.kind === 'replacement'
+      ) {
+        const r = ev.response;
+        final = {
+          answer: r.answer,
+          sources: 'sources' in r ? r.sources.map((s) => ({ title: s.filename ?? 'bron' })) : [],
+          kind: r.kind,
+        };
+      }
+    }
+    if (!final) return { ok: false, error: 'FAILED' };
+    return { ok: true, ...final };
+  } catch (e) {
+    console.error('[v1/askV1] RAG mislukt:', e);
+    return { ok: false, error: 'FAILED' };
+  }
+}

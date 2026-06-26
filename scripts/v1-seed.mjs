@@ -75,6 +75,26 @@ const { error: merr } = await sb
 if (merr) throw merr;
 console.log('✓ membership: member@example.com → seed-org (owner)');
 
+// Org B (PR-1b cross-org-isolatie). outsider wordt lid van B en blijft GEEN lid
+// van A → de auth.spec deny-path op /v1/app (die A gebruikt) blijft kloppen. Org B
+// krijgt in v1:seed:chunks een eigen chatbot + een chunk met een uniek geheim token.
+const { data: orgB, error: oberr } = await sb
+  .from('organizations')
+  .upsert({ name: 'Seed Org B', slug: 'seed-org-b' }, { onConflict: 'slug' })
+  .select('id')
+  .single();
+if (oberr) throw oberr;
+console.log(`✓ org seed-org-b: ${orgB.id}`);
+
+const { error: mberr } = await sb
+  .from('organization_members')
+  .upsert(
+    { organization_id: orgB.id, user_id: outsiderId, role: 'member' },
+    { onConflict: 'organization_id,user_id' },
+  );
+if (mberr) throw mberr;
+console.log('✓ membership: outsider@example.com → seed-org-b (member)');
+
 console.log('\n--- Zet dit in .env.local ---');
 console.log(`V1_SEED_ORG_ID=${org.id}`);
-console.log(`\n(member=${memberId} is lid; outsider=${outsiderId} is GEEN lid → deny-path)`);
+console.log(`\n(member=${memberId} lid van A; outsider=${outsiderId} lid van B, GEEN lid van A → deny-path op /v1/app)`);
