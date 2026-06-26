@@ -8,7 +8,7 @@
 import { createClient as createSb } from '@supabase/supabase-js';
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { embedTexts } from '../lib/rag/embeddings';
-import { ISO_TOKEN } from './v1-seed-chunks';
+import { ISO_TOKEN } from './v1-iso-token';
 
 const ORG_A = process.env.V1_SEED_ORG_ID;
 const URL = process.env.NEXT_PUBLIC_V1_SUPABASE_URL;

@@ -9,9 +9,7 @@
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { embedTexts } from '../lib/rag/embeddings';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-// Uniek token — gedeeld met scripts/v1-test-org-isolation.ts.
-export const ISO_TOKEN = 'ZQXGEHEIM-ORG-B-VERTROUWELIJK';
+import { ISO_TOKEN } from './v1-iso-token';
 
 const ORG_A = process.env.V1_SEED_ORG_ID;
 if (!ORG_A) {
