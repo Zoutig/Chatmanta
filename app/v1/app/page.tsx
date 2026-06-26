@@ -1,19 +1,23 @@
 import { requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
+import { createClient } from '@/lib/supabase/v1/server';
+import { getOrgChatbot } from './rag-config';
+import { V1Chat } from './v1-chat';
 
-// Beschermde V1-pagina (fundament-proof). Bewijst de auth-keten:
-//   geen sessie  → requireOrgMember → requireAuth → redirect /v1/login
-//   wél lid      → pagina rendert ("Ingelogd als …")
-//   geen lid     → AUTH_FORBIDDEN → "Geen toegang"
-// orgId komt uit V1_SEED_ORG_ID (de geseede demo-org). Bij de kernel-graduatie
-// wordt dit een echte org-resolutie (route-param / membership-lookup).
+// V1 /app: echte RAG achter auth. Auth-keten (ongewijzigd t.o.v. fundament-proof):
+//   geen sessie → requireOrgMember → requireAuth → redirect /v1/login
+//   wél lid     → resolveer de org-chatbot → render het chat-formulier
+//   geen lid    → AUTH_FORBIDDEN → "Geen toegang"
+// orgId komt (provisioneel) uit V1_SEED_ORG_ID; echte per-user org-resolutie volgt.
 export const dynamic = 'force-dynamic';
+
+const SHELL = { maxWidth: 560, margin: '12vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' };
 
 export default async function V1AppPage() {
   const orgId = process.env.V1_SEED_ORG_ID;
   if (!orgId) {
     return (
-      <main style={{ maxWidth: 480, margin: '12vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' }}>
+      <main style={SHELL}>
         <h1 style={{ fontSize: 20 }}>Config-fout</h1>
         <p style={{ fontSize: 14, color: '#555' }}>V1_SEED_ORG_ID ontbreekt in de omgeving.</p>
       </main>
@@ -28,7 +32,7 @@ export default async function V1AppPage() {
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
-        <main style={{ maxWidth: 480, margin: '12vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' }}>
+        <main style={SHELL}>
           <h1 style={{ fontSize: 20 }}>Geen toegang</h1>
           <p style={{ fontSize: 14, color: '#555' }}>Je bent geen lid van deze organisatie.</p>
         </main>
@@ -37,12 +41,22 @@ export default async function V1AppPage() {
     throw e;
   }
 
+  // Lees onder de session-client (RLS afgedwongen). Geen chatbot → nette fail-tak,
+  // nooit een lege chatbotId naar de NOT-NULL-RPC.
+  const supabase = await createClient();
+  const chatbot = await getOrgChatbot(supabase, orgId);
+
   return (
-    <main style={{ maxWidth: 480, margin: '12vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: 20 }}>V1 — beschermde pagina</h1>
+    <main style={SHELL}>
+      <h1 style={{ fontSize: 20 }}>V1 — RAG</h1>
       <p style={{ fontSize: 14, color: '#333' }}>
-        Ingelogd als <strong>{user.email}</strong>. Je bent lid van de organisatie.
+        Ingelogd als <strong>{user.email}</strong>.
       </p>
+      {chatbot ? (
+        <V1Chat chatbotName={chatbot.name} />
+      ) : (
+        <p style={{ fontSize: 14, color: '#555' }}>Deze organisatie heeft nog geen chatbot geconfigureerd.</p>
+      )}
     </main>
   );
 }
