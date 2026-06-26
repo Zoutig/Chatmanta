@@ -1,6 +1,7 @@
 'use server';
 
 import { requireOrgMember } from '@/lib/auth';
+import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { runRagQuery } from '@/lib/rag/run-rag-query';
 import { V1_RAG_DEFAULTS, buildV1Persona, getOrgChatbot } from './rag-config';
@@ -15,11 +16,14 @@ export async function askV1(question: string): Promise<AskV1Result> {
   if (!question || question.trim().length === 0) return { ok: false, error: 'FAILED' };
 
   // SA-1: org NIET uit client-input — uit de getrouwde sessie. requireOrgMember
-  // gooit AppError('AUTH_FORBIDDEN') bij niet-lid (NEXT_REDIRECT bij geen sessie).
+  // gooit AppError('AUTH_FORBIDDEN') bij niet-lid. Bij geen/verlopen sessie gooit
+  // requireAuth een NEXT_REDIRECT (geen AppError) → laten propageren zodat de
+  // client naar /v1/login gaat (spiegelt page.tsx; niet alles op FORBIDDEN mappen).
   try {
     await requireOrgMember(orgId);
-  } catch {
-    return { ok: false, error: 'FORBIDDEN' };
+  } catch (e) {
+    if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') return { ok: false, error: 'FORBIDDEN' };
+    throw e;
   }
 
   const supabase = await createClient(); // session-client → RLS afgedwongen
