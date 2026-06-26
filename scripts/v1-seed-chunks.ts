@@ -7,7 +7,7 @@
 // Draai met: npm run v1:seed:chunks   (= --conditions=react-server --import tsx)
 
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
-import { embedTexts } from '../lib/rag/embeddings';
+import { ingestDocument } from '../lib/rag/ingest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ISO_TOKEN } from './v1-iso-token';
 
@@ -27,71 +27,28 @@ Ons adres is Mantastraat 12, 1011 AB Amsterdam.`;
 const ORG_B_TEXT = `Interne notitie van organisatie B. Het geheime projectcodewoord is ${ISO_TOKEN}.
 Dit document hoort uitsluitend bij organisatie B en mag niet zichtbaar zijn voor andere organisaties.`;
 
-/** Sliding-window chunker (mirror van de seed-helper; geen import nodig). */
-function chunk(text: string, size: number, overlap: number): string[] {
-  const t = text.trim();
-  if (t.length <= size) return [t];
-  const out: string[] = [];
-  let i = 0;
-  while (i < t.length) {
-    out.push(t.slice(i, i + size));
-    i += size - overlap;
-  }
-  return out;
-}
-
 async function seedOrg(client: SupabaseClient, orgId: string, name: string, text: string) {
-  // 1) wis bestaande RAG-data van deze org (FK-cascade vanaf chatbots) — idempotent
+  // idempotent: wis bestaande RAG-data van deze org (FK-cascade vanaf chatbots)
   const { error: delErr } = await client.from('chatbots').delete().eq('organization_id', orgId);
   if (delErr) throw delErr;
 
-  // 2) chatbot (één actieve per org)
+  // chatbot (één actieve per org)
   const { data: bot, error: be } = await client
     .from('chatbots')
     .insert({ organization_id: orgId, name, bot_version: 'v1.0' })
     .select('id')
     .single();
   if (be) throw be;
-  const chatbotId = bot.id as string;
 
-  // 3) document
-  const { data: doc, error: de } = await client
-    .from('documents')
-    .insert({ organization_id: orgId, chatbot_id: chatbotId, filename: `${name}.txt`, source: 'v0_local', status: 'ready' })
-    .select('id')
-    .single();
-  if (de) throw de;
-  const documentId = doc.id as string;
-
-  // 4) parent + child chunks (mirror v0-seed-orgs: parent 3200/400, child 800/100)
-  const parents = chunk(text, 3200, 400);
-  let parentCount = 0;
-  let childCount = 0;
-  for (let pi = 0; pi < parents.length; pi++) {
-    const { data: parent, error: pe } = await client
-      .from('parent_chunks')
-      .insert({ organization_id: orgId, chatbot_id: chatbotId, document_id: documentId, parent_index: pi, content: parents[pi] })
-      .select('id')
-      .single();
-    if (pe) throw pe;
-    parentCount++;
-
-    const children = chunk(parents[pi], 800, 100);
-    const { vectors } = await embedTexts(children);
-    const rows = children.map((content, ci) => ({
-      organization_id: orgId,
-      chatbot_id: chatbotId,
-      document_id: documentId,
-      content,
-      embedding: vectors[ci],
-      parent_chunk_id: parent.id,
-      metadata: { chunk_index: ci, parent_index: pi },
-    }));
-    const { error: ce } = await client.from('document_chunks').insert(rows);
-    if (ce) throw ce;
-    childCount += children.length;
-  }
-  console.log(`✓ ${name}: chatbot ${chatbotId}, ${parentCount} parent(s), ${childCount} chunk(s)`);
+  // document + parents + children via de gedeelde ingest (zelfde 3200/400 + 800/100)
+  const res = await ingestDocument(client, {
+    organizationId: orgId,
+    chatbotId: bot.id as string,
+    filename: `${name}.txt`,
+    text,
+    source: 'v0_local',
+  });
+  console.log(`✓ ${name}: chatbot ${bot.id}, ${res.parents} parent(s), ${res.chunks} chunk(s)`);
 }
 
 async function main() {
