@@ -104,7 +104,13 @@ export async function ingestDocument(
     throw new Error(`document_chunks insert: ${cErr.message}`);
   }
 
-  await client.from('documents').update({ status: 'ready' }).eq('id', documentId);
+  const { error: readyErr } = await client.from('documents').update({ status: 'ready' }).eq('id', documentId);
+  if (readyErr) {
+    // ponytail: de chunks zijn op dit punt volledig geschreven + retrievebaar (de
+    // match-RPC filtert op deleted_at, NIET op status) — een gefaalde status-flip is
+    // cosmetisch. Warn i.p.v. falen, zodat een geslaagde ingest niet op cosmetica omvalt.
+    console.warn(`[ingestDocument] status→ready faalde voor ${documentId}: ${readyErr.message}`);
+  }
 
   return {
     documentId,
