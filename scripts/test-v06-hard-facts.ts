@@ -9,7 +9,7 @@ import {
   extractHardFacts,
   hardFactsSupportedBySources,
   containsHardFacts,
-} from '../lib/v0/server/hard-facts';
+} from '../lib/rag/hard-facts';
 
 function show(label: string, fn: () => void) {
   try {

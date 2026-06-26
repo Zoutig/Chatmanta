@@ -12,7 +12,7 @@ import {
   isTone,
   type Length,
   type Tone,
-} from '@/lib/v0/style-types';
+} from '@/lib/rag/style-types';
 
 const STORAGE_KEY = 'chatmanta:v0:style';
 

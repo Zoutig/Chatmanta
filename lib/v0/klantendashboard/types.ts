@@ -128,18 +128,9 @@ export type DocumentSummary = {
   chunkCount: number;
 };
 
-export type ManualQA = {
-  id: string;
-  question: string;
-  answer: string;
-  category?: string;
-  active: boolean;
-  updatedAt: string;
-  /** id van het via ingestText aangemaakte documents-record (WP4). Aanwezig zodra
-   *  de Q&A als kennisbank-chunk is ge-embed; optioneel voor backward-compat met
-   *  rijen van vóór de ingest-route en voor inactieve Q&A's (niet ge-embed). */
-  ingestedDocId?: string;
-};
+// ManualQA woont nu canoniek in lib/rag/types.ts (RAG-engine-laag). Re-export
+// voor back-compat met de bestaande dashboard-importers van dit pad.
+export type { ManualQA } from '@/lib/rag/types';
 
 // ---------------------------------------------------------------------------
 // Test chatbot

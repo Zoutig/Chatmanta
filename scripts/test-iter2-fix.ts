@@ -10,7 +10,7 @@ import {
   shouldDeterministicallyRefuseHardFact,
   containsEmergencyHandoff,
   containsCodeOutput,
-} from '../lib/v0/server/hard-facts';
+} from '../lib/rag/hard-facts';
 
 let failed = 0;
 function check(name: string, got: boolean, want: boolean) {

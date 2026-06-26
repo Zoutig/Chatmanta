@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { embedTexts } from './rag';
+import { embedTexts } from './embeddings';
 import {
   extractHardFacts,
   hardFactsSupportedBySources,

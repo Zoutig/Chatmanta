@@ -10,7 +10,7 @@ import {
   buildSystemPrompt,
   describeStyle,
   normalizeStyle,
-} from '../../lib/v0/style';
+} from '../../lib/rag/style';
 import {
   DEFAULT_LENGTH,
   DEFAULT_TONE,
@@ -18,7 +18,7 @@ import {
   isTone,
   LENGTHS,
   TONES,
-} from '../../lib/v0/style-types';
+} from '../../lib/rag/style-types';
 
 test('isTone / isLength accept all canonical values', () => {
   for (const t of TONES) assert.equal(isTone(t), true);

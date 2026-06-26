@@ -1,5 +1,13 @@
-// V0 persona-laag — vertaalt KNOWN_ORGS naar de strings die in bot-prompts,
-// general-knowledge-prompt, en off-topic refusals worden geïnjecteerd.
+// V0 persona-registry — vertaalt KNOWN_ORGS naar de RagPersona-velden die in
+// bot-prompts, general-knowledge-prompt, en off-topic refusals worden
+// geïnjecteerd.
+//
+// De PURE rendering-helpers (renderPersonaTemplate, composeBotPrompts,
+// buildGeneralClosingStripRegex) en het RagPersona-type wonen sinds de
+// kernel-graduatie in @/lib/rag/persona resp. @/lib/rag/types. Dit bestand
+// houdt alleen de V0-org-DATA (PERSONAS) + de lookups (getPersonaById /
+// getPersonaBySlug) en re-exporteert de renderers + OrgPersona-alias voor
+// back-compat met bestaande importers van dit pad.
 //
 // Achtergrond: alle bot-prompts (bots.ts) en zero-hit fallback-paden in
 // rag.ts hadden DEV_ORG-identiteit hard-coded ("klantcontact-medewerker van
@@ -9,29 +17,31 @@
 // stelt zich dus voor als "wij van ChatManta" terwijl hij accountancy-
 // content uit Initech aan het samenvatten is.
 //
-// Deze file definieert per OrgSlug één OrgPersona, en biedt twee helpers:
-//
-//   renderPersonaTemplate(template, persona)
-//     Vervangt {{TOKENS}} in `template` door persona-velden. Idempotent —
-//     templates zonder placeholders renderen ongewijzigd.
-//
-//   composeBotPrompts(bot, persona)
-//     Convenience: rendert systemPrompt + preProcessSystem + preProcessMultiTurnAddon
-//     van een BotConfig in één call.
-//
 // Belangrijke invariant: de DEV_ORG persona-velden zijn zo gekozen dat de
 // gerenderde prompts EXACT gelijk zijn aan de oude hard-coded strings.
 // Eval-vergelijkingen tegen DEV_ORG blijven daarmee reproduceerbaar.
 
 import 'server-only';
 
-import type { BotConfig } from './bots';
 // Type-only import — voorkomt een module-eval cycle (rag.ts → persona.ts →
 // active-org.ts → rag.ts) die anders een TDZ-ReferenceError op DEV_ORG_ID
 // zou geven. De UUIDs hieronder zijn handgemapd uit `KNOWN_ORGS` in
 // active-org.ts; checked-in als comment om drift zichtbaar te maken bij
 // future-edits.
 import type { OrgSlug } from './active-org';
+import type { RagPersona } from '@/lib/rag/types';
+
+// Back-compat alias — RagPersona is the canonical type home in lib/rag/types.ts.
+export type OrgPersona = RagPersona;
+
+// Back-compat re-export — de pure rendering-helpers wonen nu in @/lib/rag/persona.
+// Bestaande importers van @/lib/v0/server/persona (rag.ts, app/admintool) blijven
+// werken.
+export {
+  renderPersonaTemplate,
+  composeBotPrompts,
+  buildGeneralClosingStripRegex,
+} from '@/lib/rag/persona';
 
 // Slug → UUID mapping; spiegelt KNOWN_ORGS uit active-org.ts. Houden we
 // hier los zodat persona.ts geen runtime-import van active-org.ts nodig
@@ -45,74 +55,6 @@ const ORG_SLUG_TO_ID: Record<OrgSlug, string> = {
   'globex-inc': '00000000-0000-0000-0000-0000000000a2',
   initech: '00000000-0000-0000-0000-0000000000a3',
   'demo-nieuw': '00000000-0000-0000-0000-0000000000a4',
-};
-
-export type OrgPersona = {
-  /**
-   * Naam zoals de bot zichzelf noemt. Wordt in {{COMPANY}} ingelezen.
-   * DEV_ORG: "ChatManta". Anders: bedrijfsnaam ("Dakwerken De Boer").
-   */
-  company: string;
-
-  /**
-   * Optionele aanvulling op de bedrijfsnaam. Bij DEV_ORG: " — een product
-   * van Jorion Solutions" (incl. leading punctuation). Bij anderen: "".
-   * Wordt direct na {{COMPANY}} geplakt zodat één template beide vormen
-   * (parent / standalone) dekt.
-   */
-  companySuffix: string;
-
-  /**
-   * Beschrijving van de typische gesprekspartner — staat na "Je
-   * gesprekspartners zijn ". DEV_ORG: "meestal mensen die het project leren
-   * kennen: vrienden van de founders, geïnteresseerden, en de founders
-   * zelf". Anders org-specifiek.
-   */
-  audience: string;
-
-  /**
-   * Pedagogische voorbeelden in de inline-citaties-uitleg van V0.3+ system
-   * prompts. Twee voorbeelden zodat we de "[1]" en "[2][3]"-patronen kunnen
-   * blijven tonen. Org-specifiek, anders leest de LLM "ChatManta gebruikt
-   * pgvector" terwijl hij accountancy-content moet citeren.
-   */
-  citationExample1: string;
-  citationExample2: string;
-
-  /**
-   * Smalltalk-voorbeeld voor `"hey"` in de preProcessSystem. DEV_ORG:
-   * "Hoi! Leuk dat je er bent. Wat wil je weten over ChatManta?". Anders
-   * passend bij de org-naam.
-   */
-  smalltalkGreeting: string;
-
-  /**
-   * Smalltalk-voorbeeld voor `"wat kan je?"` in de preProcessSystem.
-   * Beschrijft kort welke onderwerpen de bot kan toelichten.
-   */
-  smalltalkHelpScope: string;
-
-  /**
-   * Domein-keywords voor (a) de general-knowledge prompt ("vraag binnen ons
-   * domein: ..."), (b) de DOMAIN_ALLOWLIST in reclassify-pure.ts, en (c)
-   * de off-topic refusal-zin. DEV_ORG: ["MKB", "SaaS", "AI", "RAG",
-   * "chatbots", "klantcontact", "ondernemerschap", "marketing"].
-   */
-  domainKeywords: string[];
-
-  /**
-   * Sluitzin van het general-knowledge antwoord (na GENERAL_OPENING + LLM-
-   * core). DEV_ORG: " Wil je weten hoe ChatManta hier specifiek mee omgaat?
-   * Vraag gerust." — wordt 1-op-1 achter de core geplakt.
-   */
-  generalKnowledgeClosing: string;
-
-  /**
-   * Korte beschrijving voor de off-topic refusal — staat na "Ik help met
-   * vragen rondom ". DEV_ORG: "ChatManta en aanverwante onderwerpen — denk
-   * aan MKB-tech, chatbots, klantcontact".
-   */
-  offTopicScope: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -279,85 +221,4 @@ export function getPersonaById(orgId: string): OrgPersona {
     if (ORG_SLUG_TO_ID[slug] === orgId) return PERSONAS[slug];
   }
   return PERSONAS['dev-org'];
-}
-
-// ---------------------------------------------------------------------------
-// Template-rendering
-// ---------------------------------------------------------------------------
-
-/**
- * Vervang {{TOKEN}} placeholders in een template door persona-waardes.
- * Templates die geen placeholders bevatten worden ongewijzigd geretourneerd
- * (idempotent — handig voor prompts die niets persona-specifieks bevatten).
- *
- * Ondersteunde tokens:
- *   {{COMPANY}}                — persona.company
- *   {{COMPANY_SUFFIX}}         — persona.companySuffix
- *   {{AUDIENCE}}               — persona.audience
- *   {{CITATION_EXAMPLE_1}}     — persona.citationExample1
- *   {{CITATION_EXAMPLE_2}}     — persona.citationExample2
- *   {{SMALLTALK_GREETING}}     — persona.smalltalkGreeting
- *   {{SMALLTALK_HELP_SCOPE}}   — persona.smalltalkHelpScope
- *   {{DOMAIN_KEYWORDS}}        — persona.domainKeywords.join(', ')
- *   {{GENERAL_CLOSING}}        — persona.generalKnowledgeClosing
- *   {{OFF_TOPIC_SCOPE}}        — persona.offTopicScope
- *
- * Onbekende {{...}} placeholders worden ongewijzigd gelaten. Dat is een
- * bewuste keuze: als iemand een nieuwe placeholder in een template zet maar
- * vergeet hem hier toe te voegen, valt dat in een dev-run op (de literal
- * "{{FOO}}" verschijnt in de chat), niet stilletjes als lege string.
- */
-export function renderPersonaTemplate(
-  template: string,
-  persona: OrgPersona,
-): string {
-  return template
-    .replace(/\{\{COMPANY\}\}/g, persona.company)
-    .replace(/\{\{COMPANY_SUFFIX\}\}/g, persona.companySuffix)
-    .replace(/\{\{AUDIENCE\}\}/g, persona.audience)
-    .replace(/\{\{CITATION_EXAMPLE_1\}\}/g, persona.citationExample1)
-    .replace(/\{\{CITATION_EXAMPLE_2\}\}/g, persona.citationExample2)
-    .replace(/\{\{SMALLTALK_GREETING\}\}/g, persona.smalltalkGreeting)
-    .replace(/\{\{SMALLTALK_HELP_SCOPE\}\}/g, persona.smalltalkHelpScope)
-    .replace(/\{\{DOMAIN_KEYWORDS\}\}/g, persona.domainKeywords.join(', '))
-    .replace(/\{\{GENERAL_CLOSING\}\}/g, persona.generalKnowledgeClosing)
-    .replace(/\{\{OFF_TOPIC_SCOPE\}\}/g, persona.offTopicScope);
-}
-
-/**
- * Render alle prompt-strings van een BotConfig met een persona. Eén call
- * voor de drie strings die runRagQueryStreaming nodig heeft.
- */
-export function composeBotPrompts(
-  bot: BotConfig,
-  persona: OrgPersona,
-): {
-  systemPrompt: string;
-  preProcessSystem: string;
-  preProcessMultiTurnAddon: string;
-} {
-  return {
-    systemPrompt: renderPersonaTemplate(bot.systemPrompt, persona),
-    preProcessSystem: renderPersonaTemplate(bot.preProcessSystem, persona),
-    preProcessMultiTurnAddon: renderPersonaTemplate(
-      bot.preProcessMultiTurnAddon,
-      persona,
-    ),
-  };
-}
-
-/**
- * Bouw een persona-aware regex die de generated-by-LLM-varianten van de
- * GENERAL_CLOSING uit antwoord-tekst strippen. De LLM moet de closing NIET
- * zelf produceren (zie generalSystem template) maar varianten lekken in de
- * praktijk door en moeten post-hoc worden weggepoetst. Bij DEV_ORG matcht
- * deze regex precies dezelfde patronen als de hard-coded /Wil je\.\.\.
- * ChatManta\.\.\./ uit V0.5.
- */
-export function buildGeneralClosingStripRegex(persona: OrgPersona): RegExp {
-  const escapedCompany = persona.company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(
-    `\\s*Wil je(?: meer)? weten\\s+hoe\\s+${escapedCompany}\\s+hier\\s+(?:specifiek\\s+)?mee\\s+omgaat\\??\\s*(?:Vraag gerust\\.?)?\\s*$`,
-    'i',
-  );
 }

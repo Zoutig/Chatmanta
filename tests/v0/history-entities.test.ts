@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {
   extractCandidateEntities,
   detectAdoptedHistoryEntities,
-} from '../../lib/v0/server/history-entities';
+} from '../../lib/rag/history-entities';
 
 test('extractCandidateEntities — meerwoordige namen', () => {
   assert.ok(extractCandidateEntities('mijn adviseur Mark Visser').includes('Mark Visser'));

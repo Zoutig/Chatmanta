@@ -7,7 +7,7 @@ import {
   parseReclassifyOutput,
   RECLASSIFY_SYSTEM,
   DOMAIN_ALLOWLIST,
-} from '../lib/v0/server/reclassify-pure';
+} from '../lib/rag/reclassify-pure';
 
 // Test happy paths
 assert.equal(parseReclassifyOutput('GENERAL'), 'general');

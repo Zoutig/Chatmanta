@@ -13,7 +13,7 @@
 // logica — de decision.shouldRegenerateClaims is een hint of het pad
 // het überhaupt toestaat (= path !== 'fast'), geen "must-trigger".
 
-import type { BotConfig } from './bots';
+import type { RagConfig as BotConfig } from '@/lib/rag/types';
 
 export type RetrievalStrength = 'none' | 'weak' | 'medium' | 'strong';
 export type DecisionPath = 'fast' | 'standard' | 'careful';

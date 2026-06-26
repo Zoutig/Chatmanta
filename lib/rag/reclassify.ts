@@ -1,7 +1,7 @@
 import 'server-only';
 
 import OpenAI from 'openai';
-import type { BotConfig } from './bots';
+import type { RagConfig as BotConfig, RagPersona as OrgPersona } from '@/lib/rag/types';
 import {
   parseReclassifyOutput,
   ReclassifyResult,
@@ -9,7 +9,6 @@ import {
   DOMAIN_ALLOWLIST,
   buildReclassifySystem,
 } from './reclassify-pure';
-import type { OrgPersona } from './persona';
 
 // V0.5 — tweede-stage classifier voor het zero-hit-pad in runRagQueryStreaming.
 //

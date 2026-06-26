@@ -8,7 +8,7 @@
 // ≥1 vraagwoord. (Een losse "en" tussen naamwoorden zónder vraagwoord telt niet.)
 
 import { strict as assert } from 'node:assert';
-import { looksMultiHop } from '../lib/v0/server/rag-decision';
+import { looksMultiHop } from '../lib/rag/rag-decision';
 
 function show(label: string, fn: () => void) {
   try {

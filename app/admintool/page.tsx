@@ -9,7 +9,8 @@ import { getAllTimeUsage } from '@/lib/v0/server/log';
 import { BOT_VERSIONS_ORDERED, BOTS, resolveBot } from '@/lib/v0/server/bots';
 import { getActiveOrgFromCookies, listKnownOrgs } from '@/lib/v0/server/active-org';
 import { getExamplesForOrg } from '@/lib/v0/server/empty-state-examples';
-import { getPersonaBySlug, renderPersonaTemplate } from '@/lib/v0/server/persona';
+import { getPersonaBySlug } from '@/lib/v0/server/persona';
+import { renderPersonaTemplate } from '@/lib/rag/persona';
 
 export const dynamic = 'force-dynamic';
 

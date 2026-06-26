@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './svg-icons';
 import { StylePill } from './style-pill';
-import type { Length, Tone } from '@/lib/v0/style-types';
+import type { Length, Tone } from '@/lib/rag/style-types';
 
 const MAX_CHARS = 1000;
 const PRESETS: { value: number; label: string }[] = [

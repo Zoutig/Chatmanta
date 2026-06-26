@@ -6,7 +6,7 @@ import {
   buildAllowedUrlSet,
   sanitizeSourceLinks,
   stripMarkdownLinks,
-} from '../../lib/v0/server/source-links';
+} from '../../lib/rag/source-links';
 
 const REAL = 'https://v0-demo1-website.vercel.app/over-ons';
 

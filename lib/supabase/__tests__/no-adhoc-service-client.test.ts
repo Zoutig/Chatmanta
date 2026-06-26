@@ -114,3 +114,23 @@ test('V1-auth-laag importeert niet de V0 service-role-factory', () => {
     .map((f) => f.rel);
   assert.deepEqual(offenders, [], `V1-auth importeert de V0 service-role-factory:\n${offenders.join('\n')}`);
 });
+
+test('lib/rag is neutraal — importeert niets uit lib/v0', () => {
+  const v0Import = /from ['"]@\/lib\/v0\//;
+  const offenders: string[] = [];
+  for (const file of walk(join(repoRoot, 'lib', 'rag'))) {
+    const src = readFileSync(file, 'utf8');
+    if (v0Import.test(src)) offenders.push(relative(repoRoot, file));
+  }
+  assert.deepEqual(offenders, [], `lib/rag importeert uit lib/v0 (graduatie-lek):\n${offenders.join('\n')}`);
+});
+
+test('lib/rag gebruikt geen service-role-factory direct (client wordt geinjecteerd)', () => {
+  const factoryImport = /from ['"]@\/lib\/supabase\/(service-role|v1\/service-role)['"]/;
+  const offenders: string[] = [];
+  for (const file of walk(join(repoRoot, 'lib', 'rag'))) {
+    const src = readFileSync(file, 'utf8');
+    if (factoryImport.test(src)) offenders.push(relative(repoRoot, file));
+  }
+  assert.deepEqual(offenders, [], `lib/rag pakt zelf een client i.p.v. injectie:\n${offenders.join('\n')}`);
+});

@@ -2,7 +2,7 @@
 // Run: npx tsx scripts/test-v06-history-resolution.ts
 
 import { strict as assert } from 'node:assert';
-import { needsHistoryResolution } from '../lib/v0/server/rag-decision';
+import { needsHistoryResolution } from '../lib/rag/rag-decision';
 
 function show(label: string, fn: () => void) {
   try {

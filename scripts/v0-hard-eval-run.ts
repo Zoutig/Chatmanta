@@ -23,7 +23,7 @@ import { join } from 'node:path';
 import { runRagQueryStreaming, type ChatResponse, type ChatHistoryTurn } from '../lib/v0/server/rag';
 import { BOTS, BOT_VERSIONS_ORDERED, resolveBot } from '../lib/v0/server/bots';
 import { checkMustNot, withConcurrency } from '../lib/v0/server/eval';
-import { extractHardFacts, hardFactsSupportedBySources } from '../lib/v0/server/hard-facts';
+import { extractHardFacts, hardFactsSupportedBySources } from '../lib/rag/hard-facts';
 import {
   canaryLeaked,
   looksLikeRefusal,
@@ -41,7 +41,7 @@ import {
   type ResultsFile,
   type AnchorVerdict,
   type AnchorsFile,
-} from '../lib/v0/server/hard-eval-checks';
+} from '../lib/rag/hard-eval-checks';
 
 const CONCURRENCY = 2;
 
@@ -256,16 +256,24 @@ const CACHE_SCHEMA = 'v2';
 //   antwoorden ZONDER de fingerprint te raken. Wis `eval-out/hard/.cache/` na een
 //   corpus-wijziging, of draai zonder --cache.
 const PIPELINE_SOURCES = [
-  'lib/v0/server/rag.ts',
+  'lib/v0/server/rag.ts', // V0-adapter (dun) — injecteert client/persona en delegeert
+  'lib/rag/run-rag-query.ts', // de gegradueerde engine (de hele pipeline-body)
+  'lib/rag/embeddings.ts',
+  'lib/rag/preprocess-parse.ts',
+  'lib/rag/reclassify.ts',
+  'lib/rag/reclassify-pure.ts',
+  'lib/rag/history-entities.ts',
+  'lib/rag/hard-eval-checks.ts',
   'lib/v0/server/bots.ts',
-  'lib/v0/server/hard-facts.ts',
-  'lib/v0/server/rag-decision.ts',
-  'lib/v0/server/claims.ts',
   'lib/v0/server/persona.ts',
-  'lib/v0/server/manual-qa.ts',
-  'lib/v0/server/source-links.ts',
-  'lib/v0/style.ts',
-  'lib/v0/style-types.ts',
+  'lib/rag/hard-facts.ts',
+  'lib/rag/rag-decision.ts',
+  'lib/rag/claims.ts',
+  'lib/rag/persona.ts',
+  'lib/rag/manual-qa.ts',
+  'lib/rag/source-links.ts',
+  'lib/rag/style.ts',
+  'lib/rag/style-types.ts',
   'lib/ai/llm.ts',
 ];
 

@@ -2,7 +2,7 @@
 // Apart bestand zodat StylePill, StyleSegmented en PromptView dezelfde
 // strings tonen.
 
-import type { Length, Tone } from '@/lib/v0/style-types';
+import type { Length, Tone } from '@/lib/rag/style-types';
 
 export const STYLE_LABELS: {
   tone: Record<Tone, string>;

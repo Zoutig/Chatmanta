@@ -8,7 +8,7 @@ import {
   TONES,
   type Length,
   type Tone,
-} from '@/lib/v0/style-types';
+} from '@/lib/rag/style-types';
 import { STYLE_HINTS, STYLE_LABELS } from './style-labels';
 import { SegmentedRadio } from './ui/segmented-radio';
 

@@ -9,7 +9,8 @@ import { AppError } from '@/lib/errors/app-error';
 //
 // These helpers read the user's session from cookies (via `lib/supabase/v1/server.ts`)
 // — subject to RLS, no service-role bypass. For privileged service-role work
-// after these checks pass, use the wrappers in `lib/supabase/admin.ts`.
+// after these checks pass, use the auth-gated wrappers in `lib/supabase/admin.ts`;
+// the underlying V1 service-role factory lives in `lib/supabase/v1/service-role.ts`.
 
 /**
  * Require the request to come from an authenticated user.

@@ -17,7 +17,7 @@
 // mogen hem ook draaien. Geen I/O hier — pure transformatie.
 
 import type { ChatbotSettings, Language } from '../types';
-import type { Length, Tone } from '../../style-types';
+import type { Length, Tone } from '@/lib/rag/style-types';
 
 const LANG_LABEL_NL: Record<Language, string> = {
   nl: 'Nederlands',

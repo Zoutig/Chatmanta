@@ -32,7 +32,7 @@ import {
   type DeterministicVerdict,
   type JudgeVerdict,
   type HardCaseFile,
-} from '../lib/v0/server/hard-eval-checks';
+} from '../lib/rag/hard-eval-checks';
 
 let failed = 0;
 function check(name: string, got: boolean, want: boolean) {

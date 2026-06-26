@@ -2,7 +2,7 @@
 // Run: npx tsx scripts/test-v06-decision.ts
 
 import { strict as assert } from 'node:assert';
-import { decideRagStrategy } from '../lib/v0/server/rag-decision';
+import { decideRagStrategy } from '../lib/rag/rag-decision';
 import { BOTS } from '../lib/v0/server/bots';
 import type { BotConfig } from '../lib/v0/server/bots';
 
