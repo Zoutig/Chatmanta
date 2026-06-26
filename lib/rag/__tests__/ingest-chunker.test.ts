@@ -10,10 +10,12 @@ test('chunkSliding: korte tekst → één getrimde chunk', () => {
   assert.deepEqual(chunkSliding('  hallo  ', 100, 10), ['hallo']);
 });
 
-test('chunkSliding: lange tekst → meerdere chunks, elk ≤ size', () => {
+test('chunkSliding: lange tekst → chunks ≤ size, met break-op-einde (V0-pariteit)', () => {
   const text = 'x'.repeat(250);
-  const chunks = chunkSliding(text, 100, 20); // stride 80 → starts 0,80,160,240
-  assert.equal(chunks.length, 4);
+  // stride 80 → starts 0, 80, 160 → bij 160 is 160+100≥250 dus break (geen 4e
+  // staart-chunk die in chunk 3 valt — exact V0's chunkSliding-gedrag).
+  const chunks = chunkSliding(text, 100, 20);
+  assert.equal(chunks.length, 3);
   assert.ok(chunks.every((c) => c.length <= 100));
 });
 

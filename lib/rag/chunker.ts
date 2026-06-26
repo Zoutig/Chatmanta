@@ -18,6 +18,10 @@ export function chunkSliding(text: string, size: number, overlap: number): strin
   for (let start = 0; start < trimmed.length; start += stride) {
     const slice = trimmed.slice(start, start + size).trim();
     if (slice.length > 0) out.push(slice);
+    // Stop zodra dit venster het einde raakt — anders emit de loop een extra
+    // staart-chunk die volledig in de vorige chunk valt (V0-pariteit:
+    // scripts/v0-seed-orgs.ts:51, v0-reingest-parents.ts, lib/v0/server/rag.ts).
+    if (start + size >= trimmed.length) break;
   }
   return out;
 }

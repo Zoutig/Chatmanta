@@ -32,8 +32,9 @@ async function main() {
 
   const client = getV1ServiceRoleClient();
 
-  // org resolveren (by id of slug)
-  const orgQ = client.from('organizations').select('id, name');
+  // org resolveren (by id of slug). deleted_at-filter: de service-role bypasst RLS,
+  // dus zonder dit filter zou een soft-deleted org alsnog resolven (soft-delete-regel).
+  const orgQ = client.from('organizations').select('id, name').is('deleted_at', null);
   const { data: org, error: orgErr } = await (
     UUID_RE.test(orgArg) ? orgQ.eq('id', orgArg) : orgQ.eq('slug', orgArg)
   ).maybeSingle();
@@ -48,7 +49,7 @@ async function main() {
   const organizationId = org.id as string;
 
   // chatbot resolveren-of-aanmaken (één-per-org; ingest mag auto-createn — spec §6)
-  const { data: existing } = await client
+  const { data: existing, error: botLookupErr } = await client
     .from('chatbots')
     .select('id')
     .eq('organization_id', organizationId)
@@ -56,6 +57,11 @@ async function main() {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
+  if (botLookupErr) {
+    // niet stil doorlopen naar auto-create: een gefaalde lookup ≠ "geen chatbot".
+    console.error(`chatbot-lookup faalde: ${botLookupErr.message}`);
+    process.exit(1);
+  }
   let chatbotId = existing?.id as string | undefined;
   if (!chatbotId) {
     const { data: newBot, error: be } = await client
