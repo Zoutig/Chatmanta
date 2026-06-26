@@ -194,7 +194,7 @@ create policy "query_log_select_org_members"
   );
 
 -- 6. match_chunks_with_parents (document-only + p_chatbot_id; security invoker)
-create function public.match_chunks_with_parents(
+create or replace function public.match_chunks_with_parents(
   p_organization_id uuid,
   p_chatbot_id      uuid,
   query_embedding   vector(1536),
@@ -225,8 +225,12 @@ as $$
     p.content      as parent_content,
     p.parent_index as parent_index
   from public.document_chunks c
-  join public.documents d on d.id = c.document_id
-  left join public.parent_chunks p on p.id = c.parent_chunk_id
+  -- defense-in-depth: joins re-asserten dezelfde org+chatbot zodat een (toekomstig)
+  -- gedrifte/foutgelabelde rij of een service-role-pad (RLS-bypass) nooit een
+  -- document/parent van een andere chatbot of org als grond kan teruggeven.
+  join public.documents d on d.id = c.document_id and d.chatbot_id = c.chatbot_id
+  left join public.parent_chunks p
+    on p.id = c.parent_chunk_id and p.organization_id = c.organization_id and p.chatbot_id = c.chatbot_id
   where c.organization_id = p_organization_id
     and c.chatbot_id = p_chatbot_id
     and d.deleted_at is null

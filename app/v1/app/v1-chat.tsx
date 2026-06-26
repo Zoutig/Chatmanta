@@ -13,8 +13,15 @@ export function V1Chat({ chatbotName }: { chatbotName: string }) {
     if (!question.trim() || loading) return;
     setLoading(true);
     setResult(null);
-    setResult(await askV1(question));
-    setLoading(false);
+    try {
+      setResult(await askV1(question));
+    } catch {
+      // askV1 hoort altijd een AskV1Result te returnen; dit vangnet zorgt dat een
+      // onverwachte rejection de knop niet permanent op 'Bezig…' laat staan.
+      setResult({ ok: false, error: 'FAILED' });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

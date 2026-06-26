@@ -26,19 +26,24 @@ export async function askV1(question: string): Promise<AskV1Result> {
     throw e;
   }
 
-  const supabase = await createClient(); // session-client → RLS afgedwongen
-  const chatbot = await getOrgChatbot(supabase, orgId);
-  if (!chatbot) return { ok: false, error: 'NO_CHATBOT' };
-
-  const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
-  const persona = buildV1Persona(chatbot.name);
-
-  // Terminale StreamEvents dragen de volledige ChatResponse in `ev.response`.
-  // 'replacement' (claim-regenerate / deterministische weiger) wint van een
-  // eerdere answer-done. `answer` zit op alle drie ChatResponse-varianten;
-  // `sources` alléén op 'answer'/'fallback' (NIET 'smalltalk') → `'sources' in r`.
-  let final: { answer: string; sources: { title: string }[]; kind: string } | null = null;
+  // createClient + chatbot-resolutie + de RAG-loop in één try: élke onverwachte
+  // fout (DB/RLS-hapering op de chatbots-select, getOrgChatbot die throwt, engine-
+  // fout) → nette FAILED i.p.v. een rejected promise die de UI op 'Bezig…' laat
+  // hangen. NEXT_REDIRECT komt alleen uit requireOrgMember hierboven (al
+  // afgehandeld + doorgegooid), niet uit dit blok.
   try {
+    const supabase = await createClient(); // session-client → RLS afgedwongen
+    const chatbot = await getOrgChatbot(supabase, orgId);
+    if (!chatbot) return { ok: false, error: 'NO_CHATBOT' };
+
+    const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
+    const persona = buildV1Persona(chatbot.name);
+
+    // Terminale StreamEvents dragen de volledige ChatResponse in `ev.response`.
+    // 'replacement' (claim-regenerate / deterministische weiger) wint van een
+    // eerdere answer-done. `answer` zit op alle drie ChatResponse-varianten;
+    // `sources` alléén op 'answer'/'fallback' (NIET 'smalltalk') → `'sources' in r`.
+    let final: { answer: string; sources: { title: string }[]; kind: string } | null = null;
     for await (const ev of runRagQuery(supabase, {
       question: question.trim(),
       threshold: config.similarityThreshold,
@@ -63,9 +68,10 @@ export async function askV1(question: string): Promise<AskV1Result> {
         };
       }
     }
-  } catch {
+    if (!final) return { ok: false, error: 'FAILED' };
+    return { ok: true, ...final };
+  } catch (e) {
+    console.error('[v1/askV1] RAG mislukt:', e);
     return { ok: false, error: 'FAILED' };
   }
-  if (!final) return { ok: false, error: 'FAILED' };
-  return { ok: true, ...final };
 }
