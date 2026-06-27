@@ -13,6 +13,10 @@ export type IngestInput = {
   /** Koppelt een gecrawlde pagina (source='website') aan z'n knowledge_sources-rij
    *  voor re-crawl-dedup + dashboard-groepering. Null/undefined voor uploads. */
   knowledgeSourceId?: string;
+  /** Of het document mee mag in retrieval (de match-RPC filtert d.included). Default
+   *  true. De crawler gebruikt dit om een door de klant uitgezette pagina bij re-crawl
+   *  uitgezet te houden i.p.v. stil terug naar de DB-default. */
+  included?: boolean;
   metadata?: Record<string, unknown>;
 };
 
@@ -35,7 +39,7 @@ export async function ingestDocument(
   client: SupabaseClient,
   input: IngestInput,
 ): Promise<IngestResult> {
-  const { organizationId, chatbotId, filename, text, source = 'upload', knowledgeSourceId, metadata } = input;
+  const { organizationId, chatbotId, filename, text, source = 'upload', knowledgeSourceId, included, metadata } = input;
   const { parents, children } = chunkParentsAndChildren(text);
   if (children.length === 0) {
     throw new AppError('INGEST_READ_FAILED', { message: 'document is empty after trimming' });
@@ -47,6 +51,7 @@ export async function ingestDocument(
       organization_id: organizationId,
       chatbot_id: chatbotId,
       knowledge_source_id: knowledgeSourceId ?? null,
+      included: included ?? true,
       filename,
       source,
       status: 'processing',

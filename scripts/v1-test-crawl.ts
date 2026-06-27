@@ -6,7 +6,7 @@
 // alles op in finally. Draai: npm run v1:test-crawl
 
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
-import { ingestCrawlResults } from '../lib/v1/crawler/processCrawl';
+import { ingestCrawlResults, ingestSinglePage } from '../lib/v1/crawler/processCrawl';
 import { embedTexts } from '../lib/rag/embeddings';
 
 const TOKEN = 'PR3B-CRAWL-PROEF-QZ4417';
@@ -79,7 +79,33 @@ async function main() {
     if (count !== 3) throw new Error(`re-ingest gaf ${count} documents i.p.v. 3 (niet idempotent)`);
     console.log('✅ re-ingest idempotent (3 documents, geen duplicaten)');
 
-    console.log('\n✅ V1 PR-3b crawler-ingest BEWEZEN (pages-as-documents + source_url + failed/excluded + idempotent).');
+    // retry-pad (verifieert de metadata->>source_url JSON-filter in ingestSinglePage)
+    const single = await ingestSinglePage(sb, ksId, ORG as string, chatbotId, {
+      url: `${ROOT}feit`, title: 'Het feit v2', markdown: `Update: de geheime crawl-proefcode blijft ${TOKEN}.`, statusCode: 200, error: null,
+    });
+    if (single.status !== 'crawled') throw new Error(`ingestSinglePage faalde: ${JSON.stringify(single)}`);
+    const { count: feitCount } = await sb
+      .from('documents').select('id', { count: 'exact', head: true })
+      .eq('organization_id', ORG as string).eq('chatbot_id', chatbotId).eq('knowledge_source_id', ksId)
+      .eq('metadata->>source_url', `${ROOT}feit`);
+    if (feitCount !== 1) throw new Error(`ingestSinglePage gaf ${feitCount} docs voor de URL i.p.v. 1 (JSON-filter of dedup kapot)`);
+    console.log('✅ ingestSinglePage (retry) werkt — metadata->>source_url JSON-filter valide, geen duplicaat');
+
+    // included-preservatie bij re-crawl: zet het feit uit → re-crawl → moet uit blijven
+    const { error: offErr } = await sb.from('documents').update({ included: false })
+      .eq('organization_id', ORG as string).eq('chatbot_id', chatbotId).eq('knowledge_source_id', ksId)
+      .eq('metadata->>source_url', `${ROOT}feit`);
+    if (offErr) throw new Error(`included→false faalde: ${offErr.message}`);
+    await ingestCrawlResults(sb, ksId, ORG as string, chatbotId, PAGES);
+    const { data: afterRecrawl } = await sb.from('documents').select('included')
+      .eq('organization_id', ORG as string).eq('chatbot_id', chatbotId).eq('knowledge_source_id', ksId)
+      .eq('metadata->>source_url', `${ROOT}feit`).maybeSingle();
+    if (!afterRecrawl || afterRecrawl.included !== false) {
+      throw new Error(`re-crawl reset included naar ${JSON.stringify(afterRecrawl?.included)} i.p.v. behouden=false`);
+    }
+    console.log('✅ re-crawl behoudt de uitgezette pagina (included=false)');
+
+    console.log('\n✅ V1 PR-3b crawler-ingest BEWEZEN (pages-as-documents + source_url + failed/excluded + idempotent + retry + included-preservatie).');
   } finally {
     await sb.from('knowledge_sources').delete().eq('id', ksId);
     console.log('✓ test-knowledge_source + documents (CASCADE) opgeruimd.');
