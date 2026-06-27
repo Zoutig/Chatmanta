@@ -433,12 +433,18 @@ const CACHE_HIT_THRESHOLD = 0.93;
 
 async function lookupCachedAnswer(
   client: SupabaseClient,
+  writeClient: SupabaseClient,
   queryVector: number[],
+  chatbotId: string,
+  chatbotScoped: boolean,
   botVersion: string,
   organizationId: string,
 ): Promise<ChatResponse | null> {
   const { data, error } = await client.rpc('lookup_cached_answer', {
     p_organization_id: organizationId,
+    // chatbot-scoped (V1): de RPC filtert óók op chatbot_id. V0's RPC heeft die
+    // parameter niet → alléén meesturen wanneer chatbotScoped (zie retrieveChunks).
+    ...(chatbotScoped ? { p_chatbot_id: chatbotId } : {}),
     p_bot_version: botVersion,
     query_embedding: queryVector,
     min_similarity: 0,
@@ -465,7 +471,10 @@ async function lookupCachedAnswer(
   // via `hit_count: undefined`, maar supabase-js stript undefined-keys, dus dat
   // deed nooit iets — en niets in de codebase leest hit_count. Een echte ophoog
   // vereist een atomische RPC; bewust niet gedaan, zie nacht-audit C3.)
-  client.from('answer_cache')
+  // last_hit_at via de write-client: de injected session-client (V1) mag
+  // answer_cache niet muteren onder de SELECT-only RLS. V0's write-client = z'n
+  // service-role client, dus daar ongewijzigd gedrag.
+  writeClient.from('answer_cache')
     .update({ last_hit_at: new Date().toISOString() })
     .eq('id', top.id)
     .then(() => undefined);
@@ -476,6 +485,8 @@ async function writeCachedAnswer(
   client: SupabaseClient,
   question: string,
   queryVector: number[],
+  chatbotId: string,
+  chatbotScoped: boolean,
   botVersion: string,
   response: ChatResponse,
   organizationId: string,
@@ -483,6 +494,10 @@ async function writeCachedAnswer(
   try {
     await client.from('answer_cache').insert({
       organization_id: organizationId,
+      // chatbot-scoped (V1): stempel chatbot_id zodat twee chatbots op dezelfde
+      // bot_version elkaars cache niet serveren. V0's tabel heeft geen chatbot_id
+      // → alléén meesturen wanneer chatbotScoped.
+      ...(chatbotScoped ? { chatbot_id: chatbotId } : {}),
       bot_version: botVersion,
       question,
       question_embedding: queryVector,
@@ -1189,6 +1204,13 @@ export async function* runRagQuery(
     organizationId: string;
     /** V1: scope retrieval naar deze chatbot (alleen actief bij config.chatbotScoped). Verplicht. */
     chatbotId: string;
+    /**
+     * Optionele service-role client voor geprivilegieerde answer_cache-writes
+     * (insert + last_hit_at). Nodig wanneer `client` een RLS-session-client is die
+     * answer_cache niet mag muteren (V1: SELECT-only policy). V0 laat dit weg —
+     * z'n `client` is al service-role. (Later ook bruikbaar voor query_log-logging.)
+     */
+    serviceClient?: SupabaseClient;
     history?: ChatHistoryTurn[];
     tone?: Tone;
     length?: Length;
@@ -1243,6 +1265,12 @@ export async function* runRagQuery(
   const { threshold, enableRewrite, config: bot } = input;
   const chatbotId = input.chatbotId;
   const chatbotScoped = bot.chatbotScoped;
+  // Cache-mutaties (answer_cache insert + last_hit_at) draaien via de service-
+  // role client. In V1 is `client` een RLS-session-client die answer_cache niet
+  // mag schrijven (SELECT-only policy), dus de caller geeft een service-role
+  // `serviceClient` mee. V0 geeft alléén z'n service-role client door →
+  // serviceClient undefined → val terug op `client` (daar ís dat service-role).
+  const cacheWriteClient = input.serviceClient ?? client;
   // Tone/length-resolutie: explicite request-body wint, daarna de klant-
   // dashboard default, daarna de pipeline-default. Dit pad maakt
   // /klantendashboard/instellingen → /widget chat live wired zonder dat
@@ -1492,7 +1520,15 @@ export async function* runRagQuery(
     preCacheEmbedTokens = cacheEmbed.tokens;
     preCacheEmbedCost = cacheEmbed.costUsd;
     cacheEmbedVector = cacheEmbed.vectors[0];
-    const cached = await lookupCachedAnswer(client, cacheEmbedVector, bot.version, orgId);
+    const cached = await lookupCachedAnswer(
+      client,
+      cacheWriteClient,
+      cacheEmbedVector,
+      chatbotId,
+      chatbotScoped,
+      bot.version,
+      orgId,
+    );
     stopCache();
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
@@ -2884,8 +2920,15 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
         phaseTimingsMs: phaseTimingsFinal,
       },
     };
-    writeCachedAnswer(client, original, cacheEmbedVector, bot.version, cachedResponse, orgId).catch(
-      (err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err),
-    );
+    writeCachedAnswer(
+      cacheWriteClient,
+      original,
+      cacheEmbedVector,
+      chatbotId,
+      chatbotScoped,
+      bot.version,
+      cachedResponse,
+      orgId,
+    ).catch((err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err));
   }
 }

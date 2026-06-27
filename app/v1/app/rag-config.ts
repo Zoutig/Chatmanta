@@ -21,7 +21,10 @@ const V1_OVERRIDES = {
   chatbotScoped: true,
   hybridSearch: false,
   parentDocumentRetrieval: true,
-  cacheEnabled: false,
+  // PR-3 3a: answer_cache + chatbot_id-key live in V1. Lezen onder de session-
+  // client (RLS SELECT); schrijven via een service-role client die askV1
+  // injecteert (answer_cache is SELECT-only onder RLS).
+  cacheEnabled: true,
   // ⚠️ LATEST heeft sourceLinksEnabled=true (standaard sinds v0.9.1). De
   // document-only V1-RPC levert géén source_url → uit zetten, anders verwacht
   // de bronlink-sanitizer een ontbrekend veld.

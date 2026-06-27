@@ -3,6 +3,7 @@
 import { requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
+import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { runRagQuery } from '@/lib/rag/run-rag-query';
 import { V1_RAG_DEFAULTS, buildV1Persona, getOrgChatbot } from './rag-config';
 
@@ -52,7 +53,9 @@ export async function askV1(question: string): Promise<AskV1Result> {
       persona,
       organizationId: orgId,
       chatbotId: chatbot.id,
-      disableCache: true,
+      // Cache aan (PR-3 3a): lezen onder de RLS session-client, schrijven via de
+      // service-role client (answer_cache is SELECT-only onder RLS).
+      serviceClient: getV1ServiceRoleClient(),
     })) {
       if (
         ev.kind === 'answer-done' ||
