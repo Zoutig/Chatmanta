@@ -99,7 +99,9 @@ test('alleen de V1-allowlist mag lib/supabase/v1/* importeren', () => {
     rel === join('lib', 'auth.ts') ||
     rel === join('lib', 'supabase', 'admin.ts') ||
     rel.startsWith(join('lib', 'supabase', 'v1') + sep) ||
-    rel.startsWith(join('app', 'v1') + sep);
+    rel.startsWith(join('lib', 'v1') + sep) || // V1 lib-namespace (crawler etc.) = legit V1-oppervlak
+    rel.startsWith(join('app', 'v1') + sep) ||
+    rel.startsWith(join('app', 'api', 'v1') + sep); // V1 API-routes (cron etc.) = legit V1-oppervlak
   const offenders = allFiles()
     .filter((f) => v1Import.test(f.src) && !V1_IMPORT_ALLOWED(f.rel))
     .map((f) => f.rel);
