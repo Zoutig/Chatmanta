@@ -67,11 +67,13 @@ async function ingestOnePage(
   chatbotId: string,
   knowledgeSourceId: string,
   page: CrawledPage,
+  included: boolean,
 ): Promise<{ chunks: number; embedTokens: number; costUsd: number }> {
   const res = await ingestDocument(sb, {
     organizationId,
     chatbotId,
     knowledgeSourceId,
+    included,
     filename: page.title || page.url || '(onbekend)',
     text: page.markdown,
     source: 'website',
@@ -93,6 +95,25 @@ export async function ingestCrawlResults(
   chatbotId: string,
   pages: CrawledPage[],
 ): Promise<IngestCrawlResult> {
+  // Snapshot welke pagina's de klant had uitgezet (included=false), zodat de
+  // delete-then-insert re-crawl die keuze niet stil terugdraait naar de DB-default true.
+  const { data: prevDisabled, error: prevErr } = await sb
+    .from('documents')
+    .select('metadata')
+    .eq('organization_id', organizationId)
+    .eq('chatbot_id', chatbotId)
+    .eq('knowledge_source_id', knowledgeSourceId)
+    .eq('source', 'website')
+    .eq('included', false);
+  // Fail closed: een gefaalde snapshot zou disabledUrls leeg laten → re-crawl zou een
+  // door de klant uitgezette pagina stil terug aanzetten. Liever de crawl falen.
+  if (prevErr) throw new Error(`disabled-snapshot: ${prevErr.message}`);
+  const disabledUrls = new Set(
+    (prevDisabled ?? [])
+      .map((r) => ((r.metadata ?? {}) as Record<string, unknown>).source_url as string | undefined)
+      .filter((u): u is string => !!u),
+  );
+
   const { error: delErr } = await sb
     .from('documents')
     .delete()
@@ -121,7 +142,7 @@ export async function ingestCrawlResults(
         continue;
       }
       const { chunks, embedTokens, costUsd } = await ingestOnePage(
-        sb, organizationId, chatbotId, knowledgeSourceId, page,
+        sb, organizationId, chatbotId, knowledgeSourceId, page, !disabledUrls.has(page.url),
       );
       result.pagesCrawled++;
       result.chunks += chunks;
@@ -168,17 +189,22 @@ export async function ingestSinglePage(
     return { status: 'failed', error: `oude pagina verwijderen faalde: ${delErr.message}` };
   }
 
-  await purgeAnswerCache(sb, organizationId, chatbotId);
-
   const status = pageStatus(page);
+  let result: { status: 'crawled' | 'failed' | 'excluded'; error: string | null };
   try {
     if (status !== 'crawled') {
       await insertNonCrawledPage(sb, organizationId, chatbotId, knowledgeSourceId, page, status);
-      return { status, error: pageError(page) };
+      result = { status, error: pageError(page) };
+    } else {
+      // retry: een eerder mislukte/uitgezette pagina die nu slaagt → weer included.
+      await ingestOnePage(sb, organizationId, chatbotId, knowledgeSourceId, page, true);
+      result = { status: 'crawled', error: null };
     }
-    await ingestOnePage(sb, organizationId, chatbotId, knowledgeSourceId, page);
-    return { status: 'crawled', error: null };
   } catch (err) {
-    return { status: 'failed', error: err instanceof Error ? err.message : 'onbekende fout' };
+    result = { status: 'failed', error: err instanceof Error ? err.message : 'onbekende fout' };
   }
+  // Cache pas NA de (her)insert invalideren: de KB is gewijzigd (oude rij weg) ongeacht
+  // de ingest-uitkomst, en deze volgorde voorkomt dat een lezer in het gat een lege bron ziet.
+  await purgeAnswerCache(sb, organizationId, chatbotId);
+  return result;
 }

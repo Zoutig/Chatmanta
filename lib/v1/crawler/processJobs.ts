@@ -63,10 +63,14 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
       // defense-in-depth: target_id heeft geen tenant-FK — verifieer dat de bron een
       // website-bron van DEZELFDE org+chatbot is, zodat een gedrifte/foutgelabelde job
       // nooit andermans bron muteert of er content aan koppelt.
-      const { data: srcRow } = await sb
+      const { data: srcRow, error: srcErr } = await sb
         .from('knowledge_sources').select('id')
         .eq('id', sourceId).eq('organization_id', orgId).eq('chatbot_id', chatbotId)
         .eq('type', 'website').is('deleted_at', null).maybeSingle();
+      // Een DB-fout ≠ "bron niet gevonden": gooi 'm → de outer catch behandelt 'm als
+      // exception (rate-limit-retry / nette fail met de echte boodschap) i.p.v. de job
+      // onterecht als tenant-mismatch te falen.
+      if (srcErr) throw new Error(`source lookup ${sourceId}: ${srcErr.message}`);
       if (!srcRow) {
         await failJob(sb, jobId, sourceId, orgId, chatbotId, 'Bron niet gevonden voor deze org/chatbot.');
         await recordCrawlEvent(sb, {
