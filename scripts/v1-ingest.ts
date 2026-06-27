@@ -6,7 +6,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
-import { ingestDocument } from '../lib/rag/ingest';
+import { ingestDocument, purgeAnswerCache } from '../lib/rag/ingest';
 import { extractDocText, isAllowedDocExt, ALLOWED_DOC_EXT } from '../lib/rag/doc-parse';
 import { AppError } from '../lib/errors/app-error';
 
@@ -92,6 +92,9 @@ async function main() {
     console.log(
       `✓ ingest klaar: doc ${res.documentId}, ${res.parents} parent(s), ${res.chunks} chunk(s), $${res.costUsd.toFixed(4)}`,
     );
+    // Invalideer de answer-cache van deze org+chatbot: een (her)ingest kan een feit
+    // hebben gewijzigd/verwijderd dat anders stil uit een stale cache-hit komt.
+    await purgeAnswerCache(client, organizationId, chatbotId);
     process.exit(0);
   } catch (e) {
     if (e instanceof AppError && e.code === 'INGEST_READ_FAILED') {

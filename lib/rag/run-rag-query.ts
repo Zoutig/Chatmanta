@@ -474,15 +474,19 @@ async function lookupCachedAnswer(
   // last_hit_at via de write-client: de injected session-client (V1) mag
   // answer_cache niet muteren onder de SELECT-only RLS. V0's write-client = z'n
   // service-role client, dus daar ongewijzigd gedrag.
+  // fire-and-forget; vang óók de rejection (tweede .then-arg) zodat een gefaalde
+  // update geen unhandled promise rejection wordt (de cache-hit is al bepaald).
   writeClient.from('answer_cache')
     .update({ last_hit_at: new Date().toISOString() })
     .eq('id', top.id)
-    .then(() => undefined);
+    .then(() => undefined, () => undefined);
   return top.response_json;
 }
 
 async function writeCachedAnswer(
-  client: SupabaseClient,
+  // write-enabled client (V1: service-role; V0: z'n service-role main client) — niet
+  // de RLS-session-client, die answer_cache niet mag schrijven.
+  writeClient: SupabaseClient,
   question: string,
   queryVector: number[],
   chatbotId: string,
@@ -492,7 +496,7 @@ async function writeCachedAnswer(
   organizationId: string,
 ): Promise<void> {
   try {
-    await client.from('answer_cache').insert({
+    await writeClient.from('answer_cache').insert({
       organization_id: organizationId,
       // chatbot-scoped (V1): stempel chatbot_id zodat twee chatbots op dezelfde
       // bot_version elkaars cache niet serveren. V0's tabel heeft geen chatbot_id
@@ -1456,7 +1460,13 @@ export async function* runRagQuery(
   let offTopicSuspected = false;
 
   const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history) : null;
-  const cacheEmbedPromise = bot.cacheEnabled ? embedTexts([original]) : null;
+  // cacheActive: alleen embedden als de cache écht gebruikt wordt. Zónder de
+  // disableCache-gate hier zou een eval/script (disableCache:true) op een
+  // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
+  // ge-await/gecatcht wordt (alleen het smalltalk-pad catcht 'm) → unhandled
+  // rejection. Lookup/write zijn al disableCache-gated; dit sluit de embed mee.
+  const cacheActive = bot.cacheEnabled && input.disableCache !== true;
+  const cacheEmbedPromise = cacheActive ? embedTexts([original]) : null;
 
   if (preProcessPromise) {
     yield { kind: 'status', phase: 'preprocess' };

@@ -281,7 +281,11 @@ as $$
     p.parent_index as parent_index,
     d.metadata->>'source_url' as source_url
   from public.document_chunks c
-  join public.documents d on d.id = c.document_id and d.chatbot_id = c.chatbot_id
+  -- defense-in-depth: re-assert org + chatbot op de documents-join (niet alleen
+  -- chatbot), zodat een service-role-pad (RLS-bypass) bij een gedrifte/foutgelabelde
+  -- rij nooit het source_url/metadata van een andere org kan teruggeven.
+  join public.documents d
+    on d.id = c.document_id and d.organization_id = c.organization_id and d.chatbot_id = c.chatbot_id
   left join public.parent_chunks p
     on p.id = c.parent_chunk_id and p.organization_id = c.organization_id and p.chatbot_id = c.chatbot_id
   where c.organization_id = p_organization_id
