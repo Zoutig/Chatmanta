@@ -6,7 +6,7 @@ test('V1_RAG_DEFAULTS heeft de PR-1-vlaggen goed', () => {
   assert.equal(V1_RAG_DEFAULTS.chatbotScoped, true, 'chatbotScoped moet true (V1)');
   assert.equal(V1_RAG_DEFAULTS.hybridSearch, false, 'hybridSearch uit (geen match_chunks_hybrid in 0002)');
   assert.equal(V1_RAG_DEFAULTS.parentDocumentRetrieval, true, 'parent-retrieval aan (RPC = _with_parents)');
-  assert.equal(V1_RAG_DEFAULTS.cacheEnabled, false, 'cache uit (geen answer_cache in V1 PR-1)');
+  assert.equal(V1_RAG_DEFAULTS.cacheEnabled, true, 'cache aan (answer_cache live sinds PR-3a)');
   assert.equal(V1_RAG_DEFAULTS.sourceLinksEnabled, false, 'bronlinks uit (document-only RPC, geen source_url)');
   assert.equal(V1_RAG_DEFAULTS.generalKnowledgeEnabled, false, 'alleen-gegrond (anti-hallucinatie)');
   assert.equal(V1_RAG_DEFAULTS.similarityThreshold, 0.4, 'V0-empirie-drempel');

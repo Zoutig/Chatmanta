@@ -25,7 +25,8 @@ export type IngestResult = {
  * Neutrale, client-geïnjecteerde document-ingest voor V1: schrijft een document +
  * parent_chunks + child document_chunks (geëmbed), allemaal org+chatbot-gestempeld.
  * V0 blijft op z'n eigen flat ingestText draaien (deze functie raakt V0 niet).
- * Geen answer-cache-purge (V1 heeft geen answer_cache). Append-only.
+ * Cache-invalidatie is de verantwoordelijkheid van de caller (purgeAnswerCache,
+ * één keer per ingest-operatie i.p.v. per pagina/chunk). Append-only schrijfpad.
  */
 export async function ingestDocument(
   client: SupabaseClient,
@@ -119,4 +120,28 @@ export async function ingestDocument(
     embedTokens: embed.tokens,
     costUsd: embed.costUsd,
   };
+}
+
+/**
+ * Invalideer de answer-cache van een org+chatbot na een (her)ingest, zodat een
+ * gewijzigd/verwijderd feit niet stil uit een stale gecachte response wordt
+ * geserveerd (de KB-purge-landmijn, V0 PR #205). Best-effort: een gefaalde purge
+ * mag de ingest niet laten omvallen. Caller-verantwoordelijkheid (NIET in
+ * ingestDocument zelf) zodat een crawler die N pagina's ingestreert één keer ná
+ * de batch purget i.p.v. N keer. Vereist een service-role client (answer_cache is
+ * SELECT-only onder RLS).
+ */
+export async function purgeAnswerCache(
+  client: SupabaseClient,
+  organizationId: string,
+  chatbotId: string,
+): Promise<void> {
+  const { error } = await client
+    .from('answer_cache')
+    .delete()
+    .eq('organization_id', organizationId)
+    .eq('chatbot_id', chatbotId);
+  if (error) {
+    console.warn(`[purgeAnswerCache] faalde voor org=${organizationId} chatbot=${chatbotId}: ${error.message}`);
+  }
 }
