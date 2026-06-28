@@ -9,39 +9,12 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type {
+  WebsitePage, WebsitePageStatus, SourceStatus, CrawlJobStatus, CrawlEventLite, WebsiteSource,
+} from './types';
 
-export type WebsitePageStatus = 'active' | 'disabled' | 'error' | 'processing';
-
-export type WebsitePage = {
-  id: string;
-  title: string;
-  url: string;
-  status: WebsitePageStatus;
-  lastProcessedAt: string;
-  included: boolean;
-  errorMessage: string | null;
-};
-
-export type CrawlJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type SourceStatus = 'pending' | 'crawling' | 'ready' | 'failed';
-
-export type CrawlEventLite = {
-  eventType: string;
-  firecrawlStatus: string | null;
-  completed: number | null;
-  total: number | null;
-  dataCount: number | null;
-  hasNext: boolean | null;
-  decision: string | null;
-  message: string | null;
-  createdAt: string;
-};
-
-export type WebsiteSource = {
-  source: { id: string; rootUrl: string | null; host: string | null; status: SourceStatus };
-  job: { status: CrawlJobStatus; error: string | null; completed: number; total: number; events: CrawlEventLite[] } | null;
-  pages: WebsitePage[];
-};
+// Re-export zodat bestaande importers (actions.ts) hun `type WebsiteSource` hier blijven halen.
+export type { WebsitePage, WebsitePageStatus, SourceStatus, CrawlJobStatus, CrawlEventLite, WebsiteSource };
 
 export function toUiPageStatus(db: string, included: boolean): WebsitePageStatus {
   if (db === 'failed') return 'error';
