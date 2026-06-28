@@ -60,6 +60,7 @@
     "v1:ingest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-ingest.ts",
     "v1:test-ingest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-ingest.ts",
     "v1:test-cache": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-cache.ts",
+    "v1:test-crawl": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-crawl.ts",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "dependencies": {
