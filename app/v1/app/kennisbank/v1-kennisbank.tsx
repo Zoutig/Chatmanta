@@ -91,13 +91,30 @@ export function V1Kennisbank({ initialSources }: { initialSources: WebsiteSource
 
   const toggleUrl = (u: string) => setSelected((s) => { const n = new Set(s); n.has(u) ? n.delete(u) : n.add(u); return n; });
   const toggleOpen = (id: string) => setOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // Handlers checken het ActionResult: bij {ok:false} tonen we de fout i.p.v. stil
+  // refreshen (anders ziet de gebruiker ongewijzigde state zonder uitleg).
   const togglePage = (id: string, included: boolean) =>
-    start(async () => { setBusyId(id); await setPageIncludedAction(id, included); refresh(); setBusyId(null); });
+    start(async () => {
+      setBusyId(id); setError(null);
+      const res = await setPageIncludedAction(id, included);
+      if (!res.ok) setError(res.error);
+      refresh(); setBusyId(null);
+    });
   const retry = (id: string) =>
-    start(async () => { setBusyId(id); await retryPageAction(id); refresh(); setBusyId(null); });
+    start(async () => {
+      setBusyId(id); setError(null);
+      const res = await retryPageAction(id);
+      if (!res.ok) setError(res.error);
+      refresh(); setBusyId(null);
+    });
   const del = (id: string) => {
     if (!confirm("Website-bron verwijderen? Alle pagina's gaan uit de kennisbank.")) return;
-    start(async () => { await deleteWebsiteSourceAction(id); refresh(); });
+    start(async () => {
+      setError(null);
+      const res = await deleteWebsiteSourceAction(id);
+      if (!res.ok) { setError(res.error); return; }
+      refresh();
+    });
   };
 
   // ─── selectie-paneel (na discover) ──────────────────────────────────────────
