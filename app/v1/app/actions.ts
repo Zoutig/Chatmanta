@@ -5,7 +5,8 @@ import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { runRagQuery } from '@/lib/rag/run-rag-query';
-import { V1_RAG_DEFAULTS, buildV1Persona, getOrgChatbot } from './rag-config';
+import { V1_RAG_DEFAULTS, getOrgChatbot } from './rag-config';
+import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
 
 export type AskV1Result =
   | { ok: true; answer: string; sources: { title: string }[]; kind: string }
@@ -37,7 +38,14 @@ export async function askV1(question: string): Promise<AskV1Result> {
     if (!chatbot) return { ok: false, error: 'NO_CHATBOT' };
 
     const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
-    const persona = buildV1Persona(chatbot.name);
+
+    // Klant-settings → engine-overrides. Zonder deze stap negeert askV1 de
+    // Instellingen-UI volledig (dode knoppen). Lezen onder de session-client (RLS);
+    // de mapping is puur. tone/length/extraSystemInstructions/fallbackMessage gaan
+    // naar runRagQuery; de persona krijgt de klant-naam. GK blijft bewust uit (geen
+    // enableGeneralKnowledge meegegeven → config.generalKnowledgeEnabled=false wint).
+    const settings = await getChatbotSettings(supabase, chatbot.id);
+    const { overrides, persona } = buildV1ChatbotInputs(settings, chatbot.name);
 
     // Terminale StreamEvents dragen de volledige ChatResponse in `ev.response`.
     // 'replacement' (claim-regenerate / deterministische weiger) wint van een
@@ -52,6 +60,13 @@ export async function askV1(question: string): Promise<AskV1Result> {
       persona,
       organizationId: orgId,
       chatbotId: chatbot.id,
+      // Klant-settings → engine. tone/length expliciet (resolved uit toneOfVoice/
+      // answerLength); chatbotOverrides levert extraSystemInstructions + custom
+      // fallbackMessage + taal-directive. ChatbotPromptOverrides ⊇ RagChatbotOverrides
+      // (structureel toewijsbaar — zelfde patroon als de V0-chat-adapter).
+      tone: overrides.tone,
+      length: overrides.length,
+      chatbotOverrides: overrides,
       // Cache aan (PR-3 3a): lezen onder de RLS session-client, schrijven via de
       // service-role client (answer_cache is SELECT-only onder RLS).
       serviceClient: getV1ServiceRoleClient(),
