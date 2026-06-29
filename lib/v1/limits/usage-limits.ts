@@ -51,6 +51,16 @@ export function isOverBudget(spentEur: number, capEur: number): boolean {
   return spentEur >= capEur;
 }
 
+/** Pure: ruwe kolomwaarde → geldige cap. null/undefined/NaN/negatief → default (€1);
+ *  0 blijft 0 (geldige "uit"-waarde die over-budget forceert). LET OP: `Number(null) === 0`,
+ *  dus een kale `Number()` zou null naar €0 mappen (= bot offline) — vandaar de expliciete
+ *  null-check vóór de coercion (fail-open op een ontbrekende waarde, niet fail-closed). */
+export function resolveDailyBudgetEur(raw: unknown): number {
+  if (raw == null) return DEFAULT_DAILY_BUDGET_EUR;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_DAILY_BUDGET_EUR;
+}
+
 /** Lees organizations.daily_budget_eur. Fallback → €1/dag bij null/NaN/lees-fout
  *  (een hapering mag de bot niet platleggen). */
 export async function getOrgDailyBudgetEur(
@@ -64,8 +74,8 @@ export async function getOrgDailyBudgetEur(
       .eq('id', orgId)
       .maybeSingle();
     if (error) throw error;
-    const raw = Number((data as { daily_budget_eur: number | string | null } | null)?.daily_budget_eur);
-    return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_DAILY_BUDGET_EUR;
+    const val = (data as { daily_budget_eur: number | string | null } | null)?.daily_budget_eur;
+    return resolveDailyBudgetEur(val);
   } catch (err) {
     console.error(
       '[limits] getOrgDailyBudgetEur faalde (fallback → €1):',

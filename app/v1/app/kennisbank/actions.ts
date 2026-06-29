@@ -55,6 +55,16 @@ function authFail(e: unknown): ActionFail {
   throw e;
 }
 
+/** M-C: uniforme rate-limit-ActionFail voor de crawler-acties (gedeeld 'crawl:'-bucket). */
+function crawlRateLimitFail(retryAfterSec: number): ActionFail {
+  return {
+    ok: false,
+    code: 'RATE_LIMIT',
+    error: `Te veel crawl-verzoeken — probeer over ${retryAfterSec} ${retryAfterSec === 1 ? 'seconde' : 'seconden'} opnieuw.`,
+    retryAfterSec,
+  };
+}
+
 /** Kale invoer ("jouwsite.nl") → geldig http(s)-schema. */
 function normalizeUrl(input: string): string {
   const trimmed = input.trim();
@@ -79,11 +89,15 @@ export type DiscoverResult = { rootUrl: string; urls: string[] };
 
 /** Ontdek de pagina's van een site (geen scrape, niets opgeslagen). Alleen auth nodig. */
 export async function discoverPagesAction(rawUrl: string): Promise<ActionResult<DiscoverResult>> {
+  let orgId: string;
   try {
-    await getSessionOrg(); // alleen auth nodig (niets opgeslagen); gate = lid van een org
+    ({ orgId } = await getSessionOrg()); // alleen auth nodig (niets opgeslagen); gate = lid van een org
   } catch (e) {
     return authFail(e);
   }
+  // M-C: discover raakt óók Firecrawl (mapSite) → zelfde per-org 'crawl:'-bucket als start.
+  const rl = await getOrgRateLimiter().check(`crawl:${orgId}`);
+  if (!rl.allowed) return crawlRateLimitFail(rl.retryAfterSec);
   return actionTry(async () => {
     const url = normalizeUrl(rawUrl);
     const check = await validateCrawlUrl(url);
@@ -111,14 +125,7 @@ export async function startSelectedCrawlAction(
   // ActionFail (spiegelt authFail's control-flow-return) i.p.v. via actionTry → geen
   // onnodige sink-capture voor een verwacht rate-limit.
   const rl = await getOrgRateLimiter().check(`crawl:${ctx.orgId}`);
-  if (!rl.allowed) {
-    return {
-      ok: false,
-      code: 'RATE_LIMIT',
-      error: `Te veel crawl-verzoeken — probeer over ${rl.retryAfterSec} ${rl.retryAfterSec === 1 ? 'seconde' : 'seconden'} opnieuw.`,
-      retryAfterSec: rl.retryAfterSec,
-    };
-  }
+  if (!rl.allowed) return crawlRateLimitFail(rl.retryAfterSec);
   return actionTry(async () => {
     const { sb, orgId, chatbotId } = ctx;
     const root = normalizeUrl(rootUrl);

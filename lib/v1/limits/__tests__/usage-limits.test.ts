@@ -4,7 +4,12 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { startOfUtcDayIso, startOfUtcMonthIso, isOverBudget } from '../usage-limits';
+import {
+  startOfUtcDayIso,
+  startOfUtcMonthIso,
+  isOverBudget,
+  resolveDailyBudgetEur,
+} from '../usage-limits';
 
 test('startOfUtcDayIso → UTC-middernacht van de dag', () => {
   assert.equal(
@@ -35,4 +40,15 @@ test('isOverBudget — exact-cap sluit (>=)', () => {
   assert.equal(isOverBudget(1.0, 1.0), true); // exact bereikt → dicht
   assert.equal(isOverBudget(1.01, 1.0), true);
   assert.equal(isOverBudget(0, 0), true); // cap 0 → altijd over (forceer-over-budget pad)
+});
+
+test('resolveDailyBudgetEur — null/NaN/negatief → €1, 0 blijft 0', () => {
+  // KRITISCH: null mag NIET naar 0 (Number(null)===0 zou de bot offline forceren).
+  assert.equal(resolveDailyBudgetEur(null), 1.0);
+  assert.equal(resolveDailyBudgetEur(undefined), 1.0);
+  assert.equal(resolveDailyBudgetEur('niet-een-getal'), 1.0);
+  assert.equal(resolveDailyBudgetEur(-5), 1.0);
+  assert.equal(resolveDailyBudgetEur(0), 0); // geldige "uit"-waarde (admin zet budget op 0)
+  assert.equal(resolveDailyBudgetEur(5), 5);
+  assert.equal(resolveDailyBudgetEur('2.50'), 2.5); // numeric komt als string uit PostgREST
 });
