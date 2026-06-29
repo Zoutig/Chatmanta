@@ -43,7 +43,9 @@ export const V1_DEFAULT_CHATBOT_SETTINGS: ChatbotSettings = {
   starterQuestions: [],
   primaryLanguage: 'nl',
   autoDetectLanguage: true,
-  toneOfVoice: 'personal',
+  // 'friendly' → Tone 'neutral': behoudt het geshipte default-gedrag (PR-1b/PR-3,
+  // engine DEFAULT_TONE='neutral'); een klant kiest zelf 'personal' (persoonlijk) als 'ie warmer wil.
+  toneOfVoice: 'friendly',
   extraInstructions: '',
   answerLength: 'normal',
   mayMentionPrices: true,
