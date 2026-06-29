@@ -85,6 +85,32 @@ export async function getOrgDailyBudgetEur(
   }
 }
 
+/** Gepagineerde som van query_log.cost_eur voor `orgId` vanaf `sinceIso`. Gooit door
+ *  bij DB-fout — de publieke wrappers vangen + fail-open → 0. Pagineer-patroon: zie de
+ *  PAGE_SIZE/MAX_PAGES-noot hierboven (PostgREST capt ~1000 rijen/request). */
+async function sumQueryLogCostEurSince(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  sinceIso: string,
+): Promise<number> {
+  let sum = 0;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await serviceClient
+      .from('query_log')
+      .select('cost_eur')
+      .eq('organization_id', orgId)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    for (const r of rows) sum += Number((r as { cost_eur: number | null }).cost_eur) || 0;
+    if (rows.length < PAGE_SIZE) break; // laatste (incomplete) pagina
+  }
+  return sum;
+}
+
 /** Gepagineerde som van query_log.cost_eur voor `orgId` sinds UTC-middernacht.
  *  Fail-open → 0 bij lees-/DB-fout (cap mag de bot niet platleggen), maar log luid. */
 export async function getOrgSpendTodayEur(
@@ -92,26 +118,27 @@ export async function getOrgSpendTodayEur(
   orgId: string,
 ): Promise<number> {
   try {
-    const sinceIso = startOfUtcDayIso(new Date());
-    let sum = 0;
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const from = page * PAGE_SIZE;
-      const { data, error } = await serviceClient
-        .from('query_log')
-        .select('cost_eur')
-        .eq('organization_id', orgId)
-        .gte('created_at', sinceIso)
-        .order('created_at', { ascending: true })
-        .range(from, from + PAGE_SIZE - 1);
-      if (error) throw error;
-      const rows = data ?? [];
-      for (const r of rows) sum += Number((r as { cost_eur: number | null }).cost_eur) || 0;
-      if (rows.length < PAGE_SIZE) break; // laatste (incomplete) pagina
-    }
-    return sum;
+    return await sumQueryLogCostEurSince(serviceClient, orgId, startOfUtcDayIso(new Date()));
   } catch (err) {
     console.error(
       '[limits] getOrgSpendTodayEur faalde (fail-open → 0):',
+      err instanceof Error ? err.message : err,
+    );
+    return 0;
+  }
+}
+
+/** Gepagineerde som van query_log.cost_eur voor `orgId` deze kalendermaand (admin-
+ *  deep-dive). Spiegelt getOrgSpendTodayEur met de maand-grens. Fail-open → 0. */
+export async function getOrgSpendThisMonthEur(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<number> {
+  try {
+    return await sumQueryLogCostEurSince(serviceClient, orgId, startOfUtcMonthIso(new Date()));
+  } catch (err) {
+    console.error(
+      '[limits] getOrgSpendThisMonthEur faalde (fail-open → 0):',
       err instanceof Error ? err.message : err,
     );
     return 0;
