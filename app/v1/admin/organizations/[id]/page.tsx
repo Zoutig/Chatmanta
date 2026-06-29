@@ -12,6 +12,7 @@ import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { MetricCard } from '@/app/admindashboard/components/metric-card';
 import { BudgetEditor } from './budget-editor';
+import { DeleteOrgForm } from './delete-org-form';
 
 // V1 admin — org-deep-dive. Cross-org reads via getJorionAdminClient() (service-role NÁ
 // requireJorionAdmin; admin is geen org-member → RLS-session-client zou 0 rijen geven).
@@ -245,6 +246,35 @@ export default async function OrgDeepDivePage({ params }: { params: Promise<{ id
                 )}
               </div>
             )}
+          </Card>
+        </section>
+
+        {/* Gegevensbeheer (AVG) */}
+        <section>
+          <h2 style={sectionTitle}>Gegevensbeheer (AVG)</h2>
+          <Card>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <h3 style={{ ...sectionTitle, fontSize: 14 }}>Exporteren</h3>
+                <p style={{ ...labelStyle, margin: '0 0 10px' }}>
+                  Download alle data van deze organisatie als JSON (gegevensportabiliteit).
+                </p>
+                <a
+                  href={`/v1/admin/organizations/${o.id}/export`}
+                  className="klant-btn"
+                  data-variant="secondary"
+                  style={{ padding: '8px 14px', display: 'inline-block' }}
+                >
+                  Exporteer org-data (JSON)
+                </a>
+              </div>
+              <div>
+                <h3 style={{ ...sectionTitle, fontSize: 14, color: 'var(--klant-danger)' }}>
+                  Gevarenzone
+                </h3>
+                <DeleteOrgForm orgId={o.id} slug={o.slug} />
+              </div>
+            </div>
           </Card>
         </section>
       </div>
