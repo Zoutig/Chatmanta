@@ -57,16 +57,25 @@ test('mergeChatbotSettings: enum-waarde buiten de toegestane set → default', (
   assert.equal(merged.primaryLanguage, V1_DEFAULT_CHATBOT_SETTINGS.primaryLanguage);
 });
 
-test('sanitizeChatbotPatch: whitelist filtert vreemde/widget-only velden weg', () => {
+test('sanitizeChatbotPatch: whitelist filtert vreemde velden weg, widget-velden door', () => {
   const clean = sanitizeChatbotPatch({
     toneOfVoice: 'professional',
     fallbackMessage: 'Bel ons.',
-    // niet-whitelisted: widget-only + contact-velden mogen niet door.
+    // M-B: welcomeMessage + de widget-appearance-velden mogen nu wél door.
     welcomeMessage: 'hoi',
+    accentColor: '#ff0000',
+    position: 'bottom-left',
+    // niet-whitelisted: contact-velden + GK-toggle blijven geweerd.
     contactEmail: 'x@y.nl',
     answerGeneralKnowledge: true,
   } as Partial<ChatbotSettings>);
-  assert.deepEqual(clean, { toneOfVoice: 'professional', fallbackMessage: 'Bel ons.' });
+  assert.deepEqual(clean, {
+    toneOfVoice: 'professional',
+    fallbackMessage: 'Bel ons.',
+    welcomeMessage: 'hoi',
+    accentColor: '#ff0000',
+    position: 'bottom-left',
+  });
 });
 
 test('sanitizeChatbotPatch: te lang vrije-tekstveld → INPUT_INVALID', () => {

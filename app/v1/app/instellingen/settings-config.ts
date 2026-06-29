@@ -13,6 +13,7 @@ import type {
   Language,
   SourceStrictness,
   ToneOfVoice,
+  WidgetPosition,
 } from '@/lib/v0/klantendashboard/types';
 import {
   buildChatbotOverrides,
@@ -30,11 +31,25 @@ import { AppError } from '@/lib/errors/app-error';
 const DEFAULT_FALLBACK_MESSAGE =
   'Daar heb ik geen informatie over. Stel je vraag anders, of neem contact op met de organisatie.';
 
+// M-B widget-appearance: de klant-instelbare uiterlijk-velden van de embed-widget.
+// Bewust een V1-LOKAAL type i.p.v. de V0 ChatbotSettings te wijzigen (V0 ongemoeid):
+// deze velden leven in dezelfde chatbots.settings jsonb naast de antwoord-velden.
+// `welcomeMessage` zit al in ChatbotSettings → niet hier herhaald.
+export type V1WidgetAppearance = {
+  accentColor: string;
+  position: WidgetPosition;
+  headerTitle: string;
+  launcherText: string;
+};
+
+/** V1-settings = de V0-antwoordvelden + de M-B widget-appearance-velden. */
+export type V1ChatbotSettings = ChatbotSettings & V1WidgetAppearance;
+
 // Neutrale V1-default — één set i.p.v. de org-gekeyde V0-mock (die hangt aan de
 // V0-sandbox-slugs). Een ontbrekend jsonb-veld valt hierop terug; lege strings
-// (klant heeft bewust geleegd) blijven leeg. Alle ChatbotSettings-velden ingevuld
-// zodat mergeChatbotSettings altijd een compleet object oplevert.
-export const V1_DEFAULT_CHATBOT_SETTINGS: ChatbotSettings = {
+// (klant heeft bewust geleegd) blijven leeg. Alle velden ingevuld zodat
+// mergeChatbotSettings altijd een compleet object oplevert.
+export const V1_DEFAULT_CHATBOT_SETTINGS: V1ChatbotSettings = {
   chatbotName: '',
   companyDescription: '',
   // Widget-only velden (niet getoond in de V1-UI) — defaults bewaard zodat het
@@ -60,6 +75,12 @@ export const V1_DEFAULT_CHATBOT_SETTINGS: ChatbotSettings = {
   contactPhone: '',
   contactPageUrl: '',
   unknownAnswerMessage: '',
+  // M-B widget-appearance. accentColor = FAB/header/verstuurknop-kleur; headerTitle
+  // leeg → de widget valt terug op de chatbotnaam; launcherText leeg → geen tooltip.
+  accentColor: '#2563eb',
+  position: 'bottom-right',
+  headerTitle: '',
+  launcherText: '',
 };
 
 // Toegestane waarden per enum-veld (runtime-spiegel van de string-union types).
@@ -72,12 +93,14 @@ const TONE_OF_VOICE_VALUES = [
 const LANGUAGE_VALUES = ['nl', 'en', 'de', 'fr', 'es'] as const satisfies readonly Language[];
 const ANSWER_LENGTH_VALUES = ['short', 'normal', 'long'] as const satisfies readonly AnswerLength[];
 const SOURCE_STRICTNESS_VALUES = ['strict', 'normal', 'flexible'] as const satisfies readonly SourceStrictness[];
+const WIDGET_POSITION_VALUES = ['bottom-right', 'bottom-left'] as const satisfies readonly WidgetPosition[];
 
-const ENUM_VALUES: Partial<Record<keyof ChatbotSettings, readonly string[]>> = {
+const ENUM_VALUES: Partial<Record<keyof V1ChatbotSettings, readonly string[]>> = {
   toneOfVoice: TONE_OF_VOICE_VALUES,
   primaryLanguage: LANGUAGE_VALUES,
   answerLength: ANSWER_LENGTH_VALUES,
   sourceStrictness: SOURCE_STRICTNESS_VALUES,
+  position: WIDGET_POSITION_VALUES,
 };
 
 /**
@@ -92,13 +115,13 @@ const ENUM_VALUES: Partial<Record<keyof ChatbotSettings, readonly string[]>> = {
  *     Instellingen-pagina voor die org platlegt.
  * Optionele velden zonder default (bv. showStarterQuestions) blijven ongemoeid.
  */
-export function mergeChatbotSettings(raw: unknown): ChatbotSettings {
+export function mergeChatbotSettings(raw: unknown): V1ChatbotSettings {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ...V1_DEFAULT_CHATBOT_SETTINGS };
   }
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { ...V1_DEFAULT_CHATBOT_SETTINGS, ...src };
-  for (const key of Object.keys(V1_DEFAULT_CHATBOT_SETTINGS) as (keyof ChatbotSettings)[]) {
+  for (const key of Object.keys(V1_DEFAULT_CHATBOT_SETTINGS) as (keyof V1ChatbotSettings)[]) {
     const value = src[key];
     const def = V1_DEFAULT_CHATBOT_SETTINGS[key];
     const allowed = ENUM_VALUES[key];
@@ -111,7 +134,7 @@ export function mergeChatbotSettings(raw: unknown): ChatbotSettings {
     else valid = true;
     out[key] = valid ? value : def;
   }
-  return out as ChatbotSettings;
+  return out as V1ChatbotSettings;
 }
 
 /**
@@ -122,7 +145,7 @@ export function mergeChatbotSettings(raw: unknown): ChatbotSettings {
 export async function getChatbotSettings(
   client: SupabaseClient,
   chatbotId: string,
-): Promise<ChatbotSettings> {
+): Promise<V1ChatbotSettings> {
   const { data, error } = await client
     .from('chatbots')
     .select('settings')
@@ -170,7 +193,13 @@ const ALLOWED_PATCH_FIELDS = [
   'mayShareContact',
   'honestAboutUnknown',
   'fallbackMessage',
-] as const satisfies readonly (keyof ChatbotSettings)[];
+  // M-B widget-appearance (klant-editor). NIET allowed_domains — Jorion-beheerd (M-D).
+  'welcomeMessage',
+  'accentColor',
+  'position',
+  'headerTitle',
+  'launcherText',
+] as const satisfies readonly (keyof V1ChatbotSettings)[];
 
 // Lengte-caps op de vrije-tekstvelden (stijl van ORG_NAME_MAX in account/actions.ts)
 // → een action-call kan geen onbegrensde prompt-bloat in de system-prompt persisteren.
@@ -179,6 +208,10 @@ const TEXT_FIELD_MAX: Partial<Record<(typeof ALLOWED_PATCH_FIELDS)[number], numb
   companyDescription: 2000,
   extraInstructions: 4000,
   fallbackMessage: 1000,
+  welcomeMessage: 300,
+  accentColor: 32,
+  headerTitle: 120,
+  launcherText: 120,
 };
 
 /**
@@ -186,7 +219,7 @@ const TEXT_FIELD_MAX: Partial<Record<(typeof ALLOWED_PATCH_FIELDS)[number], numb
  * velden worden stil genegeerd; een te lang veld gooit AppError('INPUT_INVALID')
  * (mapt via actionTry naar ActionFail). Puur — geen I/O — zodat dit unit-testbaar is.
  */
-export function sanitizeChatbotPatch(patch: Partial<ChatbotSettings>): Partial<ChatbotSettings> {
+export function sanitizeChatbotPatch(patch: Partial<V1ChatbotSettings>): Partial<V1ChatbotSettings> {
   const clean: Record<string, unknown> = {};
   for (const key of ALLOWED_PATCH_FIELDS) {
     const value = patch[key];
@@ -202,5 +235,5 @@ export function sanitizeChatbotPatch(patch: Partial<ChatbotSettings>): Partial<C
     }
     clean[key] = value;
   }
-  return clean as Partial<ChatbotSettings>;
+  return clean as Partial<V1ChatbotSettings>;
 }

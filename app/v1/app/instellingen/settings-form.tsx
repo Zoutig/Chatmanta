@@ -7,12 +7,13 @@
 
 import { useState, useTransition } from 'react';
 import { saveChatbotSettingsAction } from './actions';
+import type { V1ChatbotSettings } from './settings-config';
 import type {
   AnswerLength,
-  ChatbotSettings,
   Language,
   SourceStrictness,
   ToneOfVoice,
+  WidgetPosition,
 } from '@/lib/v0/klantendashboard/types';
 
 const TONE_OPTIONS: { value: ToneOfVoice; label: string; help: string }[] = [
@@ -42,14 +43,14 @@ const inputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-export function V1SettingsForm({ initial }: { initial: ChatbotSettings }) {
-  const [s, setS] = useState<ChatbotSettings>(initial);
-  const [baseline, setBaseline] = useState<ChatbotSettings>(initial);
+export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
+  const [s, setS] = useState<V1ChatbotSettings>(initial);
+  const [baseline, setBaseline] = useState<V1ChatbotSettings>(initial);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function update<K extends keyof ChatbotSettings>(key: K, value: ChatbotSettings[K]) {
+  function update<K extends keyof V1ChatbotSettings>(key: K, value: V1ChatbotSettings[K]) {
     setS((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
     setError(null);
@@ -189,6 +190,56 @@ export function V1SettingsForm({ initial }: { initial: ChatbotSettings }) {
             rows={3}
             value={s.fallbackMessage}
             onChange={(e) => update('fallbackMessage', e.target.value)}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Widget">
+        <Field label="Accentkleur" hint="Kleur van de chat-knop, header en verstuurknop.">
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(s.accentColor) ? s.accentColor : '#2563eb'}
+              onChange={(e) => update('accentColor', e.target.value)}
+              style={{ width: 44, height: 36, padding: 0, border: '1px solid #ccc', borderRadius: 6, cursor: 'pointer' }}
+              aria-label="Accentkleur"
+            />
+            <input
+              style={{ ...inputStyle, width: 120 }}
+              value={s.accentColor}
+              onChange={(e) => update('accentColor', e.target.value)}
+            />
+          </div>
+        </Field>
+        <Field label="Positie" hint="Hoek waar de chat-knop op de site verschijnt.">
+          <select
+            style={inputStyle}
+            value={s.position}
+            onChange={(e) => update('position', e.target.value as WidgetPosition)}
+          >
+            <option value="bottom-right">Rechtsonder</option>
+            <option value="bottom-left">Linksonder</option>
+          </select>
+        </Field>
+        <Field label="Titel in de header" hint="Leeg laten → de chatbotnaam wordt gebruikt.">
+          <input
+            style={inputStyle}
+            value={s.headerTitle}
+            onChange={(e) => update('headerTitle', e.target.value)}
+          />
+        </Field>
+        <Field label="Welkomstbericht" hint="Het eerste bericht dat de bezoeker ziet in het chatvenster.">
+          <input
+            style={inputStyle}
+            value={s.welcomeMessage}
+            onChange={(e) => update('welcomeMessage', e.target.value)}
+          />
+        </Field>
+        <Field label="Tekst bij de knop" hint="Optioneel tooltip-bubbeltje naast de chat-knop. Leeg = geen tooltip.">
+          <input
+            style={inputStyle}
+            value={s.launcherText}
+            onChange={(e) => update('launcherText', e.target.value)}
           />
         </Field>
       </Section>
