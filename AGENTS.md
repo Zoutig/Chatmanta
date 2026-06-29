@@ -76,8 +76,8 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 
 ### V1 (gepland — Phase 4 van het Bouwplan)
 
-- Anthropic Claude Haiku 4.5 als primair, met OpenAI als technische fallback in `callLLM()`-laag (niet klant-zichtbaar)
-- Migratie-grens: nieuwe LLM-laag in `lib/ai/llm.ts` met provider-abstractie (`MODEL_COSTS` voor EUR-billing; V0 gebruikt naast deze tabel een eigen `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`)
+- **V1 draait op OpenAI `gpt-4o-mini`** (scope-beslissing 2026-06-29). De RAG-engine roept `openai()` direct aan; de `callLLM()`/`streamLLM()`-provider-abstractie + Claude Haiku 4.5 + automatische OpenAI-fallback verschuiven naar **V2** (Haiku dan als backup, niet klant-zichtbaar). De `callLLM`/`streamLLM`-stub mag in V1 een stub blijven. Zie `docs/V1_STATUS_EN_PLAN.md`.
+- Migratie-grens (ligt dormant klaar voor V2): de LLM-laag `lib/ai/llm.ts` met provider-abstractie + `MODEL_COSTS` voor EUR-billing. V0 én V1-op-gpt-4o-mini gebruiken `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`.
 - Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
 
 > ⚠️ **Firecrawl is geen V1-plan meer — al geshipt in V0.** De website-crawler (max 50 pagina's/crawl) draait live in V0-vorm: `lib/v0/crawler/`, dashboard in de Kennisbank, migraties 0032/0035/0036/0037, PR #95/#107/#120. Stond hier ooit als "Phase 5 (gepland)". De V1-hardening (auth, per-user multi-tenancy) komt nog.
