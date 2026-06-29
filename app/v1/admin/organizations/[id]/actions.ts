@@ -100,6 +100,28 @@ export async function deleteOrgDataAction(
     const { error: delErr } = await admin.from('organizations').delete().eq('id', orgId);
     if (delErr) throw new Error(`organizations delete: ${delErr.message}`);
 
+    // 2b. best-effort: ruim de ruwe Storage-objecten van de org op (v1-documents).
+    //     Storage heeft geen FK → niet ge-cascade. Objecten zijn genest als
+    //     <orgId>/<chatbotId>/<file>, dus list(orgId) geeft chatbot-"mappen", niet
+    //     files → recursief: per chatbot-map de files listen en de volle paden removen.
+    //     Niet-fataal: een gefaalde opruiming mag de voltooide org-delete niet
+    //     terugdraaien (originelen worden normaal al post-ingest verwijderd → vangnet).
+    try {
+      const { data: chatbotDirs } = await admin.storage.from('v1-documents').list(orgId, { limit: 1000 });
+      const objectPaths: string[] = [];
+      for (const dir of chatbotDirs ?? []) {
+        const { data: files } = await admin.storage
+          .from('v1-documents')
+          .list(`${orgId}/${dir.name}`, { limit: 1000 });
+        for (const f of files ?? []) objectPaths.push(`${orgId}/${dir.name}/${f.name}`);
+      }
+      if (objectPaths.length) await admin.storage.from('v1-documents').remove(objectPaths);
+    } catch (e) {
+      console.warn(
+        `[deleteOrgDataAction] Storage-opruiming faalde (genegeerd) ${orgId}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+
     // 3. best-effort de auth-users verwijderen. Eén-org-per-user (§1.5), maar we
     //    checken expliciet of de user na de cascade nog elders member is
     //    (multi-org-edge → NIET blind deleten). Een gefaalde user-delete mag de
@@ -107,12 +129,18 @@ export async function deleteOrgDataAction(
     const deletedUserIds: string[] = [];
     const skippedMultiOrgUserIds: string[] = [];
     for (const uid of memberUserIds) {
-      const { count } = await admin
+      if (uid === actorId) {
+        skippedMultiOrgUserIds.push(uid); // de handelende admin nooit zichzelf wissen
+        continue;
+      }
+      const { count, error: cntErr } = await admin
         .from('organization_members')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', uid);
-      if ((count ?? 0) > 0) {
-        skippedMultiOrgUserIds.push(uid); // hoort nog bij een andere org
+      // Fail CLOSED: bij een count-fout is count null → NIET blind deleten (mogelijk
+      // nog member van een andere org). Sla over en registreer.
+      if (cntErr || (count ?? 0) > 0) {
+        skippedMultiOrgUserIds.push(uid); // andere org, of count-fout → safe skip
         continue;
       }
       const { error: userErr } = await admin.auth.admin.deleteUser(uid);

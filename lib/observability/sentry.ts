@@ -18,6 +18,13 @@ function beforeSend(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
   for (const ex of event.exception?.values ?? []) {
     if (ex.value) ex.value = redactPii(ex.value);
   }
+  // Backstop: gooi request-headers/cookies weg als de SDK ze ooit zelf vult — die
+  // bevatten de Supabase auth-cookie + x-forwarded-for IP. captureServerError stuurt
+  // ze al niet mee; dit dekt elk ander pad (AVG, defense-in-depth).
+  if (event.request) {
+    delete event.request.headers;
+    delete event.request.cookies;
+  }
   return event;
 }
 
@@ -35,7 +42,14 @@ export function initSentry(): void {
 }
 
 /** Dunne capture-helper voor onRequestError + ad-hoc server-fouten.
- *  No-op zonder DSN (Sentry.captureException doet niets als init geen DSN kreeg). */
+ *  No-op zonder DSN (Sentry.captureException doet niets als init geen DSN kreeg).
+ *  Geef ALLEEN gesaneerde velden mee als ctx — nooit een ruwe request/headers. */
 export function captureServerError(err: unknown, ctx?: Record<string, unknown>): void {
   Sentry.captureException(err, ctx ? { extra: ctx } : undefined);
+}
+
+/** Flush pending events vóór een serverless-instance suspendt. @sentry/node flusht
+ *  niet automatisch; zonder DSN is dit een no-op-safe await. */
+export async function flushSentry(ms = 2000): Promise<void> {
+  await Sentry.flush(ms);
 }

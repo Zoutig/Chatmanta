@@ -32,6 +32,17 @@ export async function onRequestError(
   context: unknown,
 ): Promise<void> {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  const { captureServerError } = await import('./lib/observability/sentry');
-  captureServerError(err, { request, context });
+  const req = request as { path?: string; method?: string } | undefined;
+  const ctx = context as { routePath?: string } | undefined;
+  const sentry = await import('./lib/observability/sentry');
+  // ALLEEN veilige velden — NOOIT de ruwe request/headers (die bevatten de Supabase
+  // auth-cookie + x-forwarded-for IP) en niet de ruwe context.
+  sentry.captureServerError(err, {
+    path: req?.path,
+    method: req?.method,
+    routePath: ctx?.routePath,
+  });
+  // @sentry/node flusht niet automatisch vóór de serverless-instance suspendt → event
+  // zou verloren gaan. No-op-safe zonder DSN.
+  await sentry.flushSentry(2000);
 }

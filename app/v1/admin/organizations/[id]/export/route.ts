@@ -53,6 +53,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .limit(QUERY_LOG_CAP),
   ]);
 
+  // Verzamel sub-query-fouten: een gefaalde sub-sectie levert `.data ?? []` (leeg) op —
+  // zonder dit zou een onvolledige AVG-export als compleet worden gepresenteerd.
+  const subErrors: Record<string, string> = {};
+  if (members.error) subErrors.members = members.error.message;
+  if (chatbots.error) subErrors.chatbots = chatbots.error.message;
+  if (sources.error) subErrors.knowledge_sources = sources.error.message;
+  if (documents.error) subErrors.documents = documents.error.message;
+  if (jobs.error) subErrors.processing_jobs = jobs.error.message;
+  if (queryLog.error) subErrors.query_log = queryLog.error.message;
+
   const payload = {
     exported_at: new Date().toISOString(),
     organization: org,
@@ -66,6 +76,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       query_log: `Gecapt op de recentste ${QUERY_LOG_CAP} rijen (PostgREST-cap).`,
       document_chunks: 'Chunk-content weggelaten (afgeleide data; document-metadata is opgenomen).',
     },
+    // Alleen aanwezig als een sub-query faalde → de export is dan ONVOLLEDIG.
+    _errors: Object.keys(subErrors).length ? subErrors : undefined,
   };
 
   return new Response(JSON.stringify(payload, null, 2), {
