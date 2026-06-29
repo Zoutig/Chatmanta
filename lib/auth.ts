@@ -98,6 +98,9 @@ export async function getSessionOrg(): Promise<{ user: User; orgId: string }> {
   const user = await requireAuth();
   const supabase = await createClient();
 
+  // M1-aanname: één org per klant (blueprint §1.5). Mocht een user ooit meerdere
+  // memberships krijgen, dan kiest dit deterministisch de OUDSTE (created_at asc) —
+  // een org-switcher is V2-werk, niet M1.
   const { data, error } = await supabase
     .from('organization_members')
     .select('organization_id')

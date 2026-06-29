@@ -29,7 +29,7 @@ export async function askV1(question: string): Promise<AskV1Result> {
   // createClient + chatbot-resolutie + de RAG-loop in één try: élke onverwachte
   // fout (DB/RLS-hapering op de chatbots-select, getOrgChatbot die throwt, engine-
   // fout) → nette FAILED i.p.v. een rejected promise die de UI op 'Bezig…' laat
-  // hangen. NEXT_REDIRECT komt alleen uit requireOrgMember hierboven (al
+  // hangen. NEXT_REDIRECT komt alleen uit getSessionOrg hierboven (al
   // afgehandeld + doorgegooid), niet uit dit blok.
   try {
     const supabase = await createClient(); // session-client → RLS afgedwongen

@@ -47,6 +47,30 @@ async function insertOrgWithUniqueSlug(
   throw new Error('kon geen unieke slug genereren');
 }
 
+/** F3: best-effort compenserende cleanup na een mislukte org-aanmaak — laat geen
+ *  wees-org + gestrande uitgenodigde user achter (er is geen admin-delete-UI in M1).
+ *  Idempotent + fail-soft: een fout hier mag de oorspronkelijke fout niet maskeren.
+ *  Org-delete cascade't member + chatbot (FK ON DELETE CASCADE); een VERS uitgenodigde
+ *  auth-user wordt verwijderd, een al-BESTAANDE user NIET (kan bij andere orgs horen). */
+async function rollbackOrgCreate(
+  admin: SupabaseClient,
+  orgId: string | null,
+  freshUserId: string | null,
+): Promise<void> {
+  try {
+    if (orgId) {
+      const { error } = await admin.from('organizations').delete().eq('id', orgId);
+      if (error) console.error(`[v1/createClientOrganization] rollback org faalde: ${error.message}`);
+    }
+    if (freshUserId) {
+      const { error } = await admin.auth.admin.deleteUser(freshUserId);
+      if (error) console.error(`[v1/createClientOrganization] rollback user faalde: ${error.message}`);
+    }
+  } catch (e) {
+    console.error('[v1/createClientOrganization] rollback wierp (genegeerd):', e);
+  }
+}
+
 /** Resolve de redirect-basis voor de invite-mail. Override via NEXT_PUBLIC_SITE_URL,
  *  anders uit de request-origin (server action). MOET in de Supabase Auth redirect-
  *  allowlist staan, anders weigert Supabase de redirect. */
@@ -82,13 +106,19 @@ export async function createClientOrganization(
 
   const admin = getV1ServiceRoleClient();
 
+  // F3: track wat al is aangemaakt zodat de catch het kan opruimen bij een latere fout.
+  // Élke fout ná de org-insert gooit (i.p.v. early-return) → één cleanup-pad in de catch.
+  let createdOrgId: string | null = null;
+  let freshUserId: string | null = null; // alléén gezet bij een VERS uitgenodigde user
+
   try {
     // 1+2. org met unieke slug
     const { id: orgId, slug } = await insertOrgWithUniqueSlug(admin, name);
+    createdOrgId = orgId;
 
-    // 3. owner uitnodigen (magic-link → /v1/auth/callback). email_exists → bestaande
+    // 3. owner uitnodigen (token_hash-mail → /v1/auth/confirm). email_exists → bestaande
     //    user opzoeken (idempotent, geen dubbele invite).
-    const redirectTo = `${await resolveOrigin()}/v1/auth/callback`;
+    const redirectTo = `${await resolveOrigin()}/v1/auth/confirm`;
     let ownerUserId: string;
     let invited = true;
     const { data: invite, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
@@ -98,19 +128,23 @@ export async function createClientOrganization(
       const code = (inviteErr as { code?: string }).code;
       if (code === 'email_exists' || /already|exist|registered|duplicate/i.test(inviteErr.message)) {
         invited = false;
+        // ponytail: scant alleen de eerste 200 users (ceiling) i.p.v. paginate-loop.
+        // Ruim genoeg voor M1-volumes; upgrade naar paginatie/admin-getUserByEmail als
+        // de user-tabel groeit.
         const { data: list, error: listErr } = await admin.auth.admin.listUsers({
           page: 1,
           perPage: 200,
         });
-        if (listErr) return { ok: false, error: `gebruiker-lookup faalde: ${listErr.message}` };
+        if (listErr) throw new Error(`gebruiker-lookup faalde: ${listErr.message}`);
         const existing = list.users.find((u) => u.email?.toLowerCase() === email);
-        if (!existing) return { ok: false, error: 'gebruiker bestaat al maar werd niet gevonden.' };
+        if (!existing) throw new Error('gebruiker bestaat al maar werd niet gevonden.');
         ownerUserId = existing.id;
       } else {
-        return { ok: false, error: `uitnodigen faalde: ${inviteErr.message}` };
+        throw new Error(`uitnodigen faalde: ${inviteErr.message}`);
       }
     } else {
       ownerUserId = invite.user.id;
+      freshUserId = ownerUserId; // vers aangemaakt → mag bij rollback weg
     }
 
     // 4. de handle_new_auth_user-trigger heeft de public.users-rij al gemaakt
@@ -123,7 +157,7 @@ export async function createClientOrganization(
         { organization_id: orgId, user_id: ownerUserId, role: 'owner' },
         { onConflict: 'organization_id,user_id' },
       );
-    if (memberErr) return { ok: false, error: `membership: ${memberErr.message}` };
+    if (memberErr) throw new Error(`membership: ${memberErr.message}`);
 
     // 6. auto-create de ene chatbot (één-per-org). bot_version = de V1-default die de
     //    seed/ingest gebruiken (v1.0). 23505 = one-active-per-org → al aanwezig (ok).
@@ -131,10 +165,10 @@ export async function createClientOrganization(
       .from('chatbots')
       .insert({ organization_id: orgId, name, bot_version: 'v1.0' });
     if (botErr && (botErr as { code?: string }).code !== '23505') {
-      return { ok: false, error: `chatbot: ${botErr.message}` };
+      throw new Error(`chatbot: ${botErr.message}`);
     }
 
-    // 7. audit (fail-soft). user_id = de actor (admin); owner in metadata.
+    // 7. audit (fail-soft, throwt nooit → geen rollback-risico). user_id = actor (admin).
     await writeAuditLog(admin, {
       organizationId: orgId,
       userId: actorId,
@@ -147,6 +181,7 @@ export async function createClientOrganization(
     return { ok: true, orgId, slug, ownerUserId, invited };
   } catch (e) {
     console.error('[v1/createClientOrganization] mislukt:', e);
+    await rollbackOrgCreate(admin, createdOrgId, freshUserId);
     return { ok: false, error: e instanceof Error ? e.message : 'onbekende fout' };
   }
 }

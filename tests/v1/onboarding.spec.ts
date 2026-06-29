@@ -19,6 +19,9 @@ const ADMIN_EMAIL = process.env.V1_SEED_ADMIN_EMAIL;
 const ADMIN_PW = process.env.V1_SEED_ADMIN_PW;
 
 const haveAdmin = Boolean(URL && SERVICE_KEY && ADMIN_EMAIL && ADMIN_PW);
+// De deny-path heeft GEEN admin-seed nodig (alleen URL + SERVICE_KEY om een no-org
+// user te maken), dus die test staat los van de admin-gate hieronder (F4).
+const haveSvc = Boolean(URL && SERVICE_KEY);
 
 function svc(): SupabaseClient {
   return createClient(URL as string, SERVICE_KEY as string, {
@@ -60,6 +63,7 @@ test.describe('V1 M1 onboarding', () => {
       .maybeSingle();
     expect(org, 'organizations-rij').toBeTruthy();
     const orgId = (org as { id: string }).id;
+    let ownerUserId: string | undefined;
 
     try {
       const { data: members } = await sb
@@ -67,7 +71,7 @@ test.describe('V1 M1 onboarding', () => {
         .select('user_id, role')
         .eq('organization_id', orgId);
       expect(members?.some((m) => m.role === 'owner'), 'owner-membership').toBe(true);
-      const ownerUserId = members?.find((m) => m.role === 'owner')?.user_id as string | undefined;
+      ownerUserId = members?.find((m) => m.role === 'owner')?.user_id as string | undefined;
 
       const { data: bots } = await sb
         .from('chatbots')
@@ -84,16 +88,18 @@ test.describe('V1 M1 onboarding', () => {
         .eq('action', 'org.create');
       expect((audit ?? []).length, 'org.create audit-rij').toBeGreaterThan(0);
       expect(audit?.[0].target_id, 'audit target = org').toBe(orgId);
-
-      // cleanup: audit (org_id wordt anders SET NULL bij org-delete) + org-cascade + owner auth-user
-      await sb.from('audit_logs').delete().eq('organization_id', orgId);
-      await sb.from('organizations').delete().eq('id', orgId); // cascade → members + chatbots
-      if (ownerUserId) await sb.auth.admin.deleteUser(ownerUserId);
     } finally {
-      // best-effort: laat geen org achter als een assert faalde vóór de cleanup
+      // best-effort cleanup, ook als een assert hierboven faalde: audit (org_id wordt
+      // anders SET NULL bij org-delete) → org-cascade (members + chatbots) → auth-user.
+      await sb.from('audit_logs').delete().eq('organization_id', orgId);
       await sb.from('organizations').delete().eq('id', orgId);
+      if (ownerUserId) await sb.auth.admin.deleteUser(ownerUserId);
     }
   });
+});
+
+test.describe('V1 M1 deny-path', () => {
+  test.skip(!haveSvc, 'V1 URL / SERVICE_KEY ontbreekt');
 
   test('gebruiker zonder org-membership → "Geen toegang"', async ({ page }) => {
     const sb = svc();
