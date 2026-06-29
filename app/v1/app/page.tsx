@@ -43,6 +43,11 @@ export default async function V1AppPage() {
       <p style={{ fontSize: 14, color: '#333' }}>
         Ingelogd als <strong>{user.email}</strong>.
       </p>
+      <nav style={{ display: 'flex', gap: 16, fontSize: 14, marginBottom: 8 }}>
+        <a href="/v1/app/kennisbank">Kennisbank</a>
+        <a href="/v1/app/instellingen">Instellingen</a>
+        <a href="/v1/app/account">Account</a>
+      </nav>
       {chatbot ? (
         <V1Chat chatbotName={chatbot.name} />
       ) : (
