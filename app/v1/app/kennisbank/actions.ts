@@ -8,9 +8,11 @@
 // (RLS-bypass → object-level guard). Reads via de session-client (RLS); writes via de
 // V1 service-role.
 //
-// ponytail: GEEN per-IP rate-limit hier (V1 mist die infra nog; member-scoped auth +
-// de MAX_CRAWL_PAGES-cap zijn de controles). Upgrade-pad: Upstash-ratelimit in de
-// V1-hardening-mijlpaal, vóór de eerste echte klant onbewaakt crawlt.
+// M-C: de crawl-START-actie (startSelectedCrawlAction, raakt Firecrawl + maakt jobs)
+// heeft een per-org rate-limit ('crawl:'-bucket, los van het chat-bucket). Lichte polls
+// (tick/refresh) blijven bewust ongelimiteerd; Firecrawl-credit-budget zelf = buiten
+// scope (puur abuse-rate-limiting van de start). Per-IP rate-limit op acties = V1-
+// hardening (V1 mist die infra nog).
 
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -23,6 +25,7 @@ import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
 import { verifyMagicBytes } from '@/lib/rag/file-signature';
 import { getOrgChatbot } from '../rag-config';
+import { getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
 import { validateCrawlUrl } from '@/lib/v1/crawler/validateCrawlUrl';
 import { normalizeHost } from '@/lib/v1/crawler/normalizeHost';
 import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v1/crawler/firecrawl';
@@ -52,6 +55,16 @@ function authFail(e: unknown): ActionFail {
   throw e;
 }
 
+/** M-C: uniforme rate-limit-ActionFail voor de crawler-acties (gedeeld 'crawl:'-bucket). */
+function crawlRateLimitFail(retryAfterSec: number): ActionFail {
+  return {
+    ok: false,
+    code: 'RATE_LIMIT',
+    error: `Te veel crawl-verzoeken — probeer over ${retryAfterSec} ${retryAfterSec === 1 ? 'seconde' : 'seconden'} opnieuw.`,
+    retryAfterSec,
+  };
+}
+
 /** Kale invoer ("jouwsite.nl") → geldig http(s)-schema. */
 function normalizeUrl(input: string): string {
   const trimmed = input.trim();
@@ -76,11 +89,15 @@ export type DiscoverResult = { rootUrl: string; urls: string[] };
 
 /** Ontdek de pagina's van een site (geen scrape, niets opgeslagen). Alleen auth nodig. */
 export async function discoverPagesAction(rawUrl: string): Promise<ActionResult<DiscoverResult>> {
+  let orgId: string;
   try {
-    await getSessionOrg(); // alleen auth nodig (niets opgeslagen); gate = lid van een org
+    ({ orgId } = await getSessionOrg()); // alleen auth nodig (niets opgeslagen); gate = lid van een org
   } catch (e) {
     return authFail(e);
   }
+  // M-C: discover raakt óók Firecrawl (mapSite) → zelfde per-org 'crawl:'-bucket als start.
+  const rl = await getOrgRateLimiter().check(`crawl:${orgId}`);
+  if (!rl.allowed) return crawlRateLimitFail(rl.retryAfterSec);
   return actionTry(async () => {
     const url = normalizeUrl(rawUrl);
     const check = await validateCrawlUrl(url);
@@ -104,6 +121,11 @@ export async function startSelectedCrawlAction(
   } catch (e) {
     return authFail(e);
   }
+  // M-C: per-org abuse-rate-limit op de start-actie (eigen 'crawl:'-bucket). Directe
+  // ActionFail (spiegelt authFail's control-flow-return) i.p.v. via actionTry → geen
+  // onnodige sink-capture voor een verwacht rate-limit.
+  const rl = await getOrgRateLimiter().check(`crawl:${ctx.orgId}`);
+  if (!rl.allowed) return crawlRateLimitFail(rl.retryAfterSec);
   return actionTry(async () => {
     const { sb, orgId, chatbotId } = ctx;
     const root = normalizeUrl(rootUrl);
