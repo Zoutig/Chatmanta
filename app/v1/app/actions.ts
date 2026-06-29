@@ -1,10 +1,12 @@
 'use server';
 
+import { after } from 'next/server';
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
-import { runRagQuery } from '@/lib/rag/run-rag-query';
+import { runRagQuery, type ChatResponse } from '@/lib/rag/run-rag-query';
+import { logRagQuery } from '@/lib/rag/log-query';
 import { V1_RAG_DEFAULTS, getOrgChatbot } from './rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
 
@@ -52,6 +54,11 @@ export async function askV1(question: string): Promise<AskV1Result> {
     // eerdere answer-done. `answer` zit op alle drie ChatResponse-varianten;
     // `sources` alléén op 'answer'/'fallback' (NIET 'smalltalk') → `'sources' in r`.
     let final: { answer: string; sources: { title: string }[]; kind: string } | null = null;
+    // M-A: capture óók de volledige ChatResponse voor query_log (cost/latency/
+    // telemetrie). followups-done/metrics-done vullen 'm ná answer-done aan —
+    // zonder die merge ondertelt de cost de follow-up-tokens (M-C budget-cap
+    // leest dan te laag). Spiegelt app/api/v0/chat/route.ts.
+    let finalResponse: ChatResponse | null = null;
     for await (const ev of runRagQuery(supabase, {
       question: question.trim(),
       threshold: config.similarityThreshold,
@@ -78,14 +85,53 @@ export async function askV1(question: string): Promise<AskV1Result> {
         ev.kind === 'replacement'
       ) {
         const r = ev.response;
+        finalResponse = r;
         final = {
           answer: r.answer,
           sources: 'sources' in r ? r.sources.map((s) => ({ title: s.filename ?? 'bron' })) : [],
           kind: r.kind,
         };
+      } else if (ev.kind === 'followups-done' && finalResponse?.kind === 'answer') {
+        const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
+        finalResponse = {
+          ...fr,
+          chatInputTokens: fr.chatInputTokens + ev.inputTokens,
+          chatOutputTokens: fr.chatOutputTokens + ev.outputTokens,
+          totalCostUsd: fr.totalCostUsd + ev.costUsd,
+          extras: {
+            ...(fr.extras ?? {}),
+            ...(ev.followUps.length > 0 ? { followUps: ev.followUps } : {}),
+          },
+        };
+      } else if (ev.kind === 'metrics-done' && finalResponse?.kind === 'answer') {
+        const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
+        finalResponse = {
+          ...fr,
+          extras: {
+            ...(fr.extras ?? {}),
+            phaseTimingsMs: ev.phaseTimingsMs,
+          },
+        };
       }
     }
     if (!final) return { ok: false, error: 'FAILED' };
+
+    // M-A: log de afgeronde query best-effort (never-throws), zonder de response
+    // te vertragen. query_log is SELECT-only onder RLS → schrijf via de
+    // service-role-client. ipHash null: authed dashboard-chat heeft geen
+    // onvertrouwd bezoeker-IP (de publieke widget-route M-B levert die wél).
+    if (finalResponse) {
+      const responseForLog = finalResponse;
+      after(() =>
+        logRagQuery(getV1ServiceRoleClient(), {
+          question: question.trim(),
+          response: responseForLog,
+          organizationId: orgId,
+          chatbotId: chatbot.id,
+          ipHash: null,
+        }),
+      );
+    }
     return { ok: true, ...final };
   } catch (e) {
     console.error('[v1/askV1] RAG mislukt:', e);

@@ -97,6 +97,20 @@ export function costForModelUsd(
 }
 
 /**
+ * USD→EUR conversie voor query_log.cost_eur. De engine sommeert kosten in USD
+ * (costForModelUsd); de EUR-cap (M-C) en EUR-billing willen EUR.
+ * ponytail: vaste FX-constante (env-override USD_EUR_RATE). Dit is een
+ * budget-backstop, geen factuur. Upgrade-pad (V2): live FX of per-call EUR via
+ * MODEL_COSTS — let op: MODEL_COSTS (EUR) spiegelt nu nog de USD-tabel, dus
+ * her-summeren geeft GEEN echte EUR tot die tabel echte EUR-rates krijgt.
+ */
+const USD_EUR_RATE = Number(process.env.USD_EUR_RATE) || 0.92;
+export function costUsdToEur(usd: number): number {
+  if (!Number.isFinite(usd) || usd <= 0) return 0;
+  return Math.round(usd * USD_EUR_RATE * 1e6) / 1e6; // 6 decimalen, matcht kolom
+}
+
+/**
  * Generate a complete LLM response. Real implementation in Fase 4.
  * Until then this throws to prevent silent misuse.
  */
