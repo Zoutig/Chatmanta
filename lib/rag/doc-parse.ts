@@ -9,14 +9,13 @@
 
 import 'server-only';
 import * as mammoth from 'mammoth';
+import type { AllowedDocExt } from './doc-ext';
 
-/** Ondersteunde extensies (kleine letters, zonder punt). */
-export const ALLOWED_DOC_EXT = ['pdf', 'docx', 'txt', 'md'] as const;
-export type AllowedDocExt = (typeof ALLOWED_DOC_EXT)[number];
-
-export function isAllowedDocExt(ext: string): ext is AllowedDocExt {
-  return (ALLOWED_DOC_EXT as readonly string[]).includes(ext);
-}
+// De ext-allowlist is pure data → leeft in doc-ext.ts (client-safe, geen server-only).
+// Hier re-geëxporteerd zodat bestaande server-side callers (admin-crawl, v1-ingest,
+// de V1-upload-action) hun import-pad behouden.
+export { ALLOWED_DOC_EXT, isAllowedDocExt } from './doc-ext';
+export type { AllowedDocExt } from './doc-ext';
 
 export async function extractDocText(buffer: Buffer, ext: AllowedDocExt): Promise<string> {
   switch (ext) {
