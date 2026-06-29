@@ -25,6 +25,7 @@ import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
+import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { V1_RAG_DEFAULTS, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from '@/app/v1/app/instellingen/settings-config';
 import type { ChatbotPromptOverrides } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
@@ -125,10 +126,6 @@ export async function POST(req: Request) {
     });
   }
 
-  // 3. M-C: per-IP rate-limit is hierboven (gate #0) gedaan; M-C voegt per-ORG
-  //    rate-limit + dag-budget-cap toe.
-  //    M-C: per-IP here trusts XFF first-hop; M-C per-org limiter must use a trusted hop.
-
   // 4. Resolve org+chatbot uit de GESIGNEERDE slug via service-role.
   const svc = getV1ServiceRoleClient();
   const { data: org, error: orgErr } = await svc
@@ -152,6 +149,18 @@ export async function POST(req: Request) {
     return ndjsonOnce(requestId, queryLogId, { kind: 'error', code: 'INTERNAL', requestId });
   }
   const activeChatbot = chatbot;
+
+  // 4b. M-C combined per-ORG gate: per-org rate-limit + maand-cap + dag-budget. De per-IP
+  //     rate-limit (gate #0) blijft staan; dit voegt per-org + kosten/maand toe. Block →
+  //     terminale 'fallback'-NDJSON met de gate-message (zoals de injection-block);
+  //     geen pipeline → niet billable.
+  const gate = await checkOrgChatGates(svc, organizationId);
+  if (!gate.ok) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: { kind: 'fallback', answer: gate.message },
+    });
+  }
 
   // 5. Klant-settings → engine-overrides. Bij een settings-read-fout draaien we door
   //    op de default-persona zonder overrides (de chat mag niet falen op een

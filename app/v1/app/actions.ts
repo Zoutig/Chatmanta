@@ -9,10 +9,14 @@ import { runRagQuery, type ChatResponse } from '@/lib/rag/run-rag-query';
 import { logRagQuery } from '@/lib/rag/log-query';
 import { V1_RAG_DEFAULTS, getOrgChatbot } from './rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
+import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 
 export type AskV1Result =
   | { ok: true; answer: string; sources: { title: string }[]; kind: string }
-  | { ok: false; error: 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' };
+  | {
+      ok: false;
+      error: 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' | 'RATE_LIMITED' | 'BUDGET_EXHAUSTED' | 'MONTHLY_LIMIT';
+    };
 
 export async function askV1(question: string): Promise<AskV1Result> {
   if (!question || question.trim().length === 0) return { ok: false, error: 'FAILED' };
@@ -38,6 +42,12 @@ export async function askV1(question: string): Promise<AskV1Result> {
     const supabase = await createClient(); // session-client → RLS afgedwongen
     const chatbot = await getOrgChatbot(supabase, orgId);
     if (!chatbot) return { ok: false, error: 'NO_CHATBOT' };
+
+    // M-C: cost/abuse-guard vóór de (betaalde) pipeline. Per-org rate-limit + maand-cap
+    // + dag-budget op de service-role (org-expliciet, geen client-input). Geblokt →
+    // geen runRagQuery → niet billable. UI mapt de code naar NL (v1-chat.tsx).
+    const gate = await checkOrgChatGates(getV1ServiceRoleClient(), orgId);
+    if (!gate.ok) return { ok: false, error: gate.code };
 
     const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
 

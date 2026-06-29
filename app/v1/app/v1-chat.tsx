@@ -3,6 +3,27 @@
 import { useState, type FormEvent } from 'react';
 import { askV1, type AskV1Result } from './actions';
 
+type AskV1Error = Extract<AskV1Result, { ok: false }>['error'];
+
+/** Code → klant-vriendelijke NL-melding (askV1 retourneert alleen de code). */
+function errorMessage(code: AskV1Error): string {
+  switch (code) {
+    case 'NO_CHATBOT':
+      return 'Er is nog geen chatbot ingesteld voor deze organisatie.';
+    case 'FORBIDDEN':
+      return 'Je hebt geen toegang tot deze chatbot.';
+    case 'RATE_LIMITED':
+      return 'Het is nu erg druk. Probeer het zo dadelijk opnieuw.';
+    case 'MONTHLY_LIMIT':
+      return 'De maandelijkse gesprekslimiet is bereikt. Probeer het volgende maand opnieuw.';
+    case 'BUDGET_EXHAUSTED':
+      return 'Het daglimiet van deze chatbot is bereikt. Probeer het morgen opnieuw.';
+    case 'FAILED':
+    default:
+      return 'Er ging iets mis. Probeer het opnieuw.';
+  }
+}
+
 export function V1Chat({ chatbotName }: { chatbotName: string }) {
   const [question, setQuestion] = useState('');
   const [result, setResult] = useState<AskV1Result | null>(null);
@@ -55,7 +76,7 @@ export function V1Chat({ chatbotName }: { chatbotName: string }) {
               )}
             </>
           ) : (
-            <p style={{ color: '#b00' }}>Er ging iets mis ({result.error}).</p>
+            <p style={{ color: '#b00' }}>{errorMessage(result.error)}</p>
           )}
         </div>
       )}
