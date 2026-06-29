@@ -4,7 +4,9 @@ import {
   V1_DEFAULT_CHATBOT_SETTINGS,
   mergeChatbotSettings,
   buildV1ChatbotInputs,
+  sanitizeChatbotPatch,
 } from '../instellingen/settings-config';
+import { isAppError } from '@/lib/errors/app-error';
 import type { ChatbotSettings } from '@/lib/v0/klantendashboard/types';
 
 test('mergeChatbotSettings: ontbrekend veld → default (niet lege string)', () => {
@@ -24,6 +26,54 @@ test('mergeChatbotSettings: corrupt/niet-object jsonb → volledige defaults', (
   assert.deepEqual(mergeChatbotSettings(null), V1_DEFAULT_CHATBOT_SETTINGS);
   assert.deepEqual(mergeChatbotSettings('nonsense'), V1_DEFAULT_CHATBOT_SETTINGS);
   assert.deepEqual(mergeChatbotSettings([1, 2]), V1_DEFAULT_CHATBOT_SETTINGS);
+});
+
+test('mergeChatbotSettings: corrupt veld-type → default (crash-vector dichtgezet)', () => {
+  // chatbotName: null zou buildChatbotOverrides op .trim() laten crashen → askV1 +
+  // Instellingen-pagina down. Coercion vangt het en levert een engine-veilig object.
+  const merged = mergeChatbotSettings({
+    chatbotName: null,
+    companyDescription: 42,
+    mayMentionPrices: 'ja',
+    honestAboutUnknown: 1,
+  });
+  assert.equal(merged.chatbotName, V1_DEFAULT_CHATBOT_SETTINGS.chatbotName);
+  assert.equal(merged.companyDescription, V1_DEFAULT_CHATBOT_SETTINGS.companyDescription);
+  assert.equal(merged.mayMentionPrices, V1_DEFAULT_CHATBOT_SETTINGS.mayMentionPrices);
+  assert.equal(merged.honestAboutUnknown, V1_DEFAULT_CHATBOT_SETTINGS.honestAboutUnknown);
+  assert.doesNotThrow(() => buildV1ChatbotInputs(merged, 'DB-naam'));
+});
+
+test('mergeChatbotSettings: enum-waarde buiten de toegestane set → default', () => {
+  const merged = mergeChatbotSettings({
+    toneOfVoice: 'sarcastisch',
+    answerLength: 'epic',
+    sourceStrictness: 'whatever',
+    primaryLanguage: 'klingon',
+  });
+  assert.equal(merged.toneOfVoice, V1_DEFAULT_CHATBOT_SETTINGS.toneOfVoice);
+  assert.equal(merged.answerLength, V1_DEFAULT_CHATBOT_SETTINGS.answerLength);
+  assert.equal(merged.sourceStrictness, V1_DEFAULT_CHATBOT_SETTINGS.sourceStrictness);
+  assert.equal(merged.primaryLanguage, V1_DEFAULT_CHATBOT_SETTINGS.primaryLanguage);
+});
+
+test('sanitizeChatbotPatch: whitelist filtert vreemde/widget-only velden weg', () => {
+  const clean = sanitizeChatbotPatch({
+    toneOfVoice: 'professional',
+    fallbackMessage: 'Bel ons.',
+    // niet-whitelisted: widget-only + contact-velden mogen niet door.
+    welcomeMessage: 'hoi',
+    contactEmail: 'x@y.nl',
+    answerGeneralKnowledge: true,
+  } as Partial<ChatbotSettings>);
+  assert.deepEqual(clean, { toneOfVoice: 'professional', fallbackMessage: 'Bel ons.' });
+});
+
+test('sanitizeChatbotPatch: te lang vrije-tekstveld → INPUT_INVALID', () => {
+  assert.throws(
+    () => sanitizeChatbotPatch({ extraInstructions: 'a'.repeat(4001) }),
+    (e) => isAppError(e) && e.code === 'INPUT_INVALID',
+  );
 });
 
 test('buildV1ChatbotInputs: settings → de overrides die askV1 doorgeeft', () => {

@@ -7,7 +7,13 @@
 // dit niet: dit is app/v1, geen lib/rag.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ChatbotSettings } from '@/lib/v0/klantendashboard/types';
+import type {
+  AnswerLength,
+  ChatbotSettings,
+  Language,
+  SourceStrictness,
+  ToneOfVoice,
+} from '@/lib/v0/klantendashboard/types';
 import {
   buildChatbotOverrides,
   type ChatbotPromptOverrides,
@@ -54,16 +60,56 @@ export const V1_DEFAULT_CHATBOT_SETTINGS: ChatbotSettings = {
   unknownAnswerMessage: '',
 };
 
+// Toegestane waarden per enum-veld (runtime-spiegel van de string-union types).
+// `satisfies` vangt een typo/ongeldige waarde hier; een type-lid dat hier
+// ontbreekt zou die waarde naar de default laten terugvallen — laag risico op deze
+// stabiele product-enums, bewust niet exhaustief afgedwongen.
+const TONE_OF_VOICE_VALUES = [
+  'professional', 'personal', 'friendly', 'concise', 'enthusiastic', 'informal',
+] as const satisfies readonly ToneOfVoice[];
+const LANGUAGE_VALUES = ['nl', 'en', 'de', 'fr', 'es'] as const satisfies readonly Language[];
+const ANSWER_LENGTH_VALUES = ['short', 'normal', 'long'] as const satisfies readonly AnswerLength[];
+const SOURCE_STRICTNESS_VALUES = ['strict', 'normal', 'flexible'] as const satisfies readonly SourceStrictness[];
+
+const ENUM_VALUES: Partial<Record<keyof ChatbotSettings, readonly string[]>> = {
+  toneOfVoice: TONE_OF_VOICE_VALUES,
+  primaryLanguage: LANGUAGE_VALUES,
+  answerLength: ANSWER_LENGTH_VALUES,
+  sourceStrictness: SOURCE_STRICTNESS_VALUES,
+};
+
 /**
  * Merge de opgeslagen jsonb over de V1-defaults. Ontbrekend veld → default (niet
- * een lege string); een aanwezig veld (ook lege string) wint. Defensief tegen
- * corrupte/niet-object jsonb (handmatige DB-edit) → volledige defaults.
+ * een lege string); een aanwezig veld met het juiste type (ook lege string) wint.
+ * Twee lagen defensiviteit tegen een corrupte/handmatig-bewerkte jsonb:
+ *  1. niet-object (null, string, array) → volledige defaults;
+ *  2. per-veld type-coercion — een veld met de verkeerde JS-type (bv.
+ *     `chatbotName: null`) of een enum-veld met een waarde buiten de toegestane set
+ *     valt terug op de default. Zonder dit lekt een non-string door naar
+ *     buildChatbotOverrides, waar `.trim()` crasht en zowel askV1 (chat) als de
+ *     Instellingen-pagina voor die org platlegt.
+ * Optionele velden zonder default (bv. showStarterQuestions) blijven ongemoeid.
  */
 export function mergeChatbotSettings(raw: unknown): ChatbotSettings {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ...V1_DEFAULT_CHATBOT_SETTINGS };
   }
-  return { ...V1_DEFAULT_CHATBOT_SETTINGS, ...(raw as Partial<ChatbotSettings>) };
+  const src = raw as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...V1_DEFAULT_CHATBOT_SETTINGS, ...src };
+  for (const key of Object.keys(V1_DEFAULT_CHATBOT_SETTINGS) as (keyof ChatbotSettings)[]) {
+    const value = src[key];
+    const def = V1_DEFAULT_CHATBOT_SETTINGS[key];
+    const allowed = ENUM_VALUES[key];
+    let valid: boolean;
+    if (value === undefined) valid = false;
+    else if (allowed) valid = typeof value === 'string' && allowed.includes(value);
+    else if (typeof def === 'string') valid = typeof value === 'string';
+    else if (typeof def === 'boolean') valid = typeof value === 'boolean';
+    else if (Array.isArray(def)) valid = Array.isArray(value) && value.every((v) => typeof v === 'string');
+    else valid = true;
+    out[key] = valid ? value : def;
+  }
+  return out as ChatbotSettings;
 }
 
 /**
@@ -100,4 +146,59 @@ export function buildV1ChatbotInputs(
   const overrides = buildChatbotOverrides(settings);
   const companyName = settings.chatbotName.trim() || fallbackCompanyName;
   return { overrides, persona: buildV1Persona(companyName) };
+}
+
+// ---------------------------------------------------------------------------
+// Save-patch sanitatie (NIT-hardening)
+// ---------------------------------------------------------------------------
+
+// Whitelist: alléén de antwoord-beïnvloedende velden die het Instellingen-formulier
+// ook bewerkt. De form stuurt het hele settings-object mee (incl. uit `current`
+// overgenomen widget-/contact-velden); filteren zorgt dat een gemaakte action-call
+// geen vreemde of widget-only velden op de eigen org kan persisteren.
+const ALLOWED_PATCH_FIELDS = [
+  'chatbotName',
+  'companyDescription',
+  'primaryLanguage',
+  'toneOfVoice',
+  'extraInstructions',
+  'answerLength',
+  'sourceStrictness',
+  'mayMentionPrices',
+  'mayShareContact',
+  'honestAboutUnknown',
+  'fallbackMessage',
+] as const satisfies readonly (keyof ChatbotSettings)[];
+
+// Lengte-caps op de vrije-tekstvelden (stijl van ORG_NAME_MAX in account/actions.ts)
+// → een action-call kan geen onbegrensde prompt-bloat in de system-prompt persisteren.
+const TEXT_FIELD_MAX: Partial<Record<(typeof ALLOWED_PATCH_FIELDS)[number], number>> = {
+  chatbotName: 120,
+  companyDescription: 2000,
+  extraInstructions: 4000,
+  fallbackMessage: 1000,
+};
+
+/**
+ * Beperk een client-patch tot de whitelist en cap de vrije-tekstvelden. Onbekende
+ * velden worden stil genegeerd; een te lang veld gooit AppError('INPUT_INVALID')
+ * (mapt via actionTry naar ActionFail). Puur — geen I/O — zodat dit unit-testbaar is.
+ */
+export function sanitizeChatbotPatch(patch: Partial<ChatbotSettings>): Partial<ChatbotSettings> {
+  const clean: Record<string, unknown> = {};
+  for (const key of ALLOWED_PATCH_FIELDS) {
+    const value = patch[key];
+    if (value === undefined) continue;
+    const max = TEXT_FIELD_MAX[key];
+    if (max !== undefined) {
+      if (typeof value !== 'string') {
+        throw new AppError('INPUT_INVALID', { message: `Ongeldige waarde voor "${key}".` });
+      }
+      if (value.length > max) {
+        throw new AppError('INPUT_INVALID', { message: `Dit veld is te lang (max ${max} tekens).` });
+      }
+    }
+    clean[key] = value;
+  }
+  return clean as Partial<ChatbotSettings>;
 }

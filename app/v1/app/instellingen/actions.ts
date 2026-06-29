@@ -16,7 +16,7 @@ import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/error
 import { purgeAnswerCache } from '@/lib/rag/ingest';
 import type { ChatbotSettings } from '@/lib/v0/klantendashboard/types';
 import { getOrgChatbot } from '../rag-config';
-import { getChatbotSettings } from './settings-config';
+import { getChatbotSettings, sanitizeChatbotPatch } from './settings-config';
 
 const SETTINGS_PATH = '/v1/app/instellingen';
 
@@ -41,9 +41,13 @@ export async function saveChatbotSettingsAction(
     const chatbot = await getOrgChatbot(svc, orgId);
     if (!chatbot) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
 
+    // NIT-hardening: beperk de client-patch tot de antwoord-beïnvloedende velden die
+    // de UI toont + cap de vrije-tekstvelden (geen vreemde velden / prompt-bloat).
+    const safePatch = sanitizeChatbotPatch(patch);
+
     // Merge patch over de huidige (over defaults gemergde) settings → compleet object.
     const current = await getChatbotSettings(svc, chatbot.id);
-    const next: ChatbotSettings = { ...current, ...patch };
+    const next: ChatbotSettings = { ...current, ...safePatch };
 
     const { error } = await svc
       .from('chatbots')
