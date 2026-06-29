@@ -1,11 +1,11 @@
 // V1 Kennisbank — Website-crawler dashboard (member-scoped).
 //
-// Auth-keten = die van /v1/app: geen sessie → requireOrgMember → requireAuth → redirect
-// /v1/login; geen lid → AUTH_FORBIDDEN → "Geen toegang". Org (provisioneel) uit
-// V1_SEED_ORG_ID. Reads onder de session-client (RLS); de crawler-acties (mutaties)
-// draaien op de V1 service-role NA requireOrgMember (zie actions.ts, SA-1).
+// Auth-keten = die van /v1/app: geen sessie → getSessionOrg → requireAuth → redirect
+// /v1/login; geen lid → AUTH_FORBIDDEN → "Geen toegang". Org uit de sessie
+// (organization_members), niet uit env. Reads onder de session-client (RLS); de
+// crawler-acties (mutaties) draaien op de V1 service-role NA getSessionOrg (zie actions.ts, SA-1).
 
-import { requireOrgMember } from '@/lib/auth';
+import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getOrgChatbot } from '../rag-config';
@@ -17,18 +17,9 @@ export const dynamic = 'force-dynamic';
 const SHELL = { maxWidth: 760, margin: '8vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' } as const;
 
 export default async function V1KennisbankPage() {
-  const orgId = process.env.V1_SEED_ORG_ID;
-  if (!orgId) {
-    return (
-      <main style={SHELL}>
-        <h1 style={{ fontSize: 20 }}>Config-fout</h1>
-        <p style={{ fontSize: 14, color: '#555' }}>V1_SEED_ORG_ID ontbreekt in de omgeving.</p>
-      </main>
-    );
-  }
-
+  let orgId: string;
   try {
-    await requireOrgMember(orgId);
+    ({ orgId } = await getSessionOrg());
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (

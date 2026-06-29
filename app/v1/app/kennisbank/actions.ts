@@ -2,11 +2,11 @@
 
 // V1 Website Crawler — server actions voor het Kennisbank-dashboard (app/v1).
 //
-// Auth (SA-1): requireOrgMember(orgId) VÓÓR elke service-role-write; org uit de
-// getrouwde sessie (V1_SEED_ORG_ID, provisioneel), NOOIT uit client-input. Élke
-// cliënt-ID-mutatie scoopt bovendien .eq(organization_id).eq(chatbot_id) op de
-// service-role-query (RLS-bypass → object-level guard). Reads via de session-client
-// (RLS); writes via de V1 service-role.
+// Auth (SA-1): getSessionOrg() VÓÓR elke service-role-write; org uit de getrouwde
+// sessie (organization_members), NOOIT uit env/client-input. Élke cliënt-ID-mutatie
+// scoopt bovendien .eq(organization_id).eq(chatbot_id) op de service-role-query
+// (RLS-bypass → object-level guard). Reads via de session-client (RLS); writes via de
+// V1 service-role.
 //
 // ponytail: GEEN per-IP rate-limit hier (V1 mist die infra nog; member-scoped auth +
 // de MAX_CRAWL_PAGES-cap zijn de controles). Upgrade-pad: Upstash-ratelimit in de
@@ -14,7 +14,7 @@
 
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { requireOrgMember } from '@/lib/auth';
+import { getSessionOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { AppError, isAppError } from '@/lib/errors/app-error';
@@ -36,9 +36,7 @@ type V1CrawlCtx = { orgId: string; chatbotId: string; sb: SupabaseClient };
 /** Resolve org (uit de sessie) + actieve chatbot + een V1 service-role client. Gooit
  *  AUTH_FORBIDDEN (niet-lid), NEXT_REDIRECT (geen sessie) of NOT_FOUND (geen chatbot). */
 async function requireV1OrgChatbot(): Promise<V1CrawlCtx> {
-  const orgId = process.env.V1_SEED_ORG_ID;
-  if (!orgId) throw new AppError('INTERNAL', { message: 'V1_SEED_ORG_ID ontbreekt' });
-  await requireOrgMember(orgId);
+  const { orgId } = await getSessionOrg();
   const sb = getV1ServiceRoleClient();
   const chatbot = await getOrgChatbot(sb, orgId);
   if (!chatbot) throw new AppError('NOT_FOUND', { message: 'Geen chatbot geconfigureerd voor deze org.' });
@@ -76,10 +74,8 @@ export type DiscoverResult = { rootUrl: string; urls: string[] };
 
 /** Ontdek de pagina's van een site (geen scrape, niets opgeslagen). Alleen auth nodig. */
 export async function discoverPagesAction(rawUrl: string): Promise<ActionResult<DiscoverResult>> {
-  const orgId = process.env.V1_SEED_ORG_ID;
   try {
-    if (!orgId) throw new AppError('INTERNAL', { message: 'V1_SEED_ORG_ID ontbreekt' });
-    await requireOrgMember(orgId);
+    await getSessionOrg(); // alleen auth nodig (niets opgeslagen); gate = lid van een org
   } catch (e) {
     return authFail(e);
   }

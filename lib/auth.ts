@@ -80,3 +80,40 @@ export async function requireJorionAdmin(): Promise<User> {
   }
   return user;
 }
+
+/**
+ * Resolve the org of the logged-in user from their single organization_members row
+ * (blueprint §1.5 = één org per klant), read under the session-client (RLS).
+ *
+ * This replaces the provisional `process.env.V1_SEED_ORG_ID` in the /v1/app surface:
+ * the dashboard org now comes from the authenticated session, never from env/client
+ * (hard rule: org uit de getrouwde sessie).
+ *
+ * Throws (mirroring requireOrgMember, so existing catch-blocks keep working):
+ *   - NEXT_REDIRECT (geen sessie) via requireAuth → caller lets it propagate to /v1/login
+ *   - AppError('AUTH_FORBIDDEN') when the user is a member of no org → "geen toegang"
+ *   - AppError('INTERNAL') on a DB/RLS hiccup
+ */
+export async function getSessionOrg(): Promise<{ user: User; orgId: string }> {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // M1-aanname: één org per klant (blueprint §1.5). Mocht een user ooit meerdere
+  // memberships krijgen, dan kiest dit deterministisch de OUDSTE (created_at asc) —
+  // een org-switcher is V2-werk, niet M1.
+  const { data, error } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError('INTERNAL', { message: `Org-resolutie faalde: ${error.message}` });
+  }
+  if (!data) {
+    throw new AppError('AUTH_FORBIDDEN', { message: 'user is not a member of any organization' });
+  }
+  return { user, orgId: data.organization_id as string };
+}
