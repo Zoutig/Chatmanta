@@ -20,7 +20,9 @@ if (!ORG) {
   process.exit(1);
 }
 
-const TOKEN = Math.random().toString(36).slice(2, 10);
+// letter-prefix ('x'): voorkomt dat een toevallig all-digit token door redactPii
+// als telefoonnummer wordt gemaskeerd → anders mist de exacte-match readback de rij.
+const TOKEN = 'x' + Math.random().toString(36).slice(2, 10);
 const QUESTION = `test ${TOKEN}`;
 const FAKE_EMAIL = 'jan@firma.nl';
 const COST_USD = 0.005;
