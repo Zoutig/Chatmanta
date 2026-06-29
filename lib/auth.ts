@@ -78,6 +78,15 @@ export async function requireJorionAdmin(): Promise<User> {
   if (!profile?.is_jorion_admin) {
     throw new AppError('AUTH_FORBIDDEN', { message: 'Jorion-admin role required' });
   }
+
+  // M-E §2 — idiomatische Supabase AAL2 step-up. Blokkeer ALLEEN als de admin MFA
+  // HEEFT (nextLevel === 'aal2') maar deze sessie nog niet aal2 is. Niet-ge-enrollde
+  // admins (nextLevel !== 'aal2') laten we door — anders breekt het admin-dashboard
+  // tot MFA-enrollment (= ops). Enrollen activeert de gate automatisch.
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+    throw new AppError('AUTH_FORBIDDEN', { message: '2FA vereist — voltooi de tweede stap.' });
+  }
   return user;
 }
 
