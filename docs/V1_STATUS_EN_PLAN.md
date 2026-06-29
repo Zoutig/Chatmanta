@@ -10,7 +10,7 @@
 2. **Geen automatische fallback in V1** (lijnt met §18, dat dit al naar v2 zette). V1 heeft één provider (OpenAI/gpt-4o-mini), geen fallback-laag.
 3. **Telemetrie/billing (mijn keuze, "doe wat best is"):** port `logQuery` naar het V1-pad tijdens de Phase-7-hardening (telemetrie + fundering voor de budget-cap), houd de bestaande `cost_usd`-kolom (geen migratie nodig), voeg `cost_eur` pas toe wanneer EUR-billing echt nodig is (V2-tiering).
 
-> **Doc-update-kandidaten (niet door mij gewijzigd):** door keuze #1 zijn achterhaald — AGENTS.md §Stack "V1 (Phase 4): Anthropic Claude Haiku primair + OpenAI-fallback", blueprint §1.5 #3 ("Eén default LLM-model (Claude Haiku 4.5)") + §18 (Haiku default), en de handoff/AGENTS-framing "callLLM-mijlpaal = volgende V1-stap". Ook de stale `docs/handoffs/HANDOFF_2026-06-27_*` (door de 06-29-handoff al als "mag weg" gemarkeerd).
+> **Doc-updates (2026-06-29, gedaan):** AGENTS.md §Stack V1 + blueprint §1.5 #3 + §18 zijn bijgewerkt naar V1=gpt-4o-mini (Haiku→V2). **Nog open kandidaten:** de handoff/AGENTS-framing "callLLM-mijlpaal = volgende V1-stap" + de stale `docs/handoffs/HANDOFF_2026-06-27_*` (door de 06-29-handoff al als "mag weg" gemarkeerd).
 
 ## Bron-lagen & geverifieerde drift
 
