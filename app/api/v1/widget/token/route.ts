@@ -10,16 +10,21 @@ import { NextResponse } from 'next/server';
 import { createEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
+import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 
 export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
+  // Per-IP rate-limit (cost-explosion guard) — mirror van V0's token-route, gate #1.
+  const rl = await getRateLimiter().check(getClientIp(req));
+  if (!rl.allowed) return new NextResponse(null, { status: 429 });
+
   const slug = new URL(req.url).searchParams.get('org');
   if (!slug || !sameOrigin(req)) {
     return new NextResponse(null, { status: 401 });
   }
 
-  // M-C: per-IP rate-limit hier (de V1-rate-limit-laag is één aparte slice).
+  // M-C: per-IP hier doet (gate #1); M-C voegt per-ORG rate-limit toe.
 
   // Org-resolutie via service-role: de slug moet een bestaande, niet-verwijderde
   // org zijn. Onbekend → 401 (geen token voor een onbekende slug).

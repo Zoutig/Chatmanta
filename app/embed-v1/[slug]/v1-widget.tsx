@@ -337,7 +337,10 @@ export function V1Widget(props: V1WidgetProps) {
           <Bubble key={m.id} role={m.role} accentColor={accentColor} error={m.error} fg={fg}>
             {m.role === 'assistant'
               ? m.content
-                ? renderMarkdownLite(m.content, accentColor, !m.streaming)
+                ? // linkify=false ALTIJD: widget-contract = sourceLinksEnabled UIT →
+                  // links nooit klikbaar (label → platte tekst), óók niet bij een
+                  // gedeelde answer_cache-hit die met sourceLinksEnabled=true schreef.
+                  renderMarkdownLite(m.content, accentColor, false)
                 : m.streaming
                 ? '…'
                 : ''

@@ -78,6 +78,25 @@ test('sanitizeChatbotPatch: whitelist filtert vreemde velden weg, widget-velden 
   });
 });
 
+test('accentColor: ongeldige (niet-hex) waarde wordt geweerd op read + write', () => {
+  // read-pad: een corrupte/geïnjecteerde jsonb-waarde → coerce naar default.
+  assert.equal(
+    mergeChatbotSettings({ accentColor: 'url(https://evil/x)' }).accentColor,
+    V1_DEFAULT_CHATBOT_SETTINGS.accentColor,
+  );
+  assert.equal(mergeChatbotSettings({ accentColor: 'red' }).accentColor, V1_DEFAULT_CHATBOT_SETTINGS.accentColor);
+  // geldige hex blijft behouden.
+  assert.equal(mergeChatbotSettings({ accentColor: '#AbC123' }).accentColor, '#AbC123');
+
+  // write-pad: een niet-hex accentColor wordt stil gedropt (niet gepersisteerd).
+  assert.deepEqual(
+    sanitizeChatbotPatch({ accentColor: 'url(https://evil/x)' } as Partial<ChatbotSettings>),
+    {},
+  );
+  // geldige hex gaat door.
+  assert.deepEqual(sanitizeChatbotPatch({ accentColor: '#ff0000' }), { accentColor: '#ff0000' });
+});
+
 test('sanitizeChatbotPatch: te lang vrije-tekstveld → INPUT_INVALID', () => {
   assert.throws(
     () => sanitizeChatbotPatch({ extraInstructions: 'a'.repeat(4001) }),

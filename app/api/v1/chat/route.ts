@@ -20,6 +20,9 @@ import {
 import { logRagQuery } from '@/lib/rag/log-query';
 import { hashIp } from '@/lib/observability/hash-ip';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
+import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
+// TODO(V2): graduate detectInjection to a neutral lib/rag detector to drop the lib/v0 import.
+import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { V1_RAG_DEFAULTS, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
@@ -51,15 +54,6 @@ function parseHistory(input: unknown): ChatHistoryTurn[] {
   return out.slice(-16);
 }
 
-// Onvertrouwd bezoeker-IP (eerste x-forwarded-for-hop). Inline port van het
-// V0-helpertje; geen lib/v0-import. Alleen voor de gehashte ip_hash (AVG).
-function getClientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for');
-  const first = xff?.split(',')[0]?.trim();
-  if (first) return first;
-  return req.headers.get('x-real-ip')?.trim() ?? req.headers.get('cf-connecting-ip')?.trim() ?? 'unknown';
-}
-
 const NDJSON_HEADERS = (requestId: string) =>
   new Headers({
     'Content-Type': 'application/x-ndjson; charset=utf-8',
@@ -80,6 +74,23 @@ export async function POST(req: Request) {
   // Pre-gegenereerde query_log-id zodat de widget hem al kent via het 'meta'-event
   // vóór de log-insert (die loopt post-stream via after()).
   const queryLogId = crypto.randomUUID();
+
+  // 0. Per-IP rate-limit — V0's gate #1, vóór auth (cost-explosion guard).
+  //    Hergebruikt de Upstash-backed limiter (USE_UPSTASH) met in-memory fail-safe;
+  //    dezelfde RATE_LIMIT_PER_MIN-config als V0. Block → 429 + RateLimit-headers.
+  const rl = await getRateLimiter().check(getClientIp(req));
+  if (!rl.allowed) {
+    return new NextResponse(null, {
+      status: 429,
+      headers: {
+        'Retry-After': String(rl.retryAfterSec),
+        'X-RateLimit-Limit': String(rl.limit),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(Math.floor(rl.resetAt / 1000)),
+        'X-Request-Id': requestId,
+      },
+    });
+  }
 
   const slug = new URL(req.url).searchParams.get('org');
 
@@ -102,7 +113,21 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 400, headers: { 'X-Request-Id': requestId } });
   }
 
-  // 3. M-C: per-org rate-limit + dag-budget-cap komen hier (NIET in M-B gebouwd).
+  // 2b. Prompt-injection gate — V0 public-path parity: het publieke widget-pad
+  //     blokkeert injection ALTIJD, vóór enige pipeline/DB-call. Eén terminale
+  //     'fallback' event met INJECTION_BLOCKED_MESSAGE — de widget toont dat als
+  //     antwoord (ev.response.answer). Block wordt NIET gelogd (V1 logRagQuery kent
+  //     geen blocked-kind; bewust minimaal — geen nieuwe infra).
+  if (detectInjection(question).detected) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: { kind: 'fallback', answer: INJECTION_BLOCKED_MESSAGE },
+    });
+  }
+
+  // 3. M-C: per-IP rate-limit is hierboven (gate #0) gedaan; M-C voegt per-ORG
+  //    rate-limit + dag-budget-cap toe.
+  //    M-C: per-IP here trusts XFF first-hop; M-C per-org limiter must use a trusted hop.
 
   // 4. Resolve org+chatbot uit de GESIGNEERDE slug via service-role.
   const svc = getV1ServiceRoleClient();

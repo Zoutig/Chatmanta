@@ -103,6 +103,11 @@ const ENUM_VALUES: Partial<Record<keyof V1ChatbotSettings, readonly string[]>> =
   position: WIDGET_POSITION_VALUES,
 };
 
+// accentColor stroomt rauw in style={{ background: accentColor }} van de widget.
+// Een niet-kleur als `url(https://evil/x)` zou élke widget-load een externe resource
+// laten ophalen → afdwingen dat het een #rrggbb hex-kleur is (trust-boundary-validatie).
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
 /**
  * Merge de opgeslagen jsonb over de V1-defaults. Ontbrekend veld → default (niet
  * een lege string); een aanwezig veld met het juiste type (ook lege string) wint.
@@ -128,6 +133,7 @@ export function mergeChatbotSettings(raw: unknown): V1ChatbotSettings {
     let valid: boolean;
     if (value === undefined) valid = false;
     else if (allowed) valid = typeof value === 'string' && allowed.includes(value);
+    else if (key === 'accentColor') valid = typeof value === 'string' && HEX_COLOR_RE.test(value);
     else if (typeof def === 'string') valid = typeof value === 'string';
     else if (typeof def === 'boolean') valid = typeof value === 'boolean';
     else if (Array.isArray(def)) valid = Array.isArray(value) && value.every((v) => typeof v === 'string');
@@ -233,6 +239,9 @@ export function sanitizeChatbotPatch(patch: Partial<V1ChatbotSettings>): Partial
         throw new AppError('INPUT_INVALID', { message: `Dit veld is te lang (max ${max} tekens).` });
       }
     }
+    // accentColor moet #rrggbb zijn (zie HEX_COLOR_RE): ongeldig → stil droppen
+    // i.p.v. een url(...)/CSS-injectie naar de widget-style te persisteren.
+    if (key === 'accentColor' && !HEX_COLOR_RE.test(value as string)) continue;
     clean[key] = value;
   }
   return clean as Partial<V1ChatbotSettings>;
