@@ -14,9 +14,8 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { isAppError } from '@/lib/errors/app-error';
 import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/errors/action';
 import { purgeAnswerCache } from '@/lib/rag/ingest';
-import type { ChatbotSettings } from '@/lib/v0/klantendashboard/types';
 import { getOrgChatbot } from '../rag-config';
-import { getChatbotSettings, sanitizeChatbotPatch } from './settings-config';
+import { getChatbotSettings, sanitizeChatbotPatch, type V1ChatbotSettings } from './settings-config';
 
 const SETTINGS_PATH = '/v1/app/instellingen';
 
@@ -27,8 +26,8 @@ function authFail(e: unknown): ActionFail {
 }
 
 export async function saveChatbotSettingsAction(
-  patch: Partial<ChatbotSettings>,
-): Promise<ActionResult<{ settings: ChatbotSettings }>> {
+  patch: Partial<V1ChatbotSettings>,
+): Promise<ActionResult<{ settings: V1ChatbotSettings }>> {
   let orgId: string;
   try {
     ({ orgId } = await getSessionOrg());
@@ -47,7 +46,7 @@ export async function saveChatbotSettingsAction(
 
     // Merge patch over de huidige (over defaults gemergde) settings → compleet object.
     const current = await getChatbotSettings(svc, chatbot.id);
-    const next: ChatbotSettings = { ...current, ...safePatch };
+    const next: V1ChatbotSettings = { ...current, ...safePatch };
 
     const { error } = await svc
       .from('chatbots')

@@ -43,6 +43,13 @@ export const config = {
   // demo-cookie. Die routes doen zelf dual-auth (cookie OF embed-token +
   // origin-lock). Zie app/api/v0/chat/route.ts en app/api/v0/feedback/route.ts.
   //
+  // M-B (V1-widget): dezelfde uitzondering voor de V1-publieke paden — api/v1/chat,
+  // api/v1/widget (token) en widget-v1.js. Die doen zelf embed-token + origin-lock
+  // (zie app/api/v1/chat/route.ts). De V1-embed-PAGINA /embed-v1/* valt al onder de
+  // bestaande `embed`-prefix-alternatief (geen anker → matcht ook embed-v1) — bewust,
+  // geen aparte entry nodig. NB: /api/v1/* begint met /api (niet /v1) → raakt de
+  // updateSession-branch hierboven niet; deze routes hebben geen Supabase-sessie.
+  //
   // /crawl-eval/* zijn statische fixture-pagina's (public/crawl-eval/) voor de
   // golden-set crawler-eval. Ze MOETEN publiek bereikbaar zijn zodat Firecrawl ze
   // van buitenaf kan crawlen (anders → login-redirect → 0 bruikbare pagina's).
@@ -50,6 +57,6 @@ export const config = {
   // Segment-geankerd (`crawl-eval(?:/|$)`) zodat ALLEEN het exacte pad-segment de
   // gate omzeilt — niet een toekomstig /crawl-evaluation o.i.d. (Codex-review).
   matcher: [
-    '/((?!login|privacy(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/widget|widget\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|privacy(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };
