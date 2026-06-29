@@ -67,7 +67,9 @@ export default async function OrganizationsPage() {
           <tbody>
             {rows.map((o) => (
               <tr key={o.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={{ padding: '6px 8px' }}>{o.name}</td>
+                <td style={{ padding: '6px 8px' }}>
+                  <Link href={`/v1/admin/organizations/${o.id}`}>{o.name}</Link>
+                </td>
                 <td style={{ padding: '6px 8px', color: '#555' }}>{o.slug}</td>
                 <td style={{ padding: '6px 8px', color: '#555' }}>
                   {new Date(o.created_at).toLocaleDateString('nl-NL')}
