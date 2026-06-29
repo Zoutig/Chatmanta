@@ -62,6 +62,7 @@
     "v1:test-cache": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-cache.ts",
     "v1:test-crawl": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-crawl.ts",
     "v1:test-log": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-log.ts",
+    "v1:test-limits": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-limits.ts",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "dependencies": {
