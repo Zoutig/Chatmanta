@@ -19,7 +19,9 @@ import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { AppError, isAppError } from '@/lib/errors/app-error';
 import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/errors/action';
-import { purgeAnswerCache } from '@/lib/rag/ingest';
+import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
+import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
+import { verifyMagicBytes } from '@/lib/rag/file-signature';
 import { getOrgChatbot } from '../rag-config';
 import { validateCrawlUrl } from '@/lib/v1/crawler/validateCrawlUrl';
 import { normalizeHost } from '@/lib/v1/crawler/normalizeHost';
@@ -256,6 +258,130 @@ export async function retryPageAction(pageId: string): Promise<ActionResult> {
     await ingestSinglePage(sb, knowledgeSourceId, orgId, chatbotId, page);
     revalidatePath(KENNISBANK_PATH);
     return {};
+  });
+}
+
+// ─── Document-uploads (PDF/DOCX/TXT/MD ≤10MB via signed Storage-URL) ─────────
+
+const DOC_BUCKET = 'v1-documents';
+const MAX_DOC_BYTES = 10 * 1024 * 1024; // mirror van de bucket-cap (file_size_limit)
+
+/** Bestandsnaam → veilig pad-segment (geen slashes/spaties/rare tekens). ALLEEN voor
+ *  het Storage-pad — NIET voor weergave (zie displayDocName). */
+function safeDocName(filename: string): string {
+  const base = filename.split(/[\\/]/).pop() ?? 'document';
+  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
+  return cleaned.slice(-120) || 'document';
+}
+
+/** Originele bestandsnaam voor weergave in de docs-lijst (licht getrimd + gecapt).
+ *  Houdt spaties/leestekens — alleen het pad-segment moet gesaniteerd zijn. */
+function displayDocName(filename: string): string {
+  const base = (filename.split(/[\\/]/).pop() ?? '').trim();
+  return (base || 'document').slice(0, 200);
+}
+
+function docExtOf(filename: string): string {
+  return filename.split('.').pop()?.toLowerCase() ?? '';
+}
+
+/**
+ * Stap 1: maak een kortlevende signed upload-URL zodat de browser het bestand
+ * DIRECT naar Storage post — NIET via een server-action, want Vercel capt action-
+ * bodies op 4,5MB → een 10MB-upload faalt anders stil. Het pad is SERVER-gegenereerd
+ * (`<orgId>/<chatbotId>/<uuid>-<naam>`; de klant noemt nooit het pad → geen path-
+ * injection), en ext + size worden server-side voorgevalideerd. De harde 10MB-cap zit
+ * op de bucket zelf (file_size_limit) — die kan de client niet omzeilen.
+ *
+ * ponytail: een geüpload-maar-nooit-verwerkt object (tab dicht vóór
+ * processUploadedDocAction) blijft een wees in de bucket — geen ingest, dus
+ * processUploadedDocAction's finally-remove draait nooit. Opruim-cron is deferred
+ * (samen met de delete-doc-UI); upgrade-pad: nightly sweep op objecten ouder dan X
+ * zonder bijbehorende documents-rij.
+ */
+export async function createUploadUrlAction(
+  filename: string,
+  sizeBytes: number,
+): Promise<ActionResult<{ signedUrl: string; token: string; path: string }>> {
+  let ctx: V1CrawlCtx;
+  try {
+    ctx = await requireV1OrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { sb, orgId, chatbotId } = ctx;
+    const ext = docExtOf(filename);
+    if (!isAllowedDocExt(ext)) fail('INGEST_TYPE', 'Alleen PDF, DOCX, TXT of MD worden ondersteund.');
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) fail('INPUT_INVALID', 'Ongeldige bestandsgrootte.');
+    if (sizeBytes > MAX_DOC_BYTES) fail('INGEST_TOO_LARGE', 'Bestand te groot (max 10 MB).');
+
+    const path = `${orgId}/${chatbotId}/${crypto.randomUUID()}-${safeDocName(filename)}`;
+    const { data, error } = await sb.storage.from(DOC_BUCKET).createSignedUploadUrl(path);
+    if (error || !data) throw new Error(`createSignedUploadUrl: ${error?.message ?? 'geen URL'}`);
+    return { signedUrl: data.signedUrl, token: data.token, path: data.path };
+  });
+}
+
+/**
+ * Stap 2: verwerk het reeds-geüploade bestand. Download via service-role →
+ * magic-bytes (defense-in-depth tegen een gespooft MIME/ext) → extractDocText →
+ * ingestDocument (org+chatbot-gestempeld) → answer-cache purgen → het ORIGINEEL
+ * verwijderen (de chunks zijn de source of truth; AVG-clean, geen ruwe-bestand-store).
+ * `path` wordt her-gevalideerd tegen de eigen org/chatbot-prefix: zelfs met een
+ * geknutseld pad kan een lid niets buiten z'n eigen namespace lezen (SA-1, RLS-bypass).
+ */
+export async function processUploadedDocAction(
+  path: string,
+  filename: string,
+): Promise<ActionResult<{ documentId: string; chunks: number }>> {
+  let ctx: V1CrawlCtx;
+  try {
+    ctx = await requireV1OrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { sb, orgId, chatbotId } = ctx;
+    const ext = docExtOf(filename);
+    if (!isAllowedDocExt(ext)) fail('INGEST_TYPE', 'Alleen PDF, DOCX, TXT of MD worden ondersteund.');
+    // Het pad MOET in de eigen org/chatbot-namespace liggen (server-gegenereerd in
+    // stap 1 — een afwijking = geknutseld). Service-role bypast RLS, dus dit is de guard.
+    if (!path.startsWith(`${orgId}/${chatbotId}/`)) fail('AUTH_FORBIDDEN', 'Pad buiten je eigen namespace.');
+
+    const { data: blob, error: dlErr } = await sb.storage.from(DOC_BUCKET).download(path);
+    if (dlErr || !blob) fail('NOT_FOUND', `Upload niet gevonden: ${dlErr?.message ?? 'geen bestand'}`);
+    const buffer = Buffer.from(await blob.arrayBuffer());
+
+    // Zodra de bytes binnen zijn ruimen we het origineel ALTIJD op (de chunks zijn de
+    // source of truth; AVG-clean, geen ruwe-bestand-store). Eén remove in finally dekt
+    // élk pad — succes, magic-bytes-fail, lege tekst én een gefaalde ingest (anders
+    // bleef het bestand bij een ingest-fout als wees achter). Idempotent: precies één
+    // keer. Best-effort — een gefaalde remove mag de echte fout/het resultaat niet maskeren.
+    try {
+      if (!verifyMagicBytes(buffer, ext)) {
+        fail('INGEST_TYPE', 'Bestandsinhoud komt niet overeen met het bestandstype.');
+      }
+
+      const text = await extractDocText(buffer, ext);
+      if (!text.trim()) {
+        fail('INGEST_READ_FAILED', 'Geen tekst gevonden in het bestand (gescande PDF zonder tekstlaag?).');
+      }
+
+      const res = await ingestDocument(sb, {
+        organizationId: orgId,
+        chatbotId,
+        filename: displayDocName(filename),
+        text,
+        source: 'upload',
+      });
+      await purgeAnswerCache(sb, orgId, chatbotId);
+      revalidatePath(KENNISBANK_PATH);
+      return { documentId: res.documentId, chunks: res.chunks };
+    } finally {
+      const { error: rmErr } = await sb.storage.from(DOC_BUCKET).remove([path]);
+      if (rmErr) console.warn(`[processUploadedDocAction] origineel verwijderen faalde voor ${path}: ${rmErr.message}`);
+    }
   });
 }
 
