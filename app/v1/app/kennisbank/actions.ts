@@ -266,11 +266,19 @@ export async function retryPageAction(pageId: string): Promise<ActionResult> {
 const DOC_BUCKET = 'v1-documents';
 const MAX_DOC_BYTES = 10 * 1024 * 1024; // mirror van de bucket-cap (file_size_limit)
 
-/** Bestandsnaam → veilig pad-segment (geen slashes/spaties/rare tekens). */
+/** Bestandsnaam → veilig pad-segment (geen slashes/spaties/rare tekens). ALLEEN voor
+ *  het Storage-pad — NIET voor weergave (zie displayDocName). */
 function safeDocName(filename: string): string {
   const base = filename.split(/[\\/]/).pop() ?? 'document';
   const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
   return cleaned.slice(-120) || 'document';
+}
+
+/** Originele bestandsnaam voor weergave in de docs-lijst (licht getrimd + gecapt).
+ *  Houdt spaties/leestekens — alleen het pad-segment moet gesaniteerd zijn. */
+function displayDocName(filename: string): string {
+  const base = (filename.split(/[\\/]/).pop() ?? '').trim();
+  return (base || 'document').slice(0, 200);
 }
 
 function docExtOf(filename: string): string {
@@ -284,6 +292,12 @@ function docExtOf(filename: string): string {
  * (`<orgId>/<chatbotId>/<uuid>-<naam>`; de klant noemt nooit het pad → geen path-
  * injection), en ext + size worden server-side voorgevalideerd. De harde 10MB-cap zit
  * op de bucket zelf (file_size_limit) — die kan de client niet omzeilen.
+ *
+ * ponytail: een geüpload-maar-nooit-verwerkt object (tab dicht vóór
+ * processUploadedDocAction) blijft een wees in de bucket — geen ingest, dus
+ * processUploadedDocAction's finally-remove draait nooit. Opruim-cron is deferred
+ * (samen met de delete-doc-UI); upgrade-pad: nightly sweep op objecten ouder dan X
+ * zonder bijbehorende documents-rij.
  */
 export async function createUploadUrlAction(
   filename: string,
@@ -339,32 +353,35 @@ export async function processUploadedDocAction(
     if (dlErr || !blob) fail('NOT_FOUND', `Upload niet gevonden: ${dlErr?.message ?? 'geen bestand'}`);
     const buffer = Buffer.from(await blob.arrayBuffer());
 
-    if (!verifyMagicBytes(buffer, ext)) {
-      await sb.storage.from(DOC_BUCKET).remove([path]); // ruim de verdachte upload op
-      fail('INGEST_TYPE', 'Bestandsinhoud komt niet overeen met het bestandstype.');
+    // Zodra de bytes binnen zijn ruimen we het origineel ALTIJD op (de chunks zijn de
+    // source of truth; AVG-clean, geen ruwe-bestand-store). Eén remove in finally dekt
+    // élk pad — succes, magic-bytes-fail, lege tekst én een gefaalde ingest (anders
+    // bleef het bestand bij een ingest-fout als wees achter). Idempotent: precies één
+    // keer. Best-effort — een gefaalde remove mag de echte fout/het resultaat niet maskeren.
+    try {
+      if (!verifyMagicBytes(buffer, ext)) {
+        fail('INGEST_TYPE', 'Bestandsinhoud komt niet overeen met het bestandstype.');
+      }
+
+      const text = await extractDocText(buffer, ext);
+      if (!text.trim()) {
+        fail('INGEST_READ_FAILED', 'Geen tekst gevonden in het bestand (gescande PDF zonder tekstlaag?).');
+      }
+
+      const res = await ingestDocument(sb, {
+        organizationId: orgId,
+        chatbotId,
+        filename: displayDocName(filename),
+        text,
+        source: 'upload',
+      });
+      await purgeAnswerCache(sb, orgId, chatbotId);
+      revalidatePath(KENNISBANK_PATH);
+      return { documentId: res.documentId, chunks: res.chunks };
+    } finally {
+      const { error: rmErr } = await sb.storage.from(DOC_BUCKET).remove([path]);
+      if (rmErr) console.warn(`[processUploadedDocAction] origineel verwijderen faalde voor ${path}: ${rmErr.message}`);
     }
-
-    const text = await extractDocText(buffer, ext);
-    if (!text.trim()) {
-      await sb.storage.from(DOC_BUCKET).remove([path]);
-      fail('INGEST_READ_FAILED', 'Geen tekst gevonden in het bestand (gescande PDF zonder tekstlaag?).');
-    }
-
-    const res = await ingestDocument(sb, {
-      organizationId: orgId,
-      chatbotId,
-      filename: safeDocName(filename),
-      text,
-      source: 'upload',
-    });
-    await purgeAnswerCache(sb, orgId, chatbotId);
-    // Origineel weg: de chunks zijn nu de source of truth (AVG-clean). Best-effort —
-    // een gefaalde remove mag de geslaagde ingest niet laten omvallen.
-    const { error: rmErr } = await sb.storage.from(DOC_BUCKET).remove([path]);
-    if (rmErr) console.warn(`[processUploadedDocAction] origineel verwijderen faalde voor ${path}: ${rmErr.message}`);
-
-    revalidatePath(KENNISBANK_PATH);
-    return { documentId: res.documentId, chunks: res.chunks };
   });
 }
 

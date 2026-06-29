@@ -13,14 +13,16 @@
 -- verwerk-action her-valideert dat een pad in de eigen org/chatbot-namespace ligt.
 --
 -- file_size_limit (10MB) wordt door Storage zelf afgedwongen — de STERKE cap, want
--- een client kan tegen de server-action liegen over de grootte. allowed_mime_types
--- beperkt tot de vier ondersteunde types; magic-bytes-validatie (server-side, na
--- download) is de extra defense-in-depth bovenop deze MIME-cap.
+-- een client kan tegen de server-action liegen over de grootte.
+--
+-- GEEN allowed_mime_types op de bucket: uploadToSignedUrl negeert de contentType-optie
+-- voor een browser-File en stuurt het File-eigen file.type. Voor .md is dat vaak leeg
+-- → application/octet-stream → buiten elke MIME-allowlist → Storage weigert (400) vóór
+-- de ingest. Het type-filter draait daarom volledig server-side: de ext-allowlist
+-- (ALLOWED_DOC_EXT) bij het maken van de signed URL + magic-bytes-validatie na download.
+-- Samen met de Storage file_size_limit is dat de volledige upload-validatie.
 -- =============================================================================
 
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('v1-documents', 'v1-documents', false, 10485760,
-  array['application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain', 'text/markdown'])
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('v1-documents', 'v1-documents', false, 10485760)
 on conflict (id) do nothing;

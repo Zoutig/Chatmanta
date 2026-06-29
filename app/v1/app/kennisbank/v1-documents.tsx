@@ -52,7 +52,7 @@ export function V1Documents({ initialDocs }: { initialDocs: UploadedDoc[] }) {
       const supabase = createClient();
       const up = await supabase.storage
         .from('v1-documents')
-        .uploadToSignedUrl(urlRes.path, urlRes.token, file, { contentType: file.type || 'application/octet-stream' });
+        .uploadToSignedUrl(urlRes.path, urlRes.token, file);
       if (up.error) { setError(`Upload mislukt: ${up.error.message}`); return; }
       // 3. server verwerkt: download → magic-bytes → extract → ingest → opruimen.
       const proc = await processUploadedDocAction(urlRes.path, file.name);
