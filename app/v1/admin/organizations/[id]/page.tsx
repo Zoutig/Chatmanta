@@ -76,23 +76,29 @@ export default async function OrgDeepDivePage({ params }: { params: Promise<{ id
   const memberCount = o.organization_members?.[0]?.count ?? 0;
   const capEur = resolveDailyBudgetEur(o.daily_budget_eur);
 
-  // Parallel: chatbot, kennisbronnen, deze-maand-cijfers, recente fouten.
-  const [chatbotRes, sourcesRes, conversations, spendEur, failedJobsRes, failEventsRes] =
+  // Chatbot eerst — nodig om kennisbronnen óók op chatbot_id te scopen (per-rule-conventie).
+  const { data: chatbotData } = await admin
+    .from('chatbots')
+    .select('id, name, bot_version, created_at')
+    .eq('organization_id', id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const chatbot = chatbotData as { id: string; name: string; bot_version: string; created_at: string } | null;
+
+  // Kennisbronnen gescoped op org + chatbot (geen chatbot → geen bronnen).
+  let sourcesQuery = admin
+    .from('knowledge_sources')
+    .select('id, type, normalized_host, root_url, status, created_at')
+    .eq('organization_id', id)
+    .is('deleted_at', null);
+  if (chatbot) sourcesQuery = sourcesQuery.eq('chatbot_id', chatbot.id);
+
+  // Parallel: kennisbronnen, deze-maand-cijfers, recente fouten.
+  const [sourcesRes, conversations, spendEur, failedJobsRes, failEventsRes] =
     await Promise.all([
-      admin
-        .from('chatbots')
-        .select('id, name, bot_version, created_at')
-        .eq('organization_id', id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      admin
-        .from('knowledge_sources')
-        .select('id, type, normalized_host, root_url, status, created_at')
-        .eq('organization_id', id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false }),
+      sourcesQuery.order('created_at', { ascending: false }),
       getOrgConversationsThisMonth(admin, id),
       getOrgSpendThisMonthEur(admin, id),
       admin
@@ -111,7 +117,6 @@ export default async function OrgDeepDivePage({ params }: { params: Promise<{ id
         .limit(10),
     ]);
 
-  const chatbot = chatbotRes.data as { name: string; bot_version: string; created_at: string } | null;
   const sources = (sourcesRes.data ?? []) as Array<{
     id: string; type: string; normalized_host: string | null; root_url: string | null; status: string; created_at: string;
   }>;

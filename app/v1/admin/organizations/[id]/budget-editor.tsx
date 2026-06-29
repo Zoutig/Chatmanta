@@ -17,6 +17,10 @@ export function BudgetEditor({ orgId, currentEur }: { orgId: string; currentEur:
     e.preventDefault();
     if (pending) return;
     setMsg(null);
+    if (value.trim() === '') {
+      setMsg({ ok: false, text: 'Vul een bedrag in (0 = uit).' });
+      return;
+    }
     const eur = Number(value);
     start(async () => {
       const res = await setOrgDailyBudgetAction(orgId, eur);
@@ -35,6 +39,7 @@ export function BudgetEditor({ orgId, currentEur }: { orgId: string; currentEur:
         Dagbudget (€)
         <input
           type="number"
+          required
           min={0}
           max={1000}
           step={0.5}

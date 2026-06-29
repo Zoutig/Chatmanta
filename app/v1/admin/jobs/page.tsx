@@ -58,7 +58,7 @@ export default async function AdminJobsPage() {
   }
 
   // Laatste crawl_event per job (decision/message) — recente set, eerste = nieuwste.
-  const lastEventByJob = new Map<string, string>();
+  const lastEventByJob = new Map<string, string | null>();
   const { data: events } = await admin
     .from('crawl_events')
     .select('processing_job_id, decision, message, created_at')
@@ -66,7 +66,7 @@ export default async function AdminJobsPage() {
     .limit(200);
   for (const ev of (events ?? []) as Array<{ processing_job_id: string | null; decision: string | null; message: string | null }>) {
     if (!ev.processing_job_id || lastEventByJob.has(ev.processing_job_id)) continue;
-    lastEventByJob.set(ev.processing_job_id, ev.message ?? ev.decision ?? '');
+    lastEventByJob.set(ev.processing_job_id, ev.message ?? ev.decision ?? null);
   }
 
   const rows: JobRow[] = jobs.map((j) => ({

@@ -35,11 +35,18 @@ export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult
   return actionTry(async () => {
     const { data: job } = await admin
       .from('processing_jobs')
-      .select('organization_id, chatbot_id, target_id')
+      .select('organization_id, chatbot_id, target_id, status')
       .eq('id', jobId)
       .eq('job_type', 'crawl_website')
       .maybeSingle();
     if (!job) fail('NOT_FOUND', 'Job niet gevonden.');
+    // Her-check de status vóór de betaalde Firecrawl-call: alleen een mislukte of
+    // klare job mag opnieuw — anders dubbel-crawl/dubbele credits (UI disabled dit
+    // al, maar service-role-actions vertrouwen niet op de client).
+    const jobStatus = job.status as string;
+    if (jobStatus !== 'failed' && jobStatus !== 'completed') {
+      fail('INPUT_INVALID', 'Deze job is nog bezig — opnieuw proberen kan pas als hij mislukt of klaar is.');
+    }
     const orgId = job.organization_id as string;
     const chatbotId = job.chatbot_id as string;
     const sourceId = job.target_id as string;
