@@ -16,5 +16,22 @@ export async function register() {
     assertProductionEnv(process.env, { isProduction: isProductionRuntime(process.env) });
 
     await import('./lib/v0/server/error-capture');
+
+    // M-E §1 — server-side Sentry (no-op zonder SENTRY_DSN). Onafhankelijk van de
+    // V0 DB error-sink hierboven; beide vangen, geen single-sink-replace.
+    const { initSentry } = await import('./lib/observability/sentry');
+    initSentry();
   }
+}
+
+// Next 16 roept dit bij elke server-/route-fout → vangt de unhandled 500's en
+// stuurt ze naar Sentry. Alleen in de nodejs-runtime (@sentry/node is node-only).
+export async function onRequestError(
+  err: unknown,
+  request: unknown,
+  context: unknown,
+): Promise<void> {
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+  const { captureServerError } = await import('./lib/observability/sentry');
+  captureServerError(err, { request, context });
 }
