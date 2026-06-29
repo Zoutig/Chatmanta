@@ -1,6 +1,6 @@
 'use server';
 
-import { requireOrgMember } from '@/lib/auth';
+import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
@@ -9,19 +9,18 @@ import { V1_RAG_DEFAULTS, buildV1Persona, getOrgChatbot } from './rag-config';
 
 export type AskV1Result =
   | { ok: true; answer: string; sources: { title: string }[]; kind: string }
-  | { ok: false; error: 'CONFIG' | 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' };
+  | { ok: false; error: 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' };
 
 export async function askV1(question: string): Promise<AskV1Result> {
-  const orgId = process.env.V1_SEED_ORG_ID;
-  if (!orgId) return { ok: false, error: 'CONFIG' };
   if (!question || question.trim().length === 0) return { ok: false, error: 'FAILED' };
 
-  // SA-1: org NIET uit client-input — uit de getrouwde sessie. requireOrgMember
-  // gooit AppError('AUTH_FORBIDDEN') bij niet-lid. Bij geen/verlopen sessie gooit
-  // requireAuth een NEXT_REDIRECT (geen AppError) → laten propageren zodat de
+  // SA-1: org NIET uit client-input/env — uit de getrouwde sessie. getSessionOrg
+  // gooit AppError('AUTH_FORBIDDEN') bij geen-membership. Bij geen/verlopen sessie
+  // gooit requireAuth een NEXT_REDIRECT (geen AppError) → laten propageren zodat de
   // client naar /v1/login gaat (spiegelt page.tsx; niet alles op FORBIDDEN mappen).
+  let orgId: string;
   try {
-    await requireOrgMember(orgId);
+    ({ orgId } = await getSessionOrg());
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') return { ok: false, error: 'FORBIDDEN' };
     throw e;

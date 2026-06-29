@@ -12,8 +12,10 @@ export async function proxy(req: NextRequest) {
   // V1-routes (Supabase Auth) draaien NIET door de V0-demo-wachtwoord-gate.
   // In plaats daarvan ververst de Supabase SSR-middleware hier de sessie-cookie;
   // de eigenlijke toegangscontrole gebeurt per-pagina via requireAuth/
-  // requireOrgMember (lib/auth.ts). Zo blijft de V0-gate intact voor al het
-  // andere, en valt /v1/* erbuiten (analoog aan de /embed-exemptie).
+  // requireOrgMember/requireJorionAdmin (lib/auth.ts). Zo blijft de V0-gate intact
+  // voor al het andere, en valt /v1/* erbuiten (analoog aan de /embed-exemptie).
+  // Dekt /v1/app, /v1/login, /v1/admin/* (M1-onboarding) én /v1/auth/* (de
+  // magic-link-callback + set-password) — allemaal via deze ene startsWith('/v1').
   if (req.nextUrl.pathname.startsWith('/v1')) {
     return updateSession(req);
   }
