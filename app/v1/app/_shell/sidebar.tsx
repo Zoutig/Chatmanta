@@ -1,5 +1,14 @@
 import Link from 'next/link';
-import { LayoutDashboard, MessageSquare, BookOpen, Code, Settings, User } from 'lucide-react';
+import {
+  LayoutDashboard,
+  MessageSquare,
+  MessagesSquare,
+  Inbox,
+  BookOpen,
+  Code,
+  Settings,
+  User,
+} from 'lucide-react';
 import { NavItem } from '@/app/klantendashboard/components/nav-item';
 
 // V1 /app sidebar — puur presentationeel. Repliceert de V0-klantendashboard-
@@ -83,6 +92,12 @@ export function V1Sidebar() {
         </NavItem>
         <NavItem href="/v1/app/preview" label="Preview chatbot">
           <MessageSquare size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/v1/app/gesprekken" label="Gesprekken">
+          <MessagesSquare size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/v1/app/contactverzoeken" label="Contactverzoeken">
+          <Inbox size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/v1/app/kennisbank" label="Kennisbank">
           <BookOpen size={17} strokeWidth={1.7} />

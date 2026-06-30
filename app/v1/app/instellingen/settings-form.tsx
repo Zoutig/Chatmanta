@@ -65,6 +65,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
       mayShareContact: s.mayShareContact,
       honestAboutUnknown: s.honestAboutUnknown,
       fallbackMessage: s.fallbackMessage,
+      contactRequestsEnabled: s.contactRequestsEnabled,
     };
     startTransition(async () => {
       const res = await saveChatbotSettingsAction(answerPatch);
@@ -187,6 +188,12 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
           help="Aanbevolen aan. Voorkomt dat de chatbot iets verzint dat niet in je bronnen staat."
           value={s.honestAboutUnknown}
           onChange={(v) => update('honestAboutUnknown', v)}
+        />
+        <Toggle
+          label="Contactverzoeken aanzetten"
+          help="De chatbot biedt bezoekers met een contactvraag een kort formulier aan. De verzoeken verschijnen onder Contactverzoeken."
+          value={s.contactRequestsEnabled}
+          onChange={(v) => update('contactRequestsEnabled', v)}
         />
       </Section>
 

@@ -10,6 +10,8 @@ import { AnimatedThemeToggler } from '@/app/components/ui/animated-theme-toggler
 const SECTION_LABELS: { match: (p: string) => boolean; label: string }[] = [
   { match: (p) => p === '/v1/app', label: 'Overzicht' },
   { match: (p) => p.startsWith('/v1/app/preview'), label: 'Preview chatbot' },
+  { match: (p) => p.startsWith('/v1/app/gesprekken'), label: 'Gesprekken' },
+  { match: (p) => p.startsWith('/v1/app/contactverzoeken'), label: 'Contactverzoeken' },
   { match: (p) => p.startsWith('/v1/app/kennisbank'), label: 'Kennisbank' },
   { match: (p) => p.startsWith('/v1/app/widget'), label: 'Widget' },
   { match: (p) => p.startsWith('/v1/app/instellingen'), label: 'Instellingen' },

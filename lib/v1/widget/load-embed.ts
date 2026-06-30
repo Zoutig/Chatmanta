@@ -55,6 +55,11 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
 
   const settings = mergeChatbotSettings(chatbot.settings);
   const headerTitle = settings.headerTitle.trim() || settings.chatbotName.trim() || chatbot.name;
+  // Per-org feature-flag (settings-agent voegt het veld toe aan settings-config).
+  // Defensief gelezen zodat dit ook vóór die wiring werkt (fail-closed → false).
+  // De submit-route is de autoritatieve gate; dit stuurt alleen de UI-zichtbaarheid.
+  const contactRequestsEnabled =
+    (settings as { contactRequestsEnabled?: unknown }).contactRequestsEnabled === true;
 
   return {
     kind: 'ok',
@@ -67,6 +72,7 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
       headerTitle,
       welcomeMessage: settings.welcomeMessage,
       launcherText: settings.launcherText,
+      contactRequestsEnabled,
     },
   };
 }
