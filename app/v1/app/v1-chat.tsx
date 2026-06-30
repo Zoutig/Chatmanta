@@ -46,29 +46,44 @@ export function V1Chat({ chatbotName }: { chatbotName: string }) {
   }
 
   return (
-    <section style={{ marginTop: 16 }}>
-      <p style={{ fontSize: 14, color: '#333' }}>
-        Stel een vraag aan <strong>{chatbotName}</strong>.
+    <section>
+      <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: '0 0 12px' }}>
+        Stel een vraag aan <strong style={{ color: 'var(--klant-ink)' }}>{chatbotName}</strong>.
       </p>
-      <form onSubmit={onSubmit} style={{ display: 'flex', gap: 8 }}>
+      <form onSubmit={onSubmit} style={{ display: 'flex', gap: 10 }}>
         <input
+          className="klant-input"
           name="question"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Stel een vraag…"
-          style={{ flex: 1, padding: 8 }}
         />
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          className="klant-ui-btn"
+          data-variant="primary"
+          data-size="md"
+          disabled={loading}
+          style={{ flexShrink: 0 }}
+        >
           {loading ? 'Bezig…' : 'Vraag'}
         </button>
       </form>
       {result && (
-        <div data-testid="v1-answer" style={{ marginTop: 20, whiteSpace: 'pre-wrap', fontSize: 14 }}>
+        <div
+          data-testid="v1-answer"
+          style={{
+            marginTop: 18,
+            whiteSpace: 'pre-wrap',
+            fontSize: 14,
+            color: 'var(--klant-ink)',
+          }}
+        >
           {result.ok ? (
             <>
-              <p>{result.answer}</p>
+              <p style={{ margin: 0 }}>{result.answer}</p>
               {result.sources.length > 0 && (
-                <ul style={{ color: '#666', fontSize: 13 }}>
+                <ul style={{ color: 'var(--klant-muted)', fontSize: 13, marginTop: 10 }}>
                   {result.sources.map((s, i) => (
                     <li key={i}>{s.title}</li>
                   ))}
@@ -76,7 +91,7 @@ export function V1Chat({ chatbotName }: { chatbotName: string }) {
               )}
             </>
           ) : (
-            <p style={{ color: '#b00' }}>{errorMessage(result.error)}</p>
+            <p style={{ color: 'var(--klant-danger)', margin: 0 }}>{errorMessage(result.error)}</p>
           )}
         </div>
       )}

@@ -1,10 +1,10 @@
 'use client';
 
 // V1 Kennisbank — document-upload-UI (PDF/DOCX/TXT/MD ≤10MB) + read-only docs-lijst.
-// Bewust minimaal + self-contained (inline styles, zoals v1-kennisbank.tsx): de
-// V1-app-shell heeft nog geen dashboard-chrome. Het bestand gaat DIRECT naar Storage
-// via een signed upload-URL (omzeilt de 4,5MB server-action-body-cap); de server
-// genereert het pad + valideert ext/size/magic-bytes autoritatief.
+// Styling via het V0-klantendashboard-designsysteem (klant.css-classes, geladen door
+// de /v1/app-shell). Het bestand gaat DIRECT naar Storage via een signed upload-URL
+// (omzeilt de 4,5MB server-action-body-cap); de server genereert het pad + valideert
+// ext/size/magic-bytes autoritatief. Alleen markup/className is herstyled.
 
 import { useRef, useState, useTransition, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,8 +14,6 @@ import { createUploadUrlAction, processUploadedDocAction } from './actions';
 
 export type UploadedDoc = { id: string; filename: string; status: string; createdAt: string };
 
-const card: CSSProperties = { border: '1px solid #e2e2e2', borderRadius: 10, padding: 14, background: '#fff' };
-const btnPrimary: CSSProperties = { padding: '7px 12px', borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: 'pointer', fontSize: 13 };
 const ellipsis: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
@@ -64,8 +62,8 @@ export function V1Documents({ initialDocs }: { initialDocs: UploadedDoc[] }) {
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <p style={{ fontSize: 13, color: '#555', margin: 0 }}>
+      <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0 }}>
           Upload een document (PDF, DOCX, TXT of MD, max 10 MB). De tekst wordt aan je chatbot toegevoegd; het
           originele bestand bewaren we niet.
         </p>
@@ -78,28 +76,28 @@ export function V1Documents({ initialDocs }: { initialDocs: UploadedDoc[] }) {
           style={{ display: 'none' }}
         />
         <div>
-          <button type="button" style={btnPrimary} disabled={pending} onClick={() => inputRef.current?.click()}>
+          <button type="button" className="klant-btn" data-variant="primary" disabled={pending} onClick={() => inputRef.current?.click()}>
             {pending ? 'Bezig met uploaden…' : '+ Document uploaden'}
           </button>
         </div>
-        {error && <div style={{ color: '#c00', fontSize: 13 }}>{error}</div>}
-        {notice && <div style={{ color: '#0a7d18', fontSize: 13 }}>{notice}</div>}
+        {error && <div style={{ color: 'var(--klant-danger)', fontSize: 13 }}>{error}</div>}
+        {notice && <div style={{ color: 'var(--klant-success)', fontSize: 13 }}>{notice}</div>}
       </div>
 
       {initialDocs.length === 0 ? (
-        <div style={{ ...card, fontSize: 13, color: '#777' }}>Nog geen documenten geüpload.</div>
+        <div className="klant-card" style={{ fontSize: 13, color: 'var(--klant-muted)' }}>Nog geen documenten geüpload.</div>
       ) : (
-        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        <div className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
           {initialDocs.map((d, i) => (
             <div
               key={d.id}
-              style={{ display: 'flex', gap: 10, padding: '10px 14px', alignItems: 'center', fontSize: 13, borderTop: i === 0 ? 'none' : '1px solid #f4f4f4' }}
+              style={{ display: 'flex', gap: 10, padding: '10px 14px', alignItems: 'center', fontSize: 13, borderTop: i === 0 ? 'none' : '1px solid var(--klant-border)' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div title={d.filename} style={{ fontWeight: 600, ...ellipsis }}>{d.filename}</div>
-                <div style={{ fontSize: 12, color: '#777' }}>{fmtDate(d.createdAt)}</div>
+                <div style={{ fontSize: 12, color: 'var(--klant-muted)' }}>{fmtDate(d.createdAt)}</div>
               </div>
-              <span style={{ fontSize: 12, color: d.status === 'failed' ? '#c00' : '#777', flexShrink: 0 }}>
+              <span style={{ fontSize: 12, color: d.status === 'failed' ? 'var(--klant-danger)' : 'var(--klant-muted)', flexShrink: 0 }}>
                 {statusLabel(d.status)}
               </span>
             </div>

@@ -1,9 +1,9 @@
 'use client';
 
 // V1 Kennisbank — functionele website-crawler-UI (discover → kies → crawl → beheer).
-// Bewust minimaal + self-contained (inline styles, geen klant.css/V0-helpers): de
-// V1-app-shell heeft nog geen dashboard-chrome. Polished groepering/zoek/bron-viewer
-// uit het V0-dashboard zijn hier weggelaten — functioneel-eerst, polish later.
+// Styling via het V0-klantendashboard-designsysteem (klant.css-classes, geladen door
+// de /v1/app-shell); alleen markup/className is herstyled — alle crawl-handlers,
+// effecten en server-actions zijn onveranderd.
 
 import { useState, useEffect, useTransition, type CSSProperties } from 'react';
 import {
@@ -17,10 +17,6 @@ import {
 } from './actions';
 import type { WebsiteSource } from './types';
 
-const card: CSSProperties = { border: '1px solid #e2e2e2', borderRadius: 10, padding: 14, background: '#fff' };
-const btn: CSSProperties = { padding: '7px 12px', borderRadius: 8, border: '1px solid #d0d0d0', background: '#fafafa', cursor: 'pointer', fontSize: 13 };
-const btnPrimary: CSSProperties = { ...btn, background: '#111', color: '#fff', borderColor: '#111' };
-const inputStyle: CSSProperties = { padding: '7px 10px', borderRadius: 8, border: '1px solid #d0d0d0', fontSize: 13, flex: 1, minWidth: 0 };
 const ellipsis: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 function sourceLabel(s: WebsiteSource): string {
@@ -120,34 +116,34 @@ export function V1Kennisbank({ initialSources }: { initialSources: WebsiteSource
   // ─── selectie-paneel (na discover) ──────────────────────────────────────────
   if (discovered) {
     return (
-      <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <strong style={{ fontSize: 14 }}>Kies welke pagina&apos;s je chatbot mag gebruiken</strong>
-        <div style={{ fontSize: 13, color: '#555', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ fontSize: 13, color: 'var(--klant-muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
           <span>{discovered.urls.length} pagina&apos;s gevonden.</span>
           <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
             Max
             <input type="number" min={1} max={50} value={maxPages}
               onChange={(e) => setMaxPages(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
-              style={{ ...inputStyle, width: 60, flex: 'none' }} />
+              className="klant-input" style={{ width: 60, flex: 'none' }} />
           </label>
         </div>
         <div style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'center' }}>
-          <button type="button" style={btn} onClick={() => setSelected(new Set(discovered.urls))}>Alles</button>
-          <button type="button" style={btn} onClick={() => setSelected(new Set())}>Niets</button>
-          <span style={{ color: '#777' }}>{selected.size} van {discovered.urls.length} geselecteerd</span>
+          <button type="button" className="klant-btn" onClick={() => setSelected(new Set(discovered.urls))}>Alles</button>
+          <button type="button" className="klant-btn" onClick={() => setSelected(new Set())}>Niets</button>
+          <span style={{ color: 'var(--klant-dim)' }}>{selected.size} van {discovered.urls.length} geselecteerd</span>
         </div>
-        <div style={{ maxHeight: 360, overflow: 'auto', border: '1px solid #eee', borderRadius: 8 }}>
+        <div style={{ maxHeight: 360, overflow: 'auto', border: '1px solid var(--klant-border)', borderRadius: 'var(--klant-r-md)' }}>
           {discovered.urls.map((u) => (
-            <label key={u} title={u} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderTop: '1px solid #f0f0f0', fontSize: 13, cursor: 'pointer', alignItems: 'center' }}>
+            <label key={u} title={u} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderTop: '1px solid var(--klant-border)', fontSize: 13, cursor: 'pointer', alignItems: 'center' }}>
               <input type="checkbox" checked={selected.has(u)} onChange={() => toggleUrl(u)} />
               <span style={{ flex: 1, ...ellipsis }}>{u}</span>
             </label>
           ))}
         </div>
-        {error && <div style={{ color: '#c00', fontSize: 13 }}>{error}</div>}
+        {error && <div style={{ color: 'var(--klant-danger)', fontSize: 13 }}>{error}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" style={btn} onClick={() => { setDiscovered(null); setMode('list'); }} disabled={pending}>Annuleren</button>
-          <button type="button" style={btnPrimary} onClick={onStart} disabled={pending || selected.size === 0}>
+          <button type="button" className="klant-btn" onClick={() => { setDiscovered(null); setMode('list'); }} disabled={pending}>Annuleren</button>
+          <button type="button" className="klant-btn" data-variant="primary" onClick={onStart} disabled={pending || selected.size === 0}>
             {pending ? 'Starten…' : `Crawl ${Math.min(selected.size, maxPages)} pagina's starten`}
           </button>
         </div>
@@ -158,31 +154,34 @@ export function V1Kennisbank({ initialSources }: { initialSources: WebsiteSource
   // ─── lijst + crawl-toevoegen ────────────────────────────────────────────────
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <button type="button" style={mode === 'crawl' ? btnPrimary : btn}
-        onClick={() => { setMode(mode === 'crawl' ? 'list' : 'crawl'); setError(null); }}
-        disabled={pending}>
-        + Website crawlen
-      </button>
+      <div>
+        <button type="button" className="klant-btn" data-variant={mode === 'crawl' ? 'primary' : undefined}
+          onClick={() => { setMode(mode === 'crawl' ? 'list' : 'crawl'); setError(null); }}
+          disabled={pending}>
+          + Website crawlen
+        </button>
+      </div>
 
       {mode === 'crawl' && (
-        <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p style={{ fontSize: 13, color: '#555', margin: 0 }}>
+        <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0 }}>
             Geef je website-URL op. We zoeken eerst de pagina&apos;s, daarna kies je welke meegaan.
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <input type="url" placeholder="https://jouwwebsite.nl" value={url} disabled={pending}
-              onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onDiscover()} style={inputStyle} />
-            <button type="button" style={btnPrimary} onClick={onDiscover} disabled={pending || !url.trim()}>
+              onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onDiscover()}
+              className="klant-input" style={{ flex: 1, minWidth: 0 }} />
+            <button type="button" className="klant-btn" data-variant="primary" onClick={onDiscover} disabled={pending || !url.trim()}>
               {pending ? 'Zoeken…' : "Pagina's zoeken"}
             </button>
           </div>
         </div>
       )}
 
-      {error && <div style={{ color: '#c00', fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--klant-danger)', fontSize: 13 }}>{error}</div>}
 
       {sources.length === 0 && (
-        <div style={{ ...card, fontSize: 13, color: '#777' }}>Nog geen websites. Klik &ldquo;+ Website crawlen&rdquo;.</div>
+        <div className="klant-card" style={{ fontSize: 13, color: 'var(--klant-muted)' }}>Nog geen websites. Klik &ldquo;+ Website crawlen&rdquo;.</div>
       )}
 
       {sources.map((ws) => {
@@ -190,40 +189,40 @@ export function V1Kennisbank({ initialSources }: { initialSources: WebsiteSource
         const crawling = ws.job?.status === 'pending' || ws.job?.status === 'processing';
         const isOpen = open.has(id);
         return (
-          <div key={id} style={{ ...card, padding: 0, overflow: 'hidden' }}>
+          <div key={id} className="klant-card" style={{ padding: 0, overflow: 'hidden' }}>
             <div role="button" tabIndex={crawling ? -1 : 0}
               onClick={() => !crawling && toggleOpen(id)}
               onKeyDown={(e) => { if (!crawling && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleOpen(id); } }}
               style={{ display: 'flex', gap: 10, padding: '12px 14px', cursor: crawling ? 'default' : 'pointer', alignItems: 'center' }}>
-              <span aria-hidden style={{ color: '#999', width: 14 }}>{crawling ? '⏳' : isOpen ? '▾' : '▸'}</span>
+              <span aria-hidden style={{ color: 'var(--klant-dim)', width: 14 }}>{crawling ? '⏳' : isOpen ? '▾' : '▸'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, ...ellipsis }}>{ws.source.host ?? ws.source.rootUrl ?? '(onbekend)'}</div>
-                <div style={{ fontSize: 12, color: '#777' }}>
+                <div style={{ fontSize: 12, color: 'var(--klant-muted)' }}>
                   {sourceLabel(ws)}{crawling && ws.job ? ` (${ws.job.completed}/${ws.job.total})` : ''}
                 </div>
               </div>
             </div>
             {isOpen && !crawling && (
-              <div style={{ borderTop: '1px solid #eee' }}>
+              <div style={{ borderTop: '1px solid var(--klant-border)' }}>
                 {ws.pages.length === 0 && (
-                  <div style={{ padding: '10px 14px', fontSize: 13, color: '#777' }}>Geen pagina&apos;s.</div>
+                  <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--klant-muted)' }}>Geen pagina&apos;s.</div>
                 )}
                 {ws.pages.map((p) => {
                   const busy = pending && busyId === p.id;
                   return (
-                    <div key={p.id} style={{ display: 'flex', gap: 10, padding: '8px 14px', alignItems: 'center', fontSize: 13, borderTop: '1px solid #f4f4f4' }}>
+                    <div key={p.id} style={{ display: 'flex', gap: 10, padding: '8px 14px', alignItems: 'center', fontSize: 13, borderTop: '1px solid var(--klant-border)' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div title={p.url} style={ellipsis}>{p.title}</div>
                         {p.status === 'error' && p.errorMessage && (
-                          <div title={p.errorMessage} style={{ fontSize: 11, color: '#c00', ...ellipsis }}>⚠ {p.errorMessage}</div>
+                          <div title={p.errorMessage} style={{ fontSize: 11, color: 'var(--klant-danger)', ...ellipsis }}>⚠ {p.errorMessage}</div>
                         )}
                       </div>
                       {p.status === 'error' ? (
-                        <button type="button" style={{ ...btn, fontSize: 12, padding: '4px 9px' }} disabled={busy} onClick={() => retry(p.id)}>
+                        <button type="button" className="klant-btn" style={{ fontSize: 12, padding: '4px 9px' }} disabled={busy} onClick={() => retry(p.id)}>
                           Opnieuw
                         </button>
                       ) : (
-                        <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12, color: '#777', cursor: 'pointer', flexShrink: 0 }}>
+                        <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12, color: 'var(--klant-muted)', cursor: 'pointer', flexShrink: 0 }}>
                           <input type="checkbox" checked={p.included} disabled={busy} onChange={() => togglePage(p.id, !p.included)} />
                           {p.included ? 'Aan' : 'Uit'}
                         </label>
@@ -231,8 +230,8 @@ export function V1Kennisbank({ initialSources }: { initialSources: WebsiteSource
                     </div>
                   );
                 })}
-                <div style={{ padding: '8px 14px', borderTop: '1px solid #f4f4f4' }}>
-                  <button type="button" style={{ ...btn, fontSize: 12, color: '#c00' }} onClick={() => del(id)} disabled={pending}>
+                <div style={{ padding: '8px 14px', borderTop: '1px solid var(--klant-border)' }}>
+                  <button type="button" className="klant-btn" data-variant="danger" style={{ fontSize: 12 }} onClick={() => del(id)} disabled={pending}>
                     Website-bron verwijderen
                   </button>
                 </div>
