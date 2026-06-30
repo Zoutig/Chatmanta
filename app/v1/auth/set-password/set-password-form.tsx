@@ -117,7 +117,7 @@ export function SetPasswordForm() {
                 Stel je wachtwoord in
               </h1>
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                Kies een wachtwoord om je account te activeren
+                Kies een nieuw wachtwoord voor je account
               </p>
             </div>
 
