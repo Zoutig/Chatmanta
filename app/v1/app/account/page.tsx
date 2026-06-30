@@ -7,11 +7,10 @@
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
+import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { AccountForm } from './account-form';
 
 export const dynamic = 'force-dynamic';
-
-const SHELL = { maxWidth: 640, margin: '8vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' } as const;
 
 export default async function V1AccountPage() {
   let session: Awaited<ReturnType<typeof getSessionOrg>>;
@@ -20,10 +19,7 @@ export default async function V1AccountPage() {
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
-        <main style={SHELL}>
-          <h1 style={{ fontSize: 20 }}>Geen toegang</h1>
-          <p style={{ fontSize: 14, color: '#555' }}>Je bent geen lid van deze organisatie.</p>
-        </main>
+        <PageHead eyebrow="Account" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
       );
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
@@ -37,16 +33,17 @@ export default async function V1AccountPage() {
   ]);
 
   return (
-    <main style={SHELL}>
-      <h1 style={{ fontSize: 22 }}>Account</h1>
-      <p style={{ fontSize: 14, color: '#555', marginBottom: 24 }}>
-        Beheer je inloggegevens en de naam van je organisatie.
-      </p>
+    <>
+      <PageHead
+        eyebrow="Account"
+        title="Jouw account en workspace"
+        subtitle="Beheer je inloggegevens en de naam van je organisatie."
+      />
       <AccountForm
         email={user.email ?? ''}
         orgName={(org?.name as string | undefined) ?? ''}
         isOwner={membership?.role === 'owner'}
       />
-    </main>
+    </>
   );
 }

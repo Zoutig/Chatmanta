@@ -8,14 +8,13 @@
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
+import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { getOrgChatbot } from '../rag-config';
 import { getWebsiteSources } from './crawl-data';
 import { V1Kennisbank } from './v1-kennisbank';
 import { V1Documents, type UploadedDoc } from './v1-documents';
 
 export const dynamic = 'force-dynamic';
-
-const SHELL = { maxWidth: 760, margin: '8vh auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' } as const;
 
 export default async function V1KennisbankPage() {
   let orgId: string;
@@ -24,10 +23,7 @@ export default async function V1KennisbankPage() {
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
-        <main style={SHELL}>
-          <h1 style={{ fontSize: 20 }}>Geen toegang</h1>
-          <p style={{ fontSize: 14, color: '#555' }}>Je bent geen lid van deze organisatie.</p>
-        </main>
+        <PageHead eyebrow="Kennisbank" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
       );
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
@@ -37,10 +33,11 @@ export default async function V1KennisbankPage() {
   const chatbot = await getOrgChatbot(supabase, orgId);
   if (!chatbot) {
     return (
-      <main style={SHELL}>
-        <h1 style={{ fontSize: 22 }}>Kennisbank</h1>
-        <p style={{ fontSize: 14, color: '#555' }}>Deze organisatie heeft nog geen chatbot geconfigureerd.</p>
-      </main>
+      <PageHead
+        eyebrow="Kennisbank"
+        title="De bronnen waaruit je chatbot put"
+        subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
+      />
     );
   }
 
@@ -63,25 +60,31 @@ export default async function V1KennisbankPage() {
   }));
 
   return (
-    <main style={SHELL}>
-      <h1 style={{ fontSize: 22 }}>Kennisbank</h1>
+    <>
+      <PageHead
+        eyebrow="Kennisbank"
+        title="De bronnen waaruit je chatbot put"
+        subtitle="Voeg documenten toe en crawl je website. Alles wat hier staat, wordt geïndexeerd en hergebruikt in elk antwoord."
+      />
 
-      <section style={{ marginTop: 20 }}>
-        <h2 style={{ fontSize: 17, marginBottom: 6 }}>Documenten</h2>
-        <p style={{ fontSize: 14, color: '#555', marginBottom: 14 }}>
-          Voeg PDF-, DOCX-, TXT- of MD-bestanden toe zodat de chatbot eruit kan putten.
-        </p>
-        <V1Documents initialDocs={docs} />
-      </section>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <section>
+          <h2 className="klant-section-title">Documenten</h2>
+          <p className="klant-section-help">
+            Voeg PDF-, DOCX-, TXT- of MD-bestanden toe zodat de chatbot eruit kan putten.
+          </p>
+          <V1Documents initialDocs={docs} />
+        </section>
 
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 17, marginBottom: 6 }}>Website</h2>
-        <p style={{ fontSize: 14, color: '#555', marginBottom: 14 }}>
-          Crawl je website zodat de chatbot eruit kan putten. Kies welke pagina&apos;s meegaan, zet ze aan/uit, of
-          probeer mislukte pagina&apos;s opnieuw.
-        </p>
-        <V1Kennisbank initialSources={sources} />
-      </section>
-    </main>
+        <section>
+          <h2 className="klant-section-title">Website</h2>
+          <p className="klant-section-help">
+            Crawl je website zodat de chatbot eruit kan putten. Kies welke pagina&apos;s meegaan, zet ze aan/uit, of
+            probeer mislukte pagina&apos;s opnieuw.
+          </p>
+          <V1Kennisbank initialSources={sources} />
+        </section>
+      </div>
+    </>
   );
 }

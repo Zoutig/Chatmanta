@@ -1,9 +1,10 @@
 'use client';
 
 // V1 Instellingen — getrimd settings-formulier. Alléén antwoord-beïnvloedende
-// velden (geen widget-only velden, geen GK-toggle — die zou in V1 dood zijn). Bewust
-// inline styles: /v1 laadt klant.css niet. Save → server-action → engine leest de
-// settings live (askV1 → buildChatbotOverrides).
+// velden (geen widget-only velden, geen GK-toggle — die zou in V1 dood zijn). Styling
+// via het V0-klantendashboard-designsysteem (klant.css-classes, geladen door de
+// /v1/app-shell). Save → server-action → engine leest de settings live
+// (askV1 → buildChatbotOverrides). Alleen markup/className is herstyled.
 
 import { useState, useTransition } from 'react';
 import { saveChatbotSettingsAction } from './actions';
@@ -31,16 +32,6 @@ const LANG_LABEL: Record<Language, string> = {
   de: 'Duits',
   fr: 'Frans',
   es: 'Spaans',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: 8,
-  fontSize: 14,
-  border: '1px solid #ccc',
-  borderRadius: 6,
-  fontFamily: 'inherit',
-  boxSizing: 'border-box',
 };
 
 export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
@@ -80,19 +71,19 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
         e.preventDefault();
         save();
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
     >
       <Section title="Basis">
         <Field label="Chatbotnaam" hint="De naam zoals je bezoekers hem zien.">
           <input
-            style={inputStyle}
+            className="klant-input"
             value={s.chatbotName}
             onChange={(e) => update('chatbotName', e.target.value)}
           />
         </Field>
         <Field label="Korte bedrijfsomschrijving" hint="Eén of twee zinnen — geeft de bot context in de system-prompt.">
           <textarea
-            style={inputStyle}
+            className="klant-textarea"
             rows={2}
             value={s.companyDescription}
             onChange={(e) => update('companyDescription', e.target.value)}
@@ -103,7 +94,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
       <Section title="Taal">
         <Field label="Hoofdtaal">
           <select
-            style={inputStyle}
+            className="klant-select"
             value={s.primaryLanguage}
             onChange={(e) => update('primaryLanguage', e.target.value as Language)}
           >
@@ -119,7 +110,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
       <Section title="Tone of voice">
         <Field label="Toon">
           <select
-            style={inputStyle}
+            className="klant-select"
             value={s.toneOfVoice}
             onChange={(e) => update('toneOfVoice', e.target.value as ToneOfVoice)}
           >
@@ -132,7 +123,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
         </Field>
         <Field label="Extra instructies" hint="Bijv. 'Verwijs bij twijfel altijd naar onze contactpagina.'">
           <textarea
-            style={inputStyle}
+            className="klant-textarea"
             rows={3}
             value={s.extraInstructions}
             onChange={(e) => update('extraInstructions', e.target.value)}
@@ -143,7 +134,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
       <Section title="Antwoordgedrag">
         <Field label="Antwoordlengte">
           <select
-            style={inputStyle}
+            className="klant-select"
             value={s.answerLength}
             onChange={(e) => update('answerLength', e.target.value as AnswerLength)}
           >
@@ -154,7 +145,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
         </Field>
         <Field label="Hoe strikt mag de chatbot van zijn bronnen afwijken?" hint="'Strikt' = alleen wat letterlijk in je bronnen staat. 'Flexibel' = mag combineren.">
           <select
-            style={inputStyle}
+            className="klant-select"
             value={s.sourceStrictness}
             onChange={(e) => update('sourceStrictness', e.target.value as SourceStrictness)}
           >
@@ -186,7 +177,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
       <Section title="Fallback">
         <Field label="Fallbackbericht" hint="Wordt getoond als de chatbot geen antwoord kon vinden.">
           <textarea
-            style={inputStyle}
+            className="klant-textarea"
             rows={3}
             value={s.fallbackMessage}
             onChange={(e) => update('fallbackMessage', e.target.value)}
@@ -201,11 +192,12 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
               type="color"
               value={/^#[0-9a-fA-F]{6}$/.test(s.accentColor) ? s.accentColor : '#2563eb'}
               onChange={(e) => update('accentColor', e.target.value)}
-              style={{ width: 44, height: 36, padding: 0, border: '1px solid #ccc', borderRadius: 6, cursor: 'pointer' }}
+              style={{ width: 44, height: 36, padding: 0, border: '1px solid var(--klant-border)', borderRadius: 'var(--klant-r-md)', cursor: 'pointer' }}
               aria-label="Accentkleur"
             />
             <input
-              style={{ ...inputStyle, width: 120 }}
+              className="klant-input"
+              style={{ width: 120 }}
               value={s.accentColor}
               onChange={(e) => update('accentColor', e.target.value)}
             />
@@ -213,7 +205,7 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
         </Field>
         <Field label="Positie" hint="Hoek waar de chat-knop op de site verschijnt.">
           <select
-            style={inputStyle}
+            className="klant-select"
             value={s.position}
             onChange={(e) => update('position', e.target.value as WidgetPosition)}
           >
@@ -223,21 +215,21 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
         </Field>
         <Field label="Titel in de header" hint="Leeg laten → de chatbotnaam wordt gebruikt.">
           <input
-            style={inputStyle}
+            className="klant-input"
             value={s.headerTitle}
             onChange={(e) => update('headerTitle', e.target.value)}
           />
         </Field>
         <Field label="Welkomstbericht" hint="Het eerste bericht dat de bezoeker ziet in het chatvenster.">
           <input
-            style={inputStyle}
+            className="klant-input"
             value={s.welcomeMessage}
             onChange={(e) => update('welcomeMessage', e.target.value)}
           />
         </Field>
         <Field label="Tekst bij de knop" hint="Optioneel tooltip-bubbeltje naast de chat-knop. Leeg = geen tooltip.">
           <input
-            style={inputStyle}
+            className="klant-input"
             value={s.launcherText}
             onChange={(e) => update('launcherText', e.target.value)}
           />
@@ -247,13 +239,14 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <button
           type="submit"
+          className="klant-btn"
+          data-variant="primary"
           disabled={pending || !dirty}
-          style={{ padding: '8px 16px', fontSize: 14, cursor: pending || !dirty ? 'default' : 'pointer' }}
         >
           {pending ? 'Bezig…' : 'Instellingen opslaan'}
         </button>
-        {saved && <span style={{ fontSize: 13, color: '#0a0' }}>Opgeslagen</span>}
-        {error && <span role="alert" style={{ fontSize: 13, color: '#b00020' }}>{error}</span>}
+        {saved && <span style={{ fontSize: 13, color: 'var(--klant-success)' }}>Opgeslagen</span>}
+        {error && <span role="alert" style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>}
       </div>
     </form>
   );
@@ -261,20 +254,20 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h2 style={{ fontSize: 16, margin: 0 }}>{title}</h2>
-      {children}
+    <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <h3 className="klant-section-title" style={{ margin: 0 }}>{title}</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{children}</div>
     </section>
   );
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
+    <div>
+      <label className="klant-label">{label}</label>
       {children}
-      {hint && <span style={{ fontSize: 12, color: '#777' }}>{hint}</span>}
-    </label>
+      {hint && <div className="klant-hint">{hint}</div>}
+    </div>
   );
 }
 
@@ -290,16 +283,41 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(e) => onChange(e.target.checked)}
-        style={{ marginTop: 3 }}
-      />
+    <label style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        style={{
+          flexShrink: 0,
+          marginTop: 2,
+          width: 34,
+          height: 20,
+          borderRadius: 999,
+          border: 'none',
+          background: value ? 'var(--klant-accent)' : 'var(--klant-border-strong)',
+          position: 'relative',
+          cursor: 'pointer',
+          transition: 'background 120ms ease',
+        }}
+        aria-pressed={value}
+        aria-label={label}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: value ? 16 : 2,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            background: '#fff',
+            transition: 'left 120ms ease',
+          }}
+        />
+      </button>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
-        <span style={{ fontSize: 12, color: '#777' }}>{help}</span>
+        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--klant-fg)' }}>{label}</span>
+        <span style={{ fontSize: 12, color: 'var(--klant-fg-muted)' }}>{help}</span>
       </span>
     </label>
   );
