@@ -8,14 +8,16 @@ import { AnimatedThemeToggler } from '@/app/components/ui/animated-theme-toggler
 // Breadcrumb-labels per route. usePathname is client-only → de topbar is een
 // client-island (zoals V0), óók voor de drawer-state.
 const SECTION_LABELS: { match: (p: string) => boolean; label: string }[] = [
-  { match: (p) => p === '/v1/app', label: 'Chatbot' },
+  { match: (p) => p === '/v1/app', label: 'Overzicht' },
+  { match: (p) => p.startsWith('/v1/app/preview'), label: 'Preview chatbot' },
   { match: (p) => p.startsWith('/v1/app/kennisbank'), label: 'Kennisbank' },
+  { match: (p) => p.startsWith('/v1/app/widget'), label: 'Widget' },
   { match: (p) => p.startsWith('/v1/app/instellingen'), label: 'Instellingen' },
   { match: (p) => p.startsWith('/v1/app/account'), label: 'Account' },
 ];
 
 function sectionLabel(pathname: string): string {
-  return SECTION_LABELS.find((s) => s.match(pathname))?.label ?? 'Chatbot';
+  return SECTION_LABELS.find((s) => s.match(pathname))?.label ?? 'Overzicht';
 }
 
 export function V1Topbar() {

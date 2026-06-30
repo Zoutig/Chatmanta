@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { MessageSquare, BookOpen, Settings, User } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, BookOpen, Code, Settings, User } from 'lucide-react';
 import { NavItem } from '@/app/klantendashboard/components/nav-item';
 
 // V1 /app sidebar — puur presentationeel. Repliceert de V0-klantendashboard-
 // chrome (brand-blok + NavItem-nav) maar zonder org-switcher / search / tweaks
-// (V0-sandbox-only). Statische nav → alléén de 4 bestaande V1-pagina's.
+// (V0-sandbox-only). Statische nav → de V1-klantpagina's (Gesprekken/
+// Contactverzoeken/Feedback volgen in een latere ronde).
 export function V1Sidebar() {
   return (
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
@@ -77,11 +78,17 @@ export function V1Sidebar() {
 
       {/* Nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 6 }}>
-        <NavItem href="/v1/app" label="Chatbot" exact>
+        <NavItem href="/v1/app" label="Overzicht" exact>
+          <LayoutDashboard size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/v1/app/preview" label="Preview chatbot">
           <MessageSquare size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/v1/app/kennisbank" label="Kennisbank">
           <BookOpen size={17} strokeWidth={1.7} />
+        </NavItem>
+        <NavItem href="/v1/app/widget" label="Widget">
+          <Code size={17} strokeWidth={1.7} />
         </NavItem>
         <NavItem href="/v1/app/instellingen" label="Instellingen">
           <Settings size={17} strokeWidth={1.7} />

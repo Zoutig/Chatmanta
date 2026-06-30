@@ -3,28 +3,30 @@ import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { Card } from '@/app/klantendashboard/components/ui/card';
+import { MetricCard } from '@/app/admindashboard/components/metric-card';
 import { getOrgChatbot } from './rag-config';
-import { V1Chat } from './v1-chat';
+import { getV1OverviewMetrics } from '@/lib/v1/dashboard/metrics';
+import { TopQuestions, UnansweredQuestions, SetupChecklist } from './_overview/sections';
 
-// V1 /app: echte RAG achter auth. Auth-keten:
-//   geen sessie → getSessionOrg → requireAuth → redirect /v1/login
-//   wél lid     → resolveer org (uit de sessie) + org-chatbot → render het chat-formulier
+// V1 /app: Overzicht-landing achter auth. Auth-keten (ongewijzigd):
+//   geen sessie → getSessionOrg → requireAuth → redirect /v1/login (NEXT_REDIRECT
+//                 is geen AppError → valt door naar de re-throw)
+//   wél lid     → resolveer org (uit de sessie) + chatbot → render het overzicht
 //   geen lid    → AUTH_FORBIDDEN → "Geen toegang"
-// orgId komt uit de sessie (organization_members), niet uit env.
-// De shell (sidebar/topbar/<main>) komt uit layout.tsx — hier alléén binnen-content.
+// orgId komt uit de sessie (organization_members), niet uit env. De chat is
+// verhuisd naar /v1/app/preview. De shell (sidebar/topbar/<main>) komt uit
+// layout.tsx — hier alléén binnen-content.
 export const dynamic = 'force-dynamic';
 
-export default async function V1AppPage() {
+export default async function V1OverviewPage() {
   let session: Awaited<ReturnType<typeof getSessionOrg>>;
   try {
-    // Redirect (geen sessie) gooit een NEXT_REDIRECT-fout die GEEN AppError is →
-    // valt door naar de re-throw onderaan, zodat de redirect werkt.
     session = await getSessionOrg();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
         <PageHead
-          eyebrow="Chatbot"
+          eyebrow="Overzicht"
           title="Geen toegang"
           subtitle="Je bent geen lid van deze organisatie."
         />
@@ -32,32 +34,67 @@ export default async function V1AppPage() {
     }
     throw e;
   }
-  const { user, orgId } = session;
+  const { orgId } = session;
 
   // Lees onder de session-client (RLS afgedwongen). Geen chatbot → nette fail-tak,
-  // nooit een lege chatbotId naar de NOT-NULL-RPC.
+  // nooit een lege chatbotId naar de metric-reads.
   const supabase = await createClient();
   const chatbot = await getOrgChatbot(supabase, orgId);
 
+  if (!chatbot) {
+    return (
+      <>
+        <PageHead
+          eyebrow="Overzicht"
+          title="Je chatbot"
+          subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
+        />
+        <Card>
+          <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: 0 }}>
+            Zodra er een chatbot is, verschijnen hier je gesprekken, kosten en de meest gestelde vragen.
+          </p>
+        </Card>
+      </>
+    );
+  }
+
+  const m = await getV1OverviewMetrics(supabase, orgId, chatbot.id);
+  const allSetupDone = m.setup.hasDocument && m.setup.hasKnowledgeSource && m.setup.hasTraffic;
+
+  const subtitle =
+    m.conversationsThisMonth === 0
+      ? 'Nog geen gesprekken deze maand — je chatbot staat klaar voor bezoekers.'
+      : `Deze maand voerde je chatbot ${m.conversationsThisMonth} gesprek${
+          m.conversationsThisMonth === 1 ? '' : 'ken'
+        }.`;
+
   return (
     <>
-      <PageHead
-        eyebrow="Chatbot"
-        title="Test je chatbot"
-        subtitle="Stel een vraag en zie het antwoord dat je bezoekers krijgen, gegrond op je kennisbank."
-      />
-      <p className="klant-hint" style={{ marginBottom: 16 }}>
-        Ingelogd als <strong>{user.email}</strong>.
-      </p>
-      <Card>
-        {chatbot ? (
-          <V1Chat chatbotName={chatbot.name} />
-        ) : (
-          <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: 0 }}>
-            Deze organisatie heeft nog geen chatbot geconfigureerd.
-          </p>
-        )}
-      </Card>
+      <PageHead eyebrow="Overzicht" title={chatbot.name} subtitle={subtitle} />
+
+      {/* Kerncijfers */}
+      <div className="klant-metrics-grid">
+        <MetricCard label="Gesprekken" value={m.conversationsThisMonth} sub="deze maand" />
+        <MetricCard label="Kosten" value={`€${m.spendThisMonthEur.toFixed(2)}`} sub="deze maand" />
+        <MetricCard
+          label="Weiger-ratio"
+          value={m.refusalRate === null ? '—' : `${Math.round(m.refusalRate * 100)}%`}
+          tone={m.refusalRate !== null && m.refusalRate >= 0.3 ? 'warn' : 'ink'}
+          sub={m.scannedThisMonth > 0 ? `over ${m.scannedThisMonth} vragen` : 'nog geen verkeer'}
+        />
+        <MetricCard
+          label="Snelheid"
+          value={m.latency.p50 === null ? '—' : `${Math.round(m.latency.p50)} ms`}
+          sub={m.latency.p95 === null ? 'mediaan responstijd' : `p95 ${Math.round(m.latency.p95)} ms`}
+        />
+      </div>
+
+      {/* Onboarding-nudge zolang de setup niet rond is */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+        {!allSetupDone && <SetupChecklist setup={m.setup} />}
+        <TopQuestions items={m.topQuestions} />
+        <UnansweredQuestions items={m.unanswered} />
+      </div>
     </>
   );
 }
