@@ -50,6 +50,12 @@ export const config = {
   // geen aparte entry nodig. NB: /api/v1/* begint met /api (niet /v1) → raakt de
   // updateSession-branch hierboven niet; deze routes hebben geen Supabase-sessie.
   //
+  // api/v1/cron (process-crawls): de V1-crawler-pinger-route, exact zoals api/v0/cron.
+  // Wordt server-side aangeroepen (externe pinger of Vercel-cron) zónder demo-cookie en
+  // beveiligt zichzelf via Bearer CRON_SECRET in de handler — zonder deze exemptie zou
+  // elke ping naar /login omgeleid worden en de crawl-verwerking nooit draaien. Segment-
+  // geankerd (`api/v1/cron(?:/|$)`) zodat alleen dit pad-segment de gate omzeilt.
+  //
   // /crawl-eval/* zijn statische fixture-pagina's (public/crawl-eval/) voor de
   // golden-set crawler-eval. Ze MOETEN publiek bereikbaar zijn zodat Firecrawl ze
   // van buitenaf kan crawlen (anders → login-redirect → 0 bruikbare pagina's).
@@ -57,6 +63,6 @@ export const config = {
   // Segment-geankerd (`crawl-eval(?:/|$)`) zodat ALLEEN het exacte pad-segment de
   // gate omzeilt — niet een toekomstig /crawl-evaluation o.i.d. (Codex-review).
   matcher: [
-    '/((?!login|privacy(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|privacy(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };
