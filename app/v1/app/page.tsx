@@ -40,6 +40,7 @@ import { OnboardingTour } from '@/app/klantendashboard/components/onboarding-tou
 import { StartTourButton } from '@/app/klantendashboard/components/start-tour-button';
 import { getOrgChatbot } from './rag-config';
 import { getV1OverviewMetrics } from '@/lib/v1/dashboard/metrics';
+import { getActiveQuizForOrg } from '@/lib/v1/quiz/data';
 import { SetupChecklist } from './_overview/setup-checklist';
 // Type-only imports van V0-shapes — voor adapter-objecten die aan de hergebruikte
 // V0-componenten worden doorgegeven. Geen runtime-impact.
@@ -147,6 +148,12 @@ export default async function V1OverviewPage() {
   }
 
   const m = await getV1OverviewMetrics(supabase, orgId, chatbot.id);
+
+  // Actieve kennisquiz? → banner-nudge naar /v1/app/quiz (best-effort, nooit blokken).
+  const activeQuiz = await getActiveQuizForOrg(supabase, orgId).catch(() => null);
+  const quizOpen =
+    activeQuiz?.status === 'actief' &&
+    activeQuiz.questionCount - activeQuiz.answeredCount - activeQuiz.skippedCount > 0;
 
   const widgetInstalled = m.widgetStatus !== 'not_installed';
   // allStepsDone spiegelt V0's checklist.every(s => s.status === 'completed'):
@@ -257,6 +264,20 @@ export default async function V1OverviewPage() {
               cta={{ label: 'Widget installeren', href: '/v1/app/widget' }}
             />
           )}
+        </div>
+      )}
+
+      {/* Actieve kennisquiz — nudge om te beantwoorden. */}
+      {quizOpen && (
+        <div style={{ marginBottom: 20 }}>
+          <DismissibleBanner
+            dismissId="v1-quiz-active"
+            signature="active"
+            variant="info"
+            title="Er staat een kennisquiz voor je klaar"
+            message="Beantwoord een paar korte vragen zodat je chatbot je bedrijf beter leert kennen."
+            cta={{ label: 'Quiz starten', href: '/v1/app/quiz' }}
+          />
         </div>
       )}
 

@@ -18,11 +18,14 @@ import {
   countRecentNegativeFeedback,
   type V1ConversationFilter,
 } from '@/lib/v1/dashboard/conversations';
+import { getV1KlantFaqForDashboard, getV1FaqConfig } from '@/lib/v1/dashboard/faq';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
 import { Icon } from '@/app/klantendashboard/components/ui/icons';
+import { TabsNav } from '@/app/klantendashboard/components/tabs';
 import { NegativeFeedbackTable } from '@/app/klantendashboard/gesprekken/components/negative-feedback-table';
 import { ReloadButton } from '@/app/klantendashboard/gesprekken/components/reload-button';
+import { TopQuestionsTab } from './top-questions/top-questions-tab';
 import { getOrgChatbot } from '../rag-config';
 import { FilterBar } from './filter-bar';
 
@@ -49,7 +52,7 @@ function formatDateTime(iso: string): string {
 export default async function V1GesprekkenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; view?: string }>;
 }) {
   let orgId: string;
   try {
@@ -79,19 +82,33 @@ export default async function V1GesprekkenPage({
     );
   }
 
-  const { filter: rawFilter } = await searchParams;
+  const { filter: rawFilter, view: rawView } = await searchParams;
   const filter: V1ConversationFilter = VALID_FILTERS.includes(rawFilter as V1ConversationFilter)
     ? (rawFilter as V1ConversationFilter)
     : 'last_30_days';
+  const view: 'gesprekken' | 'top-questions' =
+    rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
 
-  const [items, negativeFeedback, recentNegativeCount] = await Promise.all([
-    filter === 'negative_feedback'
-      ? Promise.resolve([])
-      : listV1Conversations(supabase, orgId, chatbot.id, filter),
-    listV1NegativeFeedback(supabase, orgId, chatbot.id),
-    countRecentNegativeFeedback(supabase, orgId, chatbot.id, 7),
-  ]);
+  const [items, faqResult, faqConfig, negativeFeedback, recentNegativeCount, qaData] =
+    await Promise.all([
+      filter === 'negative_feedback'
+        ? Promise.resolve([])
+        : listV1Conversations(supabase, orgId, chatbot.id, filter),
+      getV1KlantFaqForDashboard(supabase, orgId, chatbot.id),
+      getV1FaqConfig(supabase, orgId, chatbot.id),
+      listV1NegativeFeedback(supabase, orgId, chatbot.id),
+      countRecentNegativeFeedback(supabase, orgId, chatbot.id, 7),
+      supabase
+        .from('org_qa_items')
+        .select('question')
+        .eq('organization_id', orgId)
+        .eq('chatbot_id', chatbot.id)
+        .eq('active', true),
+    ]);
 
+  const existingQAQuestions = (qaData.data ?? []).map(
+    (r: { question: string }) => r.question as string,
+  );
   const unansweredCount = items.filter((x) => x.unanswered).length;
 
   return (
@@ -103,11 +120,32 @@ export default async function V1GesprekkenPage({
         actions={<ReloadButton />}
       />
 
-      <FilterBar active={filter} />
+      <TabsNav
+        basePath="/v1/app/gesprekken"
+        paramName="view"
+        active={view}
+        tabs={[
+          { key: 'gesprekken', label: 'Alle gesprekken', count: items.length },
+          { key: 'top-questions', label: 'Meest gestelde vragen', count: faqResult.items.length },
+        ]}
+      />
 
-      {filter === 'negative_feedback' ? (
+      {view === 'top-questions' && (
+        <TopQuestionsTab
+          initial={faqResult.items}
+          totalUnique={faqResult.totalUnique}
+          pending={faqResult.pending}
+          generatedAt={faqResult.generatedAt}
+          config={faqConfig}
+          existingQAQuestions={existingQAQuestions}
+        />
+      )}
+
+      {view === 'gesprekken' && <FilterBar active={filter} />}
+
+      {view === 'gesprekken' && filter === 'negative_feedback' ? (
         <NegativeFeedbackTable items={negativeFeedback} />
-      ) : items.length === 0 ? (
+      ) : view === 'gesprekken' && items.length === 0 ? (
         <div className="klant-empty">
           <div className="klant-empty-icon">
             <MessagesSquare size={26} strokeWidth={1.6} />
@@ -121,7 +159,7 @@ export default async function V1GesprekkenPage({
               : 'Zodra je widget live staat, verschijnen hier de gesprekken van je bezoekers.'}
           </p>
         </div>
-      ) : (
+      ) : view === 'gesprekken' ? (
         <>
           {recentNegativeCount > 0 && (
             <div
@@ -260,7 +298,7 @@ export default async function V1GesprekkenPage({
             </ul>
           </div>
         </>
-      )}
+      ) : null}
     </>
   );
 }

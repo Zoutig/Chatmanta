@@ -58,6 +58,8 @@ export default async function V1AdminLayout({ children }: { children: React.Reac
         <nav style={{ display: 'flex', gap: 18, fontSize: 14 }}>
           <Link href="/v1/admin/organizations">Organisaties</Link>
           <Link href="/v1/admin/jobs">Jobs</Link>
+          <Link href="/v1/admin/quiz">Quiz</Link>
+          <Link href="/v1/admin/feedback">Feedback</Link>
           <Link href="/v1/admin/audit">Audit-log</Link>
         </nav>
       </header>
