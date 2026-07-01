@@ -11,6 +11,7 @@ const OPTIONS: { key: V1ConversationFilter; label: string }[] = [
   { key: 'last_7_days', label: 'Laatste 7 dagen' },
   { key: 'last_30_days', label: 'Laatste 30 dagen' },
   { key: 'unanswered', label: 'Onbeantwoord' },
+  { key: 'negative_feedback', label: 'Negatieve feedback' },
 ];
 
 export function FilterBar({ active }: { active: V1ConversationFilter }) {

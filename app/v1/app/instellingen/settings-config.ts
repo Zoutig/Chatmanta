@@ -13,7 +13,9 @@ import type {
   Language,
   SourceStrictness,
   ToneOfVoice,
+  WidgetLogoStyle,
   WidgetPosition,
+  WidgetTheme,
 } from '@/lib/v0/klantendashboard/types';
 import {
   buildChatbotOverrides,
@@ -40,13 +42,20 @@ export type V1WidgetAppearance = {
   position: WidgetPosition;
   headerTitle: string;
   launcherText: string;
+  // Widget-uiterlijk uitbreiding (V0-parity: logo-stijl + thema + ondertitel)
+  logoStyle: WidgetLogoStyle;
+  customLogoDataUrl: string | null;
+  theme: WidgetTheme;
+  subtitle: string;
 };
 
 /** V1-settings = de V0-antwoordvelden + de M-B widget-appearance-velden + de V1
- *  contactverzoeken-toggle. `contactRequestsEnabled` leeft naast de andere velden
- *  in chatbots.settings jsonb; de widget-capture (andere milestone) leest 'm. */
+ *  contactverzoeken-toggle + notificatie-e-mail. Alle velden leven in
+ *  chatbots.settings jsonb. `contactRequestsEnabled` + `notificationEmail` worden
+ *  bewust LOS van de gewone chatbot-save bijgehouden (eigen sectie + eigen patch). */
 export type V1ChatbotSettings = ChatbotSettings & V1WidgetAppearance & {
   contactRequestsEnabled: boolean;
+  notificationEmail: string; // '' = gebruik het org-standaard-e-mailadres
 };
 
 // Neutrale V1-default — één set i.p.v. de org-gekeyde V0-mock (die hangt aan de
@@ -56,8 +65,6 @@ export type V1ChatbotSettings = ChatbotSettings & V1WidgetAppearance & {
 export const V1_DEFAULT_CHATBOT_SETTINGS: V1ChatbotSettings = {
   chatbotName: '',
   companyDescription: '',
-  // Widget-only velden (niet getoond in de V1-UI) — defaults bewaard zodat het
-  // type compleet is; de widget-milestone geeft ze pas een oppervlak.
   welcomeMessage: 'Hoi! Hoe kan ik je helpen?',
   starterQuestions: [],
   primaryLanguage: 'nl',
@@ -85,9 +92,15 @@ export const V1_DEFAULT_CHATBOT_SETTINGS: V1ChatbotSettings = {
   position: 'bottom-right',
   headerTitle: '',
   launcherText: '',
+  // Widget-logo + thema + ondertitel (V0-parity).
+  logoStyle: 'chat-bubble',
+  customLogoDataUrl: null,
+  theme: 'auto',
+  subtitle: '',
   // V1 contactverzoeken-toggle — opt-in (default uit). Aan = de widget biedt
   // bezoekers met een contactvraag een formulier aan + de dashboard-tab toont data.
   contactRequestsEnabled: false,
+  notificationEmail: '',
 };
 
 // Toegestane waarden per enum-veld (runtime-spiegel van de string-union types).
@@ -101,6 +114,8 @@ const LANGUAGE_VALUES = ['nl', 'en', 'de', 'fr', 'es'] as const satisfies readon
 const ANSWER_LENGTH_VALUES = ['short', 'normal', 'long'] as const satisfies readonly AnswerLength[];
 const SOURCE_STRICTNESS_VALUES = ['strict', 'normal', 'flexible'] as const satisfies readonly SourceStrictness[];
 const WIDGET_POSITION_VALUES = ['bottom-right', 'bottom-left'] as const satisfies readonly WidgetPosition[];
+const WIDGET_LOGO_STYLE_VALUES = ['brand-mark', 'chat-bubble', 'custom-logo'] as const satisfies readonly WidgetLogoStyle[];
+const WIDGET_THEME_VALUES = ['auto', 'light', 'dark'] as const satisfies readonly WidgetTheme[];
 
 const ENUM_VALUES: Partial<Record<keyof V1ChatbotSettings, readonly string[]>> = {
   toneOfVoice: TONE_OF_VOICE_VALUES,
@@ -108,12 +123,18 @@ const ENUM_VALUES: Partial<Record<keyof V1ChatbotSettings, readonly string[]>> =
   answerLength: ANSWER_LENGTH_VALUES,
   sourceStrictness: SOURCE_STRICTNESS_VALUES,
   position: WIDGET_POSITION_VALUES,
+  logoStyle: WIDGET_LOGO_STYLE_VALUES,
+  theme: WIDGET_THEME_VALUES,
 };
 
 // accentColor stroomt rauw in style={{ background: accentColor }} van de widget.
 // Een niet-kleur als `url(https://evil/x)` zou élke widget-load een externe resource
 // laten ophalen → afdwingen dat het een #rrggbb hex-kleur is (trust-boundary-validatie).
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+// Maximale grootte van een base64-data-URL voor het custom logo (200KB bestand →
+// ~267KB base64). Iets ruimer om encoding-overhead op te vangen.
+const MAX_LOGO_DATA_URL_CHARS = 300 * 1024;
 
 /**
  * Merge de opgeslagen jsonb over de V1-defaults. Ontbrekend veld → default (niet
@@ -141,6 +162,8 @@ export function mergeChatbotSettings(raw: unknown): V1ChatbotSettings {
     if (value === undefined) valid = false;
     else if (allowed) valid = typeof value === 'string' && allowed.includes(value);
     else if (key === 'accentColor') valid = typeof value === 'string' && HEX_COLOR_RE.test(value);
+    // customLogoDataUrl mag null zijn (logo verwijderd) of een string (data-URL).
+    else if (key === 'customLogoDataUrl') valid = value === null || typeof value === 'string';
     else if (typeof def === 'string') valid = typeof value === 'string';
     else if (typeof def === 'boolean') valid = typeof value === 'boolean';
     else if (Array.isArray(def)) valid = Array.isArray(value) && value.every((v) => typeof v === 'string');
@@ -190,44 +213,67 @@ export function buildV1ChatbotInputs(
 // Save-patch sanitatie (NIT-hardening)
 // ---------------------------------------------------------------------------
 
-// Whitelist: alléén de antwoord-beïnvloedende velden die het Instellingen-formulier
-// ook bewerkt. De form stuurt het hele settings-object mee (incl. uit `current`
-// overgenomen widget-/contact-velden); filteren zorgt dat een gemaakte action-call
-// geen vreemde of widget-only velden op de eigen org kan persisteren.
+// Whitelist: alléén de velden die de Instellingen- of Widget-pagina bewerken.
+// De form stuurt het hele settings-object mee (incl. uit `current` overgenomen
+// velden); filteren zorgt dat een gemaakte action-call geen vreemde of andere-
+// pagina-velden kan persisteren.
 const ALLOWED_PATCH_FIELDS = [
+  // Basis
   'chatbotName',
   'companyDescription',
+  // Startsuggesties (Instellingen-pagina)
+  'starterQuestions',
+  'showStarterQuestions',
+  // Taal
   'primaryLanguage',
+  'autoDetectLanguage',
+  // Tone of voice
   'toneOfVoice',
   'extraInstructions',
+  // Antwoordgedrag
   'answerLength',
   'sourceStrictness',
   'mayMentionPrices',
   'mayShareContact',
   'honestAboutUnknown',
+  'unknownAnswerMessage',
+  // Fallback & contact
   'fallbackMessage',
-  // V1 contactverzoeken-toggle (boolean) — passeert sanitizeChatbotPatch ongemoeid,
-  // net als de andere booleans; mergeChatbotSettings valideert het type op read.
+  'contactEmail',
+  'contactPhone',
+  'contactPageUrl',
+  // Contactverzoeken (eigen sectie)
   'contactRequestsEnabled',
-  // M-B widget-appearance (klant-editor). NIET allowed_domains — Jorion-beheerd (M-D).
+  'notificationEmail',
+  // Widget-appearance (Widget-pagina). NIET allowed_domains — Jorion-beheerd (M-D).
   'welcomeMessage',
   'accentColor',
   'position',
   'headerTitle',
   'launcherText',
+  'logoStyle',
+  'customLogoDataUrl',
+  'theme',
+  'subtitle',
 ] as const satisfies readonly (keyof V1ChatbotSettings)[];
 
-// Lengte-caps op de vrije-tekstvelden (stijl van ORG_NAME_MAX in account/actions.ts)
-// → een action-call kan geen onbegrensde prompt-bloat in de system-prompt persisteren.
+// Lengte-caps op de vrije-tekstvelden → een action-call kan geen onbegrensde
+// prompt-bloat in de system-prompt persisteren.
 const TEXT_FIELD_MAX: Partial<Record<(typeof ALLOWED_PATCH_FIELDS)[number], number>> = {
   chatbotName: 120,
   companyDescription: 2000,
   extraInstructions: 4000,
   fallbackMessage: 1000,
+  unknownAnswerMessage: 1000,
+  contactEmail: 200,
+  contactPhone: 60,
+  contactPageUrl: 300,
+  notificationEmail: 200,
   welcomeMessage: 300,
   accentColor: 32,
   headerTitle: 120,
   launcherText: 120,
+  subtitle: 120,
 };
 
 /**
@@ -240,6 +286,15 @@ export function sanitizeChatbotPatch(patch: Partial<V1ChatbotSettings>): Partial
   for (const key of ALLOWED_PATCH_FIELDS) {
     const value = patch[key];
     if (value === undefined) continue;
+
+    // customLogoDataUrl: mag null zijn (logo wissen) of een string (data-URL, max cap).
+    // Niet in TEXT_FIELD_MAX omdat null geen string is en de check dan zou gooien.
+    if (key === 'customLogoDataUrl') {
+      if (value !== null && (typeof value !== 'string' || value.length > MAX_LOGO_DATA_URL_CHARS)) continue;
+      clean[key] = value;
+      continue;
+    }
+
     const max = TEXT_FIELD_MAX[key];
     if (max !== undefined) {
       if (typeof value !== 'string') {

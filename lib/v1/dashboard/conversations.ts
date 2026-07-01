@@ -15,7 +15,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { NegativeFeedbackItem } from '@/lib/v0/klantendashboard/types';
 
-export type V1ConversationFilter = 'today' | 'last_7_days' | 'last_30_days' | 'unanswered';
+export type V1ConversationFilter = 'today' | 'last_7_days' | 'last_30_days' | 'unanswered' | 'negative_feedback';
 
 export type V1ConversationListItem = {
   id: string;
@@ -149,6 +149,33 @@ export async function getV1Conversation(
     },
     messages,
   };
+}
+
+// ---------------------------------------------------------------------------
+// countRecentNegativeFeedback — telt negatieve feedback (rating='down') in de
+// laatste `days` dagen voor de DANGER-banner op de gesprekken-lijst.
+// ---------------------------------------------------------------------------
+export async function countRecentNegativeFeedback(
+  client: SupabaseClient,
+  orgId: string,
+  chatbotId: string,
+  days: number,
+): Promise<number> {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const { count, error } = await client
+      .from('feedback')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .eq('rating', 'down')
+      .gte('created_at', since.toISOString());
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 // ---------------------------------------------------------------------------
