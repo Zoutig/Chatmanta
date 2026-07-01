@@ -407,6 +407,125 @@ export async function processUploadedDocAction(
   });
 }
 
+// ─── Losse pagina importeren ────────────────────────────────────────────────
+
+/** Schraap één URL en ingest die als website-document (maakt bron aan indien nodig). */
+export async function scrapeSinglePageAction(rawUrl: string): Promise<ActionResult> {
+  let ctx: V1CrawlCtx;
+  try {
+    ctx = await requireV1OrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { sb, orgId, chatbotId } = ctx;
+    const url = normalizeUrl(rawUrl);
+    const check = await validateCrawlUrl(url);
+    if (!check.allowed) fail('CRAWL_FAILED', check.reason);
+    const sourceId = await upsertWebsiteSource(sb, orgId, chatbotId, url, hostnameOf(url));
+    const page = await scrapeOne(url);
+    page.url = page.url || url;
+    const { status, error: ingestError } = await ingestSinglePage(sb, sourceId, orgId, chatbotId, page);
+    if (status === 'failed') fail('CRAWL_FAILED', ingestError ?? page.error ?? 'Pagina kon niet worden opgehaald.');
+    await sb.from('knowledge_sources')
+      .update({ status: 'ready' })
+      .eq('id', sourceId).eq('organization_id', orgId).eq('chatbot_id', chatbotId);
+    revalidatePath(KENNISBANK_PATH);
+    return {};
+  });
+}
+
+// ─── Document lezen (bronnen-viewer) ────────────────────────────────────────
+
+/** Reconstrueer de tekst van een geüpload document uit de document_chunks. */
+export async function getDocContentAction(
+  docId: string,
+): Promise<ActionResult<{ title: string; text: string }>> {
+  let ctx: V1CrawlCtx;
+  try {
+    ctx = await requireV1OrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { sb, orgId, chatbotId } = ctx;
+    const { data: doc } = await sb
+      .from('documents')
+      .select('filename')
+      .eq('id', docId).eq('organization_id', orgId).eq('chatbot_id', chatbotId).eq('source', 'upload')
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!doc) fail('NOT_FOUND', 'Document niet gevonden.');
+    const { data: rows, error } = await sb
+      .from('document_chunks')
+      .select('content, metadata')
+      .eq('document_id', docId).eq('organization_id', orgId).eq('chatbot_id', chatbotId);
+    if (error) throw new Error(`document_chunks read: ${error.message}`);
+    const ordered = (rows ?? [])
+      .map((r) => ({ idx: Number((r.metadata as { chunk_index?: number } | null)?.chunk_index ?? 0), content: (r.content as string) ?? '' }))
+      .sort((a, b) => a.idx - b.idx);
+    return { title: doc.filename as string, text: ordered.map((o) => o.content).join('\n\n') };
+  });
+}
+
+/** Reconstrueer de tekst van een gecrawlde website-pagina (V1: pages-as-documents). */
+export async function getPageContentAction(
+  pageId: string,
+): Promise<ActionResult<{ title: string; url: string; text: string }>> {
+  let ctx: V1CrawlCtx;
+  try {
+    ctx = await requireV1OrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { sb, orgId, chatbotId } = ctx;
+    const { data: doc } = await sb
+      .from('documents')
+      .select('filename, metadata')
+      .eq('id', pageId).eq('organization_id', orgId).eq('chatbot_id', chatbotId).eq('source', 'website')
+      .maybeSingle();
+    if (!doc) fail('NOT_FOUND', 'Pagina niet gevonden.');
+    const meta = (doc.metadata ?? {}) as Record<string, unknown>;
+    const { data: rows, error } = await sb
+      .from('document_chunks')
+      .select('content, metadata')
+      .eq('document_id', pageId).eq('organization_id', orgId).eq('chatbot_id', chatbotId);
+    if (error) throw new Error(`document_chunks read: ${error.message}`);
+    const ordered = (rows ?? [])
+      .map((r) => ({ idx: Number((r.metadata as { chunk_index?: number } | null)?.chunk_index ?? 0), content: (r.content as string) ?? '' }))
+      .sort((a, b) => a.idx - b.idx);
+    return {
+      title: (meta.source_title as string | null) ?? (doc.filename as string) ?? '',
+      url: (meta.source_url as string | null) ?? '',
+      text: ordered.map((o) => o.content).join('\n\n'),
+    };
+  });
+}
+
+// ─── Document verwijderen ────────────────────────────────────────────────────
+
+/** Soft-delete een geüpload document (sets deleted_at) + purge answer-cache. */
+export async function deleteDocumentAction(docId: string): Promise<ActionResult> {
+  let ctx: V1CrawlCtx;
+  try {
+    ctx = await requireV1OrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { sb, orgId, chatbotId } = ctx;
+    const { error } = await sb
+      .from('documents')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', docId).eq('organization_id', orgId).eq('chatbot_id', chatbotId).eq('source', 'upload');
+    if (error) throw new Error(`documents soft-delete: ${error.message}`);
+    await purgeAnswerCache(sb, orgId, chatbotId);
+    revalidatePath(KENNISBANK_PATH);
+    return {};
+  });
+}
+
 // ─── helper ────────────────────────────────────────────────────────────────
 
 /** Hergebruikt of maakt de website-bron van de org+chatbot VOOR DIT DOMEIN; status
