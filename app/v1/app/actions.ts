@@ -5,7 +5,7 @@ import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
-import { runRagQuery, type ChatResponse } from '@/lib/rag/run-rag-query';
+import { runRagQuery, type ChatResponse, type ChatHistoryTurn } from '@/lib/rag/run-rag-query';
 import { logRagQuery } from '@/lib/rag/log-query';
 import { V1_RAG_DEFAULTS, getOrgChatbot } from './rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
@@ -18,7 +18,7 @@ export type AskV1Result =
       error: 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' | 'RATE_LIMITED' | 'BUDGET_EXHAUSTED' | 'MONTHLY_LIMIT';
     };
 
-export async function askV1(question: string): Promise<AskV1Result> {
+export async function askV1(question: string, history?: ChatHistoryTurn[]): Promise<AskV1Result> {
   if (!question || question.trim().length === 0) return { ok: false, error: 'FAILED' };
 
   // SA-1: org NIET uit client-input/env — uit de getrouwde sessie. getSessionOrg
@@ -84,6 +84,8 @@ export async function askV1(question: string): Promise<AskV1Result> {
       tone: overrides.tone,
       length: overrides.length,
       chatbotOverrides: overrides,
+      // Multi-turn context voor de preview-widget. Lege array (geen history) = single-turn.
+      history,
       // Cache aan (PR-3 3a): lezen onder de RLS session-client, schrijven via de
       // service-role client (answer_cache is SELECT-only onder RLS).
       serviceClient: getV1ServiceRoleClient(),

@@ -1,33 +1,47 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight, Menu } from 'lucide-react';
+import { Bell, ChevronRight, ExternalLink, Menu, SlidersHorizontal } from 'lucide-react';
+import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
 import { AnimatedThemeToggler } from '@/app/components/ui/animated-theme-toggler';
+import { TWEAKS_TOGGLE_EVENT } from '@/app/klantendashboard/components/tweaks/tweaks-panel';
+import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 
-// Breadcrumb-labels per route. usePathname is client-only → de topbar is een
-// client-island (zoals V0), óók voor de drawer-state.
+// Breadcrumb-labels per V1-route. usePathname is client-only — vandaar dat de
+// topbar een client-island blijft (zoals V0, ook voor de drawer-state).
 const SECTION_LABELS: { match: (p: string) => boolean; label: string }[] = [
   { match: (p) => p === '/v1/app', label: 'Overzicht' },
-  { match: (p) => p.startsWith('/v1/app/preview'), label: 'Preview chatbot' },
+  { match: (p) => p.startsWith('/v1/app/kennisbank'), label: 'Kennisbank' },
+  { match: (p) => p.startsWith('/v1/app/preview'), label: 'Preview Chatbot' },
+  { match: (p) => p.startsWith('/v1/app/instellingen'), label: 'Instellingen' },
+  { match: (p) => p.startsWith('/v1/app/widget'), label: 'Widget' },
   { match: (p) => p.startsWith('/v1/app/gesprekken'), label: 'Gesprekken' },
   { match: (p) => p.startsWith('/v1/app/contactverzoeken'), label: 'Contactverzoeken' },
-  { match: (p) => p.startsWith('/v1/app/kennisbank'), label: 'Kennisbank' },
-  { match: (p) => p.startsWith('/v1/app/widget'), label: 'Widget' },
-  { match: (p) => p.startsWith('/v1/app/instellingen'), label: 'Instellingen' },
   { match: (p) => p.startsWith('/v1/app/account'), label: 'Account' },
+  { match: (p) => p.startsWith('/v1/app/feedback'), label: 'Feedback' },
 ];
 
 function sectionLabel(pathname: string): string {
   return SECTION_LABELS.find((s) => s.match(pathname))?.label ?? 'Overzicht';
 }
 
-export function V1Topbar() {
+export function V1Topbar({
+  orgName,
+  chatbotStatus,
+  unansweredCount = 0,
+  negativeFeedbackCount = 0,
+}: {
+  orgName: string;
+  chatbotStatus: ChatbotStatus;
+  unansweredCount?: number;
+  negativeFeedbackCount?: number;
+}) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const notifCount = unansweredCount + negativeFeedbackCount;
 
-  // Drawer-toggle: zet data-klant-drawer-open op het [data-klant-scope]-element
-  // (klant.css' off-canvas-mechanisme onder ≤900px). Gekopieerd uit V0-topbar.
   const toggleDrawer = (open: boolean) => {
     setDrawerOpen(open);
     if (typeof document !== 'undefined') {
@@ -37,7 +51,8 @@ export function V1Topbar() {
     }
   };
 
-  // Sluit de drawer bij navigatie naar een andere sectie.
+  // Sluit de drawer zodra je naar een andere sectie navigeert. Zonder dit blijft
+  // de off-canvas drawer open staan over de nieuwe pagina heen.
   useEffect(() => {
     setDrawerOpen(false);
     if (typeof document !== 'undefined') {
@@ -47,6 +62,12 @@ export function V1Topbar() {
       document.body.dataset.klantDrawerOpen = 'false';
     }
   }, [pathname]);
+
+  const openTweaks = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(TWEAKS_TOGGLE_EVENT));
+    }
+  };
 
   return (
     <header className="klant-topbar">
@@ -61,15 +82,22 @@ export function V1Topbar() {
           <Menu size={18} strokeWidth={1.7} />
         </button>
 
+        {/* Breadcrumb: actieve org → sectie */}
         <nav
           aria-label="Kruimelpad"
           style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minWidth: 0 }}
         >
           <span
             className="klant-topbar-label"
-            style={{ color: 'var(--klant-muted)', whiteSpace: 'nowrap' }}
+            style={{
+              color: 'var(--klant-muted)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: 180,
+            }}
           >
-            Klantendashboard
+            {orgName || 'Klantendashboard'}
           </span>
           <ChevronRight
             size={14}
@@ -91,7 +119,72 @@ export function V1Topbar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="klant-topbar-label">
+          <StatusBadge status={chatbotStatus} />
+        </span>
+
+        {/* Notificaties → onbeantwoord + negatieve feedback */}
+        <Link
+          href="/v1/app/gesprekken?filter=unanswered"
+          className="klant-ui-iconbtn"
+          style={{ width: 34, height: 34, position: 'relative' }}
+          title={
+            notifCount > 0
+              ? `${notifCount} item(s) die aandacht vragen`
+              : 'Geen openstaande items'
+          }
+          aria-label="Notificaties"
+        >
+          <Bell size={15} strokeWidth={1.7} />
+          {notifCount > 0 && (
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: -3,
+                right: -3,
+                minWidth: 15,
+                height: 15,
+                padding: '0 4px',
+                borderRadius: 999,
+                background: 'var(--klant-warn)',
+                color: 'var(--klant-bg)',
+                fontSize: 9.5,
+                fontWeight: 700,
+                lineHeight: '15px',
+                textAlign: 'center',
+                fontFamily: 'var(--klant-font-body)',
+              }}
+            >
+              {notifCount > 9 ? '9+' : notifCount}
+            </span>
+          )}
+        </Link>
+
+        {/* Weergave-opties (modus / accent / dichtheid) */}
+        <button
+          type="button"
+          className="klant-ui-iconbtn"
+          style={{ width: 34, height: 34 }}
+          onClick={openTweaks}
+          title="Weergave-opties"
+          aria-label="Weergave-opties"
+        >
+          <SlidersHorizontal size={15} strokeWidth={1.7} />
+        </button>
+
         <AnimatedThemeToggler />
+
+        <Link
+          href="/v1/app/preview"
+          className="klant-ui-btn klant-topbar-preview-btn"
+          data-variant="secondary"
+          data-size="md"
+          title="Open de widget-demo om te zien hoe je chatbot op een website verschijnt"
+        >
+          <ExternalLink size={14} strokeWidth={1.7} />
+          <span>Preview chatbot</span>
+        </Link>
       </div>
 
       {drawerOpen ? (
