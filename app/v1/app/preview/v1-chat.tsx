@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { askV1, type AskV1Result } from './actions';
+import { askV1, type AskV1Result } from '../actions';
 
 type AskV1Error = Extract<AskV1Result, { ok: false }>['error'];
 
@@ -46,9 +46,10 @@ export function V1Chat({ chatbotName }: { chatbotName: string }) {
   }
 
   return (
-    <section>
+    <div className="klant-card" style={{ width: 'min(560px, 100%)' }}>
       <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: '0 0 12px' }}>
-        Stel een vraag aan <strong style={{ color: 'var(--klant-ink)' }}>{chatbotName}</strong>.
+        Stel een vraag aan <strong style={{ color: 'var(--klant-ink)' }}>{chatbotName}</strong> en
+        zie het antwoord dat je bezoekers krijgen.
       </p>
       <form onSubmit={onSubmit} style={{ display: 'flex', gap: 10 }}>
         <input
@@ -95,6 +96,6 @@ export function V1Chat({ chatbotName }: { chatbotName: string }) {
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }

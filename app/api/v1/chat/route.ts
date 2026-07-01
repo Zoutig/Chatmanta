@@ -18,6 +18,7 @@ import {
   type ChatHistoryTurn,
 } from '@/lib/rag/run-rag-query';
 import { logRagQuery } from '@/lib/rag/log-query';
+import { appendTurn } from '@/lib/v1/conversations/write';
 import { hashIp } from '@/lib/observability/hash-ip';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
@@ -38,7 +39,9 @@ export const maxDuration = 60;
 // Defense-in-depth payload-grens; de semantische cap zit in de engine.
 const MAX_QUESTION_CHARS = 8000;
 
-type Body = { question?: unknown; version?: unknown; history?: unknown };
+type Body = { question?: unknown; version?: unknown; history?: unknown; threadId?: unknown };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function parseHistory(input: unknown): ChatHistoryTurn[] {
   if (!Array.isArray(input)) return [];
@@ -113,6 +116,11 @@ export async function POST(req: Request) {
   if (!question.trim() || question.length > MAX_QUESTION_CHARS) {
     return new NextResponse(null, { status: 400, headers: { 'X-Request-Id': requestId } });
   }
+  // Client-gegenereerde sessie-thread-id (uuid). Alléén voor het transcript — niet
+  // voor autorisatie (org+chatbot komen uit het token). Ongeldig/ontbrekend → geen
+  // thread-write (de chat draait gewoon door).
+  const threadId =
+    typeof body.threadId === 'string' && UUID_RE.test(body.threadId) ? body.threadId : null;
 
   // 2b. Prompt-injection gate — V0 public-path parity: het publieke widget-pad
   //     blokkeert injection ALTIJD, vóór enige pipeline/DB-call. Eén terminale
@@ -260,6 +268,26 @@ export async function POST(req: Request) {
             overrideId: queryLogId,
           }),
         );
+
+        // 8b. Transcript-write — ADDITIEF na de pipeline, best-effort. Org+chatbot
+        //     komen uit het token (NOOIT de body); threadId is de client-sessie-uuid.
+        //     appendTurn throwt nooit; een write-fout breekt de stream niet.
+        //     finalResponse.kind ∈ {smalltalk,answer,fallback} — alle geldig in de
+        //     thread_messages.kind-CHECK.
+        if (threadId) {
+          const turnAnswer = responseForLog.answer;
+          const turnKind = responseForLog.kind;
+          after(() =>
+            appendTurn(getV1ServiceRoleClient(), {
+              orgId: organizationId,
+              chatbotId: activeChatbot.id,
+              threadId,
+              question: question.trim(),
+              answer: turnAnswer,
+              kind: turnKind,
+            }),
+          );
+        }
       }
     },
   });

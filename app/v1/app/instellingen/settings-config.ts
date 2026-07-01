@@ -42,8 +42,12 @@ export type V1WidgetAppearance = {
   launcherText: string;
 };
 
-/** V1-settings = de V0-antwoordvelden + de M-B widget-appearance-velden. */
-export type V1ChatbotSettings = ChatbotSettings & V1WidgetAppearance;
+/** V1-settings = de V0-antwoordvelden + de M-B widget-appearance-velden + de V1
+ *  contactverzoeken-toggle. `contactRequestsEnabled` leeft naast de andere velden
+ *  in chatbots.settings jsonb; de widget-capture (andere milestone) leest 'm. */
+export type V1ChatbotSettings = ChatbotSettings & V1WidgetAppearance & {
+  contactRequestsEnabled: boolean;
+};
 
 // Neutrale V1-default — één set i.p.v. de org-gekeyde V0-mock (die hangt aan de
 // V0-sandbox-slugs). Een ontbrekend jsonb-veld valt hierop terug; lege strings
@@ -81,6 +85,9 @@ export const V1_DEFAULT_CHATBOT_SETTINGS: V1ChatbotSettings = {
   position: 'bottom-right',
   headerTitle: '',
   launcherText: '',
+  // V1 contactverzoeken-toggle — opt-in (default uit). Aan = de widget biedt
+  // bezoekers met een contactvraag een formulier aan + de dashboard-tab toont data.
+  contactRequestsEnabled: false,
 };
 
 // Toegestane waarden per enum-veld (runtime-spiegel van de string-union types).
@@ -199,6 +206,9 @@ const ALLOWED_PATCH_FIELDS = [
   'mayShareContact',
   'honestAboutUnknown',
   'fallbackMessage',
+  // V1 contactverzoeken-toggle (boolean) — passeert sanitizeChatbotPatch ongemoeid,
+  // net als de andere booleans; mergeChatbotSettings valideert het type op read.
+  'contactRequestsEnabled',
   // M-B widget-appearance (klant-editor). NIET allowed_domains — Jorion-beheerd (M-D).
   'welcomeMessage',
   'accentColor',

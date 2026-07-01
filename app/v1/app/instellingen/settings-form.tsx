@@ -14,7 +14,6 @@ import type {
   Language,
   SourceStrictness,
   ToneOfVoice,
-  WidgetPosition,
 } from '@/lib/v0/klantendashboard/types';
 
 const TONE_OPTIONS: { value: ToneOfVoice; label: string; help: string }[] = [
@@ -50,8 +49,26 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
   function save() {
     setSaved(false);
     setError(null);
+    // Widget-uiterlijk-velden (accentColor/position/headerTitle/launcherText/
+    // welcomeMessage) leven nu op de Widget-pagina en worden hier niet bewerkt —
+    // dus ook NIET meesturen: anders zou een stale waarde uit deze (mogelijk eerder
+    // geladen) pagina een wijziging op de Widget-pagina overschrijven (data-loss).
+    const answerPatch: Partial<V1ChatbotSettings> = {
+      chatbotName: s.chatbotName,
+      companyDescription: s.companyDescription,
+      primaryLanguage: s.primaryLanguage,
+      toneOfVoice: s.toneOfVoice,
+      extraInstructions: s.extraInstructions,
+      answerLength: s.answerLength,
+      sourceStrictness: s.sourceStrictness,
+      mayMentionPrices: s.mayMentionPrices,
+      mayShareContact: s.mayShareContact,
+      honestAboutUnknown: s.honestAboutUnknown,
+      fallbackMessage: s.fallbackMessage,
+      contactRequestsEnabled: s.contactRequestsEnabled,
+    };
     startTransition(async () => {
-      const res = await saveChatbotSettingsAction(s);
+      const res = await saveChatbotSettingsAction(answerPatch);
       if (res.ok) {
         setS(res.settings);
         setBaseline(res.settings);
@@ -172,6 +189,12 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
           value={s.honestAboutUnknown}
           onChange={(v) => update('honestAboutUnknown', v)}
         />
+        <Toggle
+          label="Contactverzoeken aanzetten"
+          help="De chatbot biedt bezoekers met een contactvraag een kort formulier aan. De verzoeken verschijnen onder Contactverzoeken."
+          value={s.contactRequestsEnabled}
+          onChange={(v) => update('contactRequestsEnabled', v)}
+        />
       </Section>
 
       <Section title="Fallback">
@@ -181,57 +204,6 @@ export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
             rows={3}
             value={s.fallbackMessage}
             onChange={(e) => update('fallbackMessage', e.target.value)}
-          />
-        </Field>
-      </Section>
-
-      <Section title="Widget">
-        <Field label="Accentkleur" hint="Kleur van de chat-knop, header en verstuurknop.">
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="color"
-              value={/^#[0-9a-fA-F]{6}$/.test(s.accentColor) ? s.accentColor : '#2563eb'}
-              onChange={(e) => update('accentColor', e.target.value)}
-              style={{ width: 44, height: 36, padding: 0, border: '1px solid var(--klant-border)', borderRadius: 'var(--klant-r-md)', cursor: 'pointer' }}
-              aria-label="Accentkleur"
-            />
-            <input
-              className="klant-input"
-              style={{ width: 120 }}
-              value={s.accentColor}
-              onChange={(e) => update('accentColor', e.target.value)}
-            />
-          </div>
-        </Field>
-        <Field label="Positie" hint="Hoek waar de chat-knop op de site verschijnt.">
-          <select
-            className="klant-select"
-            value={s.position}
-            onChange={(e) => update('position', e.target.value as WidgetPosition)}
-          >
-            <option value="bottom-right">Rechtsonder</option>
-            <option value="bottom-left">Linksonder</option>
-          </select>
-        </Field>
-        <Field label="Titel in de header" hint="Leeg laten → de chatbotnaam wordt gebruikt.">
-          <input
-            className="klant-input"
-            value={s.headerTitle}
-            onChange={(e) => update('headerTitle', e.target.value)}
-          />
-        </Field>
-        <Field label="Welkomstbericht" hint="Het eerste bericht dat de bezoeker ziet in het chatvenster.">
-          <input
-            className="klant-input"
-            value={s.welcomeMessage}
-            onChange={(e) => update('welcomeMessage', e.target.value)}
-          />
-        </Field>
-        <Field label="Tekst bij de knop" hint="Optioneel tooltip-bubbeltje naast de chat-knop. Leeg = geen tooltip.">
-          <input
-            className="klant-input"
-            value={s.launcherText}
-            onChange={(e) => update('launcherText', e.target.value)}
           />
         </Field>
       </Section>

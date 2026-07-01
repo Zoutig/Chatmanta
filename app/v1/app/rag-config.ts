@@ -25,10 +25,11 @@ const V1_OVERRIDES = {
   // client (RLS SELECT); schrijven via een service-role client die askV1
   // injecteert (answer_cache is SELECT-only onder RLS).
   cacheEnabled: true,
-  // PR-3b: website-documents dragen nu source_url (de match-RPC geeft
-  // d.metadata->>'source_url' terug) → bronlinks aan. Document-only orgs hebben
-  // source_url null → de sanitizer maakt er gewoon platte tekst van (geen link).
-  sourceLinksEnabled: true,
+  // V1 hard rule (AGENTS.md): bronlinks UIT in V1. Ook al dragen website-documents
+  // source_url en zou de match-RPC/sanitizer ze veilig kunnen renderen, de bewuste
+  // keuze is geen bronlinks in V1 (Seb, 2026-06-30). Zet niet terug op true zonder
+  // die regel opnieuw te wegen.
+  sourceLinksEnabled: false,
   generalKnowledgeEnabled: false,
 } satisfies Partial<RagConfig>;
 
