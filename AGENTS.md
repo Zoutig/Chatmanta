@@ -186,6 +186,7 @@ CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill
 - Vul `.github/pull_request_template.md` volledig in. Dit is wat de reviewer + zijn agent leest om context te krijgen — schrijf het voor een collega die niet bij je gesprek was.
 - Run `graphify update .` bij nieuwe files of grote refactors (output is gitignored — alleen lokaal up-to-date houden, niet committen)
 - Check of je geen V1 hard rules schendt (zie boven)
+- Definition of Done vóór de PR: `npm run typecheck` én `npm run build` groen (Windows: verwijder eerst `.next/` als er een dev-server heeft gedraaid — een vervuilde `.next` crasht de build), en het gedrag geverifieerd via test, Playwright of browser
 - PR aanmaken met `gh pr create` — gebruik de template (gh detecteert die automatisch)
 
 **Branch protection op `main`:**
@@ -199,3 +200,7 @@ CC heeft een `EnterWorktree` tool en een `superpowers:using-git-worktrees` skill
 - Probeer NOOIT `git push --no-verify` zonder dat de gebruiker er expliciet om vraagt. Dit ondermijnt de hele bescherming.
 - **Geen absolute paden naar de hoofdrepo vanuit een worktree-sessie.** Edit/Write met `C:\Users\solys\Documents\Code\chatmanta\...` terwijl je in `../chatmanta-<doel>/` werkt schrijft naar de hoofdrepo, niet je worktree — je commit landt dan in de verkeerde branch. Gebruik relatieve paden of paden onder de worktree-root. De globale pre-edit hook (`~/.claude/hooks/pre-edit-worktree-check.ps1`) print bij elke edit de worktree-root en branch, en flagt `OUTSIDE WORKTREE` als je een vreemd pad raakt — neem die warning serieus en heroverweeg vóór je verder typt.
 - **Na een merge ruim je op:** `git branch -D feat/seb/<branch>` lokaal (squash-merges → `-d` faalt altijd, dus `-D`), `git push origin --delete feat/seb/<branch>` op remote (of via `gh`), `git worktree remove ../chatmanta-<doel>` als het er een was, en `Get-Process node | Stop-Process -Force` als poort 3000/3001 vast blijft zitten door een orphan dev-server.
+
+**Bij sessie-einde:**
+- Check dat alles gecommit en gepusht is en meld expliciet of de sessie veilig afgesloten kan worden (`/close` automatiseert dit; `/close all` sweept alle worktrees).
+- Werk dat later verder moet: maak een handoff-doc (`/handoff`, landt in `docs/handoffs/`) zodat een verse sessie zonder contextverlies kan hervatten.
