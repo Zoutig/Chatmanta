@@ -95,7 +95,7 @@ export async function generateQuizForOrgAction(
 
     let quiz;
     try {
-      quiz = await createQuiz(admin, { organizationId: orgId, analyseModel: model });
+      quiz = await createQuiz(admin, { organizationId: orgId, chatbotId: chatbot.id, analyseModel: model });
     } catch (e) {
       if (e instanceof QuizExistsError) fail('INPUT_INVALID', 'Er is al een quiz voor deze org (race-conditie). Ververs de pagina.');
       throw e;
@@ -178,7 +178,9 @@ export async function addQuizQuestionAction(
     if (quiz.status !== 'concept') fail('INPUT_INVALID', `Vragen toevoegen kan alleen in een concept-quiz (status: ${quiz.status}).`);
     const vraag = (input.vraag ?? '').trim();
     if (vraag.length < 1 || vraag.length > 2000) fail('INPUT_INVALID', 'Vraag moet tussen 1 en 2000 tekens zijn.');
-    const created = await insertQuestions(admin, quizId, orgId, [
+    const chatbot = await getOrgChatbot(admin, orgId);
+    if (!chatbot) fail('NOT_FOUND', 'Geen chatbot geconfigureerd voor deze org.');
+    const created = await insertQuestions(admin, quizId, orgId, chatbot.id, [
       { ...input, vraag, bron: 'niels', goedgekeurd: true },
     ]);
     revalidate(orgId);

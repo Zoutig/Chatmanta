@@ -103,6 +103,9 @@ export async function submitQuizAnswerV1Action(
       }
     }
 
+    const chatbot = await getOrgChatbot(sb, orgId);
+    if (!chatbot) return { ok: false, error: 'Geen chatbot geconfigureerd voor deze organisatie.' };
+
     // Atomic claim: UNIQUE(question_id) is de echte idempotentie-grens.
     let answer;
     try {
@@ -110,6 +113,7 @@ export async function submitQuizAnswerV1Action(
         quizId: quiz.id,
         questionId: question.id,
         organizationId: orgId,
+        chatbotId: chatbot.id,
         antwoord,
         meerkeuzeOptie,
         andersTekst,
@@ -125,7 +129,6 @@ export async function submitQuizAnswerV1Action(
     // Ingest — pas na de geslaagde claim (één winner, geen dubbele KB-documenten).
     if (antwoord && antwoord.length > 0) {
       try {
-        const chatbot = await getOrgChatbot(sb, orgId);
         if (chatbot) {
           const res = await ingestDocument(sb, {
             organizationId: orgId,

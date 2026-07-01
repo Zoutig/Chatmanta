@@ -185,8 +185,18 @@ export async function recordQuizEvent(
   },
 ): Promise<void> {
   try {
+    // v1_quiz_event draagt org+chatbot NOT NULL (RLS-consistentie met de andere quiz-
+    // tabellen). recordQuizEvent krijgt alleen quizId, dus resolve ze uit de quiz-rij.
+    const { data: q } = await client
+      .from(TABLE)
+      .select('organization_id, chatbot_id')
+      .eq('id', quizId)
+      .maybeSingle();
+    const quizRow = q as { organization_id: string; chatbot_id: string } | null;
     await client.from(EVENTS).insert({
       quiz_id: quizId,
+      organization_id: quizRow?.organization_id,
+      chatbot_id: quizRow?.chatbot_id,
       kind: ev.kind,
       from_status: ev.fromStatus ?? null,
       to_status: ev.toStatus ?? null,
@@ -210,12 +220,13 @@ export class QuizExistsError extends Error {
 
 export async function createQuiz(
   client: SupabaseClient,
-  input: { organizationId: string; analyseModel: QuizAnalyseModel; analyseMethod?: QuizAnalyseMethod },
+  input: { organizationId: string; chatbotId: string; analyseModel: QuizAnalyseModel; analyseMethod?: QuizAnalyseMethod },
 ): Promise<QuizItem> {
   const { data, error } = await client
     .from(TABLE)
     .insert({
       organization_id: input.organizationId,
+      chatbot_id: input.chatbotId,
       status: 'generating',
       analyse_model: input.analyseModel,
       analyse_method: input.analyseMethod ?? 'category_probe',
@@ -346,12 +357,14 @@ export async function insertQuestions(
   client: SupabaseClient,
   quizId: string,
   organizationId: string,
+  chatbotId: string,
   questions: QuizQuestionInput[],
 ): Promise<QuizQuestion[]> {
   if (questions.length === 0) return [];
   const rows = questions.map((qn, i) => ({
     quiz_id: quizId,
     organization_id: organizationId,
+    chatbot_id: chatbotId,
     categorie: qn.categorie,
     categorie_label: qn.categorieLabel ?? null,
     context: qn.context ?? null,
@@ -439,6 +452,7 @@ export async function createAnswer(
     quizId: string;
     questionId: string;
     organizationId: string;
+    chatbotId: string;
     antwoord?: string | null;
     meerkeuzeOptie?: string | null;
     andersTekst?: string | null;
@@ -451,6 +465,7 @@ export async function createAnswer(
       quiz_id: input.quizId,
       question_id: input.questionId,
       organization_id: input.organizationId,
+      chatbot_id: input.chatbotId,
       antwoord: input.antwoord ?? null,
       meerkeuze_optie: input.meerkeuzeOptie ?? null,
       anders_tekst: input.andersTekst ?? null,

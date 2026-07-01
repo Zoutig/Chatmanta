@@ -4,6 +4,7 @@
 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { requireJorionAdmin } from '@/lib/auth';
 import { getTicket, listTicketEvents, getTicketAttachmentSignedUrl } from '@/lib/v1/feedback/db';
 import {
   FEEDBACK_PRIORITY_LABELS,
@@ -64,6 +65,7 @@ const AUTHOR_LABEL: Record<FeedbackEvent['author'], string> = {
 };
 
 export default async function V1FeedbackDetail({ params }: { params: Promise<{ id: string }> }) {
+  await requireJorionAdmin(); // defense-in-depth: page-level gate náást de layout (leest cross-org PII + mint signed-URL)
   const { id } = await params;
   const item = await getTicket(id);
   if (!item) notFound();

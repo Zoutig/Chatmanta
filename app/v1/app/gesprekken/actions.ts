@@ -18,7 +18,6 @@ import { getSessionOrg } from '@/lib/auth';
 import { requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
-import { createClient } from '@/lib/supabase/v1/server';
 import { ingestDocument } from '@/lib/rag/ingest';
 import { getOrgChatbot } from '../rag-config';
 

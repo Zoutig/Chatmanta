@@ -415,7 +415,7 @@ export async function analyzeKnowledgeBase(input: {
       return { status: 'leeg', questionCount: 0, analyseCostUsd, generationCostUsd };
     }
 
-    await insertQuestions(client, quizId, organizationId, gen.questions);
+    await insertQuestions(client, quizId, organizationId, chatbotId, gen.questions);
     await setQuizAnalysis(client, quizId, { bedrijfscontext, analyseCostUsd, generationCostUsd });
     await updateQuizCounts(client, quizId, { questionCount: gen.questions.length });
     await recordQuizEvent(client, quizId, { kind: 'generated', meta: { questionCount: gen.questions.length }, author: 'systeem' });

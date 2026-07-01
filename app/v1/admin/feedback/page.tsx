@@ -3,6 +3,7 @@
 // Org-filter weggelaten: V1 heeft geen KNOWN_ORGS; org_name komt via join in listTickets.
 
 import Link from 'next/link';
+import { requireJorionAdmin } from '@/lib/auth';
 import { Card } from '@/app/klantendashboard/components/ui/card';
 import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
 import { listTickets, getTicketSummary } from '@/lib/v1/feedback/db';
@@ -130,6 +131,7 @@ function FeedbackRow({ f }: { f: TicketWithOrg }) {
 }
 
 export default async function V1FeedbackInboxPage({ searchParams }: { searchParams: Promise<SP> }) {
+  await requireJorionAdmin(); // defense-in-depth: page-level gate náást de layout (leest cross-org PII)
   const sp = await searchParams;
 
   const view: FeedbackView = (FEEDBACK_VIEWS as readonly string[]).includes(sp.view ?? '')
