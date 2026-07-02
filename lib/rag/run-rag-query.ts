@@ -2880,7 +2880,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
         );
       });
       const fu = await Promise.race([
-        generateFollowUps(original, finalAnswerText, bot),
+        generateFollowUps(original, activeAnswerText, bot),
         timeoutSignal,
       ]);
       followUps = fu.followUps;
