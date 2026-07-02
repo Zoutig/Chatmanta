@@ -4,15 +4,15 @@ Dit document is voor mensen (Sebastiaan + Niels). Voor Claude Code agents is er 
 
 ## Wat is ChatManta?
 
-Een SaaS-product van Jorion Solutions. Klanten (kleine bedrijven) krijgen een chatbot op hun website die vragen kan beantwoorden op basis van hun eigen content (website + documenten). Onder de motorkap: RAG (Retrieval-Augmented Generation) met Claude Haiku als taalmodel.
+Een SaaS-product van Jorion Solutions. Klanten (kleine bedrijven) krijgen een chatbot op hun website die vragen kan beantwoorden op basis van hun eigen content (website + documenten). Onder de motorkap: RAG (Retrieval-Augmented Generation) met **OpenAI gpt-4o-mini** als taalmodel.
 
-We zitten in de pre-build / V1-fase. Eerst MVP, daarna 2-3 testklanten, daarna pas uitbreiden.
+V1 is code-compleet; we zitten in de launch-voorbereiding met 2-3 testklanten.
 
 ## Stack in één oogopslag
 
 - **Next.js 16** (App Router) + TypeScript + Tailwind v4 + shadcn/ui
 - **Supabase** voor database (Postgres met pgvector), auth en file storage
-- **Anthropic Claude Haiku 4.5** voor antwoorden, **OpenAI text-embedding-3-small** voor embeddings
+- **OpenAI gpt-4o-mini** voor antwoorden, **OpenAI text-embedding-3-small** voor embeddings
 - **Firecrawl** om websites te crawlen
 - **Vercel** voor hosting
 
