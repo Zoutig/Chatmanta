@@ -1,11 +1,11 @@
-// Run: node --import tsx --test tests/widget/origin-allowlist.test.ts
+// Run: node --import tsx --test lib/widget/__tests__/origin-allowlist.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeHost,
   parseAllowedOrigins,
   evaluateEmbedAccess,
-} from '../../lib/widget/origin-allowlist';
+} from '../origin-allowlist';
 
 test('normalizeHost strips scheme, path, port, query and leading www', () => {
   assert.equal(normalizeHost('https://www.Example.com:443/pad?x=1'), 'example.com');

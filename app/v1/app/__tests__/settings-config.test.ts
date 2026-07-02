@@ -65,7 +65,8 @@ test('sanitizeChatbotPatch: whitelist filtert vreemde velden weg, widget-velden 
     welcomeMessage: 'hoi',
     accentColor: '#ff0000',
     position: 'bottom-left',
-    // niet-whitelisted: contact-velden + GK-toggle blijven geweerd.
+    // contactEmail zit bewust in de whitelist (sectie Fallback & contact, settings-config.ts:242);
+    // alleen de GK-toggle blijft geweerd (niet in ALLOWED_PATCH_FIELDS).
     contactEmail: 'x@y.nl',
     answerGeneralKnowledge: true,
   } as Partial<ChatbotSettings>);
@@ -75,6 +76,7 @@ test('sanitizeChatbotPatch: whitelist filtert vreemde velden weg, widget-velden 
     welcomeMessage: 'hoi',
     accentColor: '#ff0000',
     position: 'bottom-left',
+    contactEmail: 'x@y.nl',
   });
 });
 

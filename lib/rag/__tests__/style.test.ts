@@ -1,6 +1,6 @@
 // Unit-tests voor lib/v0/style.ts en lib/v0/style-types.ts
 //
-// Run: node --import tsx --test tests/v0/style.test.ts
+// Run: node --import tsx --test lib/rag/__tests__/style.test.ts
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import {
   buildSystemPrompt,
   describeStyle,
   normalizeStyle,
-} from '../../lib/rag/style';
+} from '../style';
 import {
   DEFAULT_LENGTH,
   DEFAULT_TONE,
@@ -18,7 +18,7 @@ import {
   isTone,
   LENGTHS,
   TONES,
-} from '../../lib/rag/style-types';
+} from '../style-types';
 
 test('isTone / isLength accept all canonical values', () => {
   for (const t of TONES) assert.equal(isTone(t), true);
