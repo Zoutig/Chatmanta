@@ -12,6 +12,9 @@
 >
 > **Drift check (run first)**: `git diff --stat 628e7df..HEAD -- lib/rag/run-rag-query.ts lib/rag/ingest.ts lib/v0/server/rag.ts supabase/migrations supabase/migrations-v1`
 > Bij drift: vergelijk de "Current state"-excerpts met de live code; mismatch = STOP.
+> **Verwachte drift** (géén STOP): plan 003 wijzigt in ditzelfde bestand regel ~2883
+> (`generateFollowUps(original, activeAnswerText, bot)`) — dat ligt buiten de
+> excerpt-regio's van dit plan (486-513, 1468-1469, 2921-2943) en is bedoeld.
 
 ## Status
 
@@ -24,7 +27,7 @@
 
 ## Why this matters
 
-De answer-cache wordt org-breed gepurged bij élke kennisbank-/instellingen-/Q&A-wijziging, omdat de cache-key geen KB-revisie bevat. Maar de cache-**write** aan het einde van een chat-pipeline is fire-and-forget (geen await) en gebruikt retrieval-data van het bégin van de pipeline. Volgorde: retrieval@t0 → klant wijzigt KB + purge@t1 → insert@t2. De insert zet dan een antwoord op basis van de oude KB terug in de zojuist geleegde cache, en dat verouderde antwoord (oude prijs, oude openingstijd) wordt als cache-hit geserveerd tot de vólgende KB-wijziging. Venster: de volledige pipeline-duur (~2-13s) bij elke KB-mutatie, op V0 én V1. De fix: een per-org "epoch" die elke purge ophoogt; de write gaat alleen door als de epoch sinds pipeline-start niet veranderd is.
+De answer-cache wordt org-breed gepurged bij élke kennisbank-/instellingen-/Q&A-wijziging, omdat de cache-key geen KB-revisie bevat. Maar de cache-**write** aan het einde van een chat-pipeline is fire-and-forget (geen await) en gebruikt retrieval-data van het bégin van de pipeline. Volgorde: retrieval@t0 → klant wijzigt KB + purge@t1 → insert@t2. De insert zet dan een antwoord op basis van de oude KB terug in de zojuist geleegde cache, en dat verouderde antwoord (oude prijs, oude openingstijd) wordt als cache-hit geserveerd tot de vólgende KB-wijziging. Venster: de volledige pipeline-duur (~2-13s) bij elke KB-mutatie, op V0 én V1. De fix: een per-org "epoch" die elke purge ophoogt; de write gaat alleen door als de epoch sinds pipeline-start niet veranderd is. NB (panel-review): dit VERSMALT het race-venster van de volledige pipeline-duur naar één DB-round-trip (re-read → insert); dat restvenster is bewust geaccepteerd — echt sluiten zou de epoch in het insert-predicaat moeten vouwen (zie maintenance-notes).
 
 ## Current state
 
@@ -214,5 +217,6 @@ Schrijf een wegwerp-verificatiescript of gebruik psql/MCP: (1) lees epoch van ee
 ## Maintenance notes
 
 - De extra kosten zijn één lichte pk-select per cache-actieve chatbeurt (parallel met de embed — geen wall-clock-impact) en één select per cache-write. Als dat ooit knelt: epoch meecachen in dezelfde roundtrip als de lookup.
+- Rest-race (purge tussen re-read en insert, ~1 round-trip): geaccepteerd. Volledig sluiten kan later door de epoch-vergelijking in het insert-statement zelf te vouwen (`insert ... select ... where (select epoch ...) = $expected`).
 - Toekomstige purge-plekken MOETEN via de bestaande `purgeAnswerCache`-functies blijven lopen (daar zit de bump). Reviewer let op directe `answer_cache`-deletes.
 - Dit lost de race op, niet de bredere wens van cache-TTL/embed-hergebruik uit de eerdere cache-analyse (zie memory/PR #205-traject) — die blijven aparte afwegingen.

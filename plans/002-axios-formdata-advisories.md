@@ -52,8 +52,8 @@ De 2 moderate postcss-advisories zitten in de build-toolchain van `next` zelf; d
 ## Scope
 
 **In scope** (de enige files die mogen wijzigen):
+- `package.json` (het `overrides`-blok)
 - `package-lock.json`
-- `package.json` (alléén als een `overrides`-blok nodig blijkt)
 
 **Out of scope** (NIET aanraken):
 - Elke andere dependency-versie (next, react, openai, supabase-js, …)
@@ -74,17 +74,31 @@ Run `npm audit --omit=dev` en bewaar de output (3 high verwacht).
 
 **Verify**: output noemt axios + form-data HIGH en "fix available via `npm audit fix`".
 
-### Step 2: Fix toepassen
+### Step 2: Chirurgisch overrides-blok (NIET `npm audit fix`)
 
-Run `npm audit fix` (ZONDER `--force`).
+⚠️ Panel-review 2026-07-02 (dry-run-bewijs): `npm audit fix` bumpt hier ~30 pakketten,
+waaronder `@mendable/firecrawl-js` 4.25.0→4.29.x (minor SDK-drift op het crawl-pad die
+een smoke-test zou vereisen) en een ~17-pakketten-babel-cascade in de dev-tree. Daarom
+dichten we alléén de twee prod-bereikbare advisories, met een `overrides`-blok.
 
-**Verify**: `git diff --stat` → alleen `package-lock.json` gewijzigd (evt. `package.json` als npm de firecrawl-range aanpaste — dan checken dat het binnen `^4.x` blijft).
+Voeg toe aan `package.json` (top-level, naast dependencies):
+
+```json
+  "overrides": {
+    "axios": "^1.18.0",
+    "form-data": "^4.0.6"
+  }
+```
+
+Run daarna `npm install`.
+
+**Verify**: `git diff --stat` → alleen `package.json` + `package-lock.json`.
 
 ### Step 3: Controleer dat alleen de bedoelde packages bewogen zijn
 
-Run `git diff package-lock.json | grep -E '"(axios|form-data|@mendable/firecrawl-js)"' | head -20` en `npm ls axios form-data`.
+Run `npm ls axios form-data @mendable/firecrawl-js`.
 
-**Verify**: axios ≥ een gepatchte versie (>1.15.2), form-data ≥ 4.0.6; `@mendable/firecrawl-js` nog steeds major 4.
+**Verify**: axios ≥ 1.18.0 (overridden), form-data ≥ 4.0.6 (overridden); `@mendable/firecrawl-js` staat nog exact op 4.25.0 — geen SDK-drift, dus geen crawl-smoke-test nodig.
 
 ### Step 4: Her-audit + regressiecheck
 
@@ -100,22 +114,23 @@ Verwijder `.next/` en run `npm run build`.
 
 ## Test plan
 
-Geen nieuwe tests: dit is een lockfile-bump. De bestaande verificatie (typecheck + test:unit + build) plus de her-audit is het bewijs. Een live crawl-smoke-test (billable, vereist `FIRECRAWL_API_KEY`) is NIET nodig voor een patch-bump binnen dezelfde SDK-major; alleen draaien als de operator erom vraagt.
+Geen nieuwe tests: dit is een transitieve-versie-pin. De bestaande verificatie (typecheck + test:unit + build) plus de her-audit is het bewijs. Een live crawl-smoke-test (billable, vereist `FIRECRAWL_API_KEY`) is NIET nodig: `@mendable/firecrawl-js` zelf blijft op 4.25.0.
 
 ## Done criteria
 
 - [ ] `npm audit --omit=dev` → 0 high
-- [ ] `npm ls axios` toont een versie > 1.15.2; `npm ls form-data` > 4.0.5
+- [ ] `npm ls axios` toont ≥ 1.18.0; `npm ls form-data` ≥ 4.0.6; firecrawl-js op 4.25.0
 - [ ] `npm run typecheck` exit 0; `npm run test:unit` groen; `npm run build` exit 0
-- [ ] `git status`: alleen `package-lock.json` (+ evt. `package.json` overrides) gewijzigd
+- [ ] `git status`: alleen `package.json` + `package-lock.json` gewijzigd
 - [ ] Statusrij in `plans/README.md` bijgewerkt
 
 ## STOP conditions
 
 Stop en rapporteer als:
-- `npm audit fix` `@mendable/firecrawl-js` naar een andere **major** wil bumpen (5.x) — dat kan SDK-gedrag verschuiven en vereist een crawl-smoke-test + overleg.
-- `npm audit fix` wijzigingen aan `next`, `react` of `react-dom` voorstelt.
-- Na de fix nog steeds high-advisories overblijven — dan is een `overrides`-blok nodig: leg het voor i.p.v. zelf te experimenteren.
+- `npm install` na het overrides-blok een `ERESOLVE`/conflict-fout geeft.
+- `npm run typecheck` of `npm run test:unit` faalt na de bump (axios-gedragswijziging die firecrawl raakt).
+- `npm audit --omit=dev` na de overrides nóg high-advisories toont — leg voor i.p.v. zelf verder te bumpen.
+- Gebruik in geen geval `npm audit fix` (zie Step 2) of `--force`.
 
 ## Maintenance notes
 

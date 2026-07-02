@@ -78,30 +78,31 @@
 Nieuw bestand `scripts/run-unit-tests.mjs` (stdlib-only; `fs.readdirSync(..., { recursive: true })` vereist Node ≥20.1 — CI draait Node 22):
 
 ```js
-// Draait alle unit-tests: elk bestand onder een __tests__-map in lib/ of app/
-// dat op .test.ts of .test.tsx eindigt. Vervangt de handmatige filelijst die
-// wees-tests stil liet vallen. Faalt óók als er een .test.-file BUITEN een
-// __tests__-map wordt gevonden (nieuwe wezen voorkomen).
-import { readdirSync } from 'node:fs';
+// Draait alle unit-tests: elk bestand onder een __tests__-map in lib/ of app/.
+// TWEE passes met verschillende module-condities (panel-review 2026-07-02):
+//   pass 1 "react-server": alles BEHALVE files die react-dom/server importeren
+//     — modules met `import 'server-only'` (embed-token V0/V1) vereisen deze
+//     conditie, en de overige (pure) tests zijn er ongevoelig voor;
+//   pass 2 "default": alleen de react-dom/server-files (render-markdown-lite)
+//     — react-dom/server GOOIT juist onder de react-server-conditie.
+// Faalt óók op .test.-files BUITEN een __tests__-map (nieuwe wezen voorkomen).
+import { readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const ROOTS = ['lib', 'app'];
-const STRAY_ROOTS = ['scripts', 'tests'];
+const ROOTS = ['lib', 'app', 'scripts', 'tests'];
 const isTest = (p) => /\.test\.(ts|tsx)$/.test(p);
 const inTestsDir = (p) => /(^|[\\/])__tests__[\\/]/.test(p);
 
-const files = [];
+const serverPass = [];
+const domPass = [];
+const strays = [];
 for (const root of ROOTS) {
   for (const f of readdirSync(root, { recursive: true })) {
     const p = `${root}/${String(f).replaceAll('\\', '/')}`;
-    if (isTest(p) && inTestsDir(p)) files.push(p);
-  }
-}
-const strays = [];
-for (const root of [...ROOTS, ...STRAY_ROOTS]) {
-  for (const f of readdirSync(root, { recursive: true })) {
-    const p = `${root}/${String(f).replaceAll('\\', '/')}`;
-    if (isTest(p) && !inTestsDir(p)) strays.push(p);
+    if (!isTest(p)) continue;
+    if (!inTestsDir(p)) { strays.push(p); continue; }
+    if (/from ['"]react-dom\/server['"]/.test(readFileSync(p, 'utf8'))) domPass.push(p);
+    else serverPass.push(p);
   }
 }
 if (strays.length) {
@@ -109,9 +110,20 @@ if (strays.length) {
   for (const s of strays) console.error(`  - ${s}`);
   process.exit(1);
 }
-console.log(`Running ${files.length} test files...`);
-const r = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...files.sort()], { stdio: 'inherit' });
-process.exit(r.status ?? 1);
+const run = (label, extraArgs, files) => {
+  if (!files.length) return 0;
+  console.log(`[${label}] ${files.length} test files...`);
+  const r = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', ...extraArgs, '--test', ...files.sort()],
+    { stdio: 'inherit' },
+  );
+  return r.status ?? 1;
+};
+// Beide passes draaien altijd; exit non-zero zodra één pass faalt.
+const s = run('react-server', ['--conditions=react-server'], serverPass);
+const d = run('default', [], domPass);
+process.exit(s || d);
 ```
 
 **Verify**: `node scripts/run-unit-tests.mjs` → faalt nu met de 7 strays in de lijst (dat is de bedoeling — de guard werkt).
@@ -127,7 +139,7 @@ process.exit(r.status ?? 1);
 Deze 8 tests hebben mogelijk maanden niet gedraaid. Draai de suite en triageer failures per file:
 - Faalt door **drift in de test zelf** (hernoemde export, gewijzigde signature): pas de test minimaal aan zodat hij het huidige, correcte gedrag asserteert.
 - Faalt door een **echte bug in productiecode**: STOP, rapporteer welke test + welk gedrag.
-- Faalt met een `server-only`-importfout: voeg `'--conditions=react-server'` toe aan de spawnSync-args in de runner en draai de héle suite opnieuw; breekt er dan iets anders → STOP.
+- Conditie-fouten (`server-only`-throw of "react-dom/server is not supported in React Server Components") horen door de twee-pass-partitie al opgelost te zijn; zie je er tóch één, dan zit die file in de verkeerde pass — check de `react-dom/server`-detectieregex en STOP als dat niet de verklaring is.
 
 **Verify**: `node scripts/run-unit-tests.mjs` → exit 0, ≥29 files, alle tests pass.
 
@@ -162,6 +174,7 @@ Dit plan ís testinfrastructuur. Bewijs: (a) de runner draait ≥29 files (was 2
 
 ## Maintenance notes
 
-- Nieuwe unit-tests: altijd in een `__tests__`-map onder `lib/` of `app/` — de runner vindt ze vanzelf; daarbuiten faalt de suite luid (bewust).
+- Nieuwe unit-tests: altijd in een `__tests__`-map onder `lib/` of `app/` — de runner vindt ze vanzelf; daarbuiten (binnen lib/app/scripts/tests) faalt de suite luid (bewust; de scan dekt geen repo-root of docs/).
+- De twee-pass-conditiesplitsing is nodig zolang er zowel `server-only`-modules als `react-dom/server`-tests bestaan; een test die beide nodig heeft kan niet — herschrijf zo'n test dan zonder react-dom/server.
 - Als lint-schuld (36 errors) ooit is opgeruimd: voeg `npm run lint` toe aan `verify` én als CI-stap — dat is de tweede helft van audit-bevinding tests-05.
 - Plannen 005 en 007 voegen nieuwe testfiles toe en rekenen op deze runner.

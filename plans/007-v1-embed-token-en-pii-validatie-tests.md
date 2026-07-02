@@ -79,15 +79,15 @@
 
 ### Step 1: Embed-token-test
 
-Nieuw `lib/v1/widget/__tests__/embed-token.test.ts`, gemodelleerd op de V0-assertieset. Zet bovenaan `process.env.EMBED_TOKEN_SECRET = 'test-secret-16chars-minimum';` vóór de import van de module (of gebruik dynamic import ná het zetten). Cases:
+Nieuw `lib/v1/widget/__tests__/embed-token.test.ts`, gemodelleerd op de V0-assertieset. Zet bovenaan in de testfile `process.env.EMBED_TOKEN_SECRET = 'test-secret-16chars-minimum';` — door ES-import-hoisting draait dat feitelijk ná de import, en dat is prima: `secret()` leest de env per aanroep (regel 19-25), er is dus GEEN dynamic-import-constructie nodig (de V0-modeltest doet exact hetzelfde). Cases:
 1. round-trip: `verifyEmbedToken(createEmbedToken('acme'), 'acme')` → true
 2. verkeerde slug → false
 3. tampered signature (laatste char van het token muteren) → false
 4. verlopen token (`createEmbedToken('acme', -10)`) → false
 5. lege/onzin-input (`null`, `''`, `'geen-punt'`) → false
-6. zonder secret (`delete process.env.EMBED_TOKEN_SECRET` in een subtest, module her-importeren of de check via een tweede proces) → `verifyEmbedToken` → false, `createEmbedToken` → throw. Als module-herimport te fragiel is: laat case 6 vallen en noteer dat in de test-comment (de secret-functie wordt per call geëvalueerd — check dat eerst; zo ja is her-import onnodig).
+6. zonder secret: `delete process.env.EMBED_TOKEN_SECRET` in een subtest → `verifyEmbedToken` → false en `createEmbedToken` → throw; zet de env daarna terug. Werkt zonder module-herimport omdat `secret()` per call leest.
 
-**Escape hatch `server-only`**: de module importeert `'server-only'` (regel 14). Als de test daarop faalt: voeg `'--conditions=react-server'` toe aan de runner uit plan 001 (`scripts/run-unit-tests.mjs`, spawnSync-args) en draai de héle suite; breekt er dan een andere test → STOP en rapporteer.
+**Conditie-noot**: de module importeert `'server-only'` (regel 14). De runner uit plan 001 draait deze test daarom in de `react-server`-pass — dat is al geregeld, geen hatch nodig. Faalt de import tóch op condities: STOP en rapporteer (dan is de runner-partitie kapot, dat hoort bij plan 001).
 
 **Verify**: `npm run test:unit` → embed-token-tests draaien en zijn groen.
 

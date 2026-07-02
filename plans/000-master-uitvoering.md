@@ -62,6 +62,9 @@ van 005/007/008 — dan die drie herbeoordelen).
   of dit prefix; NOOIT paden onder `C:\...\Code\chatmanta\` = de hoofdrepo).
 - Lees je volledige planbestand vóór je begint; volg het stap voor stap; draai elke
   verificatie; STOP-condities zijn hard. Documenteer elke afwijking in NOTES.
+- **Negeer de `Git workflow`/branch-sectie van je plan**: maak GEEN nieuwe branch
+  (`git checkout -b` is verboden) — je zit al op `feat/seb/audit-fixes-batch`;
+  gebruik uit die sectie alléén de commit-message.
 - Commit op de huidige branch met de message uit je plan; sla de README-statusupdate over.
 - Rapporteer in het vaste format: STATUS / STEPS / STOPPED BECAUSE / FILES CHANGED / NOTES —
   en claim niets zonder tool-bewijs uit je eigen sessie.
@@ -71,7 +74,7 @@ van 005/007/008 — dan die drie herbeoordelen).
 | Check | Commando | Eis |
 |---|---|---|
 | Typecheck | `npm run typecheck` | exit 0 |
-| Unit-tests | `npm run test:unit` | exit 0, ≥29 testfiles + nieuwe tests uit 005/006/007 |
+| Unit-tests | `npm run test:unit` | exit 0, ≥29 testfiles + nieuwe tests uit 005/006/007; runner draait TWEE conditie-passes (react-server + default) en aggregeert beide exit-codes |
 | Build | `.next/` verwijderen → `npm run build` | exit 0 |
 | Lint niet slechter | `npm run lint` | ≤ 36 errors (baseline 2026-07-02) |
 | Audit | `npm audit --omit=dev` | 0 high |
@@ -86,6 +89,29 @@ van 005/007/008 — dan die drie herbeoordelen).
    `plans/`-kopie verwijderen vóór `git pull` (anders blokkeert de pull op
    untracked-overschrijving).
 4. Eindrapport aan Sebastiaan: per plan verdict, verificatie-uitkomsten, restpunten.
+
+## Panel-verwerking (2026-07-02, vóór start uitvoering)
+
+Drie reviewers (hard-rules / correctness-Opus / ponytail-Sonnet) hebben dit plan-pakket
+beoordeeld. Verwerkt:
+- **BLOCKER (correctness)** → plan 001: runner is twee-pass geworden (react-server-conditie
+  voor alles behalve de react-dom/server-test; exit-codes geaggregeerd). Empirisch bewezen
+  conflict: `server-only`-modules vs `react-dom/server` verdragen niet dezelfde conditie.
+- **MAJOR (correctness)** → plan 002: `npm audit fix` (bumpte in dry-run ~30 pakketten incl.
+  firecrawl 4.25→4.29) vervangen door chirurgisch `overrides`-blok voor axios/form-data.
+- **MAJOR (ponytail)** → plan 009: TLS eerst testen met kaal `ssl: true`; CA-machinerie
+  alleen bij bewezen certfout; bij pooler-onbereikbaarheid niets ongetest shippen.
+- **MINORs (hard-rules)** → executor-contract verbiedt nu expliciet branch-aanmaak;
+  plan 008 werkt óók `AGENTS.md:80` (MODEL_COSTS-referentie) bij; plan 006 behandelt
+  003's regel-2883-wijziging als verwachte drift; claim "dicht de race" verzacht naar
+  "versmalt tot één round-trip" (rest-race gedocumenteerd).
+- **Verworpen**: hard-rules-claim dat `public._migrations` RLS uit heeft — onjuist,
+  `scripts/migrate.mjs:81` zet RLS aan zonder policies; de migratie-comment in plan 006
+  ("zelfde houding als _migrations") klopte dus al.
+- **Bevestigd door reviewers** (niet opnieuw uitzoeken): `cacheWriteClient` is op álle
+  V0/V1-paden service-role; 003↔006 raken niet-overlappende regio's; CI heeft geen extra
+  secrets nodig voor de verhuisde tests; 29 testfiles-telling klopt; deploy-volgorde 006
+  (MCP-migratie vóór merge) dekt ook dev/previews (zelfde twee Supabase-projecten).
 
 ## Risico's & vangnetten
 

@@ -48,6 +48,7 @@ Samen: ~170 regels en 1 dependency weg, en de SSRF-guard heeft weer één bron v
 **In scope**:
 - `package.json` + `package-lock.json` (nanoid eruit)
 - `lib/ai/llm.ts` (EUR-blok + comments)
+- `AGENTS.md` (alléén de "Migratie-grens"-regel ~80 die `MODEL_COSTS` bij naam noemt)
 - Nieuw: `lib/rag/crawler/validateCrawlUrl.ts` + `lib/rag/crawler/normalizeHost.ts` (verhuisd)
 - `lib/v0/crawler/validateCrawlUrl.ts`, `lib/v0/crawler/normalizeHost.ts`, `lib/v1/crawler/validateCrawlUrl.ts`, `lib/v1/crawler/normalizeHost.ts` → worden 1-regel re-export-shims
 
@@ -76,6 +77,8 @@ Haal `"nanoid": "^5.1.11"` uit `package.json` dependencies en run `npm install` 
 
 In `lib/ai/llm.ts`: verwijder `MODEL_COSTS`, `SupportedModel`, `calculateCost` (regel ~31-56) en `SupportedModelUsd` (~76). Werk de comments bij: regel ~66-67 wordt "Alle callers (V0 én V1) rekenen in USD via costForModelUsd; EUR ontstaat alleen via costUsdToEur."; in de `costUsdToEur`-comment (~104-105) vervalt de verwijzing naar MODEL_COSTS.
 
+Werk óók `AGENTS.md` regel ~80 bij (panel-bevinding): de zin "de LLM-laag `lib/ai/llm.ts` met provider-abstractie + `MODEL_COSTS` voor EUR-billing" verwijst straks naar een geschrapt symbool. Vervang dat deel door: "de LLM-laag `lib/ai/llm.ts` met provider-abstractie; EUR ontstaat via `costUsdToEur` (een echte EUR-tarieventabel komt pas met een echte V2-billing-caller)". Raak de rest van de regel/alinea niet aan.
+
 **Verify**: `grep -rn "MODEL_COSTS[^_]\|calculateCost\|SupportedModel" app lib scripts` → alleen nog `MODEL_COSTS_USD`-gerelateerde hits binnen llm.ts; `npm run typecheck` exit 0; `npm run test:unit` groen (`lib/ai/__tests__/cost.test.ts` test de USD-helpers).
 
 ### Step 3: Crawler-utils dedupliceren
@@ -101,6 +104,7 @@ Geen nieuwe tests: alle drie de wijzigingen zijn deletions/verhuizingen met best
 
 - [ ] nanoid weg uit package.json; lock bijgewerkt
 - [ ] llm.ts bevat geen EUR-tabel/calculateCost/SupportedModel* meer; comments kloppen weer
+- [ ] `grep -n "MODEL_COSTS[^_]" AGENTS.md` → 0 hits
 - [ ] `lib/rag/crawler/` bevat de enige implementatie; 4 shims op de oude paden
 - [ ] `npm run typecheck` + `npm run test:unit` + `npm run build` groen
 - [ ] Netto diff: ~170 regels minder (excl. lockfile)

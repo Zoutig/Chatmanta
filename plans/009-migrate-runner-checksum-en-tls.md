@@ -98,28 +98,30 @@ In de apply-loop (regel ~137-140): `insert into public._migrations(id, checksum)
 
 **Verify**: `node --check scripts/migrate.mjs` exit 0.
 
-### Step 4: TLS-certvalidatie
+### Step 4: TLS-certvalidatie — test éérst de simpelste vorm (panel-review 2026-07-02)
 
-Vervang het ssl-blok (regel 57-62) door:
+Bouw GEEN CA-machinerie voordat bewezen is dat die nodig is. Ladder:
+
+**4a — probeer echte validatie met pg's default.** Vervang regel 57-62 door:
 
 ```js
-// TLS: met MIGRATE_SSL_CA (pad naar het Supabase CA-certificaat, te downloaden
-// via Dashboard → Project Settings → Database → SSL) valideren we het server-
-// certificaat. Zonder CA vallen we terug op het oude gedrag, met een luide
-// waarschuwing — de runner mag ops niet blokkeren tot de CA is ingericht.
-const caPath = process.env.MIGRATE_SSL_CA;
-const ssl = caPath
-  ? { ca: readFileSync(caPath, 'utf8'), rejectUnauthorized: true }
-  : { rejectUnauthorized: false };
-if (!caPath) {
-  console.warn('⚠ MIGRATE_SSL_CA niet gezet — TLS-certvalidatie staat UIT (zie plan 009).');
-}
-const client = new pg.Client({ connectionString: url, ssl });
+const client = new pg.Client({
+  connectionString: url,
+  // TLS mét certvalidatie (pg-default CA-store). De Supabase-pooler draagt
+  // doorgaans een publiek vertrouwd certificaat; de oude
+  // `rejectUnauthorized: false` accepteerde élk certificaat.
+  ssl: true,
+});
 ```
 
-Documenteer `MIGRATE_SSL_CA` ook in `.env.local.example` (één regel bij de DATABASE_URL-sectie).
+Run `npm run migrate:status` (en `npm run migrate:v1:status`).
+- **Werkt het** → klaar. Geen env-var, geen CA-bestand, geen warning-machinerie.
+- **Faalt het met een certificaatfout** (bv. `SELF_SIGNED_CERT_IN_CHAIN`/`UNABLE_TO_VERIFY_LEAF_SIGNATURE`) → ga naar 4b.
+- **Timeout/onbereikbaar** (bekende pooler-block vanaf deze machine) → draai de ssl-wijziging terug naar het huidige `{ rejectUnauthorized: false }` en rapporteer als STOP-note: de TLS-stap kan alleen geverifieerd landen vanaf een machine mét connectiviteit. Ship géén ongeteste TLS-wijziging aan de prod-DDL-tool.
 
-**Verify**: `node --check scripts/migrate.mjs` exit 0; `npm run migrate:status` zonder CA toont de waarschuwing en werkt verder als voorheen (mits pooler bereikbaar).
+**4b — alléén bij een certfout in 4a**: implementeer de `MIGRATE_SSL_CA`-variant (env-var met pad naar het Supabase CA-cert uit Dashboard → Project Settings → Database → SSL; `{ ca: readFileSync(caPath,'utf8'), rejectUnauthorized: true }`, fallback naar het oude gedrag mét `console.warn` als de var ontbreekt) en documenteer de var in `.env.local.example`.
+
+**Verify**: `node --check scripts/migrate.mjs` exit 0 + de uitkomst van de status-run expliciet in je rapport (welke tak: 4a-geslaagd / 4b / teruggedraaid).
 
 ### Step 5: End-to-end-bewijs (alleen als de DB bereikbaar is)
 
@@ -136,7 +138,7 @@ De runner heeft geen unit-testinfrastructuur (CLI, DB-afhankelijk). Bewijs = Ste
 
 - [ ] `_migrations` krijgt/heeft `checksum`-kolom; apply én bootstrap schrijven hem
 - [ ] Bewerkte al-applied migratie ⇒ fail-loud met exit 1 (Step 5-bewijs of gerapporteerde pooler-block)
-- [ ] TLS valideert met `MIGRATE_SSL_CA`; zonder CA: oude gedrag + luide warning; `.env.local.example` gedocumenteerd
+- [ ] TLS: óf `ssl: true` bewezen werkend (4a), óf CA-variant (4b), óf expliciet teruggedraaid + gerapporteerd (onbereikbaar) — geen ongeteste TLS-wijziging
 - [ ] `node --check scripts/migrate.mjs` exit 0
 - [ ] Geen enkele wijziging onder `supabase/migrations*`
 - [ ] Statusrij in `plans/README.md` bijgewerkt
