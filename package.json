@@ -70,6 +70,10 @@
     "v1:eval": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-eval-run.ts",
     "postinstall": "git config core.hooksPath .githooks"
   },
+  "overrides": {
+    "axios": "^1.18.0",
+    "form-data": "^4.0.6"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
     "@ark-ui/react": "^5.36.2",
