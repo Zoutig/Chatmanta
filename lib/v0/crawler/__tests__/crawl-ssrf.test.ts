@@ -1,6 +1,6 @@
 // Unit-tests voor de SSRF-guard van de website-crawler (SA-2).
 //
-// Run: node --import tsx --test tests/v0/crawl-ssrf.test.ts
+// Run: node --import tsx --test lib/v0/crawler/__tests__/crawl-ssrf.test.ts
 //
 // Alle cases hier zijn hermetisch: ze raken óf een letterlijk IP, óf een
 // geblokkeerde hostnaam/scheme — dus de DNS-lookup-tak wordt nooit geraakt en
@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { validateCrawlUrl } from '../../lib/v0/crawler/validateCrawlUrl';
+import { validateCrawlUrl } from '../validateCrawlUrl';
 
 async function assertBlocked(url: string) {
   const res = await validateCrawlUrl(url);

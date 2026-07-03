@@ -19,7 +19,11 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { createHash } from 'node:crypto';
 import pg from 'pg';
+
+// Content-vingerafdruk van een migratiebestand — basis voor drift-detectie.
+const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 // Doel-selectie. Default = V0 (`npm run migrate` draait byte-voor-byte als
 // voorheen). Met `--v1` (zie `migrate:v1` in package.json) draait hij tegen de
@@ -80,22 +84,85 @@ await client.query(`
   );
   alter table public._migrations enable row level security;
 `);
+// checksum-kolom voor drift-detectie — additief, idempotent (rijen van vóór
+// deze hardening houden checksum null en worden hieronder ge-backfilled).
+await client.query(`
+  alter table public._migrations add column if not exists checksum text;
+`);
 
 const { rows: applied } = await client.query(
-  'select id from public._migrations order by id',
+  'select id, checksum from public._migrations order by id',
 );
 const appliedIds = new Set(applied.map((r) => r.id));
 const pending = files.filter((f) => !appliedIds.has(f.replace(/\.sql$/, '')));
 
+// --- Drift-detectie -------------------------------------------------------
+// Vergelijk voor elke reeds-toegepaste migratie waarvan we nog een lokaal
+// bestand hebben de opgeslagen checksum met de huidige file-hash. Een gemergde
+// migratie is onveranderlijk; wie er achteraf in wijzigt krijgt hier een harde
+// stop (verse DB draait de wijziging wél, bestaande DB niet → schema-divergentie).
+const fileById = new Map(files.map((f) => [f.replace(/\.sql$/, ''), f]));
+const drift = [];      // ids waarvan de inhoud is gewijzigd ná toepassing
+const backfills = [];  // pre-hardening rijen (checksum null) → eenmalig invullen
+for (const row of applied) {
+  const file = fileById.get(row.id);
+  if (!file) continue; // applied maar geen lokaal bestand — waarschuwing hieronder
+  const hash = sha256(readFileSync(join(migrationsDir, file), 'utf8'));
+  if (row.checksum == null) {
+    // Aanname: een null-checksum-rij (van vóór deze hardening) is toegepast met
+    // exact de huidige bestandsinhoud. Eenmalige backfill; bij twijfel over een
+    // specifieke migratie kan de rij handmatig op NULL worden gezet.
+    backfills.push({ id: row.id, hash });
+  } else if (row.checksum !== hash) {
+    drift.push(row.id);
+  }
+}
+
+for (const { id, hash } of backfills) {
+  await client.query(
+    'update public._migrations set checksum = $2 where id = $1',
+    [id, hash],
+  );
+  console.log(`  ~ checksum backfilled: ${id}`);
+}
+
+for (const id of appliedIds) {
+  if (!fileById.has(id)) {
+    console.warn(`  ! applied maar geen lokaal bestand: ${id} (verwijderde migratie?)`);
+  }
+}
+
+// Drift is fataal voor muterende modes: stop vóór er iets aan de DB verandert.
+// In status-mode wordt drift per rij gemarkeerd en volgt exit 1 aan het einde.
+if (drift.length > 0 && mode !== 'status') {
+  console.error('');
+  console.error('✗ DRIFT — reeds-toegepaste migratie(s) zijn ná toepassing bewerkt:');
+  for (const id of drift) console.error(`  !! ${id}`);
+  console.error('  Een gemergde migratie is onveranderlijk: draai de wijziging terug');
+  console.error('  of voeg de aanpassing toe als NIEUWE migratie. Niets toegepast.');
+  await client.end();
+  process.exit(1);
+}
+
 if (mode === 'status') {
+  const driftSet = new Set(drift);
   console.log('--- Migrations status ---');
   for (const f of files) {
     const id = f.replace(/\.sql$/, '');
-    const tag = appliedIds.has(id) ? '✓ applied' : '· pending';
+    const tag = driftSet.has(id)
+      ? '!! DRIFT '
+      : appliedIds.has(id)
+        ? '✓ applied'
+        : '· pending';
     console.log(`  ${tag}  ${id}`);
   }
   console.log('');
   console.log(`${appliedIds.size} applied / ${pending.length} pending / ${files.length} totaal.`);
+  if (drift.length > 0) {
+    console.error(`\n✗ ${drift.length} migratie(s) met drift — inhoud gewijzigd ná toepassing.`);
+    await client.end();
+    process.exit(1);
+  }
   await client.end();
   process.exit(0);
 }
@@ -108,9 +175,10 @@ if (mode === 'bootstrap') {
       console.log(`  ✓ ${id} (al gemarkeerd)`);
       continue;
     }
+    const bsql = readFileSync(join(migrationsDir, f), 'utf8');
     await client.query(
-      'insert into public._migrations(id) values ($1) on conflict do nothing',
-      [id],
+      'insert into public._migrations(id, checksum) values ($1, $2) on conflict do nothing',
+      [id, sha256(bsql)],
     );
     console.log(`  ✓ ${id} gemarkeerd als applied`);
   }
@@ -135,8 +203,8 @@ for (const file of pending) {
     await client.query('begin');
     await client.query(sql);
     await client.query(
-      'insert into public._migrations(id) values ($1)',
-      [id],
+      'insert into public._migrations(id, checksum) values ($1, $2)',
+      [id, sha256(sql)],
     );
     await client.query('commit');
     console.log('✓');

@@ -325,6 +325,13 @@ export async function purgeAnswerCache(organizationId: string): Promise<number |
       console.warn(`[cache] purge failed org=${organizationId}:`, error.message);
       return null;
     }
+    // Epoch-bump (migr 0054, plan 006): laat in-flight pipelines hun
+    // fire-and-forget cache-write overslaan, anders herbevuilt een lopende chat
+    // de zojuist geleegde cache met een pre-purge antwoord.
+    const { error: bumpErr } = await sb.rpc('bump_cache_epoch', {
+      p_organization_id: organizationId,
+    });
+    if (bumpErr) console.warn(`[cache] epoch bump failed org=${organizationId}:`, bumpErr.message);
     console.info(`[cache] purged ${count ?? 0} rows org=${organizationId}`);
     return count ?? 0;
   } catch (err) {

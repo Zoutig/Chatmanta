@@ -1,6 +1,6 @@
 // Unit-tests voor lib/v0/server/history-entities.ts (v0.8.1 anti-adoptie).
 //
-// Run: node --import tsx --test tests/v0/history-entities.test.ts
+// Run: node --import tsx --test lib/rag/__tests__/history-entities.test.ts
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {
   extractCandidateEntities,
   detectAdoptedHistoryEntities,
-} from '../../lib/rag/history-entities';
+} from '../history-entities';
 
 test('extractCandidateEntities — meerwoordige namen', () => {
   assert.ok(extractCandidateEntities('mijn adviseur Mark Visser').includes('Mark Visser'));

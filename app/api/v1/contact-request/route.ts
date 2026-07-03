@@ -22,32 +22,9 @@ import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { getOrgChatbot } from '@/app/v1/app/rag-config';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
+import { validateContactBody } from '@/lib/v1/widget/contact-validate';
 
 export const runtime = 'nodejs';
-
-const NAME_MAX = 200;
-const SUBJECT_MAX = 300;
-const MESSAGE_MAX = 4000;
-// Telefoon: cijfers, spaties, +, haakjes, schuine streep, punt, koppelteken; 5-20 tekens.
-const PHONE_RE = /^[\d+\s()/.-]{5,20}$/;
-// Bewust een losse vorm-check (geen volledige RFC) — de mens leest het terug.
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-type Body = {
-  name?: unknown;
-  email?: unknown;
-  phone?: unknown;
-  preferredContact?: unknown;
-  subject?: unknown;
-  message?: unknown;
-  consentGiven?: unknown;
-  // Honeypot — een echte bezoeker laat dit leeg; een bot vult het. Gevuld → stil 200.
-  company_url?: unknown;
-};
-
-function str(v: unknown): string | null {
-  return typeof v === 'string' ? v : null;
-}
 
 export async function POST(req: Request) {
   // 0. Eigen per-IP rate-limit-bucket.
@@ -101,45 +78,22 @@ export async function POST(req: Request) {
   }
   if (!enabled) return new NextResponse(null, { status: 403 });
 
-  // 5. Body parsen.
-  let body: Body;
+  // 5. Body parsen — shape-validatie doet validateContactBody (unknown in).
+  let body: unknown;
   try {
-    body = (await req.json()) as Body;
+    body = await req.json();
   } catch {
     return new NextResponse(null, { status: 400 });
   }
 
-  // 6. Honeypot — gevuld → bot. Stil 200 zonder rij (geen signaal naar de bot).
-  if ((str(body.company_url) ?? '').trim().length > 0) {
-    return NextResponse.json({ ok: true }, { status: 200 });
+  // 6+7. Honeypot + validatie — pure functie (gedrag bevroren, unit-getest).
+  const v = validateContactBody(body);
+  if (!v.ok) {
+    return v.reason === 'honeypot'
+      ? NextResponse.json({ ok: true }, { status: 200 })
+      : new NextResponse(null, { status: 400 });
   }
-
-  // 7. Validatie (hard; de DB-CHECKs zijn de backstop).
-  const name = (str(body.name) ?? '').trim();
-  if (name.length < 1 || name.length > NAME_MAX) return new NextResponse(null, { status: 400 });
-
-  if (body.consentGiven !== true) return new NextResponse(null, { status: 400 });
-
-  const preferred = str(body.preferredContact);
-  if (preferred !== 'call' && preferred !== 'email') return new NextResponse(null, { status: 400 });
-
-  let email: string | null = (str(body.email) ?? '').trim() || null;
-  let phone: string | null = (str(body.phone) ?? '').trim() || null;
-
-  if (preferred === 'call') {
-    if (!phone || !PHONE_RE.test(phone)) return new NextResponse(null, { status: 400 });
-  } else {
-    if (!email || !EMAIL_RE.test(email)) return new NextResponse(null, { status: 400 });
-  }
-  // Een meegegeven niet-voorkeursveld dat ongeldig is → wegfilteren i.p.v. de hele
-  // submit te weigeren (de DB-CHECK eist alleen dat ÉÉN van beide gevuld is).
-  if (phone && !PHONE_RE.test(phone)) phone = null;
-  if (email && !EMAIL_RE.test(email)) email = null;
-
-  const subjectRaw = str(body.subject);
-  const messageRaw = str(body.message);
-  const subject = subjectRaw ? subjectRaw.trim().slice(0, SUBJECT_MAX) || null : null;
-  const message = messageRaw ? messageRaw.trim().slice(0, MESSAGE_MAX) || null : null;
+  const { name, email, phone, preferredContact, subject, message } = v.value;
 
   // 8. Insert via service-role. org+chatbot server-bepaald; consent hard true.
   try {
@@ -149,7 +103,7 @@ export async function POST(req: Request) {
       name,
       email,
       phone,
-      preferred_contact: preferred,
+      preferred_contact: preferredContact,
       subject,
       message,
       consent_given: true,

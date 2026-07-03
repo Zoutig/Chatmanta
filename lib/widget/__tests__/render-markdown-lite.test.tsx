@@ -1,9 +1,9 @@
-// Run: node --import tsx --test tests/widget/render-markdown-lite.test.tsx
+// Run: node --import tsx --test lib/widget/__tests__/render-markdown-lite.test.tsx
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { renderMarkdownLite } from '../../lib/widget/render-markdown-lite';
+import { renderMarkdownLite } from '../render-markdown-lite';
 
 function html(input: string): string {
   return renderToStaticMarkup(renderMarkdownLite(input) as React.ReactElement);

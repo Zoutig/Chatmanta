@@ -28,10 +28,12 @@ als expliciete afspraak met de testklanten: hun echte data gaat pas in V1 (Supab
   Supabase queryt. Zonder build-time DB-env faalt die stap.
 - **Exacte stap:** GitHub → repo → Settings → Secrets and variables → Actions → New
   repository secret, zet:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `V0_SUPABASE_URL`
+  - `V0_SUPABASE_SERVICE_ROLE_KEY`
   (de keys van het **V0-sandbox**-Supabase-project — alleen fake demo-data.)
+  - `NEXT_PUBLIC_V1_SUPABASE_URL`
+  - `NEXT_PUBLIC_V1_SUPABASE_ANON_KEY`
+  (de publieke keys van het **V1-prod**-Supabase-project — nodig voor de `/v1/login` client-bundle.)
 - **Hoe verifiëren:** open een PR → de `build`-check wordt groen.
 
 ---

@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ChatManta is een website-chatbot SaaS van Jorion Solutions. Knowledge-bot voor MKB op basis van RAG over websitecontent + documenten.
 
-**Status (mei 2026):** V0 draait als actief RAG-leerplatform — multi-org sandbox met fake demo-data, eval-pipeline, parent chunks, HyDE, hybrid search, claim-verifications, latency-profiling, cache-telemetry, plus een geshipte Firecrawl-website-crawler met dashboard én een embeddable widget (beide in V0-vorm, live op prod). 37 migrations live (`0001_core_tenancy` t/m `0037_v0_multi_website`). V1 (Supabase Auth + productie-multi-tenancy) is nog niet gestart — nieuwe features landen als nieuwe V0 bot-versie tenzij Sebastiaan expliciet zegt "we starten V1".
+**Status (juli 2026):** V0 draait als actief RAG-leerplatform (migraties t/m `0053_v0_contact_requests`) mét geshipte crawler + embeddable widget. **V1 is code-compleet** — `app/v1` + `lib/v1` + migraties `0001`–`0016` op het aparte V1-prod-project; alle §1.5-items gebouwd. Resterend vóór launch: uitsluitend ops/legal, zie `docs/V1_LAUNCH_TODO.md`. Nieuwe features: overleg of ze in V0 (bot-versie) of V1 landen.
 
 ## Hoe je met dit project werkt
 
@@ -77,7 +77,7 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 ### V1 (gepland — Phase 4 van het Bouwplan)
 
 - **V1 draait op OpenAI `gpt-4o-mini`** (scope-beslissing 2026-06-29). De RAG-engine roept `openai()` direct aan; de `callLLM()`/`streamLLM()`-provider-abstractie + Claude Haiku 4.5 + automatische OpenAI-fallback verschuiven naar **V2** (Haiku dan als backup, niet klant-zichtbaar). De `callLLM`/`streamLLM`-stub mag in V1 een stub blijven. Zie `docs/V1_STATUS_EN_PLAN.md`.
-- Migratie-grens (ligt dormant klaar voor V2): de LLM-laag `lib/ai/llm.ts` met provider-abstractie + `MODEL_COSTS` voor EUR-billing. V0 én V1-op-gpt-4o-mini gebruiken `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`.
+- Migratie-grens (ligt dormant klaar voor V2): de LLM-laag `lib/ai/llm.ts` met provider-abstractie; EUR ontstaat via `costUsdToEur` (een echte EUR-tarieventabel komt pas met een echte V2-billing-caller). V0 én V1-op-gpt-4o-mini gebruiken `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`.
 - Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
 
 > ⚠️ **Firecrawl is geen V1-plan meer — al geshipt in V0.** De website-crawler (max 50 pagina's/crawl) draait live in V0-vorm: `lib/v0/crawler/`, dashboard in de Kennisbank, migraties 0032/0035/0036/0037, PR #95/#107/#120. Stond hier ooit als "Phase 5 (gepland)". De V1-hardening (auth, per-user multi-tenancy) komt nog.

@@ -1,4 +1,4 @@
-// Run: node --import tsx --test tests/v0/source-links.test.ts
+// Run: node --import tsx --test lib/rag/__tests__/source-links.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -6,7 +6,7 @@ import {
   buildAllowedUrlSet,
   sanitizeSourceLinks,
   stripMarkdownLinks,
-} from '../../lib/rag/source-links';
+} from '../source-links';
 
 const REAL = 'https://v0-demo1-website.vercel.app/over-ons';
 
