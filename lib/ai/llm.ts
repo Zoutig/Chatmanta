@@ -29,33 +29,6 @@ export type CallLLMOptions = {
 };
 
 /**
- * Per-million-token costs in EUR for each supported model. Keep this in
- * sync with provider pricing pages — used for `usage_logs.cost_eur`.
- *
- * V1 actively-billed models: claude-haiku-4-5 + gpt-4o-mini. Sonnet and
- * GPT-4o are listed for use in V2 Pro/Business tiers.
- */
-export const MODEL_COSTS = {
-  'claude-haiku-4-5':   { input_per_m: 1.0,  output_per_m: 5.0 },
-  'claude-sonnet-4-6':  { input_per_m: 3.0,  output_per_m: 15.0 },
-  'gpt-4o-mini':        { input_per_m: 0.15, output_per_m: 0.60 },
-  'gpt-4o':             { input_per_m: 2.50, output_per_m: 10.0 },
-} as const satisfies Record<string, { input_per_m: number; output_per_m: number }>;
-
-export type SupportedModel = keyof typeof MODEL_COSTS;
-
-/** Convert input/output token counts to EUR cost for the given model. */
-export function calculateCost(
-  model: SupportedModel,
-  inputTokens: number,
-  outputTokens: number,
-): number {
-  const rates = MODEL_COSTS[model];
-  return (inputTokens / 1_000_000) * rates.input_per_m
-       + (outputTokens / 1_000_000) * rates.output_per_m;
-}
-
-/**
  * Per-million-token costs in USD — pure provider-rate tabel. Gebruikt door V0
  * waar token-kosten in USD opgeteld worden (query_log.cost_usd is USD).
  *
@@ -63,8 +36,8 @@ export function calculateCost(
  * en de wijziging propageert automatisch naar elke aanroeper. NIET hardcoden
  * in callsites.
  *
- * V1 callers gebruiken MODEL_COSTS (EUR) voor billing; V0 callers gebruiken
- * MODEL_COSTS_USD voor cost-discipline-telemetrie.
+ * Alle callers (V0 én V1) rekenen in USD via costForModelUsd; EUR ontstaat
+ * alleen via costUsdToEur.
  */
 export const MODEL_COSTS_USD = {
   'claude-haiku-4-5':   { input_per_m: 1.0,  output_per_m: 5.0 },
@@ -100,9 +73,8 @@ export function costForModelUsd(
  * USD→EUR conversie voor query_log.cost_eur. De engine sommeert kosten in USD
  * (costForModelUsd); de EUR-cap (M-C) en EUR-billing willen EUR.
  * ponytail: vaste FX-constante (env-override USD_EUR_RATE). Dit is een
- * budget-backstop, geen factuur. Upgrade-pad (V2): live FX of per-call EUR via
- * MODEL_COSTS — let op: MODEL_COSTS (EUR) spiegelt nu nog de USD-tabel, dus
- * her-summeren geeft GEEN echte EUR tot die tabel echte EUR-rates krijgt.
+ * budget-backstop, geen factuur. Upgrade-pad (V2): live FX of een echte
+ * EUR-tarieventabel zodra er een V2-billing-caller is.
  */
 const USD_EUR_RATE = Number(process.env.USD_EUR_RATE) || 0.92;
 export function costUsdToEur(usd: number): number {
