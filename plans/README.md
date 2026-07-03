@@ -51,6 +51,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (met één regel reden) | REJ
 | Lint-schuld: 36 errors / 33 warnings (vooral `react-hooks/set-state-in-effect`, `no-explicit-any` in scripts) — daarná lint in `verify` + CI | dx | M | Gemeten 2026-07-02; tweede helft van bevinding tests-05 |
 | Gecrawlde/geüploade content bereikt de answer-LLM zonder expliciete "bron = data, geen instructies"-afbakening | security | M (investigate) | LOW-confidence; eerst blootstelling onderzoeken (UGC-pagina's?); her-eval nodig bij promptwijziging |
 | `@ark-ui/react` (hele lib voor één popover) → native popover-API | tech-debt | S | Vereist visuele UX-check van de accent-picker vóór verwijdering |
+| Timing-safe-compare bestaat nu 4× (cron-auth, auth-cookie, embed-token V0/V1) — consolideer naar één helper in `lib/security` | tech-debt | S | Uit batch-code-review 2026-07-03; embed-token V0/V1-kopieën zijn bewuste conventie, dus alleen deels consolideerbaar |
+| ~37 oudere scripts (`scripts/cc/*` e.a.) lezen nog oude unprefixed Supabase-env-namen die check-env niet meer valideert | dx | S | Uit batch-code-review 2026-07-03; stragglers migreren naar V0_/V1_-namen óf oude namen als soft-check terugzetten |
+| TLS-certvalidatie migrate.mjs open (`rejectUnauthorized:false`) — `ssl:true` faalt op de Supabase-CA (self-signed chain) | security | S | Uit plan 009: CA-cert downloaden (Dashboard → Database → SSL) en MIGRATE_SSL_CA-variant bouwen+testen; vergt menselijke go |
+| V1-prod-ledger heeft migraties 0017-0020 (admin_*) zónder repo-file — reconstrueren of expliciet documenteren | tech-debt | M | Ontdekt 2026-07-03; out-of-band toegepast tijdens de autonome orchestrator-run, files nooit gecommit |
 
 ## Direction — opties voor Sebastiaan (bewust geen plannen; productkeuzes)
 
