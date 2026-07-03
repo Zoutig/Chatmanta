@@ -1,24 +1,58 @@
+// V1 admin — klant deep-dive (tabbed).
+//
+// Rebuildet van de platte sectie-layout naar een ?tab=-navigatie met acht tabs:
+//   Overzicht · Notities · Onboarding · Privacy & Data · Gesprekken · Bronnen ·
+//   Usage · Beheer
+//
+// Beheer-tab bewaart de bestaande budget-editor, delete-org-form en export-link
+// (actions.ts + export/route.ts zijn ongewijzigd). Alle admin-overlay-logica
+// (profiel, notities, onboarding, privacy) is nieuw via lib/v1/admin/overlay-actions.ts.
+//
+// Auth: getJorionAdminClient() gate't intern via requireJorionAdmin(). De page-RSC
+// vangt AUTH_FORBIDDEN op voor defense-in-depth (layout-gate is niet genoeg).
+
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { isAppError } from '@/lib/errors/app-error';
-import {
-  getOrgConversationsThisMonth,
-  getOrgSpendThisMonthEur,
-  resolveDailyBudgetEur,
-} from '@/lib/v1/limits/usage-limits';
+import { getProfile } from '@/lib/v1/admin/profile';
+import { resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
-import { MetricCard } from '@/app/admindashboard/components/metric-card';
-import { BudgetEditor } from './budget-editor';
-import { DeleteOrgForm } from './delete-org-form';
+import { TabsNav, type TabDef } from '@/app/klantendashboard/components/tabs';
+import { CommercialBadge, TechnicalBadge } from '@/app/admindashboard/components/badges';
+import { OverzichtTab } from './_tabs/overzicht-tab';
+import { NotitiesTab } from './_tabs/notities-tab';
+import { OnboardingTab } from './_tabs/onboarding-tab';
+import { PrivacyTab } from './_tabs/privacy-tab';
+import { BeheerTab } from './_tabs/beheer-tab';
+import { GesprekkenTab } from './_tabs/gesprekken-tab';
+import { BronnenTab } from './_tabs/bronnen-tab';
+import { UsageTab } from './_tabs/usage-tab';
 
-// V1 admin — org-deep-dive. Cross-org reads via getJorionAdminClient() (service-role NÁ
-// requireJorionAdmin; admin is geen org-member → RLS-session-client zou 0 rijen geven).
-// De page-RSC draait óók als de layout-gate faalt, dus eigen AUTH_FORBIDDEN-afhandeling
-// (defense-in-depth).
 export const dynamic = 'force-dynamic';
+
+const TABS: TabDef[] = [
+  { key: 'overzicht',  label: 'Overzicht' },
+  { key: 'notities',   label: 'Notities' },
+  { key: 'onboarding', label: 'Onboarding' },
+  { key: 'privacy',    label: 'Privacy & Data' },
+  { key: 'gesprekken', label: 'Gesprekken' },
+  { key: 'bronnen',    label: 'Bronnen' },
+  { key: 'usage',      label: 'Usage' },
+  { key: 'beheer',     label: 'Beheer' },
+];
+
+const labelStyle = { fontSize: 11, color: 'var(--klant-dim)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
+
+function InfoItem({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={labelStyle}>{label}</div>
+      <div style={{ fontSize: 13.5, marginTop: 3, color: 'var(--klant-ink)' }}>{children}</div>
+    </div>
+  );
+}
 
 type OrgRow = {
   id: string;
@@ -29,31 +63,18 @@ type OrgRow = {
   organization_members: { count: number }[] | null;
 };
 
-const SOURCE_TONE: Record<string, PillTone> = {
-  ready: 'success',
-  crawling: 'info',
-  pending: 'neutral',
-  failed: 'danger',
-};
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-function fmtDateTime(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
-const sectionTitle = { fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--klant-ink)' } as const;
-const labelStyle = { fontSize: 12, color: 'var(--klant-muted)' } as const;
-
-export default async function OrgDeepDivePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrgDeepDivePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const { id } = await params;
 
   let admin;
   try {
-    admin = await getJorionAdminClient(); // gate't intern via requireJorionAdmin
+    admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
@@ -66,218 +87,83 @@ export default async function OrgDeepDivePage({ params }: { params: Promise<{ id
     throw e; // NEXT_REDIRECT (geen sessie) → /v1/login
   }
 
-  const { data: org } = await admin
+  const { data: orgData } = await admin
     .from('organizations')
     .select('id, name, slug, created_at, daily_budget_eur, organization_members(count)')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle();
-  if (!org) notFound();
-  const o = org as OrgRow;
-  const memberCount = o.organization_members?.[0]?.count ?? 0;
-  const capEur = resolveDailyBudgetEur(o.daily_budget_eur);
+  if (!orgData) notFound();
+  const org = orgData as OrgRow;
 
-  // Chatbot eerst — nodig om kennisbronnen óók op chatbot_id te scopen (per-rule-conventie).
+  // Chatbot-id nodig voor Bronnen-tab (knowledge_sources.chatbot_id scope).
   const { data: chatbotData } = await admin
     .from('chatbots')
-    .select('id, name, bot_version, created_at')
+    .select('id')
     .eq('organization_id', id)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
-  const chatbot = chatbotData as { id: string; name: string; bot_version: string; created_at: string } | null;
+  const chatbotId = (chatbotData as { id: string } | null)?.id ?? null;
 
-  // Kennisbronnen gescoped op org + chatbot (geen chatbot → geen bronnen).
-  let sourcesQuery = admin
-    .from('knowledge_sources')
-    .select('id, type, normalized_host, root_url, status, created_at')
-    .eq('organization_id', id)
-    .is('deleted_at', null);
-  if (chatbot) sourcesQuery = sourcesQuery.eq('chatbot_id', chatbot.id);
+  const [profile, sp] = await Promise.all([
+    getProfile(admin, id),
+    searchParams,
+  ]);
 
-  // Parallel: kennisbronnen, deze-maand-cijfers, recente fouten.
-  const [sourcesRes, conversations, spendEur, failedJobsRes, failEventsRes] =
-    await Promise.all([
-      sourcesQuery.order('created_at', { ascending: false }),
-      getOrgConversationsThisMonth(admin, id),
-      getOrgSpendThisMonthEur(admin, id),
-      admin
-        .from('processing_jobs')
-        .select('id, error_message, created_at')
-        .eq('organization_id', id)
-        .eq('status', 'failed')
-        .order('created_at', { ascending: false })
-        .limit(10),
-      admin
-        .from('crawl_events')
-        .select('id, message, decision, created_at')
-        .eq('organization_id', id)
-        .eq('event_type', 'fail')
-        .order('created_at', { ascending: false })
-        .limit(10),
-    ]);
-
-  const sources = (sourcesRes.data ?? []) as Array<{
-    id: string; type: string; normalized_host: string | null; root_url: string | null; status: string; created_at: string;
-  }>;
-  const failedJobs = (failedJobsRes.data ?? []) as Array<{ id: string; error_message: string | null; created_at: string }>;
-  const failEvents = (failEventsRes.data ?? []) as Array<{ id: string; message: string | null; decision: string | null; created_at: string }>;
-  const noErrors = failedJobs.length === 0 && failEvents.length === 0;
+  const tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as string) : 'overzicht';
+  const basePath = `/v1/admin/organizations/${id}`;
 
   return (
     <>
       <PageHead
         eyebrow={<Link href="/v1/admin/organizations">← Organisaties</Link>}
-        title={o.name}
-        subtitle={`slug: ${o.slug}`}
+        title={org.name}
+        subtitle={`slug: ${org.slug}`}
+        actions={
+          <>
+            <CommercialBadge status={profile.commercialStatus} />
+            {profile.technicalStatusOverride && (
+              <TechnicalBadge status={profile.technicalStatusOverride} />
+            )}
+          </>
+        }
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* Info */}
-        <section>
-          <h2 style={sectionTitle}>Info</h2>
-          <Card>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16 }}>
-              <div><div style={labelStyle}>Naam</div><div>{o.name}</div></div>
-              <div><div style={labelStyle}>Slug</div><div>{o.slug}</div></div>
-              <div><div style={labelStyle}>Aangemaakt</div><div>{fmtDate(o.created_at)}</div></div>
-              <div><div style={labelStyle}>Leden</div><div>{memberCount}</div></div>
-            </div>
-          </Card>
-        </section>
+      {/* Info-strip: vaste velden die altijd zichtbaar zijn */}
+      <Card style={{ marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+          <InfoItem label="Customer owner">{profile.customerOwner}</InfoItem>
+          <InfoItem label="Technical owner">{profile.technicalOwner}</InfoItem>
+          <InfoItem label="Contact">{profile.contactName ?? '—'}</InfoItem>
+          <InfoItem label="Leden">{org.organization_members?.[0]?.count ?? 0}</InfoItem>
+          <InfoItem label="Dagbudget">
+            {resolveDailyBudgetEur(org.daily_budget_eur) === 0
+              ? 'uit'
+              : `€${resolveDailyBudgetEur(org.daily_budget_eur).toFixed(2)}`}
+          </InfoItem>
+          {profile.nextAction && (
+            <InfoItem label="Volgende actie">
+              {profile.nextAction}
+              {profile.nextActionDueDate ? ` (${profile.nextActionDueDate})` : ''}
+            </InfoItem>
+          )}
+        </div>
+      </Card>
 
-        {/* Chatbot */}
-        <section>
-          <h2 style={sectionTitle}>Chatbot</h2>
-          <Card>
-            {chatbot ? (
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <strong>{chatbot.name}</strong>
-                <Pill tone="accent">{chatbot.bot_version}</Pill>
-                <span style={labelStyle}>aangemaakt {fmtDate(chatbot.created_at)}</span>
-              </div>
-            ) : (
-              <p style={labelStyle}>Geen chatbot geconfigureerd.</p>
-            )}
-          </Card>
-        </section>
+      <TabsNav tabs={TABS} active={tab} basePath={basePath} />
 
-        {/* Kennisbronnen */}
-        <section>
-          <h2 style={sectionTitle}>Kennisbronnen ({sources.length})</h2>
-          <Card padded={false}>
-            {sources.length === 0 ? (
-              <p style={{ ...labelStyle, padding: 16 }}>Nog geen kennisbronnen.</p>
-            ) : (
-              <table className="klant-table">
-                <thead><tr><th>Type</th><th>Host / URL</th><th>Status</th></tr></thead>
-                <tbody>
-                  {sources.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.type}</td>
-                      <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {s.normalized_host ?? s.root_url ?? '—'}
-                      </td>
-                      <td><Pill tone={SOURCE_TONE[s.status] ?? 'neutral'}>{s.status}</Pill></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-        </section>
-
-        {/* Deze maand + budget */}
-        <section>
-          <h2 style={sectionTitle}>Deze maand</h2>
-          <div className="klant-metrics-grid">
-            <MetricCard label="Gesprekken (turns)" value={conversations} sub="deze kalendermaand" />
-            <MetricCard label="Kosten" value={`€${spendEur.toFixed(2)}`} sub="deze kalendermaand" />
-            <MetricCard
-              label="Dagbudget"
-              value={capEur === 0 ? 'uit' : `€${capEur.toFixed(2)}`}
-              tone={capEur === 0 ? 'warn' : 'ink'}
-              sub="per dag (cap)"
-            />
-          </div>
-          <Card style={{ marginTop: 12 }}>
-            <h3 style={{ ...sectionTitle, fontSize: 14 }}>Dagbudget aanpassen</h3>
-            <p style={{ ...labelStyle, margin: '0 0 10px' }}>
-              0 = budget uit (bot weigert bij overschrijding). Bovengrens €1000/dag.
-            </p>
-            <BudgetEditor orgId={o.id} currentEur={capEur} />
-          </Card>
-        </section>
-
-        {/* Recente fouten */}
-        <section>
-          <h2 style={sectionTitle}>Recente fouten</h2>
-          <Card>
-            {noErrors ? (
-              <p style={labelStyle}>Geen recente fouten.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {failedJobs.length > 0 && (
-                  <div>
-                    <div style={{ ...labelStyle, marginBottom: 6 }}>Mislukte verwerkings-jobs</div>
-                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {failedJobs.map((j) => (
-                        <li key={j.id}>
-                          <span style={{ color: 'var(--klant-danger)' }}>{j.error_message ?? 'onbekende fout'}</span>
-                          <span style={{ ...labelStyle, marginLeft: 8 }}>{fmtDateTime(j.created_at)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {failEvents.length > 0 && (
-                  <div>
-                    <div style={{ ...labelStyle, marginBottom: 6 }}>Crawl-fouten</div>
-                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {failEvents.map((e) => (
-                        <li key={e.id}>
-                          <span style={{ color: 'var(--klant-danger)' }}>{e.message ?? e.decision ?? 'crawl-fout'}</span>
-                          <span style={{ ...labelStyle, marginLeft: 8 }}>{fmtDateTime(e.created_at)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-        </section>
-
-        {/* Gegevensbeheer (AVG) */}
-        <section>
-          <h2 style={sectionTitle}>Gegevensbeheer (AVG)</h2>
-          <Card>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <h3 style={{ ...sectionTitle, fontSize: 14 }}>Exporteren</h3>
-                <p style={{ ...labelStyle, margin: '0 0 10px' }}>
-                  Download alle data van deze organisatie als JSON (gegevensportabiliteit).
-                </p>
-                <a
-                  href={`/v1/admin/organizations/${o.id}/export`}
-                  className="klant-btn"
-                  data-variant="secondary"
-                  style={{ padding: '8px 14px', display: 'inline-block' }}
-                >
-                  Exporteer org-data (JSON)
-                </a>
-              </div>
-              <div>
-                <h3 style={{ ...sectionTitle, fontSize: 14, color: 'var(--klant-danger)' }}>
-                  Gevarenzone
-                </h3>
-                <DeleteOrgForm orgId={o.id} slug={o.slug} />
-              </div>
-            </div>
-          </Card>
-        </section>
-      </div>
+      {tab === 'overzicht'  && <OverzichtTab orgId={id} profile={profile} />}
+      {tab === 'notities'   && <NotitiesTab orgId={id} notes={profile.notes} />}
+      {tab === 'onboarding' && <OnboardingTab orgId={id} />}
+      {tab === 'privacy'    && <PrivacyTab orgId={id} />}
+      {tab === 'gesprekken' && <GesprekkenTab orgId={id} />}
+      {tab === 'bronnen'    && <BronnenTab orgId={id} chatbotId={chatbotId} />}
+      {tab === 'usage'      && <UsageTab orgId={id} />}
+      {tab === 'beheer'     && (
+        <BeheerTab orgId={id} slug={org.slug} dailyBudgetRaw={org.daily_budget_eur} />
+      )}
     </>
   );
 }
