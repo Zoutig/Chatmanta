@@ -37,6 +37,7 @@ export async function listAdminThreads(
       thread_messages(id, role, content, created_at)
     `)
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw new Error(`listAdminThreads failed: ${error.message}`);

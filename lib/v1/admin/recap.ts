@@ -5,7 +5,8 @@
 //  - Tabelnames: 'threads' i.p.v. 'v0_threads', 'thread_messages' i.p.v. 'v0_thread_messages'
 //  - DB-toegang: SupabaseClient als parameter (caller roept getJorionAdminClient() aan)
 //  - Org-resolutie: orgId als UUID, geen KNOWN_ORGS / slug
-//  - Geen deleted_at-filter op threads (V1 threads heeft nog geen soft-delete)
+//  - threads heeft geen visitor_id/updated_at (V0 wel): duur via last_message_at,
+//    unieke bezoekers via distinct query_log.ip_hash; soft-delete via deleted_at
 //
 // Pure helpers (recap-logic.ts) en LLM (recap-llm.ts) worden ongewijzigd hergebruikt.
 // De tabellen admin_monthly_recaps + admin_recap_signals bestaan via migr 0020.
@@ -101,11 +102,12 @@ export async function getRecapStats(
 ): Promise<RecapStats> {
   const { sinceIso, untilIso } = monthRangeIso(year, month);
   try {
-    // --- per-GESPREK uit 'threads' (V1 tabel; geen deleted_at in V1) ---
+    // --- per-GESPREK uit 'threads' (V1 tabel; soft-delete via deleted_at) ---
     const { data: threads, error: tErr } = await admin
       .from('threads')
-      .select('id, visitor_id, created_at, updated_at')
+      .select('id, created_at, last_message_at')
       .eq('organization_id', organizationId)
+      .is('deleted_at', null)
       .gte('created_at', sinceIso)
       .lt('created_at', untilIso)
       .limit(MAX_THREAD_ROWS);
@@ -113,16 +115,14 @@ export async function getRecapStats(
     if (tErr || !threads) return { ...EMPTY_STATS, ...turn };
 
     const totalConversations = threads.length;
-    const visitors = new Set<string>();
     const hourBuckets = new Array<number>(24).fill(0);
-    // updated_at gekopt op untilIso zodat een gesprek dat de maand overloopt
-    // de afgesloten maand niet blijft oprekken (zelfde logica als V0).
+    // last_message_at gekopt op untilIso zodat een gesprek dat de maand overloopt
+    // de afgesloten maand niet blijft oprekken (zelfde logica als V0, updated_at->last_message_at).
     const untilMs = new Date(untilIso).getTime();
     let durationSum = 0;
     for (const t of threads) {
-      if (t.visitor_id) visitors.add(String(t.visitor_id));
       const created = new Date(String(t.created_at)).getTime();
-      const updated = Math.min(new Date(String(t.updated_at)).getTime(), untilMs);
+      const updated = Math.min(new Date(String(t.last_message_at)).getTime(), untilMs);
       if (updated > created) durationSum += (updated - created) / 1000;
       hourBuckets[amsterdamHour(String(t.created_at))] += 1;
     }
@@ -144,7 +144,7 @@ export async function getRecapStats(
 
     return {
       totalConversations,
-      uniqueVisitors: visitors.size,
+      uniqueVisitors: turn.uniqueVisitors,
       avgDurationSeconds:
         totalConversations > 0 ? Math.round(durationSum / totalConversations) : 0,
       avgMessagesPerConversation,
@@ -162,9 +162,9 @@ async function getTurnStats(
   organizationId: string,
   sinceIso: string,
   untilIso: string,
-): Promise<{ totalTurns: number; unansweredCount: number }> {
+): Promise<{ totalTurns: number; unansweredCount: number; uniqueVisitors: number }> {
   try {
-    const [totalRes, fbRes] = await Promise.all([
+    const [totalRes, fbRes, ipRes] = await Promise.all([
       admin
         .from('query_log')
         .select('id', { count: 'exact', head: true })
@@ -178,13 +178,31 @@ async function getTurnStats(
         .eq('kind', 'fallback')
         .gte('created_at', sinceIso)
         .lt('created_at', untilIso),
+      // ponytail: unieke bezoekers ~ distinct ip_hash (V1 threads heeft geen visitor_id).
+      // Gekapt op MAX_QUESTION_ROWS: exact voor kleine orgs, ondergrens bij zeer druk
+      // verkeer — verhoog de cap als dat een reëel scenario wordt.
+      admin
+        .from('query_log')
+        .select('ip_hash')
+        .eq('organization_id', organizationId)
+        .not('ip_hash', 'is', null)
+        .gte('created_at', sinceIso)
+        .lt('created_at', untilIso)
+        .limit(MAX_QUESTION_ROWS),
     ]);
+    const visitors = new Set<string>();
+    if (!ipRes.error && ipRes.data) {
+      for (const r of ipRes.data as Array<{ ip_hash: string | null }>) {
+        if (r.ip_hash) visitors.add(r.ip_hash);
+      }
+    }
     return {
       totalTurns: totalRes.error ? 0 : (totalRes.count ?? 0),
       unansweredCount: fbRes.error ? 0 : (fbRes.count ?? 0),
+      uniqueVisitors: visitors.size,
     };
   } catch {
-    return { totalTurns: 0, unansweredCount: 0 };
+    return { totalTurns: 0, unansweredCount: 0, uniqueVisitors: 0 };
   }
 }
 
