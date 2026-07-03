@@ -12,10 +12,10 @@ handmatig herbevestigd in de bron. Alle bewijs-excerpts in de plannen komen uit 
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001  | Unit-test glob-runner + `verify`-commando (8 wees-tests weer actief, o.a. SSRF/origin/embed-token) | P1 | M | — | TODO |
-| 002  | axios/form-data HIGH-advisories fixen (via firecrawl) | P1 | S | — | TODO |
-| 003  | Follow-up-chips uit `activeAnswerText` (anti-hallucinatie-lek) | P1 | S | — | TODO |
-| 004  | check-env + AGENTS.md/ONBOARDING/HANDOFF waarheidsgetrouw + Node-pin | P1 | S | — | TODO |
+| 001  | Unit-test glob-runner + `verify`-commando (8 wees-tests weer actief, o.a. SSRF/origin/embed-token) | P1 | M | — | DONE (0f9eb5a) |
+| 002  | axios/form-data HIGH-advisories fixen (via firecrawl) | P1 | S | — | DONE (6325032) |
+| 003  | Follow-up-chips uit `activeAnswerText` (anti-hallucinatie-lek) | P1 | S | — | DONE (5cf7b63) |
+| 004  | check-env + AGENTS.md/ONBOARDING/HANDOFF waarheidsgetrouw + Node-pin | P1 | S | — | DONE (afcbd3c) |
 | 005  | Timing-safe CRON_SECRET-helper voor 5 cron-routes | P2 | S | 001 (zacht) | TODO |
 | 006  | Answer-cache stale-write-race: epoch-guard (⚠️ Step 0 = akkoord Sebastiaan, migraties) | P2 | M | akkoord Seb | TODO |
 | 007  | Tests op de V1 PII-poorten: embed-token HMAC + contact-validatie-extractie | P2 | M | 001 | TODO |
