@@ -21,7 +21,9 @@ for (const root of ROOTS) {
     const p = `${root}/${String(f).replaceAll('\\', '/')}`;
     if (!isTest(p)) continue;
     if (!inTestsDir(p)) { strays.push(p); continue; }
-    if (/from ['"]react-dom\/server['"]/.test(readFileSync(p, 'utf8'))) domPass.push(p);
+    // Elke verwijzing naar react-dom/server (ook server.browser of require) →
+    // default-pass; die module throwt onder de react-server-conditie.
+    if (/['"]react-dom\/server/.test(readFileSync(p, 'utf8'))) domPass.push(p);
     else serverPass.push(p);
   }
 }

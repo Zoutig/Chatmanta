@@ -8,8 +8,14 @@
 // volledig regenereerbaar, een geskipte write kost alleen een toekomstige hit.
 //
 // Bewust een eigen klein module (niet in run-rag-query.ts): unit-testbaar
-// zonder de hele engine te importeren. Vereist een service-role client —
-// answer_cache_epoch heeft RLS aan zonder policies.
+// zonder de hele engine te importeren.
+//
+// LET OP: de service-role client is load-bearing. answer_cache_epoch heeft RLS
+// aan zonder policies; onder een session-client leest een SELECT gewoon 0 rijen
+// (geen error) → epoch 0 aan beide kanten → de guard no-op't stil (fail-open).
+// Dat lekt geen stale data — de cache-WRITE zelf faalt dan óók onder RLS — maar
+// de fail-closed-garantie hieronder geldt alleen met een service-role client,
+// precies wat cacheWriteClient in de engine altijd is.
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** Epoch van een org; 0 = nog nooit gepurged (geen rij); null = niet leesbaar. */

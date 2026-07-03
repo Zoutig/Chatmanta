@@ -26,18 +26,6 @@ import { validateContactBody } from '@/lib/v1/widget/contact-validate';
 
 export const runtime = 'nodejs';
 
-type Body = {
-  name?: unknown;
-  email?: unknown;
-  phone?: unknown;
-  preferredContact?: unknown;
-  subject?: unknown;
-  message?: unknown;
-  consentGiven?: unknown;
-  // Honeypot — een echte bezoeker laat dit leeg; een bot vult het. Gevuld → stil 200.
-  company_url?: unknown;
-};
-
 export async function POST(req: Request) {
   // 0. Eigen per-IP rate-limit-bucket.
   const rl = await getMutationRateLimiter().check(`v1-contact:${getClientIp(req)}`);
@@ -90,10 +78,10 @@ export async function POST(req: Request) {
   }
   if (!enabled) return new NextResponse(null, { status: 403 });
 
-  // 5. Body parsen.
-  let body: Body;
+  // 5. Body parsen — shape-validatie doet validateContactBody (unknown in).
+  let body: unknown;
   try {
-    body = (await req.json()) as Body;
+    body = await req.json();
   } catch {
     return new NextResponse(null, { status: 400 });
   }
