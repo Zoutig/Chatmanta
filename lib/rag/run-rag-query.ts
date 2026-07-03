@@ -25,6 +25,7 @@ import type {
   RagChatbotOverrides,
 } from '@/lib/rag/types';
 import { embedTexts } from '@/lib/rag/embeddings';
+import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
 import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
@@ -1467,6 +1468,10 @@ export async function* runRagQuery(
   // rejection. Lookup/write zijn al disableCache-gated; dit sluit de embed mee.
   const cacheActive = bot.cacheEnabled && input.disableCache !== true;
   const cacheEmbedPromise = cacheActive ? embedTexts([original]) : null;
+  // Epoch-snapshot bij pipeline-start (plan 006): parallel met de embed, geen
+  // wall-clock-impact. readCacheEpoch kan niet rejecten (vangt alles → null),
+  // dus geen discard-catch nodig op het smalltalk-pad.
+  const cacheEpochPromise = cacheActive ? readCacheEpoch(cacheWriteClient, orgId) : null;
 
   if (preProcessPromise) {
     yield { kind: 'status', phase: 'preprocess' };
@@ -2930,15 +2935,29 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
         phaseTimingsMs: phaseTimingsFinal,
       },
     };
-    writeCachedAnswer(
-      cacheWriteClient,
-      original,
-      cacheEmbedVector,
-      chatbotId,
-      chatbotScoped,
-      bot.version,
-      cachedResponse,
-      orgId,
-    ).catch((err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err));
+    // Epoch-guard (plan 006): een purge (KB/instellingen/Q&A-wijziging) tijdens
+    // deze pipeline bumpt de epoch → dan zou deze write een antwoord op basis
+    // van de OUDE kennisbank terug in de zojuist geleegde cache zetten. Re-read
+    // vlak vóór de insert; verschil of onleesbaar → skip (fail-closed, cache is
+    // regenereerbaar). Versmalt het race-venster van de hele pipeline-duur
+    // (~2-13s) naar één DB-round-trip; die rest is bewust geaccepteerd.
+    void (async () => {
+      const epochAtStart = cacheEpochPromise ? await cacheEpochPromise : null;
+      const epochNow = await readCacheEpoch(cacheWriteClient, orgId);
+      if (shouldSkipCacheWrite(epochAtStart, epochNow)) {
+        console.info(`[cache write] skipped: epoch ${epochAtStart} -> ${epochNow} (purge tijdens pipeline)`);
+        return;
+      }
+      await writeCachedAnswer(
+        cacheWriteClient,
+        original,
+        cacheEmbedVector,
+        chatbotId,
+        chatbotScoped,
+        bot.version,
+        cachedResponse,
+        orgId,
+      );
+    })().catch((err) => console.warn('[cache write] failed:', err instanceof Error ? err.message : err));
   }
 }

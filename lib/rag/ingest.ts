@@ -153,4 +153,14 @@ export async function purgeAnswerCache(
   if (error) {
     console.warn(`[purgeAnswerCache] faalde voor org=${organizationId} chatbot=${chatbotId}: ${error.message}`);
   }
+  // Epoch-bump (migr V1 0021, plan 006): laat in-flight pipelines hun cache-write
+  // overslaan. De epoch is per ORG terwijl deze purge org+chatbot-gescoped is —
+  // dat over-invalideert hooguit een write van een andere chatbot in ditzelfde
+  // venster (skip-write, geen dataverlies).
+  const { error: bumpErr } = await client.rpc('bump_cache_epoch', {
+    p_organization_id: organizationId,
+  });
+  if (bumpErr) {
+    console.warn(`[purgeAnswerCache] epoch bump faalde voor org=${organizationId}: ${bumpErr.message}`);
+  }
 }
