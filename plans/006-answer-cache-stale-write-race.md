@@ -65,7 +65,7 @@ De answer-cache wordt org-breed gepurged bij élke kennisbank-/instellingen-/Q&A
 ## Scope
 
 **In scope**:
-- Nieuwe migraties: `supabase/migrations/NNNN_v0_cache_epoch.sql` + `supabase/migrations-v1/NNNN_v1_cache_epoch.sql`
+- Nieuwe migraties: `supabase/migrations/NNNN_v0_cache_epoch.sql` + `supabase/migrations-v1/0021_v1_cache_epoch.sql`
 - `lib/rag/run-rag-query.ts` (epoch-read bij start cache-pad + guard in `writeCachedAnswer`)
 - `lib/rag/ingest.ts` (V1 `purgeAnswerCache` bumpt epoch)
 - `lib/v0/server/rag.ts` (V0 `purgeAnswerCache` bumpt epoch)

@@ -36,7 +36,7 @@ Strikt sequentieel in één gedeelde worktree — vier plannen raken `package.js
    committen wél zelf, met de commit-message uit hun plan. Nooit pushen.
 2. **plans/README.md-statusrijen**: bijgehouden door de orkestrator, niet door executors.
 3. **Plan 006 Step 0 (akkoord Sebastiaan)**: ✅ afgetekend 2026-07-02. Migratienummers
-   geverifieerd: V0 → `0054_v0_cache_epoch.sql`, V1 → `0017_v1_cache_epoch.sql` (hoogste
+   geverifieerd: V0 → `0054_v0_cache_epoch.sql`, V1 → `0021_v1_cache_epoch.sql` (hoogste
    bestaand: 0053/0016; open PRs #232/#207 claimen geen migraties).
 4. **Migratie-toepassing 006**: `npm run migrate` haalt de pooler vanaf deze machine vaak
    niet → toepassing via Supabase MCP (`apply_migration`/`execute_sql`) op beide projecten,
