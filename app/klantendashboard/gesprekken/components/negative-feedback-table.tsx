@@ -7,8 +7,17 @@
 // route — alle context past in deze tabel zelf.
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MessageCircle } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronDown, ChevronRight, MessageCircle, Plus } from 'lucide-react';
 import type { NegativeFeedbackItem } from '@/lib/v0/klantendashboard/types';
+
+// Doel-URL van de Kennisbank Q&A-tab; per dashboard anders (V1 vs V0).
+// Default = V0-pad zodat het V0-dashboard niet breekt; V1 geeft z'n eigen pad door.
+const DEFAULT_QA_BASE_PATH = '/klantendashboard/kennisbank';
+
+function qaHref(basePath: string, question: string): string {
+  return `${basePath}?tab=qa&prefillQuestion=${encodeURIComponent(question)}`;
+}
 
 function formatDateTime(iso: string): string {
   if (!iso) return '—';
@@ -21,7 +30,13 @@ function formatDateTime(iso: string): string {
   });
 }
 
-export function NegativeFeedbackTable({ items }: { items: NegativeFeedbackItem[] }) {
+export function NegativeFeedbackTable({
+  items,
+  qaBasePath = DEFAULT_QA_BASE_PATH,
+}: {
+  items: NegativeFeedbackItem[];
+  qaBasePath?: string;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (items.length === 0) {
@@ -48,6 +63,7 @@ export function NegativeFeedbackTable({ items }: { items: NegativeFeedbackItem[]
               <th>Vraag bezoeker</th>
               <th>Toelichting</th>
               <th>Tijd</th>
+              <th style={{ width: 150, textAlign: 'right' }}>Actie</th>
             </tr>
           </thead>
           <tbody>
@@ -59,6 +75,7 @@ export function NegativeFeedbackTable({ items }: { items: NegativeFeedbackItem[]
                   item={f}
                   isOpen={isOpen}
                   onToggle={() => setExpandedId(isOpen ? null : f.id)}
+                  qaBasePath={qaBasePath}
                 />
               );
             })}
@@ -73,10 +90,12 @@ function FeedbackRow({
   item,
   isOpen,
   onToggle,
+  qaBasePath,
 }: {
   item: NegativeFeedbackItem;
   isOpen: boolean;
   onToggle: () => void;
+  qaBasePath: string;
 }) {
   return (
     <>
@@ -128,10 +147,21 @@ function FeedbackRow({
         <td style={{ color: 'var(--klant-fg-muted)', whiteSpace: 'nowrap' }}>
           {formatDateTime(item.createdAt)}
         </td>
+        <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+          <Link
+            href={qaHref(qaBasePath, item.question)}
+            className="klant-btn"
+            data-variant="ghost"
+            style={{ fontSize: 12, whiteSpace: 'nowrap', textDecoration: 'none' }}
+            title="Maak een Q&A van deze vraag om het antwoord te corrigeren"
+          >
+            <Plus size={12} strokeWidth={2} /> Maak Q&amp;A
+          </Link>
+        </td>
       </tr>
       {isOpen && (
         <tr>
-          <td colSpan={4} style={{ padding: '0 16px 16px', background: 'var(--klant-surface)' }}>
+          <td colSpan={5} style={{ padding: '0 16px 16px', background: 'var(--klant-surface)' }}>
             <ExpandedDetail item={item} />
           </td>
         </tr>

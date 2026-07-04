@@ -31,7 +31,9 @@ export type QAItem = {
 
 // contract props — orgId/chatbotId worden door de page doorgegeven (voor eventuele
 // toekomstige client-side gebruik); de server actions leiden org+chatbot uit de sessie af.
-type Props = { initialQA: QAItem[]; orgId: string; chatbotId: string };
+// prefillQuestion: gezet via ?prefillQuestion= (correctieloop, WP4) → opent de
+// "Nieuwe Q&A"-modal meteen met de vraag ingevuld.
+type Props = { initialQA: QAItem[]; orgId: string; chatbotId: string; prefillQuestion?: string };
 
 type DraftQA = { id?: string; question: string; answer: string; category: string; active: boolean };
 
@@ -39,9 +41,11 @@ function emptyDraft(): DraftQA {
   return { question: '', answer: '', category: '', active: true };
 }
 
-export function QATab({ initialQA }: Props) {
+export function QATab({ initialQA, prefillQuestion }: Props) {
   const [items, setItems] = useState<QAItem[]>(initialQA);
-  const [editing, setEditing] = useState<DraftQA | null>(null);
+  const [editing, setEditing] = useState<DraftQA | null>(
+    prefillQuestion ? { ...emptyDraft(), question: prefillQuestion } : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
