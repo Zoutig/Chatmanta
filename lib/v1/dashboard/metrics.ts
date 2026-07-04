@@ -158,7 +158,7 @@ export async function getV1OverviewMetrics(
       .order('created_at', { ascending: false })
       .limit(SCAN_LIMIT),
     // Widget-status: chatbots.allowed_domains-aanwezigheid als proxy voor "geïnstalleerd".
-    client.from('chatbots').select('allowed_domains').eq('id', chatbotId).maybeSingle(),
+    client.from('chatbots').select('allowed_domains').eq('id', chatbotId).is('deleted_at', null).maybeSingle(),
     // Actieve bronnen: Q&A-items.
     client
       .from('org_qa_items')
