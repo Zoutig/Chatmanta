@@ -12,10 +12,12 @@
 //   - writes via service-role (contact_requests is SELECT-only onder RLS);
 //   - geen ruwe PII in logs (alleen DB-code/message).
 //
-// ponytail: geen notificatie-mail hier (V0 deed notifyNewContactRequest via after()).
-//   Buiten deze taak-scope: het dashboard leest de rij; mail/notify is een aparte laag.
+// Notificatiemail: best-effort via after() → notifyNewV1ContactRequest (fail-safe,
+//   gated op RESEND_API_KEY). Adres uit settings.notificationEmail, anders het
+//   account-e-mailadres (org-owner), anders env; geen adres → geen mail, geen fout.
+//   De submit blokkeert nooit op de mail — de bezoeker-lead gaat voor.
 
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getMutationRateLimiter, getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
@@ -23,6 +25,7 @@ import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { getOrgChatbot } from '@/app/v1/app/rag-config';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import { validateContactBody } from '@/lib/v1/widget/contact-validate';
+import { notifyNewV1ContactRequest } from '@/lib/notifications/v1-contact-request-notify';
 
 export const runtime = 'nodejs';
 
@@ -42,15 +45,17 @@ export async function POST(req: Request) {
 
   const svc = getV1ServiceRoleClient();
 
-  // 2. Org uit de gesigneerde slug (token), NOOIT uit de body.
+  // 2. Org uit de gesigneerde slug (token), NOOIT uit de body. Naam erbij voor de
+  //    notificatiemail-onderwerpregel.
   const { data: org } = await svc
     .from('organizations')
-    .select('id')
+    .select('id, name')
     .eq('slug', slug)
     .is('deleted_at', null)
     .maybeSingle();
   if (!org) return new NextResponse(null, { status: 401 });
   const organizationId = org.id as string;
+  const orgName = (org.name as string | null) ?? slug;
 
   // 3. Per-org rate-limit (eigen bucket) — vangt token-misbruik over IP's.
   const orgRl = await getOrgRateLimiter().check(`v1-contact-org:${organizationId}`);
@@ -70,9 +75,11 @@ export async function POST(req: Request) {
   //    De flag leeft in chatbots.settings (toegevoegd door de settings-agent); we
   //    lezen 'm defensief zodat dit ook vóór die wiring fail-closed werkt.
   let enabled = false;
+  let notificationEmail = '';
   try {
     const settings = await getChatbotSettings(svc, chatbot.id);
-    enabled = (settings as { contactRequestsEnabled?: unknown }).contactRequestsEnabled === true;
+    enabled = settings.contactRequestsEnabled === true;
+    notificationEmail = typeof settings.notificationEmail === 'string' ? settings.notificationEmail : '';
   } catch {
     enabled = false;
   }
@@ -114,6 +121,17 @@ export async function POST(req: Request) {
       console.error('[v1/contact-request] insert faalde:', (insErr as { code?: string }).code ?? '', insErr.message);
       return new NextResponse(null, { status: 500 });
     }
+
+    // DB = bron-van-waarheid; mail = best-effort via after() (nooit-throw, gated op
+    // RESEND_API_KEY). Blokkeert de 201 naar de bezoeker niet.
+    after(() =>
+      notifyNewV1ContactRequest(svc, {
+        organizationId,
+        orgName,
+        notificationEmail,
+        request: { name, email, phone, preferredContact, subject, message },
+      }),
+    );
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     console.error('[v1/contact-request] onverwachte fout:', err instanceof Error ? err.message : err);

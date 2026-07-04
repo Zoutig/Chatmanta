@@ -40,9 +40,11 @@ export type BuiltEmail = { subject: string; html: string; text: string };
 /** Interne notificatie naar de ondernemer/operator over een nieuw contactverzoek.
  *  Geen PII-redactie: dit gaat naar de eigenaar van de org en de bezoeker-gegevens
  *  zijn juist nodig om contact op te nemen. `req` is service-role-geleverd; de
- *  vrije-tekst-velden worden ge-escaped tegen HTML-injectie in de mailclient. */
+ *  vrije-tekst-velden worden ge-escaped tegen HTML-injectie in de mailclient.
+ *  Param = alléén de velden die de mail toont (Pick), zodat zowel de V0- als de
+ *  V1-notify-laag 'm kan voeden zonder een volledige rij-shape na te maken. */
 export function buildContactRequestOperatorEmail(
-  req: ContactRequest,
+  req: Pick<ContactRequest, 'name' | 'email' | 'phone' | 'preferredContact' | 'subject' | 'toelichting'>,
   opts: { orgName: string; dashboardUrl: string },
 ): BuiltEmail {
   const preferredLabel = PREFERRED_LABELS[req.preferredContact];
