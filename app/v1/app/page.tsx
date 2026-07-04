@@ -12,13 +12,9 @@
 // V0-componenten worden IMPORT-ONLY hergebruikt via @/app/klantendashboard/*.
 // V1-data → V0-component-shapes via inline adapter-objecten hieronder.
 //
-// ⚠️ Twee V0-componenten bevatten hardgecodeerde /klantendashboard/-hrefs die
-//    hier NIET kunnen worden overreden (geen href-props):
-//      • TriagePanel: "Bekijk gesprek" → /klantendashboard/gesprekken?filter=unanswered
-//                     "Antwoord toevoegen" → /klantendashboard/kennisbank
-//      • TopQuestionsBars: "Alles ›" → /klantendashboard/gesprekken?view=top-questions
-//    Te fixen door die components te forken naar app/v1/app/_overview/ als de V0-
-//    routes definitief worden opgeruimd.
+// TriagePanel en TopQuestionsBars zijn geforkt naar ./_overview/ (niet uit V0
+// geïmporteerd) omdat ze hardgecodeerde hrefs bevatten — de forks wijzen naar
+// /v1/app/* i.p.v. /klantendashboard/*. V0 blijft ongewijzigd.
 //
 // Auth-keten (ongewijzigd):
 //   geen sessie → getSessionOrg → requireAuth → redirect /v1/login (NEXT_REDIRECT

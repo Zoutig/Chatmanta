@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 
-// Sidebar-zoektrigger + command-palette. V0: navigeert tussen de 7 schermen
+// Sidebar-zoektrigger + command-palette. V0: navigeert tussen de schermen
 // (geen backend-zoek). ⌘K / Ctrl-K opent ook. Bewust licht gehouden — een
 // echte content-zoek komt bij V1.
 const ROUTES: { href: string; label: string; hint: string }[] = [
@@ -14,7 +14,9 @@ const ROUTES: { href: string; label: string; hint: string }[] = [
   { href: '/klantendashboard/instellingen', label: 'Instellingen', hint: 'Toon, gedrag, fallback' },
   { href: '/klantendashboard/widget', label: 'Widget', hint: 'Uiterlijk & embed-code' },
   { href: '/klantendashboard/gesprekken', label: 'Gesprekken', hint: 'Alle conversaties' },
+  { href: '/klantendashboard/contactverzoeken', label: 'Contactverzoeken', hint: 'Terugbel- en mailverzoeken van bezoekers' },
   { href: '/klantendashboard/account', label: 'Account', hint: 'Profiel, team, abonnement' },
+  { href: '/klantendashboard/feedback', label: 'Feedback', hint: 'Meld een bug, wens of antwoordkwaliteit' },
 ];
 
 export function SearchTrigger() {

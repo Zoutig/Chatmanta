@@ -266,16 +266,17 @@ async function OnboardingTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) 
 
 async function PrivacyTab({ slug, orgId }: { slug: OrgSlug; orgId: string }) {
   const privacy = await getPrivacy(orgId);
-  // delete_after = read-time projectie (created_at + retention); de daadwerkelijke
-  // opschoning is een gedocumenteerde service, nog niet op cron.
+  // delete_after = read-time projectie (created_at + retention). Het automatisch
+  // verwijderen/anonimiseren draait dagelijks via de Vercel-cron (vercel.json,
+  // /api/v0/cron/retention → runRetentionCleanup).
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card>
         <SectionTitle>Bewaartermijnen &amp; AVG</SectionTitle>
         <p className="klant-hint" style={{ marginTop: 0, marginBottom: 14 }}>
           In V0 worden deze waarden opgeslagen en getoond. Het automatisch verwijderen/anonimiseren
-          is een voorbereide service (nog niet op cron). Laatste export:{' '}
-          {formatDateNL(privacy.lastDataExportAt)} · laatste verwijdering: {formatDateNL(privacy.lastDataDeletionAt)}.
+          draait dagelijks via een cron. Data-export bestaat nog niet in V0 — laatste export:
+          nog niet beschikbaar in V0 · laatste verwijdering: {formatDateNL(privacy.lastDataDeletionAt)}.
         </p>
         <PrivacyForm orgSlug={slug} privacy={privacy} />
       </Card>
