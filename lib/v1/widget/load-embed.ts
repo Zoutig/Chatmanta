@@ -13,6 +13,10 @@ import type { V1WidgetProps } from '@/app/embed-v1/[slug]/v1-widget';
 export type EmbedLoadResult =
   | { kind: 'notfound' }
   | { kind: 'blocked' }
+  // Klant heeft de widget gepauzeerd (chatbots.is_active = false): render niets —
+  // geen FAB, geen token. Bewust een eigen kind (geen 'blocked'): de EmbedBlocked-
+  // weergave is voor allowlist-blokkades, pauzeren is een normale klant-actie.
+  | { kind: 'paused' }
   | { kind: 'ok'; props: V1WidgetProps };
 
 /**
@@ -32,13 +36,14 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
 
   const { data: chatbot } = await svc
     .from('chatbots')
-    .select('id, name, bot_version, settings, allowed_domains')
+    .select('id, name, bot_version, settings, allowed_domains, is_active')
     .eq('organization_id', org.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
   if (!chatbot) return { kind: 'notfound' };
+  if (chatbot.is_active === false) return { kind: 'paused' };
 
   // Origin-allowlist (Jorion-beheerd). Leeg/NULL → fail-open. Block → geen token,
   // geen widget. Afgedwongen bij token-uitgifte (de embed-pagina), net als V0.

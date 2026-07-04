@@ -59,6 +59,22 @@ export function V1Widget(props: V1WidgetProps) {
   const contactEnabled = props.contactRequestsEnabled === true;
   const fg = bestForegroundOn(accentColor);
 
+  // Heartbeat: één ping bij mount (V0-embed-parity). host komt uit ?h= dat de
+  // loader meegaf; voedt widget_last_seen_at voor Live-status + admin-widgetStatus.
+  useEffect(() => {
+    const host = new URLSearchParams(window.location.search).get('h') ?? undefined;
+    void fetch(`/api/v1/widget/ping?org=${encodeURIComponent(slug)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-chatmanta-embed': props.embedToken,
+      },
+      body: JSON.stringify({ host }),
+    }).catch(() => {
+      // best-effort
+    });
+  }, [props.embedToken, slug]);
+
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');

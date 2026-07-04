@@ -147,7 +147,7 @@ export async function POST(req: Request) {
   }
   const organizationId = org.id as string;
 
-  let chatbot: { id: string; name: string; bot_version: string } | null = null;
+  let chatbot: { id: string; name: string; bot_version: string; is_active: boolean } | null = null;
   try {
     chatbot = await getOrgChatbot(svc, organizationId);
   } catch {
@@ -157,6 +157,20 @@ export async function POST(req: Request) {
     return ndjsonOnce(requestId, queryLogId, { kind: 'error', code: 'INTERNAL', requestId });
   }
   const activeChatbot = chatbot;
+
+  // 4a. Klant-pauze (chatbots.is_active). Defense in depth naast de embed-render-
+  //     gate (loadV1Embed rendert geen widget bij paused): een al-geladen iframe of
+  //     direct API-verkeer krijgt een vriendelijke terminale fallback, geen pipeline.
+  if (activeChatbot.is_active === false) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: {
+        kind: 'fallback',
+        answer:
+          'Deze chatbot is tijdelijk gepauzeerd. Probeer het later opnieuw of neem rechtstreeks contact op.',
+      },
+    });
+  }
 
   // 4b. M-C combined per-ORG gate: per-org rate-limit + maand-cap + dag-budget. De per-IP
   //     rate-limit (gate #0) blijft staan; dit voegt per-org + kosten/maand toe. Block →

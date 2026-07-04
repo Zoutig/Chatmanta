@@ -8,19 +8,19 @@
 //  - Thema-selector (auto/licht/donker)
 //  - Ondertitel-veld
 //  - Preview-sectie (statische WidgetMockup — geen live-preview zonder V1 botVersion-prop)
-//  - Live-status-paneel (graceful: V1 heeft geen heartbeat-endpoint of DB-kolommen;
-//    zie ponytail-notitie onderaan)
-//
-// ponytail: V1 heeft geen widget_pings-tabel, /api/v1/widget/ping-route, of
-// isInstalled/isActive/lastCheckedAt/installOrigin-kolommen op chatbots.
-// Live-status toont daarom statische state (allowed_domains aanwezig = geconfigureerd).
-// Voeg een processing_job/ping-tabel + cron toe als installatie-tracking nodig wordt.
-// Activate/Pause-toggle ontbreekt eveneens (geen isActive-veld). V1-blocker voor
-// productie-go-live als klanten zelf moeten kunnen aan/uitzetten.
+//  - Live-status-paneel (WP2): echte heartbeat-data (chatbots.widget_last_seen_at,
+//    gevoed door /api/v1/widget/ping vanuit de embed) + werkende installatie-check
+//    (checkWidgetInstallationAction) + Pauzeren/Activeren-toggle
+//    (toggleWidgetActiveAction op chatbots.is_active; migratie 0023).
 
 import { useRef, useState, useTransition } from 'react';
 import { Bot, Check, ChevronDown, ChevronRight, Copy, ExternalLink, Upload, X } from 'lucide-react';
 import { saveChatbotSettingsAction } from '../instellingen/actions';
+import {
+  checkWidgetInstallationAction,
+  toggleWidgetActiveAction,
+  type WidgetLiveStatus,
+} from './actions';
 import { PresetColorPicker } from '@/app/klantendashboard/widget/components/preset-color-picker';
 import { MarkPreview, BubblePreview } from '@/app/klantendashboard/components/widget-logo';
 import type { V1ChatbotSettings } from '../instellingen/settings-config';
@@ -49,10 +49,12 @@ export function V1WidgetForm({
   initial,
   slug,
   allowedDomains,
+  liveStatus,
 }: {
   initial: V1ChatbotSettings;
   slug: string;
   allowedDomains: string[];
+  liveStatus: WidgetLiveStatus;
 }) {
   const [a, setA] = useState<Appearance>({
     accentColor: initial.accentColor,
@@ -72,6 +74,33 @@ export function V1WidgetForm({
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Live-status (WP2): verse waarde uit de server-props, daarna client-side
+  // ververst via de installatie-check / toggle-acties.
+  const [live, setLive] = useState<WidgetLiveStatus>(liveStatus);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusPending, startStatusTransition] = useTransition();
+
+  const runInstallCheck = () => {
+    setStatusError(null);
+    startStatusTransition(async () => {
+      const res = await checkWidgetInstallationAction();
+      if (res.ok) {
+        setLive({ isActive: res.isActive, lastSeenAt: res.lastSeenAt, lastSeenOrigin: res.lastSeenOrigin });
+      } else {
+        setStatusError(res.error);
+      }
+    });
+  };
+
+  const toggleActive = () => {
+    setStatusError(null);
+    startStatusTransition(async () => {
+      const res = await toggleWidgetActiveAction(!live.isActive);
+      if (res.ok) setLive((cur) => ({ ...cur, isActive: res.isActive }));
+      else setStatusError(res.error);
+    });
+  };
 
   const dirty = JSON.stringify(a) !== JSON.stringify(baseline);
 
@@ -494,14 +523,10 @@ export function V1WidgetForm({
         />
       </Collapsible>
 
-      {/* Live-status */}
-      {/* ponytail: statische status — V1 heeft geen heartbeat-endpoint of
-          isInstalled/isActive/lastCheckedAt/installOrigin-kolommen op chatbots.
-          Voeg een widget_pings-tabel + /api/v1/widget/ping-route toe en wire
-          checkWidgetInstallationAction als installatie-tracking nodig wordt. */}
+      {/* Live-status (WP2): echte heartbeat-data + pauzeer-toggle. */}
       <Collapsible
         title="Live-status"
-        subtitle="Controleer of je widget op je website draait."
+        subtitle="Controleer of je widget op je website draait, en zet hem aan of uit."
         open={openSection === 'status'}
         onToggle={() => toggle('status')}
       >
@@ -513,29 +538,53 @@ export function V1WidgetForm({
           }}
         >
           <StatusCell
+            label="Status"
+            value={live.isActive ? 'Actief' : 'Gepauzeerd'}
+            tone={live.isActive ? 'success' : 'warning'}
+          />
+          <StatusCell
             label="Gevonden op website"
-            value="Nog niet gecontroleerd"
-            tone="warning"
+            value={
+              live.lastSeenAt
+                ? `Ja${live.lastSeenOrigin ? ` — op ${live.lastSeenOrigin}` : ''}`
+                : 'Nog niet gezien'
+            }
+            tone={live.lastSeenAt ? 'success' : 'warning'}
+          />
+          <StatusCell
+            label="Laatst gezien"
+            value={live.lastSeenAt ? formatLastSeen(live.lastSeenAt) : '—'}
+            tone="neutral"
           />
           <StatusCell
             label="Domeinen geconfigureerd"
             value={allowedDomains.length > 0 ? `${allowedDomains.length} domein${allowedDomains.length === 1 ? '' : 'en'}` : 'Geen beperking'}
             tone={allowedDomains.length > 0 ? 'success' : 'neutral'}
           />
-          <StatusCell label="Laatste check" value="—" tone="neutral" />
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* ponytail: Activate/Pause-toggle ontbreekt — V1 heeft geen isActive-kolom.
-              Voeg een chatbots.is_active-kolom (migr) toe als klanten zelf moeten
-              kunnen aan/uitzetten. */}
           <button
             type="button"
             className="klant-btn"
-            disabled
-            title="Installatie-check vereist een widget-ping-endpoint dat V1 nog niet heeft."
+            disabled={statusPending}
+            onClick={runInstallCheck}
+            title="Haalt de laatste heartbeat van je widget op."
           >
-            Installatie testen
+            {statusPending ? 'Controleren…' : 'Installatie testen'}
+          </button>
+          <button
+            type="button"
+            className="klant-btn"
+            disabled={statusPending}
+            onClick={toggleActive}
+            title={
+              live.isActive
+                ? 'Verbergt de widget direct voor bezoekers; je kunt hem altijd weer activeren.'
+                : 'Maakt de widget weer zichtbaar voor bezoekers.'
+            }
+          >
+            {live.isActive ? 'Pauzeren' : 'Activeren'}
           </button>
           <a
             href="/widget"
@@ -547,9 +596,14 @@ export function V1WidgetForm({
             <ExternalLink size={14} strokeWidth={1.8} /> Open demo-pagina
           </a>
           <span style={{ fontSize: 12, color: 'var(--klant-fg-muted)' }}>
-            Installatie-check is beschikbaar na V1-hardening (heartbeat-endpoint gepland).
+            {live.isActive
+              ? 'De status wordt bijgewerkt zodra de widget op je site laadt.'
+              : 'Gepauzeerd: bezoekers zien de widget niet tot je hem activeert.'}
           </span>
         </div>
+        {statusError ? (
+          <p style={{ marginTop: 10, fontSize: 12, color: 'var(--klant-danger, #b91c1c)' }}>{statusError}</p>
+        ) : null}
       </Collapsible>
     </div>
   );
@@ -911,6 +965,13 @@ function LogoChoice({
 // ---------------------------------------------------------------------------
 // StatusCell voor het live-status-paneel
 // ---------------------------------------------------------------------------
+
+// NL-weergave van de laatste heartbeat, compact (bv. "3 jul, 14:03").
+function formatLastSeen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
 
 function StatusCell({
   label,
