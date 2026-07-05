@@ -31,30 +31,55 @@ export type AdminThreadFilters = {
   toIso?: string;
 };
 
+/** Escape LIKE/ILIKE-wildcards (%, _, \) zodat een letterlijke zoekterm niet als patroon leest. */
+function escapeLikeTerm(term: string): string {
+  return term.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 export async function listAdminThreads(
   admin: AdminClient,
   organizationId: string,
   limit = 50,
   filters: AdminThreadFilters = {},
 ): Promise<V1AdminThread[]> {
-  const term = filters.search?.trim();
+  const rawTerm = filters.search?.trim();
+
+  // Zoeken is twee stappen. Stap 1 (alleen bij een zoekterm): haal enkel de
+  // matchende thread-ID's op via een inner-join-embed + ilike — PostgREST filtert
+  // de parent-rij (thread) alleen mee als de embed `!inner` is. Stap 2: de
+  // ONgefilterde embed-query hieronder (altijd left-join) met `.in('id', matchedIds)`.
+  // Niet in één query combineren: een `!inner` + ilike OP de embed filtert ook de
+  // teruggegeven thread_messages-array zelf, waardoor messageCount/firstQuestion/
+  // lastMessageAt/unanswered verderop uit de gefilterde subset i.p.v. het volledige
+  // gesprek zouden komen (bv. een vals "Onbeantwoord" als toevallig alleen het
+  // matchende user-bericht terugkomt terwijl er wél een antwoord op volgde).
+  let matchedIds: string[] | null = null;
+  if (rawTerm) {
+    const term = escapeLikeTerm(rawTerm);
+    let idQuery = admin
+      .from('threads')
+      .select('id, thread_messages!inner(content)')
+      .eq('organization_id', organizationId)
+      .is('deleted_at', null)
+      .ilike('thread_messages.content', `%${term}%`);
+    if (filters.fromIso) idQuery = idQuery.gte('created_at', filters.fromIso);
+    if (filters.toIso) idQuery = idQuery.lte('created_at', filters.toIso);
+    // ponytail: cap tegen een pathologische zoekterm die duizenden threads matcht —
+    // ruim voldoende bij het huidige klantenaantal.
+    const { data: idRows, error: idErr } = await idQuery.limit(1000);
+    if (idErr) throw new Error(`listAdminThreads (zoeken) failed: ${idErr.message}`);
+    matchedIds = (idRows ?? []).map((r) => (r as { id: string }).id);
+    if (matchedIds.length === 0) return [];
+  }
 
   // Eerste user-bericht per thread + berichten-count + timestamp.
   // thread_messages.role in ('user','assistant'); eerste user-bericht = lowest created_at met role='user'.
-  //
-  // Zoeken filtert op berichttekst via een embedded resource — PostgREST filtert de
-  // parent-rij (thread) alleen mee als de embed `!inner` is; zonder zoekterm blijft
-  // het een left-join zodat threads zonder berichten niet wegvallen.
-  const embed = term
-    ? 'thread_messages!inner(id, role, content, created_at)'
-    : 'thread_messages(id, role, content, created_at)';
-
   let query = admin
     .from('threads')
-    .select(`id, created_at, ${embed}`)
+    .select('id, created_at, thread_messages(id, role, content, created_at)')
     .eq('organization_id', organizationId)
     .is('deleted_at', null);
-  if (term) query = query.ilike('thread_messages.content', `%${term}%`);
+  if (matchedIds) query = query.in('id', matchedIds);
   if (filters.fromIso) query = query.gte('created_at', filters.fromIso);
   if (filters.toIso) query = query.lte('created_at', filters.toIso);
 
