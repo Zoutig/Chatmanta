@@ -49,7 +49,9 @@ type QueryLogRow = {
   // bot-versies krijgen NULL/false en werken zonder wijziging.
   top1_sim: number | null;
   hyde_triggered: boolean;
-  rerank_scores: unknown | null;
+  // Nooit gevuld sinds v0.4 (kolom staat klaar voor een toekomstige rerank-trace) —
+  // optioneel zodat de insert het veld mag weglaten i.p.v. altijd null te schrijven.
+  rerank_scores?: unknown | null;
   // v0.4 claim verification aggregate (migration 0009). NULL als verification
   // niet draaide voor deze query (oudere bots).
   claim_confidence: number | null;
@@ -295,7 +297,6 @@ export async function logQuery(
             length: response.length,
             top1_sim: null,
             hyde_triggered: false,
-            rerank_scores: null,
             claim_confidence: null,
             embedding_ms: null,
             retrieval_ms: null,
@@ -343,10 +344,6 @@ export async function logQuery(
             length: response.length,
             top1_sim: top1Sim,
             hyde_triggered: hydeTriggered,
-            // rerank_scores: in V0.4 nog niet gevuld — kolom staat klaar voor
-            // wanneer Cohere of een gedetailleerde LLM-rerank-trace wordt
-            // ingebouwd. Leesbare default = null.
-            rerank_scores: null,
             claim_confidence: claimConfidence,
             embedding_ms: embeddingMs,
             retrieval_ms: retrievalMs,

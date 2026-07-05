@@ -4,7 +4,6 @@
 // app/klantendashboard/feedback/components/feedback-form.tsx.
 // Enige seam-wisselingen:
 // - importeert submitFeedbackV1Action (niet V0 submitFeedbackAction)
-// - 'anders'-type weggefilterd (V1 CHECK constraint dekt dit type niet)
 // - terug-link naar /v1/app i.p.v. /klantendashboard
 
 import { useRef, useState, useTransition, type ReactNode } from 'react';
@@ -24,9 +23,6 @@ import {
   DESCRIPTION_MAX,
   DESCRIPTION_MIN,
 } from '@/lib/controlroom/feedback-validate';
-
-// ponytail: 'anders' zit niet in V1 CHECK (0016_v1_feedback_tickets.sql).
-const V1_TYPES = FEEDBACK_TYPES.filter((t) => t !== 'anders');
 
 const URGENCY_OPTIONS: { value: FeedbackUrgency; label: string; help: string }[] = [
   { value: 'low', label: 'Laag', help: 'Geen haast, wanneer het uitkomt' },
@@ -162,7 +158,7 @@ export function FeedbackForm({
           required
         >
           <option value="" disabled>Selecteer een type&hellip;</option>
-          {V1_TYPES.map((t) => (
+          {FEEDBACK_TYPES.map((t) => (
             <option key={t} value={t}>{FEEDBACK_TYPE_LABELS[t]}</option>
           ))}
         </select>

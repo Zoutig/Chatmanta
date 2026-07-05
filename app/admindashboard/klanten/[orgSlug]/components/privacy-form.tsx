@@ -36,8 +36,6 @@ export function PrivacyForm({ orgSlug, privacy }: { orgSlug: string; privacy: Pr
   const [chatDays, setChatDays] = useState(privacy.chatRetentionDays);
   const [issueDays, setIssueDays] = useState(privacy.issueRetentionDays);
   const [metaMonths, setMetaMonths] = useState(privacy.metadataRetentionMonths);
-  const [fullLogging, setFullLogging] = useState(privacy.fullConversationLogging);
-  const [pii, setPii] = useState(privacy.piiRedactionEnabled);
   const [dpa, setDpa] = useState(privacy.processorAgreementSigned);
   const [privacyText, setPrivacyText] = useState(privacy.privacyTextShared);
   const [subproc, setSubproc] = useState(privacy.subprocessorInfoShared);
@@ -54,8 +52,6 @@ export function PrivacyForm({ orgSlug, privacy }: { orgSlug: string; privacy: Pr
       chatRetentionDays: clamp(chatDays, 1, 365),
       issueRetentionDays: clamp(issueDays, 1, 730),
       metadataRetentionMonths: clamp(metaMonths, 1, 60),
-      fullConversationLogging: fullLogging,
-      piiRedactionEnabled: pii,
       processorAgreementSigned: dpa,
       privacyTextShared: privacyText,
       subprocessorInfoShared: subproc,
@@ -89,8 +85,6 @@ export function PrivacyForm({ orgSlug, privacy }: { orgSlug: string; privacy: Pr
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <Toggle label="Volledige gesprekslogging aan" checked={fullLogging} onChange={setFullLogging} />
-        <Toggle label="PII-redactie aan (intentie-flag in V0)" checked={pii} onChange={setPii} />
         <Toggle label="Verwerkersovereenkomst getekend" checked={dpa} onChange={setDpa} />
         <Toggle label="Privacytekst gedeeld met klant" checked={privacyText} onChange={setPrivacyText} />
         <Toggle label="Subprocessor-info gedeeld" checked={subproc} onChange={setSubproc} />

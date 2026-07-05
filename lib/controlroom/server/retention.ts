@@ -28,7 +28,7 @@ import { CONTACT_RETENTION_DAYS } from '@/lib/v0/server/contact-offer';
 import { RETENTION_REDACTED as REDACTED } from '@/lib/v0/retention-sentinel';
 import { PRIVACY_DEFAULTS } from '../types';
 import { sb } from './db';
-import { getPrivacy } from './privacy';
+import { getPrivacy, upsertPrivacy } from './privacy';
 
 export type RetentionOrgResult = {
   orgSlug: string;
@@ -145,6 +145,16 @@ async function processOrg(
   // Contactverzoeken kennen een eigen, vaste 90-daagse harde-delete-grens (los van
   // de chat-anonimisering hierboven).
   const contactRequestCandidates = await processContactRequests(orgId, apply);
+
+  // Privacy-tab toont "laatste verwijdering" (admindashboard/klanten/[orgSlug]) —
+  // alleen stempelen als er ook echt iets is aangepast/verwijderd, anders suggereert
+  // de datum ten onrechte recente data-verwijdering voor een org zonder kandidaten.
+  const totalTouched = (qlCount ?? 0) + msgCount + contactRequestCandidates;
+  if (apply && totalTouched > 0) {
+    await upsertPrivacy(orgId, { lastDataDeletionAt: new Date().toISOString() }).catch((e) => {
+      console.error('[retention] laatste-verwijdering-stempel faalde org=%s: %s', orgId, (e as Error).message);
+    });
+  }
 
   return {
     orgSlug: slug,
