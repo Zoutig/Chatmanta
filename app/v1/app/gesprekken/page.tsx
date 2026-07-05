@@ -144,7 +144,7 @@ export default async function V1GesprekkenPage({
       {view === 'gesprekken' && <FilterBar active={filter} />}
 
       {view === 'gesprekken' && filter === 'negative_feedback' ? (
-        <NegativeFeedbackTable items={negativeFeedback} />
+        <NegativeFeedbackTable items={negativeFeedback} qaBasePath="/v1/app/kennisbank" />
       ) : view === 'gesprekken' && items.length === 0 ? (
         <div className="klant-empty">
           <div className="klant-empty-icon">

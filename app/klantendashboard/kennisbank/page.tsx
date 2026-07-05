@@ -34,10 +34,15 @@ function mapDocType(name: string): DocumentSummary['type'] {
 export default async function KennisbankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; prefillQuestion?: string }>;
 }) {
-  const { tab } = await searchParams;
-  const activeTab = tab === 'website' || tab === 'qa' ? tab : 'documenten';
+  const { tab, prefillQuestion } = await searchParams;
+  // Een prefill-link (correctieloop, WP4) impliceert de Q&A-tab, zodat de modal mount.
+  const activeTab = prefillQuestion
+    ? 'qa'
+    : tab === 'website' || tab === 'qa'
+      ? tab
+      : 'documenten';
 
   const activeOrg = await getActiveOrgFromCookies();
   const orgId = KNOWN_ORGS[activeOrg.slug].id;
@@ -80,7 +85,9 @@ export default async function KennisbankPage({
 
       {activeTab === 'documenten' && <DocumentsTab key={activeOrg.slug} initialDocs={docs} />}
       {activeTab === 'website' && <WebsiteTab key={activeOrg.slug} initialSources={websiteSources} />}
-      {activeTab === 'qa' && <QATab key={activeOrg.slug} initialQA={qa} />}
+      {activeTab === 'qa' && (
+        <QATab key={activeOrg.slug} initialQA={qa} prefillQuestion={prefillQuestion} />
+      )}
     </>
   );
 }

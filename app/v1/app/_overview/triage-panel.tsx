@@ -181,7 +181,7 @@ export function TriagePanel({
                 Bekijk gesprek
               </Btn>
               <Btn
-                href={ADD_KNOWLEDGE_HREF}
+                href={`${ADD_KNOWLEDGE_HREF}?tab=qa&prefillQuestion=${encodeURIComponent(u.question)}`}
                 variant="primary"
                 size="sm"
                 trailingIcon={<Icon name="arrow-right" size={11} />}

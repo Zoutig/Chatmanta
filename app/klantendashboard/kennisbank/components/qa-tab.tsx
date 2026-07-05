@@ -16,9 +16,18 @@ function emptyDraft(): DraftQA {
   return { question: '', answer: '', category: '', active: true };
 }
 
-export function QATab({ initialQA }: { initialQA: ManualQA[] }) {
+export function QATab({
+  initialQA,
+  prefillQuestion,
+}: {
+  initialQA: ManualQA[];
+  /** Gezet via ?prefillQuestion= (correctieloop, WP4) → opent de modal ingevuld. */
+  prefillQuestion?: string;
+}) {
   const [items, setItems] = useState<ManualQA[]>(initialQA);
-  const [editing, setEditing] = useState<DraftQA | null>(null);
+  const [editing, setEditing] = useState<DraftQA | null>(
+    prefillQuestion ? { ...emptyDraft(), question: prefillQuestion } : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 

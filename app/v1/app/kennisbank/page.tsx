@@ -20,10 +20,15 @@ const BASE = '/v1/app/kennisbank';
 export default async function V1KennisbankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; prefillQuestion?: string }>;
 }) {
-  const { tab } = await searchParams;
-  const activeTab = tab === 'website' || tab === 'qa' ? tab : 'documenten';
+  const { tab, prefillQuestion } = await searchParams;
+  // Een prefill-link (correctieloop, WP4) impliceert de Q&A-tab, zodat de modal mount.
+  const activeTab = prefillQuestion
+    ? 'qa'
+    : tab === 'website' || tab === 'qa'
+      ? tab
+      : 'documenten';
 
   let orgId: string;
   try {
@@ -127,7 +132,12 @@ export default async function V1KennisbankPage({
       {activeTab === 'documenten' && <V1Documents initialDocs={docs} />}
       {activeTab === 'website' && <WebsiteTab initialSources={sourcesRes} />}
       {activeTab === 'qa' && (
-        <QATab initialQA={initialQA} orgId={orgId} chatbotId={chatbot.id} />
+        <QATab
+          initialQA={initialQA}
+          orgId={orgId}
+          chatbotId={chatbot.id}
+          prefillQuestion={prefillQuestion}
+        />
       )}
     </>
   );
