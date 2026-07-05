@@ -1,6 +1,8 @@
 // V1 Klantendashboard — gesprek-detail. Faithful port van V0's detail-layout:
 // twee kolommen (transcript links, acties rechts), unanswered-banner, ConversationId
-// in de footer. Bronnen-paneel WEGGELATEN — V1 thread_messages dragen geen sources-jsonb.
+// in de footer. WP4.3: per assistant-bericht een inklapbaar bronnen-paneel onder de
+// bubble (thread_messages.sources, migr 0024) — defensief, oude berichten zonder
+// sources tonen geen paneel.
 //
 // Auth: getSessionOrg → AUTH_FORBIDDEN / NEXT_REDIRECT. Read via session-client (RLS):
 // een thread van een andere org geeft null terug → notFound(). Geen service-role nodig.
@@ -17,6 +19,7 @@ import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
 import { Icon } from '@/app/klantendashboard/components/ui/icons';
 import { ConversationId } from '@/app/klantendashboard/gesprekken/[id]/components/conversation-id';
 import { ConversationActions } from './components/conversation-actions';
+import { SourcesPanel } from './components/sources-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -195,13 +198,14 @@ export default async function V1GesprekDetailPage({
                   >
                     {m.content}
                   </div>
+                  {!isUser && m.sources && <SourcesPanel sources={m.sources} />}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Rechterkolom: acties (bronnen-paneel weggelaten — V1 heeft geen sources-jsonb) */}
+        {/* Rechterkolom: acties (bronnen staan per assistant-bericht in de linkerkolom) */}
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ConversationActions
             threadId={id}
