@@ -16,5 +16,4 @@
 - [ ] Werk in een feature branch, niet direct op `main`
 - [ ] Lokaal getest — dev server draait, geen TypeScript errors
 - [ ] Geen V1 hard rules geschonden (zie `AGENTS.md` § "Wat NIET ter discussie staat")
-- [ ] `graphify update .` lokaal gedraaid bij nieuwe files of grote wijzigingen (output is gitignored, niet committen)
 - [ ] Review aan collega gevraagd (tenzij urgent en collega offline)
