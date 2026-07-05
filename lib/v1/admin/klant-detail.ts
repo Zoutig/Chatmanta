@@ -22,24 +22,43 @@ export type V1AdminThread = {
   unanswered: boolean;
 };
 
+export type AdminThreadFilters = {
+  /** ilike-zoekterm op berichttekst (case-insensitive substring). */
+  search?: string;
+  /** ISO-timestamp ondergrens (inclusief) op threads.created_at. */
+  fromIso?: string;
+  /** ISO-timestamp bovengrens (inclusief) op threads.created_at. */
+  toIso?: string;
+};
+
 export async function listAdminThreads(
   admin: AdminClient,
   organizationId: string,
   limit = 50,
+  filters: AdminThreadFilters = {},
 ): Promise<V1AdminThread[]> {
+  const term = filters.search?.trim();
+
   // Eerste user-bericht per thread + berichten-count + timestamp.
   // thread_messages.role in ('user','assistant'); eerste user-bericht = lowest created_at met role='user'.
-  const { data, error } = await admin
+  //
+  // Zoeken filtert op berichttekst via een embedded resource — PostgREST filtert de
+  // parent-rij (thread) alleen mee als de embed `!inner` is; zonder zoekterm blijft
+  // het een left-join zodat threads zonder berichten niet wegvallen.
+  const embed = term
+    ? 'thread_messages!inner(id, role, content, created_at)'
+    : 'thread_messages(id, role, content, created_at)';
+
+  let query = admin
     .from('threads')
-    .select(`
-      id,
-      created_at,
-      thread_messages(id, role, content, created_at)
-    `)
+    .select(`id, created_at, ${embed}`)
     .eq('organization_id', organizationId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .is('deleted_at', null);
+  if (term) query = query.ilike('thread_messages.content', `%${term}%`);
+  if (filters.fromIso) query = query.gte('created_at', filters.fromIso);
+  if (filters.toIso) query = query.lte('created_at', filters.toIso);
+
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(limit);
   if (error) throw new Error(`listAdminThreads failed: ${error.message}`);
 
   return (data ?? []).map((t) => {

@@ -10,13 +10,18 @@
 import 'server-only';
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { getOrgSpendTodayEur, isOverBudget } from '@/lib/v1/limits/usage-limits';
 import { getControlRoomKlanten, type ControlRoomKlant } from './overview';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type KlantWithBudget = ControlRoomKlant & { dailyBudgetEur: number };
+export type KlantWithBudget = ControlRoomKlant & {
+  dailyBudgetEur: number;
+  spentTodayEur: number;
+  cappedToday: boolean;
+};
 
 export type BudgetTone = 'ink' | 'warn' | 'danger';
 
@@ -89,8 +94,23 @@ export async function getKlantenWithBudgets(): Promise<KlantWithBudget[]> {
     budgetByOrg.set(r.id, Number(r.daily_budget_eur) || 1.0);
   }
 
-  return klanten.map((k) => ({
-    ...k,
-    dailyBudgetEur: budgetByOrg.get(k.orgId) ?? 1.0,
-  }));
+  // ponytail: per-org som-query (N+1) — huidige klantenaantal (<10) acceptabel.
+  // Cap op 30 zodat dit niet ontspoort als de klantenlijst groeit; verfijn dan
+  // naar een gebundelde query.
+  const withSpend = klanten.slice(0, 30);
+  const spentTodayEur = await Promise.all(
+    withSpend.map((k) => getOrgSpendTodayEur(admin, k.orgId)),
+  );
+  const spentByOrg = new Map(withSpend.map((k, i) => [k.orgId, spentTodayEur[i]]));
+
+  return klanten.map((k) => {
+    const dailyBudgetEur = budgetByOrg.get(k.orgId) ?? 1.0;
+    const spentToday = spentByOrg.get(k.orgId) ?? 0;
+    return {
+      ...k,
+      dailyBudgetEur,
+      spentTodayEur: spentToday,
+      cappedToday: isOverBudget(spentToday, dailyBudgetEur),
+    };
+  });
 }
