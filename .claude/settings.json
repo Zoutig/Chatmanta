@@ -1,4 +1,20 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm run typecheck)",
+      "Bash(npm run test:unit)",
+      "Bash(vercel ls *)",
+      "Bash(vercel env ls *)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_wait_for",
+      "mcp__plugin_supabase_supabase__get_advisors",
+      "mcp__plugin_supabase_supabase__list_tables",
+      "mcp__vercel__list_deployments"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
