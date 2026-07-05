@@ -54,10 +54,15 @@ export default async function V1WidgetPage() {
     .maybeSingle();
   const { data: botRow } = await supabase
     .from('chatbots')
-    .select('allowed_domains')
+    .select('allowed_domains, is_active, widget_last_seen_at, widget_last_seen_origin')
     .eq('id', chatbot.id)
     .maybeSingle();
   const allowedDomains = ((botRow?.allowed_domains as string[] | null) ?? []).filter(Boolean);
+  const liveStatus = {
+    isActive: botRow?.is_active !== false,
+    lastSeenAt: (botRow?.widget_last_seen_at as string | null) ?? null,
+    lastSeenOrigin: (botRow?.widget_last_seen_origin as string | null) ?? null,
+  };
 
   return (
     <>
@@ -66,7 +71,12 @@ export default async function V1WidgetPage() {
         title="Plaats je chatbot op je website"
         subtitle="Een paar regels code, jouw kleuren, jouw positie — bezoekers zien meteen dat het bij je site hoort."
       />
-      <V1WidgetForm initial={settings} slug={(org?.slug as string | undefined) ?? ''} allowedDomains={allowedDomains} />
+      <V1WidgetForm
+        initial={settings}
+        slug={(org?.slug as string | undefined) ?? ''}
+        allowedDomains={allowedDomains}
+        liveStatus={liveStatus}
+      />
     </>
   );
 }

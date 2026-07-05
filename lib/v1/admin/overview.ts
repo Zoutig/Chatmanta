@@ -4,7 +4,8 @@
 // Port van lib/controlroom/server/(overview|signals|usage|profiles|errors).ts:
 //  - KNOWN_ORGS → query op organizations (deleted_at IS NULL) via getJorionAdminClient()
 //  - v0_threads → threads, query_log.cost_usd → cost_eur
-//  - Geen v0_org_settings: widgetStatus afgeleid uit organizations.allowed_domains
+//  - Geen v0_org_settings: widgetStatus uit chatbots-heartbeat (migr 0023) met
+//    organizations.allowed_domains als fallback-proxy
 //  - Geen website_pages: gecrawlde pagina's = documents met source_url NOT NULL
 //  - Profile-laag inline (profiles.ts trekt V0-sb() mee via module-side-effect)
 
@@ -247,6 +248,7 @@ async function getOrgSignals(
     recentErrRes,
     crawlErrRes,
     orgDomainsRes,
+    chatbotLifecycleRes,
   ] = await Promise.all([
     // Kennisbronnen — status voor crawl-samenvatting
     admin.from('knowledge_sources').select('status').eq('organization_id', org.id).is('deleted_at', null),
@@ -276,6 +278,8 @@ async function getOrgSignals(
     admin.from('processing_jobs').select('error_message').eq('organization_id', org.id).eq('status', 'failed').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     // Widget-status: allowed_domains als proxy (V1 heeft geen v0_org_settings.widget.isActive)
     admin.from('organizations').select('allowed_domains').eq('id', org.id).maybeSingle(),
+    // Widget-levenscyclus (migr 0023): heartbeat + klant-toggle op de actieve chatbot
+    admin.from('chatbots').select('is_active, widget_last_seen_at').eq('organization_id', org.id).is('deleted_at', null).order('created_at', { ascending: true }).limit(1).maybeSingle(),
   ]);
 
   // ── Crawl-status samenvatten ──────────────────────────────────────────────
@@ -292,11 +296,20 @@ async function getOrgSignals(
   const sources = { websitePages, documents, qaItems, total: websitePages + documents + qaItems };
 
   // ── Widget-status ──────────────────────────────────────────────────────────
-  // ponytail: V1 heeft geen isActive-vlag → 'detected' als allowed_domains gezet zijn,
-  // anders 'not_installed'. 'active' vereist V1-origin-validatie (latere hardening).
+  // WP2 (migr 0023): heartbeat-gebaseerd. 'active' = ping gezien én klant-toggle aan;
+  // ping gezien maar gepauzeerd → 'detected' (geïnstalleerd, niet live); geen ping
+  // maar wel allowed_domains → 'detected' (geconfigureerd); anders 'not_installed'.
   const orgData = orgDomainsRes.data as { allowed_domains: string[] | null } | null;
-  const widgetStatus: ControlRoomKlant['widgetStatus'] =
-    (orgData?.allowed_domains?.length ?? 0) > 0 ? 'detected' : 'not_installed';
+  const lifecycle = chatbotLifecycleRes.data as
+    | { is_active: boolean; widget_last_seen_at: string | null }
+    | null;
+  const widgetStatus: ControlRoomKlant['widgetStatus'] = lifecycle?.widget_last_seen_at
+    ? lifecycle.is_active !== false
+      ? 'active'
+      : 'detected'
+    : (orgData?.allowed_domains?.length ?? 0) > 0
+      ? 'detected'
+      : 'not_installed';
 
   // ── Fallback-% en onbeantwoorde vragen ────────────────────────────────────
   const qlTotal = qlTotalRes.count ?? 0;

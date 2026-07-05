@@ -38,6 +38,11 @@ export default async function EmbedV1Page({ params, searchParams }: PageProps) {
       </>
     );
   }
+  // Gepauzeerd door de klant: render bewust niets (geen FAB) — de bezoeker merkt
+  // de widget simpelweg niet op, i.p.v. een foutmelding te zien.
+  if (result.kind === 'paused') {
+    return <style>{TRANSPARENT}</style>;
+  }
 
   return (
     <>

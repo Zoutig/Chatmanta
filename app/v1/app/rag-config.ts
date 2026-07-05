@@ -68,10 +68,10 @@ export function buildV1Persona(company: string): RagPersona {
 export async function getOrgChatbot(
   client: SupabaseClient,
   orgId: string,
-): Promise<{ id: string; name: string; bot_version: string } | null> {
+): Promise<{ id: string; name: string; bot_version: string; is_active: boolean } | null> {
   const { data, error } = await client
     .from('chatbots')
-    .select('id, name, bot_version')
+    .select('id, name, bot_version, is_active')
     .eq('organization_id', orgId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })

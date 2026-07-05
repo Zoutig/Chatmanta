@@ -106,6 +106,7 @@ export async function getV1OverviewMetrics(
     orgRes,
     qaItemsRes,
     websitePagesRes,
+    botLifecycleRes,
   ] = await Promise.all([
     // Maand-turns (= messages) — getOrgConversationsThisMonth telt query_log-rijen.
     getOrgConversationsThisMonth(client, orgId),
@@ -172,6 +173,12 @@ export async function getV1OverviewMetrics(
       .not('source_url', 'is', null)
       .eq('included', true)
       .is('deleted_at', null),
+    // Widget-levenscyclus (migr 0023): heartbeat + klant-toggle — onder RLS.
+    client
+      .from('chatbots')
+      .select('is_active, widget_last_seen_at')
+      .eq('id', chatbotId)
+      .maybeSingle(),
   ]);
 
   // --- Maand-scan verwerking ---
@@ -268,9 +275,19 @@ export async function getV1OverviewMetrics(
       ? 'testing'
       : 'concept';
 
+  // WP2 (migr 0023): heartbeat-gebaseerd — 'active' = ping gezien én toggle aan;
+  // gepauzeerd of alleen-geconfigureerd → 'detected'; anders 'not_installed'.
   const orgData = (orgRes.data as { allowed_domains: string[] | null } | null);
-  const widgetStatus: V1OverviewMetrics['widgetStatus'] =
-    (orgData?.allowed_domains?.length ?? 0) > 0 ? 'detected' : 'not_installed';
+  const botLifecycle = botLifecycleRes.data as
+    | { is_active: boolean; widget_last_seen_at: string | null }
+    | null;
+  const widgetStatus: V1OverviewMetrics['widgetStatus'] = botLifecycle?.widget_last_seen_at
+    ? botLifecycle.is_active !== false
+      ? 'active'
+      : 'detected'
+    : (orgData?.allowed_domains?.length ?? 0) > 0
+      ? 'detected'
+      : 'not_installed';
 
   // --- Sorteer + slice ---
   latencies.sort((a, b) => a - b);
