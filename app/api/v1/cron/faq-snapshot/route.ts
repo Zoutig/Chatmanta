@@ -1,13 +1,14 @@
 // V1 FAQ-snapshot cron-entrypoint.
 //
 // Herberekent per chatbot de "Meest gestelde vragen"-snapshot (klant_faq_snapshot)
-// als de laatste snapshot ouder is dan ~7 dagen. Vercel-cron kan dit dagelijks
-// aanroepen (zie vercel.json); de staleness-check hier beslist of een chatbot
-// daadwerkelijk herberekend wordt.
+// als de laatste snapshot ouder is dan ~7 dagen. Aangeroepen door een EXTERNE
+// cron-job.org-pinger (dagelijks) — NIET via vercel.json: de Hobby-cron-slots zijn
+// gereserveerd voor de V0-crons, dus V1-cron-routes draaien op de externe pinger
+// (zelfde precedent als app/api/v1/cron/process-crawls). De staleness-check hier
+// beslist of een chatbot daadwerkelijk herberekend wordt.
 //
-// Auth: Bearer CRON_SECRET — identiek aan app/api/v1/cron/process-crawls.
-// Vercel voegt de Authorization-header automatisch toe bij cron-invocaties zodra
-// CRON_SECRET als env-var is gezet. Zonder geldige secret → 401 (fail-closed).
+// Auth: Bearer CRON_SECRET — identiek aan app/api/v1/cron/process-crawls. De pinger
+// stuurt de Authorization-header mee; zonder geldige secret → 401 (fail-closed).
 //
 // ?dryRun=1 → alleen rapporteren welke chatbots herberekend ZOUDEN worden
 // (geen embed-calls, geen writes) — handig voor een handmatige check.
