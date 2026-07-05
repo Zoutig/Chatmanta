@@ -11,11 +11,11 @@
 // upsert; chatbot-insert vangt de one-active-per-org unique (23505) op. De org zelf
 // is per definitie nieuw (nieuwe klant → nieuwe slug).
 
-import { headers } from 'next/headers';
 import { requireJorionAdmin } from '@/lib/auth';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { writeAuditLog } from '@/lib/v1/audit';
 import { slugify, withSuffix } from '@/lib/v1/slugify';
+import { inviteOrLookupUserByEmail, resolveInviteRedirect } from './invite-helpers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type CreateOrgResult =
@@ -71,20 +71,6 @@ async function rollbackOrgCreate(
   }
 }
 
-/** Resolve de redirect-basis voor de invite-mail. Override via NEXT_PUBLIC_SITE_URL,
- *  anders uit de request-origin (server action). MOET in de Supabase Auth redirect-
- *  allowlist staan, anders weigert Supabase de redirect. */
-async function resolveOrigin(): Promise<string> {
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
-  if (explicit) return explicit.replace(/\/+$/, '');
-  const h = await headers();
-  const origin = h.get('origin');
-  if (origin) return origin;
-  const host = h.get('host');
-  if (host) return `https://${host}`;
-  throw new Error('kon de site-origin niet bepalen voor de invite-redirect');
-}
-
 export async function createClientOrganization(
   companyName: string,
   ownerEmail: string,
@@ -117,35 +103,10 @@ export async function createClientOrganization(
     createdOrgId = orgId;
 
     // 3. owner uitnodigen (token_hash-mail → /v1/auth/confirm). email_exists → bestaande
-    //    user opzoeken (idempotent, geen dubbele invite).
-    const redirectTo = `${await resolveOrigin()}/v1/auth/confirm`;
-    let ownerUserId: string;
-    let invited = true;
-    const { data: invite, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo,
-    });
-    if (inviteErr) {
-      const code = (inviteErr as { code?: string }).code;
-      if (code === 'email_exists' || /already|exist|registered|duplicate/i.test(inviteErr.message)) {
-        invited = false;
-        // ponytail: scant alleen de eerste 200 users (ceiling) i.p.v. paginate-loop.
-        // Ruim genoeg voor M1-volumes; upgrade naar paginatie/admin-getUserByEmail als
-        // de user-tabel groeit.
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({
-          page: 1,
-          perPage: 200,
-        });
-        if (listErr) throw new Error(`gebruiker-lookup faalde: ${listErr.message}`);
-        const existing = list.users.find((u) => u.email?.toLowerCase() === email);
-        if (!existing) throw new Error('gebruiker bestaat al maar werd niet gevonden.');
-        ownerUserId = existing.id;
-      } else {
-        throw new Error(`uitnodigen faalde: ${inviteErr.message}`);
-      }
-    } else {
-      ownerUserId = invite.user.id;
-      freshUserId = ownerUserId; // vers aangemaakt → mag bij rollback weg
-    }
+    //    user opzoeken (idempotent, geen dubbele invite). Gedeelde flow (invite-helpers).
+    const redirectTo = await resolveInviteRedirect();
+    const { userId: ownerUserId, invited } = await inviteOrLookupUserByEmail(admin, email, redirectTo);
+    if (invited) freshUserId = ownerUserId; // vers aangemaakt → mag bij rollback weg
 
     // 4. de handle_new_auth_user-trigger heeft de public.users-rij al gemaakt
     //    (AFTER INSERT op auth.users, zelfde transactie als de invite).
