@@ -69,3 +69,7 @@ dev-server.log
 
 # wekelijkse werk-samenvattingen voor privé-archief (gegenereerd door scheduled remote agent)
 /weekly-reports/
+
+# skills-installer artefacten (echte kopieën staan gecommit in .claude/skills/)
+.agents/
+skills-lock.json

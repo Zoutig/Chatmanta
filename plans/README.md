@@ -1,8 +1,11 @@
 # Implementation Plans
 
 Gegenereerd door de improve-skill (volledige repo-audit) op 2026-07-02, tegen commit `628e7df`.
-Voer uit in onderstaande volgorde tenzij de dependency-notes anders zeggen. Elke executor:
-lees het plan volledig vóór je begint, respecteer de STOP-condities, en werk je statusrij bij.
+
+**Status 2026-07-05: alle 9 plannen zijn UITGEVOERD** (PR #237, squash `4f26a52`). De plan-bestanden
+000-009 zijn daarna verwijderd — de volledige teksten staan in de git-historie (`git show 4f26a52^:plans/…`
+of PR #237). Wat hieronder blijft is de nog-actuele waarde: de statusrij met commit-verwijzingen,
+de **Backlog** (geverifieerde bevindingen zonder plan), en de **Direction**-keuzes voor Sebastiaan.
 
 Audit-methode: 9 parallelle categorie-agents + ponytail-over-engineering-scan over ~113K regels TS,
 elke bevinding adversarieel geverifieerd (33/33 overeind, 0 weerlegd), top-bevindingen daarna
