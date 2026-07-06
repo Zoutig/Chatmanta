@@ -28,11 +28,14 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
 
   const { data: org } = await svc
     .from('organizations')
-    .select('id')
+    .select('id, suspended_at')
     .eq('slug', slug)
     .is('deleted_at', null)
     .maybeSingle();
   if (!org) return { kind: 'notfound' };
+  // WP5c: operator-suspend. Hergebruikt het 'paused'-kind (klant-pauze) — beide betekenen
+  // "render geen widget, geen token". De chat-route weigert dubbel via de chat-gate.
+  if (org.suspended_at) return { kind: 'paused' };
 
   const { data: chatbot } = await svc
     .from('chatbots')

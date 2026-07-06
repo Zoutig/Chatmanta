@@ -15,7 +15,7 @@ export type AskV1Result =
   | { ok: true; answer: string; sources: { title: string }[]; kind: string }
   | {
       ok: false;
-      error: 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' | 'RATE_LIMITED' | 'BUDGET_EXHAUSTED' | 'MONTHLY_LIMIT';
+      error: 'NO_CHATBOT' | 'FORBIDDEN' | 'FAILED' | 'RATE_LIMITED' | 'BUDGET_EXHAUSTED' | 'MONTHLY_LIMIT' | 'ORG_SUSPENDED';
     };
 
 export async function askV1(question: string, history?: ChatHistoryTurn[]): Promise<AskV1Result> {

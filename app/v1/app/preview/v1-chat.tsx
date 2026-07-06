@@ -78,6 +78,7 @@ function errorLabel(res: Extract<AskV1Result, { ok: false }>): string {
     case 'RATE_LIMITED':    return 'Het is nu erg druk. Probeer het zo dadelijk opnieuw.';
     case 'MONTHLY_LIMIT':   return 'De maandelijkse gesprekslimiet is bereikt.';
     case 'BUDGET_EXHAUSTED':return 'Het daglimiet van deze chatbot is bereikt.';
+    case 'ORG_SUSPENDED':   return 'Deze chatbot is momenteel niet beschikbaar. Neem contact op met de website-eigenaar.';
     case 'FAILED':
     default:                return 'Er ging iets mis. Probeer het opnieuw.';
   }
