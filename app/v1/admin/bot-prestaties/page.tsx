@@ -29,9 +29,11 @@ import {
   type BotPerfDetail,
   type BotPerfOverview,
   type BotPerfStats,
+  type InjectionSummary,
   type OrgBotPerf,
   type PerfWindow,
   type RecentNegative,
+  type UngroundedFact,
 } from '@/lib/v1/admin/bot-performance';
 
 export const dynamic = 'force-dynamic';
@@ -242,6 +244,139 @@ function FeedbackSection({ stats, negatives }: { stats: BotPerfStats; negatives?
   );
 }
 
+// ───────────────────────── WP7: injectie / RAG-internals / grounding-drilldown ────
+
+function InjectionSection({
+  injection,
+  perOrg,
+}: {
+  injection: InjectionSummary;
+  perOrg?: OrgBotPerf[];
+}) {
+  const withAttempts = (perOrg ?? []).filter((o) => o.injection.last30 > 0);
+  return (
+    <Card>
+      <SectionTitle hint="Gedetecteerde prompt-injectie-pogingen (regex-heuristiek, log-only). Getoond zijn patroon-namen — nooit de ruwe vraagtekst.">
+        Misbruikpogingen (prompt-injectie)
+      </SectionTitle>
+      {injection.last30 === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0 }}>
+          Geen injectie-pogingen gedetecteerd in de laatste 30 dagen.
+        </p>
+      ) : (
+        <>
+          <StatRow>
+            <Stat label="Laatste 7 dagen" value={String(injection.last7)} sub="pogingen" />
+            <Stat label="Laatste 30 dagen" value={String(injection.last30)} sub="pogingen" />
+          </StatRow>
+          {injection.patterns.length > 0 ? (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--klant-dim)', margin: '14px 0 8px' }}>
+                Meest voorkomende patronen (30d):
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {injection.patterns.map((p) => (
+                  <Pill key={p.name} tone="warn">
+                    {/* plain text — patroon-naam uit INJECTION_PATTERNS, geen markdown */}
+                    {p.name} · {p.count}
+                  </Pill>
+                ))}
+              </div>
+            </>
+          ) : null}
+          {withAttempts.length > 0 ? (
+            <>
+              <div style={{ height: 1, background: 'var(--klant-border)', margin: '14px 0' }} />
+              <div style={{ fontSize: 12, color: 'var(--klant-dim)', marginBottom: 8 }}>
+                Per klant (30d):
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {withAttempts
+                  .sort((a, b) => b.injection.last30 - a.injection.last30)
+                  .map((o) => (
+                    <div
+                      key={o.orgId}
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 12 }}
+                    >
+                      <span style={{ color: 'var(--klant-ink)' }}>{o.name}</span>
+                      <span style={{ color: 'var(--klant-muted)' }}>
+                        {o.injection.last7} (7d) · {o.injection.last30} (30d)
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
+    </Card>
+  );
+}
+
+function RagInternalsSection({ stats }: { stats: BotPerfStats }) {
+  const { rag } = stats;
+  return (
+    <Card>
+      <SectionTitle hint="Interne RAG-signalen uit de telemetrie — dev-gericht. Per-fase p50 (median) over gemeten antwoorden in het venster.">
+        RAG-internals
+      </SectionTitle>
+      <StatRow>
+        <Stat label="Embedding p50" value={fmtMs(rag.embeddingP50)} />
+        <Stat label="Retrieval p50" value={fmtMs(rag.retrievalP50)} />
+        <Stat label="Rerank p50" value={fmtMs(rag.rerankP50)} />
+        <Stat label="Generatie p50" value={fmtMs(rag.generationP50)} />
+      </StatRow>
+      <div style={{ height: 1, background: 'var(--klant-border)', margin: '14px 0' }} />
+      <StatRow>
+        <Stat
+          label="Algemene kennis gebruikt"
+          value={rag.gkChecked > 0 ? String(rag.gkActual) : '—'}
+          sub={rag.gkChecked > 0 ? `van ${rag.gkChecked} antwoorden` : 'geen data'}
+        />
+        <Stat
+          label="Claim-confidence (gem.)"
+          value={rag.claimConfAvg == null ? '—' : rag.claimConfAvg.toFixed(2)}
+          sub={rag.claimConfN > 0 ? `n=${rag.claimConfN} verifier-runs` : 'geen verifier-runs'}
+        />
+      </StatRow>
+    </Card>
+  );
+}
+
+function UngroundedFactsSection({ facts }: { facts: UngroundedFact[] }) {
+  if (facts.length === 0) return null;
+  return (
+    <Card>
+      <details>
+        <summary style={{ cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: 'var(--klant-ink)' }}>
+          Ongefundeerde feiten — recentste {facts.length} (grounding-drilldown)
+        </summary>
+        <p style={{ fontSize: 12, color: 'var(--klant-dim)', margin: '6px 0 10px' }}>
+          Antwoorden waar de verifier harde feiten (bedragen/datums/aantallen/contact) niet in de
+          bronnen kon terugvinden. De feiten zijn categorie-prefixed; de vraag is PII-geredacteerd.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {facts.map((f, i) => (
+            <div key={i} style={{ borderLeft: '2px solid var(--klant-warn-border)', paddingLeft: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--klant-ink)' }}>
+                {f.facts.length > 0 ? f.facts.join(', ') : '(geen feit-labels geregistreerd)'}
+              </div>
+              {f.question ? (
+                <div style={{ fontSize: 12, color: 'var(--klant-muted)', marginTop: 2 }}>
+                  bij vraag: &ldquo;{f.question}&rdquo;
+                </div>
+              ) : null}
+              <div style={{ fontSize: 11, color: 'var(--klant-dim)', marginTop: 2 }}>
+                {formatRelativeNL(f.createdAt)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+    </Card>
+  );
+}
+
 function TrendChart({
   daily,
   window,
@@ -329,7 +464,7 @@ function CrossOrgTable({ orgs, window }: { orgs: OrgBotPerf[]; window: PerfWindo
 // ───────────────────────── views ─────────────────────────
 
 function OverviewView({ overview }: { overview: BotPerfOverview }) {
-  const { aggregate, orgs, daily, window } = overview;
+  const { aggregate, orgs, daily, window, injectionAgg } = overview;
   return (
     <>
       <header className="klant-page-header">
@@ -351,6 +486,8 @@ function OverviewView({ overview }: { overview: BotPerfOverview }) {
         <TrendChart daily={daily} window={window} hasTraffic={aggregate.total > 0} />
         <GapSection stats={aggregate} />
         <LatencySection stats={aggregate} />
+        <RagInternalsSection stats={aggregate} />
+        <InjectionSection injection={injectionAgg} perOrg={orgs} />
         <FeedbackSection stats={aggregate} />
 
         <div>
@@ -363,7 +500,7 @@ function OverviewView({ overview }: { overview: BotPerfOverview }) {
 }
 
 function DetailView({ detail }: { detail: BotPerfDetail }) {
-  const { org, daily, recentNegatives, window } = detail;
+  const { org, daily, recentNegatives, ungroundedFacts, window } = detail;
   return (
     <>
       <header className="klant-page-header">
@@ -390,9 +527,12 @@ function DetailView({ detail }: { detail: BotPerfDetail }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
         <VolumeNotice stats={org.stats} window={window} />
         <StatsGrid stats={org.stats} window={window} />
+        <UngroundedFactsSection facts={ungroundedFacts} />
         <TrendChart daily={daily} window={window} hasTraffic={org.stats.total > 0} />
         <GapSection stats={org.stats} />
         <LatencySection stats={org.stats} />
+        <RagInternalsSection stats={org.stats} />
+        <InjectionSection injection={org.injection} />
         <FeedbackSection stats={org.stats} negatives={recentNegatives} />
       </div>
     </>

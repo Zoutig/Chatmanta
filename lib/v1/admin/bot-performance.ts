@@ -53,6 +53,14 @@ type PerfRow = {
   from_cache: boolean | null;
   first_token_ms: number | null;
   total_ms: number | null;
+  // WP7 — RAG-internals (dev-gericht). Losse *_ms-kolommen i.p.v. phase_timings_ms
+  // jsonb: goedkoper (geen parse) en al gevuld door de logger. Zie migr 0002.
+  embedding_ms: number | null;
+  retrieval_ms: number | null;
+  rerank_ms: number | null;
+  generation_ms: number | null;
+  general_knowledge_actual: boolean | null;
+  claim_confidence: number | null;
 };
 
 type FeedbackCounts = { up: number; down: number };
@@ -84,6 +92,19 @@ export type BotPerfStats = {
   capped: boolean;
   feedback: { up: number; down: number; downPct: number | null };
   lowVolume: boolean;
+  // WP7 — RAG-internals (dev-gericht, compact). Per-fase p50 (median) over
+  // gemeten rijen; GK-teller = aantal antwoorden dat algemene kennis gebruikte;
+  // claim_confidence = gemiddelde verifier-confidence.
+  rag: {
+    embeddingP50: number | null;
+    retrievalP50: number | null;
+    rerankP50: number | null;
+    generationP50: number | null;
+    gkActual: number;
+    gkChecked: number;
+    claimConfAvg: number | null;
+    claimConfN: number;
+  };
 };
 
 /** V1-variant: gebruikt orgId (UUID) i.p.v. V0's OrgSlug. */
@@ -91,6 +112,7 @@ export type OrgBotPerf = {
   orgId: string;
   name: string;
   stats: BotPerfStats;
+  injection: InjectionSummary;
 };
 
 export type RecentNegative = {
@@ -99,11 +121,28 @@ export type RecentNegative = {
   question: string | null;
 };
 
+/** WP7 — injectie-telemetrie. Vaste 7/30-dagen vensters (los van de page-toggle).
+ *  `patterns` = patroon-NAMEN (uit INJECTION_PATTERNS), nooit de ruwe vraag. */
+export type InjectionSummary = {
+  last7: number;
+  last30: number;
+  patterns: { name: string; count: number }[];
+};
+
+/** WP7 — ongefundeerd-feit drill-down (grounding-detail). `question` is bij
+ *  write-time al PII-geredacteerd; `facts` = categorie-prefixed strings. */
+export type UngroundedFact = {
+  createdAt: string;
+  question: string | null;
+  facts: string[];
+};
+
 export type BotPerfOverview = {
   window: PerfWindow;
   orgs: OrgBotPerf[];
   aggregate: BotPerfStats;
   daily: DailyLinePoint[];
+  injectionAgg: InjectionSummary;
 };
 
 export type BotPerfDetail = {
@@ -111,6 +150,7 @@ export type BotPerfDetail = {
   org: OrgBotPerf;
   daily: DailyLinePoint[];
   recentNegatives: RecentNegative[];
+  ungroundedFacts: UngroundedFact[];
 };
 
 // ─────────── pure helpers ────────────────────────────────────────────────────
@@ -152,6 +192,14 @@ export function computeBotPerfStats(
   const category = { search: 0, general: 0, offTopic: 0, smalltalk: 0 };
   const ttft: number[] = [];
   const totalMs: number[] = [];
+  const embMs: number[] = [];
+  const retMs: number[] = [];
+  const rerMs: number[] = [];
+  const genMs: number[] = [];
+  let gkActual = 0;
+  let gkChecked = 0;
+  let claimConfSum = 0;
+  let claimConfN = 0;
 
   for (const r of rows) {
     if (r.kind === 'answer') answer++;
@@ -179,10 +227,27 @@ export function computeBotPerfStats(
 
     if (typeof r.first_token_ms === 'number') ttft.push(r.first_token_ms);
     if (typeof r.total_ms === 'number') totalMs.push(r.total_ms);
+    if (typeof r.embedding_ms === 'number') embMs.push(r.embedding_ms);
+    if (typeof r.retrieval_ms === 'number') retMs.push(r.retrieval_ms);
+    if (typeof r.rerank_ms === 'number') rerMs.push(r.rerank_ms);
+    if (typeof r.generation_ms === 'number') genMs.push(r.generation_ms);
+
+    if (r.general_knowledge_actual !== null) {
+      gkChecked++;
+      if (r.general_knowledge_actual) gkActual++;
+    }
+    if (typeof r.claim_confidence === 'number') {
+      claimConfSum += r.claim_confidence;
+      claimConfN++;
+    }
   }
 
   ttft.sort((a, b) => a - b);
   totalMs.sort((a, b) => a - b);
+  embMs.sort((a, b) => a - b);
+  retMs.sort((a, b) => a - b);
+  rerMs.sort((a, b) => a - b);
+  genMs.sort((a, b) => a - b);
   const gapAny = gap.zeroHits + gap.lowConfidence + gap.lowGrounding + gap.offTopic;
   const fbTotal = feedback.up + feedback.down;
 
@@ -213,6 +278,16 @@ export function computeBotPerfStats(
     capped,
     feedback: { up: feedback.up, down: feedback.down, downPct: pct(feedback.down, fbTotal) },
     lowVolume: total < LOW_VOLUME_THRESHOLD,
+    rag: {
+      embeddingP50: percentile(embMs, 50),
+      retrievalP50: percentile(retMs, 50),
+      rerankP50: percentile(rerMs, 50),
+      generationP50: percentile(genMs, 50),
+      gkActual,
+      gkChecked,
+      claimConfAvg: claimConfN > 0 ? Math.round((claimConfSum / claimConfN) * 100) / 100 : null,
+      claimConfN,
+    },
   };
 }
 
@@ -270,7 +345,7 @@ async function fetchOrgRows(
     const { data, error } = await admin
       .from('query_log')
       .select(
-        'created_at, kind, hard_fact_supported, gap_kind, category, source_count, from_cache, first_token_ms, total_ms',
+        'created_at, kind, hard_fact_supported, gap_kind, category, source_count, from_cache, first_token_ms, total_ms, embedding_ms, retrieval_ms, rerank_ms, generation_ms, general_knowledge_actual, claim_confidence',
       )
       .eq('organization_id', orgId)
       .gte('created_at', sinceIso)
@@ -334,17 +409,108 @@ async function fetchRecentNegatives(orgId: string, sinceIso: string): Promise<Re
   }
 }
 
+// ─────────── WP7: injectie + ongefundeerd-feit fetchers ───────────────────────
+
+const TOP_PATTERNS = 6;
+/** Injectie is zeldzaam; deze cap treft geen normaal volume.
+ *  ponytail: bump als een org ooit > 5000 pogingen/30d haalt. */
+const MAX_INJECTION_ROWS = 5000;
+
+export function emptyInjection(): InjectionSummary {
+  return { last7: 0, last30: 0, patterns: [] };
+}
+
+/** Injectie-pogingen over vaste 7/30-dagen (los van de page-window-toggle).
+ *  Pulled via de partial index `where injection_detected = true`. Alleen
+ *  created_at + patroon-naam — nooit de ruwe vraag (die is de aanvalstekst). */
+async function fetchOrgInjection(orgId: string): Promise<InjectionSummary> {
+  try {
+    const admin = await getJorionAdminClient();
+    const now = Date.now();
+    const since30 = new Date(now - 30 * 86_400_000).toISOString();
+    const cutoff7 = now - 7 * 86_400_000;
+    const { data, error } = await admin
+      .from('query_log')
+      .select('created_at, injection_pattern')
+      .eq('organization_id', orgId)
+      .eq('injection_detected', true)
+      .gte('created_at', since30)
+      .order('created_at', { ascending: false })
+      .limit(MAX_INJECTION_ROWS);
+    if (error || !data) return emptyInjection();
+
+    let last7 = 0;
+    const tally = new Map<string, number>();
+    for (const r of data) {
+      if (new Date(r.created_at as string).getTime() >= cutoff7) last7++;
+      const name = (r.injection_pattern as string | null) ?? 'onbekend';
+      tally.set(name, (tally.get(name) ?? 0) + 1);
+    }
+    const patterns = [...tally.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, TOP_PATTERNS);
+    return { last7, last30: data.length, patterns };
+  } catch {
+    return emptyInjection();
+  }
+}
+
+/** Merge per-org injectie-samenvattingen tot één cross-org aggregaat. */
+export function mergeInjection(list: InjectionSummary[]): InjectionSummary {
+  const tally = new Map<string, number>();
+  let last7 = 0;
+  let last30 = 0;
+  for (const s of list) {
+    last7 += s.last7;
+    last30 += s.last30;
+    for (const p of s.patterns) tally.set(p.name, (tally.get(p.name) ?? 0) + p.count);
+  }
+  const patterns = [...tally.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, TOP_PATTERNS);
+  return { last7, last30, patterns };
+}
+
+/** Recentste ongefundeerde feiten (hard_fact_supported = false) binnen het venster,
+ *  gecapt op 20. Vraag is al PII-geredacteerd; missing_hard_facts = string-lijst. */
+async function fetchOrgUngroundedFacts(orgId: string, sinceIso: string): Promise<UngroundedFact[]> {
+  try {
+    const admin = await getJorionAdminClient();
+    const { data, error } = await admin
+      .from('query_log')
+      .select('created_at, question, missing_hard_facts')
+      .eq('organization_id', orgId)
+      .eq('hard_fact_supported', false)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error || !data) return [];
+    return data.map((r) => ({
+      createdAt: r.created_at as string,
+      question: (r.question as string | null) ?? null,
+      facts: Array.isArray(r.missing_hard_facts)
+        ? (r.missing_hard_facts as unknown[]).filter((x): x is string => typeof x === 'string')
+        : [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function loadOrg(
   orgId: string,
   name: string,
   sinceIso: string,
 ): Promise<{ org: OrgBotPerf; rows: PerfRow[] }> {
-  const [{ rows, capped }, feedback] = await Promise.all([
+  const [{ rows, capped }, feedback, injection] = await Promise.all([
     fetchOrgRows(orgId, sinceIso),
     fetchOrgFeedback(orgId, sinceIso),
+    fetchOrgInjection(orgId),
   ]);
   return {
-    org: { orgId, name, stats: computeBotPerfStats(rows, feedback, capped) },
+    org: { orgId, name, stats: computeBotPerfStats(rows, feedback, capped), injection },
     rows,
   };
 }
@@ -376,6 +542,7 @@ export async function getBotPerfOverview(window: PerfWindow): Promise<BotPerfOve
     orgs: loaded.map((l) => l.org),
     aggregate: computeBotPerfStats(allRows, aggFeedback, aggCapped),
     daily: buildFallbackTrend(allRows, startDate, new Date()),
+    injectionAgg: mergeInjection(loaded.map((l) => l.org.injection)),
   };
 }
 
@@ -397,16 +564,20 @@ export async function getBotPerfDetail(
   const org = orgData as { id: string; name: string };
 
   const { startDate, sinceIso } = windowRange(window);
-  const [{ rows, capped }, feedback, recentNegatives] = await Promise.all([
-    fetchOrgRows(org.id, sinceIso),
-    fetchOrgFeedback(org.id, sinceIso),
-    fetchRecentNegatives(org.id, sinceIso),
-  ]);
+  const [{ rows, capped }, feedback, recentNegatives, injection, ungroundedFacts] =
+    await Promise.all([
+      fetchOrgRows(org.id, sinceIso),
+      fetchOrgFeedback(org.id, sinceIso),
+      fetchRecentNegatives(org.id, sinceIso),
+      fetchOrgInjection(org.id),
+      fetchOrgUngroundedFacts(org.id, sinceIso),
+    ]);
 
   return {
     window,
-    org: { orgId: org.id, name: org.name, stats: computeBotPerfStats(rows, feedback, capped) },
+    org: { orgId: org.id, name: org.name, stats: computeBotPerfStats(rows, feedback, capped), injection },
     daily: buildFallbackTrend(rows, startDate, new Date()),
     recentNegatives,
+    ungroundedFacts,
   };
 }
