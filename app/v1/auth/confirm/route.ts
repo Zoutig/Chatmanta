@@ -32,6 +32,10 @@ export async function GET(req: NextRequest) {
   if (error) {
     return NextResponse.redirect(`${origin}/v1/login?error=verify_failed`);
   }
-  // F2: hardgecodeerde redirect-target. Géén ?next= uit de query → geen open-redirect.
-  return NextResponse.redirect(`${origin}/v1/auth/set-password`);
+  // F2: hardgecodeerde redirect-targets, géén ?next= uit de query → geen open-redirect.
+  // email_change (Account-instellingen) heeft al een wachtwoord — terug naar Account
+  // i.p.v. naar set-password (dat hoort alleen bij invite/recovery, waar nog geen
+  // (nieuw) wachtwoord is gezet).
+  const target = type === 'email_change' ? '/v1/app/account' : '/v1/auth/set-password';
+  return NextResponse.redirect(`${origin}${target}`);
 }
