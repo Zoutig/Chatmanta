@@ -82,6 +82,17 @@ export default async function V1ContactverzoekenPage() {
         eyebrow="Contactverzoeken"
         title="Bezoekers die contact willen"
         subtitle="Verzoeken die je chatbot heeft opgehaald. Werk ze weg via Nieuw → Opgepakt → Afgehandeld, voeg een notitie toe en verwijder ze wanneer je klaar bent."
+        actions={
+          <a
+            href="/v1/app/contactverzoeken/export"
+            className="klant-btn"
+            data-variant="ghost"
+            style={{ textDecoration: 'none' }}
+            title="Exporteert max. 5.000 rijen als CSV"
+          >
+            Exporteer CSV
+          </a>
+        }
       />
 
       {items.length === 0 ? (
