@@ -20,7 +20,13 @@ export const dynamic = 'force-dynamic';
 
 const EXPORT_CAP = 5000;
 
-type Row = { thread_id: string; role: 'user' | 'assistant'; content: string; created_at: string };
+type Row = {
+  id: string;
+  thread_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+};
 
 export async function GET() {
   let orgId: string;
@@ -40,11 +46,12 @@ export async function GET() {
   const items = await fetchPaginated<Row>(EXPORT_CAP, (from, to) =>
     supabase
       .from('thread_messages')
-      .select('thread_id, role, content, created_at')
+      .select('id, thread_id, role, content, created_at')
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbot.id)
       .order('thread_id', { ascending: true })
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true }) // tie-breaker: created_at alleen is niet uniek genoeg op een paginagrens
       .range(from, to),
   );
 

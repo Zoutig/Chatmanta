@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic';
 const EXPORT_CAP = 5000;
 
 type Row = {
+  id: string;
   name: string;
   email: string | null;
   phone: string | null;
@@ -46,10 +47,11 @@ export async function GET() {
   const items = await fetchPaginated<Row>(EXPORT_CAP, (from, to) =>
     supabase
       .from('contact_requests')
-      .select('name, email, phone, preferred_contact, subject, message, status, notes, created_at')
+      .select('id, name, email, phone, preferred_contact, subject, message, status, notes, created_at')
       .eq('organization_id', orgId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false }) // tie-breaker: created_at alleen is niet uniek genoeg op een paginagrens
       .range(from, to),
   );
 

@@ -1,15 +1,16 @@
 // V1 Klantendashboard — CSV-export helpers (leads + gesprekken).
 //
 // toCsv: elke cel wordt gequote (dubbele quotes verdubbeld); een cel die begint
-// met = + - of @ krijgt een leidende ' — anders voert Excel/Sheets 'm uit als
-// formule (CSV-formule-injectie via bezoekers-input in naam/bericht/notities).
+// met = + - @ TAB of CR krijgt een leidende ' — anders voert Excel/Sheets 'm uit
+// als formule (CSV-formule-injectie via bezoekers-input in naam/bericht/notities;
+// prefix-set volgt OWASP: = + - @ TAB CR).
 //
 // fetchPaginated: PostgREST capt een enkele request op ~1000 rijen (db-max-rows,
 // zie lib/v1/limits/usage-limits.ts). Dit haalt tot `cap` rijen op in pagina's
 // van 1000 zodat een export-cap (bv. 5000) ook echt gehaald wordt i.p.v. stil op
 // 1000 af te kappen.
 
-const DANGEROUS_PREFIX = /^[=+\-@]/;
+const DANGEROUS_PREFIX = /^[=+\-@\t\r]/;
 
 function csvCell(value: unknown): string {
   let s = value == null ? '' : String(value);
