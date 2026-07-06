@@ -117,7 +117,20 @@ export default async function V1GesprekkenPage({
         eyebrow="Gesprekken"
         title="Alle conversaties op één plek"
         subtitle="Filter op onbeantwoord om snel te zien waar je chatbot vastloopt — en los het direct op door kennis toe te voegen."
-        actions={<ReloadButton />}
+        actions={
+          <>
+            <a
+              href="/v1/app/gesprekken/export"
+              className="klant-btn"
+              data-variant="ghost"
+              style={{ textDecoration: 'none' }}
+              title="Exporteert max. 5.000 berichten als CSV"
+            >
+              Exporteer CSV
+            </a>
+            <ReloadButton />
+          </>
+        }
       />
 
       <TabsNav

@@ -9,6 +9,7 @@
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
+import { checkOrgMonthlyLimit, checkOrgDailyBudget } from '@/lib/v1/limits/usage-limits';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { AccountForm } from './account-form';
 
@@ -29,11 +30,12 @@ export default async function V1AccountPage() {
   const { user, orgId } = session;
 
   const supabase = await createClient();
-  // Start van de huidige kalendermaand (lokale middernacht in UTC-formaat is
-  // goed genoeg voor de tellerweergave — exactheid op maandgrens is geen hard requirement).
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
-  const [{ data: org }, { data: membership }, { count: convCount }, { count: docCount }] =
+  // Verbruik-inzicht hergebruikt de bestaande limiet-checks (zelfde functies als
+  // de chat-gates) — geen nieuwe berekening. Beide accepteren elke SupabaseClient;
+  // de RLS-policies op organizations/query_log staan een org-lid dit al toe
+  // (zie ook de org-naam-select hieronder, die dezelfde policy gebruikt).
+  const [{ data: org }, { data: membership }, monthly, dailyBudget, { count: docCount }] =
     await Promise.all([
       supabase.from('organizations').select('name').eq('id', orgId).maybeSingle(),
       supabase
@@ -42,11 +44,8 @@ export default async function V1AccountPage() {
         .eq('organization_id', orgId)
         .eq('user_id', user.id)
         .maybeSingle(),
-      supabase
-        .from('query_log')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', orgId)
-        .gte('created_at', startOfMonth),
+      checkOrgMonthlyLimit(supabase, orgId),
+      checkOrgDailyBudget(supabase, orgId),
       supabase
         .from('documents')
         .select('id', { count: 'exact', head: true })
@@ -66,7 +65,8 @@ export default async function V1AccountPage() {
         orgName={(org?.name as string | undefined) ?? ''}
         isOwner={membership?.role === 'owner'}
         orgId={orgId}
-        conversationsThisMonth={convCount ?? 0}
+        monthly={monthly}
+        dailyBudget={dailyBudget}
         documentsCount={docCount ?? 0}
       />
     </>

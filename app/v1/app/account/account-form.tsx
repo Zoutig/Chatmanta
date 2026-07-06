@@ -6,8 +6,9 @@
 // Styling via het V0-klantendashboard-designsysteem (klant.css-classes).
 
 import { useState, useTransition } from 'react';
-import { Database, MessagesSquare, ShieldCheck } from 'lucide-react';
+import { Database, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/v1/client';
+import type { MonthlyVerdict, BudgetVerdict } from '@/lib/v1/limits/usage-limits';
 import { updateOrgNameAction } from './actions';
 
 const inputStyle: React.CSSProperties = { maxWidth: 360 };
@@ -17,14 +18,16 @@ export function AccountForm({
   orgName,
   isOwner,
   orgId,
-  conversationsThisMonth,
+  monthly,
+  dailyBudget,
   documentsCount,
 }: {
   email: string;
   orgName: string;
   isOwner: boolean;
   orgId: string;
-  conversationsThisMonth: number;
+  monthly: MonthlyVerdict;
+  dailyBudget: BudgetVerdict;
   documentsCount: number;
 }) {
   return (
@@ -94,16 +97,17 @@ export function AccountForm({
 
         <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h3 className="klant-section-title">Verbruik</h3>
-          <UsageCell
-            icon={MessagesSquare}
-            label="Gesprekken deze maand"
-            value={conversationsThisMonth}
-          />
+          <MonthlyUsageBar monthly={monthly} />
           <UsageCell
             icon={Database}
             label="Documenten in kennisbank"
             value={documentsCount}
           />
+          <p style={{ fontSize: 12, color: 'var(--klant-muted)', margin: 0, lineHeight: 1.5 }}>
+            {monthly.over || dailyBudget.over
+              ? 'Je hebt de maandlimiet of het dagbudget bereikt — je chatbot pauzeert tot de volgende dag (dagbudget) of tot de 1e van volgende maand (gesprekken). Neem contact op om je limiet te verhogen.'
+              : `Bij het bereiken van de maandlimiet of het dagbudget pauzeert je chatbot tijdelijk. Dagbudget vandaag: €${dailyBudget.spentEur.toFixed(2)} van €${dailyBudget.capEur.toFixed(2)}.`}
+          </p>
         </section>
       </aside>
     </div>
@@ -118,6 +122,51 @@ function Status({ msg, error }: { msg: string | null; error: string | null }) {
   if (error) return <span role="alert" style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>;
   if (msg) return <span style={{ fontSize: 13, color: 'var(--klant-success)' }}>{msg}</span>;
   return null;
+}
+
+// "X van 300 gesprekken deze maand" + percentage-bar. Zelfde bar-visual als
+// app/v1/app/_overview/top-questions-bars.tsx (track/fill, geen nieuwe stijl).
+function MonthlyUsageBar({ monthly }: { monthly: MonthlyVerdict }) {
+  const pct = Math.min(100, Math.round((monthly.count / monthly.limit) * 100));
+  const fillColor = monthly.over
+    ? 'var(--klant-danger)'
+    : pct > 80
+      ? 'var(--klant-warn)'
+      : 'var(--klant-accent)';
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: 12,
+          marginBottom: 6,
+        }}
+      >
+        <span style={{ fontSize: 13, color: 'var(--klant-ink)' }}>Gesprekken deze maand</span>
+        <span
+          style={{
+            fontFamily: 'var(--klant-font-mono)',
+            fontSize: 12,
+            color: monthly.over ? 'var(--klant-danger)' : 'var(--klant-muted)',
+          }}
+        >
+          {monthly.count} van {monthly.limit}
+        </span>
+      </div>
+      <div
+        style={{
+          height: 6,
+          background: 'var(--klant-surface-muted)',
+          borderRadius: 999,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ width: `${pct}%`, height: '100%', background: fillColor }} />
+      </div>
+    </div>
+  );
 }
 
 function UsageCell({
