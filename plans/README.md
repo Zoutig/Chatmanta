@@ -24,8 +24,17 @@ handmatig herbevestigd in de bron. Alle bewijs-excerpts in de plannen komen uit 
 | 007  | Tests op de V1 PII-poorten: embed-token HMAC + contact-validatie-extractie | P2 | M | 001 | DONE (c31bdc3+fb66d24) |
 | 008  | Ponytail-opruiming: nanoid, EUR-kostentabel, crawler-utils dedup (~170 r, −1 dep) | P3 | S | 001 (zacht) | DONE (6268817+d6f7c19+4d53a54) |
 | 009  | migrate.mjs: checksum-drift-detectie + TLS-certvalidatie | P2 | M | — | DONE (1e9b6fb; TLS teruggedraaid — CA-cert nodig, zie eindrapport) |
+| 010  | Command Center-assistent: half-gepersisteerde tool-turn brickt thread niet meer (leespad-repair + tool-loop hardening) | P2 | M | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (met één regel reden) | REJECTED (met één regel rationale)
+
+> **Ronde 2 (2026-07-06, backlog-heraudit tegen HEAD `3437648`):** plan 010 is het
+> eerste plan uit de backlog-heraudit. De rest van de backlog-verificatie + de
+> migratie-RLS-sweep + de INJECTION_PATTERNS-red-team liepen als één workflow maar
+> zijn afgebroken op een sessie-limiet (16/17 agents mislukt); alleen CC-1 (→ plan
+> 010) kwam door en is handmatig tegen de bron herbevestigd. Resterende items nog te
+> verifiëren: PERF-1..5, TEST-1, TD-1..7, DX-1/2, SEC-3/4, ledger 0017-0020, plus de
+> twee blinde vlekken. Zie de handoff voor de resume-instructie.
 
 ## Dependency notes
 
