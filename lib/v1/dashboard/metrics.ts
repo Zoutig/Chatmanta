@@ -103,7 +103,7 @@ export async function getV1OverviewMetrics(
     trafficRes,
     threadsRes,
     twoWeekRes,
-    orgRes,
+    domainsRes,
     qaItemsRes,
     websitePagesRes,
     botLifecycleRes,
@@ -157,8 +157,8 @@ export async function getV1OverviewMetrics(
       .gte('created_at', since14daysIso)
       .order('created_at', { ascending: false })
       .limit(SCAN_LIMIT),
-    // Widget-status: allowed_domains-aanwezigheid als proxy voor "geïnstalleerd".
-    client.from('organizations').select('allowed_domains').eq('id', orgId).maybeSingle(),
+    // Widget-status: chatbots.allowed_domains-aanwezigheid als proxy voor "geïnstalleerd".
+    client.from('chatbots').select('allowed_domains').eq('id', chatbotId).is('deleted_at', null).maybeSingle(),
     // Actieve bronnen: Q&A-items.
     client
       .from('org_qa_items')
@@ -170,7 +170,7 @@ export async function getV1OverviewMetrics(
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
-      .not('source_url', 'is', null)
+      .not('metadata->>source_url', 'is', null)
       .eq('included', true)
       .is('deleted_at', null),
     // Widget-levenscyclus (migr 0023): heartbeat + klant-toggle — onder RLS.
@@ -277,7 +277,7 @@ export async function getV1OverviewMetrics(
 
   // WP2 (migr 0023): heartbeat-gebaseerd — 'active' = ping gezien én toggle aan;
   // gepauzeerd of alleen-geconfigureerd → 'detected'; anders 'not_installed'.
-  const orgData = (orgRes.data as { allowed_domains: string[] | null } | null);
+  const domainsData = (domainsRes.data as { allowed_domains: string[] | null } | null);
   const botLifecycle = botLifecycleRes.data as
     | { is_active: boolean; widget_last_seen_at: string | null }
     | null;
@@ -285,7 +285,7 @@ export async function getV1OverviewMetrics(
     ? botLifecycle.is_active !== false
       ? 'active'
       : 'detected'
-    : (orgData?.allowed_domains?.length ?? 0) > 0
+    : (domainsData?.allowed_domains?.length ?? 0) > 0
       ? 'detected'
       : 'not_installed';
 

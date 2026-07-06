@@ -223,7 +223,7 @@ function verdictFor(sim: number | null): QuizProbeVerdict {
   return 'gedekt';
 }
 
-/** V1: match_chunks RPC met p_chatbot_id (chatbot-scoped retrieval). */
+/** V1: match_chunks_with_parents RPC (enige match-RPC in V1; chatbot-scoped). */
 async function runProbes(
   client: SupabaseClient,
   orgId: string,
@@ -238,7 +238,7 @@ async function runProbes(
       let top1: number | null = null;
       let evidence = '';
       if (vector) {
-        const { data, error } = await client.rpc('match_chunks', {
+        const { data, error } = await client.rpc('match_chunks_with_parents', {
           p_organization_id: orgId,
           p_chatbot_id: chatbotId,
           query_embedding: vector,

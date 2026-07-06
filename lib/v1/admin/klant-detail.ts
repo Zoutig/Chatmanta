@@ -193,7 +193,7 @@ export async function listAdminSources(
   if (sourceIds.length > 0) {
     const { data: docs, error: dErr } = await admin
       .from('documents')
-      .select('knowledge_source_id, source_url')
+      .select('knowledge_source_id, source_url:metadata->>source_url')
       .in('knowledge_source_id', sourceIds)
       .is('deleted_at', null);
     if (dErr) throw new Error(`listAdminSources docs failed: ${dErr.message}`);

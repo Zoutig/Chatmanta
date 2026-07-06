@@ -5,7 +5,7 @@
 //  - KNOWN_ORGS → query op organizations (deleted_at IS NULL) via getJorionAdminClient()
 //  - v0_threads → threads, query_log.cost_usd → cost_eur
 //  - Geen v0_org_settings: widgetStatus uit chatbots-heartbeat (migr 0023) met
-//    organizations.allowed_domains als fallback-proxy
+//    chatbots.allowed_domains als fallback-proxy
 //  - Geen website_pages: gecrawlde pagina's = documents met source_url NOT NULL
 //  - Profile-laag inline (profiles.ts trekt V0-sb() mee via module-side-effect)
 
@@ -253,9 +253,9 @@ async function getOrgSignals(
     // Kennisbronnen — status voor crawl-samenvatting
     admin.from('knowledge_sources').select('status').eq('organization_id', org.id).is('deleted_at', null),
     // Geüploade documenten (source_url = null → geen crawler-pagina)
-    admin.from('documents').select('id', { count: 'exact', head: true }).eq('organization_id', org.id).is('source_url', null).eq('included', true).is('deleted_at', null),
+    admin.from('documents').select('id', { count: 'exact', head: true }).eq('organization_id', org.id).is('metadata->>source_url', null).eq('included', true).is('deleted_at', null),
     // Gecrawlde pagina's — documents mét source_url (geen aparte website_pages-tabel in V1)
-    admin.from('documents').select('id', { count: 'exact', head: true }).eq('organization_id', org.id).not('source_url', 'is', null).eq('included', true).is('deleted_at', null),
+    admin.from('documents').select('id', { count: 'exact', head: true }).eq('organization_id', org.id).not('metadata->>source_url', 'is', null).eq('included', true).is('deleted_at', null),
     // Q&A-items
     admin.from('org_qa_items').select('id', { count: 'exact', head: true }).eq('organization_id', org.id),
     // Threads (= gesprekken) deze kalendermaand
@@ -276,8 +276,8 @@ async function getOrgSignals(
     admin.from('admin_error_groups').select('id', { count: 'exact', head: true }).eq('organization_id', org.id).eq('status', 'open').eq('severity', 'error').gte('last_seen_at', h24Iso),
     // Crawl-foutbericht: recentste mislukte processing_job
     admin.from('processing_jobs').select('error_message').eq('organization_id', org.id).eq('status', 'failed').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    // Widget-status: allowed_domains als proxy (V1 heeft geen v0_org_settings.widget.isActive)
-    admin.from('organizations').select('allowed_domains').eq('id', org.id).maybeSingle(),
+    // Widget-status-fallback: chatbots.allowed_domains als proxy (organizations heeft die kolom niet)
+    admin.from('chatbots').select('allowed_domains').eq('organization_id', org.id).is('deleted_at', null).order('created_at', { ascending: true }).limit(1).maybeSingle(),
     // Widget-levenscyclus (migr 0023): heartbeat + klant-toggle op de actieve chatbot
     admin.from('chatbots').select('is_active, widget_last_seen_at').eq('organization_id', org.id).is('deleted_at', null).order('created_at', { ascending: true }).limit(1).maybeSingle(),
   ]);
