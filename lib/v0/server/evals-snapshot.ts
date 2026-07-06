@@ -111,6 +111,94 @@ function safeStageTimings(raw: unknown): PhaseTimings | null {
   return obj as unknown as PhaseTimings;
 }
 
+// ─────────── WP7: compacte eval-verdict-tegel (bot-prestaties) ─────────────────
+// Lean per-versie samenvatting van de NIEUWSTE eval per (question × version).
+// "Pass-rate" = prod-ready true-rate (judge-veld production_ready, migr 0024) —
+// zelfde semantiek als de "prod-ready"-kolom in scripts/v0-eval-report.ts. Voor
+// pre-0024 runs is production_ready NULL → passRate null (tegel toont "—").
+
+export type EvalVerdict = {
+  botVersion: string;
+  latestRunAt: string;
+  questions: number; // # unieke vragen (latest per pair)
+  passRate: number | null; // prod-ready true-rate in %, null zonder prod-ready data
+  prodReadyN: number; // # runs met niet-null production_ready
+  avgScore: number | null; // gem. (C+P+G)/3 over gescoorde runs, als context
+};
+
+export async function getEvalVerdicts(): Promise<EvalVerdict[]> {
+  const client = getServiceRoleClient();
+  const { data, error } = await client
+    .from('eval_runs')
+    .select(
+      'question_id, bot_version, created_at, production_ready, score_correctness, score_completeness, score_grounding',
+    )
+    .eq('organization_id', DEV_ORG_ID)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`eval_runs verdict select: ${error.message}`);
+
+  // Dedupe: nieuwste rij per (question × version) — matcht getEvalSnapshot.
+  type Row = {
+    createdAt: string;
+    productionReady: boolean | null;
+    scores: (number | null)[];
+  };
+  const latestByPair = new Map<string, { version: string } & Row>();
+  for (const r of data ?? []) {
+    const key = `${r.question_id as string}::${r.bot_version as string}`;
+    if (latestByPair.has(key)) continue;
+    latestByPair.set(key, {
+      version: r.bot_version as string,
+      createdAt: r.created_at as string,
+      productionReady: (r.production_ready as boolean | null) ?? null,
+      scores: [r.score_correctness, r.score_completeness, r.score_grounding].map((s) =>
+        s === null ? null : Number(s),
+      ),
+    });
+  }
+
+  // Groepeer per versie.
+  const byVersion = new Map<string, Row[]>();
+  for (const v of latestByPair.values()) {
+    const list = byVersion.get(v.version) ?? [];
+    list.push(v);
+    byVersion.set(v.version, list);
+  }
+
+  const verdicts: EvalVerdict[] = [];
+  for (const [botVersion, rows] of byVersion.entries()) {
+    let prodReadyN = 0;
+    let prodReadyTrue = 0;
+    let scoreSum = 0;
+    let scoreN = 0;
+    let latestRunAt = rows[0].createdAt;
+    for (const row of rows) {
+      if (row.createdAt > latestRunAt) latestRunAt = row.createdAt;
+      if (row.productionReady !== null) {
+        prodReadyN++;
+        if (row.productionReady) prodReadyTrue++;
+      }
+      const present = row.scores.filter((s): s is number => s !== null);
+      if (present.length > 0) {
+        scoreSum += present.reduce((a, b) => a + b, 0) / present.length;
+        scoreN++;
+      }
+    }
+    verdicts.push({
+      botVersion,
+      latestRunAt,
+      questions: rows.length,
+      passRate: prodReadyN > 0 ? Math.round((prodReadyTrue / prodReadyN) * 100) : null,
+      prodReadyN,
+      avgScore: scoreN > 0 ? Math.round((scoreSum / scoreN) * 100) / 100 : null,
+    });
+  }
+
+  // Nieuwste eval eerst.
+  verdicts.sort((a, b) => (a.latestRunAt > b.latestRunAt ? -1 : 1));
+  return verdicts;
+}
+
 export async function getEvalSnapshot(): Promise<EvalSnapshot> {
   const client = getServiceRoleClient();
 
