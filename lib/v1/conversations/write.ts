@@ -18,6 +18,7 @@
 
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ThreadMessageSource } from './sources';
 
 // first_question is louter een lijst-/sidebar-preview; cap defensief zodat we geen
 // 8k-blob in de header-kolom zetten (de vraag zelf is al gecapt in de chat-route).
@@ -35,6 +36,9 @@ export type AppendTurnArgs = {
   answer: string;
   /** assistant-rij-kind; moet binnen de DB-CHECK vallen (smalltalk/answer/fallback/blocked) of null. */
   kind: 'smalltalk' | 'answer' | 'fallback' | 'blocked' | null;
+  /** Compacte gebruikte-bronnen-lijst (WP4.3) → thread_messages.sources op de
+      assistant-rij. Leeg/afwezig → NULL (geen bronnen-paneel in het detail). */
+  sources?: ThreadMessageSource[] | null;
 };
 
 /**
@@ -43,6 +47,7 @@ export type AppendTurnArgs = {
  */
 export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): Promise<void> {
   const { orgId, chatbotId, threadId, question, answer, kind } = args;
+  const sources = args.sources && args.sources.length > 0 ? args.sources : null;
   try {
     const trimmedQ = question.trim();
     const baseMs = Date.now();
@@ -106,6 +111,8 @@ export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): 
     // 2. De twee beurt-rijen. created_at ordent ze; een +1ms-offset op de assistant
     //    garandeert user-vóór-assistant ondanks gelijke insert-tijd. org+chatbot mee
     //    voor de directe RLS-membershipcheck (anders dan V0 0005).
+    // `sources` op beide rijen (user → null) zodat de bulk-insert één consistente
+    // kolomlijst heeft; alleen de assistant-rij draagt de bronnen.
     const { error: msgErr } = await client.from('thread_messages').insert([
       {
         organization_id: orgId,
@@ -114,6 +121,7 @@ export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): 
         role: 'user',
         content: trimmedQ,
         kind: null,
+        sources: null,
         created_at: new Date(baseMs).toISOString(),
       },
       {
@@ -123,6 +131,7 @@ export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): 
         role: 'assistant',
         content: answer,
         kind,
+        sources,
         created_at: new Date(baseMs + 1).toISOString(),
       },
     ]);

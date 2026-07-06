@@ -14,6 +14,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { NegativeFeedbackItem } from '@/lib/v0/klantendashboard/types';
+import { parseThreadMessageSources, type ThreadMessageSource } from '@/lib/v1/conversations/sources';
 
 export type V1ConversationFilter = 'today' | 'last_7_days' | 'last_30_days' | 'unanswered' | 'negative_feedback';
 
@@ -31,6 +32,8 @@ export type V1ConversationMessage = {
   content: string;
   kind: string | null;
   createdAt: string;
+  /** WP4.3: gebruikte bronnen (assistant-rijen); null = geen bronnen-paneel. */
+  sources: ThreadMessageSource[] | null;
 };
 
 export type V1ConversationDetail = {
@@ -127,7 +130,7 @@ export async function getV1Conversation(
 
   const { data: msgRows } = await client
     .from('thread_messages')
-    .select('id, role, content, kind, created_at')
+    .select('id, role, content, kind, created_at, sources')
     .eq('organization_id', orgId)
     .eq('thread_id', threadId)
     .order('created_at', { ascending: true });
@@ -138,6 +141,7 @@ export async function getV1Conversation(
     content: String(m.content ?? ''),
     kind: (m.kind as string | null) ?? null,
     createdAt: String(m.created_at ?? ''),
+    sources: parseThreadMessageSources((m as { sources?: unknown }).sources),
   }));
 
   return {

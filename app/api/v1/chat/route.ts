@@ -19,6 +19,7 @@ import {
 } from '@/lib/rag/run-rag-query';
 import { logRagQuery } from '@/lib/rag/log-query';
 import { appendTurn } from '@/lib/v1/conversations/write';
+import { toThreadMessageSources } from '@/lib/v1/conversations/sources';
 import { hashIp } from '@/lib/observability/hash-ip';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
@@ -291,6 +292,10 @@ export async function POST(req: Request) {
         if (threadId) {
           const turnAnswer = responseForLog.answer;
           const turnKind = responseForLog.kind;
+          // WP4.3: gebruikte bronnen mee voor het detail-paneel. `sources` zit op
+          // 'answer'/'fallback' (niet 'smalltalk') → 'sources' in responseForLog.
+          const turnSources =
+            'sources' in responseForLog ? toThreadMessageSources(responseForLog.sources) : null;
           after(() =>
             appendTurn(getV1ServiceRoleClient(), {
               orgId: organizationId,
@@ -299,6 +304,7 @@ export async function POST(req: Request) {
               question: question.trim(),
               answer: turnAnswer,
               kind: turnKind,
+              sources: turnSources,
             }),
           );
         }
