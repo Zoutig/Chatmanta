@@ -1,11 +1,14 @@
 // V1 admin — Beheer tab (server RSC).
-// Wraps de bestaande BudgetEditor + DeleteOrgForm + export-link uit [id]/.
-// Bewust geen nieuwe logica: hergebruik van de al geteste componenten.
+// Wraps de bestaande BudgetEditor + DeleteOrgForm + export-link uit [id]/ en voegt
+// ledenbeheer toe (uitnodigen / invite opnieuw / verwijderen — MembersManager).
 
 import { resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
+import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { listOrgMembers } from '@/lib/v1/admin/members';
 import { Card } from '@/app/klantendashboard/components/ui/card';
 import { BudgetEditor } from '../budget-editor';
 import { DeleteOrgForm } from '../delete-org-form';
+import { MembersManager } from '../members-manager';
 
 const labelStyle = { fontSize: 12, color: 'var(--klant-muted)' } as const;
 const sectionTitle = { fontSize: 14, fontWeight: 600, margin: '0 0 8px', color: 'var(--klant-ink)' } as const;
@@ -16,11 +19,22 @@ type Props = {
   dailyBudgetRaw: number | string | null;
 };
 
-export function BeheerTab({ orgId, slug, dailyBudgetRaw }: Props) {
+export async function BeheerTab({ orgId, slug, dailyBudgetRaw }: Props) {
   const capEur = resolveDailyBudgetEur(dailyBudgetRaw);
+  const admin = await getJorionAdminClient();
+  const members = await listOrgMembers(admin, orgId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Leden */}
+      <Card>
+        <h3 style={sectionTitle}>Leden</h3>
+        <p style={{ ...labelStyle, margin: '0 0 12px' }}>
+          Nodig teamleden uit, stuur een invite opnieuw of verwijder een lid. De laatste owner kan niet worden verwijderd.
+        </p>
+        <MembersManager orgId={orgId} members={members} />
+      </Card>
+
       {/* Dagbudget */}
       <Card>
         <h3 style={sectionTitle}>Dagbudget</h3>

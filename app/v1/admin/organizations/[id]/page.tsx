@@ -28,6 +28,8 @@ import { PrivacyTab } from './_tabs/privacy-tab';
 import { BeheerTab } from './_tabs/beheer-tab';
 import { GesprekkenTab } from './_tabs/gesprekken-tab';
 import { BronnenTab } from './_tabs/bronnen-tab';
+import { InstellingenTab } from './_tabs/instellingen-tab';
+import { WidgetTab } from './_tabs/widget-tab';
 import { UsageTab } from './_tabs/usage-tab';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +41,8 @@ const TABS: TabDef[] = [
   { key: 'privacy',    label: 'Privacy & Data' },
   { key: 'gesprekken', label: 'Gesprekken' },
   { key: 'bronnen',    label: 'Bronnen' },
+  { key: 'instellingen', label: 'Botinstellingen' },
+  { key: 'widget',     label: 'Widget' },
   { key: 'usage',      label: 'Usage' },
   { key: 'beheer',     label: 'Beheer' },
 ];
@@ -160,6 +164,8 @@ export default async function OrgDeepDivePage({
       {tab === 'privacy'    && <PrivacyTab orgId={id} />}
       {tab === 'gesprekken' && <GesprekkenTab orgId={id} />}
       {tab === 'bronnen'    && <BronnenTab orgId={id} chatbotId={chatbotId} />}
+      {tab === 'instellingen' && <InstellingenTab orgId={id} chatbotId={chatbotId} />}
+      {tab === 'widget'     && <WidgetTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'usage'      && <UsageTab orgId={id} />}
       {tab === 'beheer'     && (
         <BeheerTab orgId={id} slug={org.slug} dailyBudgetRaw={org.daily_budget_eur} />
