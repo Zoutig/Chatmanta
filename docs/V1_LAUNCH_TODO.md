@@ -72,13 +72,15 @@ De rest (🟡) wil je er kort daarna bij; de 🟢's kunnen wachten.
 - **Hoe:** Gratis dienst zoals **cron-job.org** of UptimeRobot → maak een job die elke 2–5 min een **GET** doet op `https://www.chatmanta.nl/api/v1/cron/process-crawls` met header `Authorization: Bearer <CRON_SECRET>` (dezelfde waarde als [#4](#4)).
 - **🤖 Alternatief:** ik kan in plaats daarvan een **Vercel-cron** toevoegen aan `vercel.json` (kleine code-wijziging) zodat je geen externe dienst nodig hebt — zeg het maar als je dat liever hebt.
 
-### <a name="7b"></a>7b. 🔴 Pingers voor faq-snapshot + retention (na merge PR #242) · 🧑
-- **Wat:** Twee extra dagelijkse cron-job.org-jobs voor V1-cron-routes die nergens gescheduled staan.
-- **Waarom:** Zonder de faq-snapshot-run blijft de klant-tab "Meest gestelde vragen" permanent leeg; zonder de retention-run draait de beloofde 90-dagen-PII-verwijdering (AVG) niet op V1.
-- **Hoe:** cron-job.org → twee dagelijkse jobs, header `Authorization: Bearer <CRON_SECRET>` (zelfde als [#4](#4)), **https+www verplicht** (pinger volgt geen redirects):
-  - `GET https://www.chatmanta.nl/api/v1/cron/faq-snapshot`
-  - `GET https://www.chatmanta.nl/api/v1/cron/retention` — test eerst handmatig met `?dryRun=1`
-- **Env voor de contactverzoek-mail (zelfde PR, werkt pas na redeploy):** `RESEND_API_KEY`; `RESEND_FROM` op **chatmanta.com** (bv. `ChatManta <feedback@chatmanta.com>` — .nl geeft een stil geslikte 403); optioneel `CONTACT_REQUEST_NOTIFY_EMAIL` als globale fallback; `NEXT_PUBLIC_APP_URL` voor de deeplink in de mail.
+### <a name="7b"></a>7b. ✅ Pinger voor faq-snapshot (na merge PR #242) · 🧑
+- **Status:** cron-job.org-job aangemaakt 2026-07-06 → `GET https://www.chatmanta.nl/api/v1/cron/faq-snapshot`, dagelijks, met `Authorization: Bearer <CRON_SECRET>` (zelfde waarde als de bestaande "Chatmanta v1"-job voor `process-crawls`, zie [#4](#4)).
+- **Env voor de contactverzoek-mail (zelfde PR):** al aanwezig op Vercel prod, geen actie nodig — geverifieerd 2026-07-06 via `vercel env ls production` (`RESEND_API_KEY`, `RESEND_FROM`, `NEXT_PUBLIC_APP_URL` staan er al sinds resp. ~36d/~58d) + lokale `.env.local`-mirror bevestigt `RESEND_FROM=ChatManta <feedback@chatmanta.com>` (het vereiste **.com**-domein, niet .nl). `CONTACT_REQUEST_NOTIFY_EMAIL` is bewust **niet** gezet — optionele laatste fallback in de adres-keten (`lib/notifications/v1-contact-request-notify.ts`); voor echte testklanten met een org-owner-account resolvet de mail al via het account-e-mailadres, dus dit ontbreekt zonder praktisch effect.
+- **Aanbevolen (niet blokkerend):** 1x een echt contactformulier op een testklant-widget invullen en checken dat de operator-mail aankomt — bevestigt de hele keten end-to-end i.p.v. op env-presence te vertrouwen.
+
+### <a name="7c"></a>7c. 🟢 Retention-pinger (`/api/v1/cron/retention`) — bewust uitgesteld naar V2 · 🧑
+- **Wat:** De 90-dagen-PII-verwijdering (AVG) draait nog niet automatisch op V1 — route bestaat, is alleen nog niet gepingd.
+- **Waarom uitgesteld:** zolang er geen KVK-inschrijving en geen echte klant-PII in productie is, is dit geen acuut risico. Beslissing 2026-07-06: pas oppakken zodra AVG/juridisch serieus wordt (rond V2, samen met [#10](#10)/[#11](#11)).
+- **Hoe (als je 'm alsnog eerder wilt aanzetten):** zelfde recept als 7b — `GET https://www.chatmanta.nl/api/v1/cron/retention` met dezelfde `CRON_SECRET`-header, **eerst** handmatig testen met `?dryRun=1` voordat je 'm live zet (dryRun toont wat verwijderd zou worden, zonder daadwerkelijk te verwijderen).
 
 ### <a name="8b"></a>UptimeRobot (uptime-monitoring) — zie 🟢 [#14](#14)
 
