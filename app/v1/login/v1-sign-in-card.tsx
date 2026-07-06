@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
@@ -301,6 +302,16 @@ export function V1SignInCard({ initialError }: { initialError?: string }) {
                     </button>
                   </div>
                 </motion.div>
+
+                <div className="flex justify-end -mt-1">
+                  <Link
+                    href="/v1/auth/forgot-password"
+                    className="text-xs transition-colors duration-300 hover:text-white"
+                    style={{ color: 'rgba(255,255,255,0.5)' }}
+                  >
+                    Wachtwoord vergeten?
+                  </Link>
+                </div>
 
                 {error ? (
                   <p role="alert" className="text-xs" style={{ color: '#ff6b6b' }}>
