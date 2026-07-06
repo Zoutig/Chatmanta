@@ -91,6 +91,7 @@ export default async function V1UsagePage() {
                 <th>Gesprekken (wk)</th>
                 <th>Gesprekken mnd</th>
                 <th>Dag-budget</th>
+                <th>Vandaag</th>
                 <th>Budget-benutting</th>
                 <th>Fallback</th>
                 <th>Kosten/mnd</th>
@@ -117,6 +118,10 @@ export default async function V1UsagePage() {
                     <td style={{ fontSize: 13 }}>{k.conversationsThisWeek}</td>
                     <td style={{ fontSize: 13 }}>{k.conversationsThisMonth}</td>
                     <td style={{ fontSize: 13 }}>{formatCostEur(k.dailyBudgetEur)}/dag</td>
+                    <td style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {formatCostEur(k.spentTodayEur)}
+                      {k.cappedToday ? <Pill tone="danger">GECAPT</Pill> : null}
+                    </td>
                     <td>
                       <Pill tone={BUDGET_TO_PILL[budget.tone]}>{budget.label}</Pill>
                     </td>
