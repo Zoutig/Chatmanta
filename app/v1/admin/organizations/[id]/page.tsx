@@ -64,6 +64,7 @@ type OrgRow = {
   slug: string;
   created_at: string;
   daily_budget_eur: number | string | null;
+  suspended_at: string | null;
   organization_members: { count: number }[] | null;
 };
 
@@ -93,7 +94,7 @@ export default async function OrgDeepDivePage({
 
   const { data: orgData } = await admin
     .from('organizations')
-    .select('id, name, slug, created_at, daily_budget_eur, organization_members(count)')
+    .select('id, name, slug, created_at, daily_budget_eur, suspended_at, organization_members(count)')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle();
@@ -168,7 +169,7 @@ export default async function OrgDeepDivePage({
       {tab === 'widget'     && <WidgetTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'usage'      && <UsageTab orgId={id} />}
       {tab === 'beheer'     && (
-        <BeheerTab orgId={id} slug={org.slug} dailyBudgetRaw={org.daily_budget_eur} />
+        <BeheerTab orgId={id} slug={org.slug} dailyBudgetRaw={org.daily_budget_eur} suspendedAt={org.suspended_at} />
       )}
     </>
   );

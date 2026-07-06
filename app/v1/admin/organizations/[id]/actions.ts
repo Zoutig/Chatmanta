@@ -19,7 +19,9 @@ import {
   sanitizeChatbotPatch,
   type V1ChatbotSettings,
 } from '@/app/v1/app/instellingen/settings-config';
-import { purgeAnswerCache } from '@/lib/rag/ingest';
+import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
+import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
+import { verifyMagicBytes } from '@/lib/rag/file-signature';
 import { inviteOrLookupUserByEmail, resolveInviteRedirect } from '../invite-helpers';
 
 /** Jorion-admin-gate voor de deep-dive-actions. Retourneert de actor-id, of een
@@ -429,5 +431,188 @@ export async function adminRemoveMemberAction(
 
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
+  });
+}
+
+// ─────────────────────────── WP5c — operator-suspend ───────────────────────────
+//
+// Expliciete opschort-status voor een niet-betalende/op te schorten klant. Zet
+// organizations.suspended_at (migr 0025). De chat-gates (lib/v1/limits/chat-gates.ts)
+// tonen dan een eerlijke "tijdelijk niet beschikbaar"-melding en de embed rendert geen
+// widget — i.p.v. het misleidende "daglimiet bereikt, probeer morgen" bij dagbudget=0.
+// Gate = Jorion-admin (cross-org); write via service-role; audit-log.
+
+/** WP5c: schort een org op (suspend=true) of hervat 'm (suspend=false). */
+export async function setOrgSuspendedAction(
+  orgId: string,
+  suspend: boolean,
+): Promise<ActionResult> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    const svc = getV1ServiceRoleClient();
+
+    const { data: org, error: orgErr } = await svc
+      .from('organizations')
+      .select('id')
+      .eq('id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (orgErr) throw new Error(`org-lookup faalde: ${orgErr.message}`);
+    if (!org) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+
+    const suspendedAt = suspend ? new Date().toISOString() : null;
+    const { error } = await svc
+      .from('organizations')
+      .update({ suspended_at: suspendedAt })
+      .eq('id', orgId);
+    if (error) throw new Error(`suspend-status opslaan faalde: ${error.message}`);
+
+    await writeAuditLog(svc, {
+      organizationId: orgId,
+      userId: actorId,
+      action: suspend ? 'org.suspend' : 'org.unsuspend',
+      targetType: 'organization',
+      targetId: orgId,
+    });
+
+    revalidatePath(`/v1/admin/organizations/${orgId}`);
+    return {};
+  });
+}
+
+// ─────────────────────────── WP5c — upload-namens-klant ───────────────────────────
+//
+// Operator-gedreven document-ingest voor een specifieke org (onboarding zonder de
+// v1:ingest-CLI). Spiegelt de klant-flow (signed-URL → verwerken): Vercel capt action-
+// bodies op 4,5MB, dus een tot-10MB-bestand gaat DIRECT naar Storage. Hergebruikt exact
+// dezelfde ingest-primitieven (extractDocText + ingestDocument) als de CLI en de klant;
+// géén nieuwe ingest-logica. Gate = Jorion-admin; org uit de route-param, chatbot via
+// getOrgChatbot, alles service-role-gestempeld + audit-log.
+//
+// ponytail: de drie path-helpers hieronder dupliceren de private helpers in
+// app/v1/app/kennisbank/actions.ts (dat bestand is deze golf off-limits — andere agent /
+// read-only). Triviale one-liners; niet de moeite van een gedeeld util-bestand waard.
+
+const ADMIN_DOC_BUCKET = 'v1-documents';
+const ADMIN_MAX_DOC_BYTES = 10 * 1024 * 1024; // mirror van de bucket-cap (file_size_limit)
+
+/** Bestandsnaam → veilig pad-segment (alléén voor het Storage-pad, niet voor weergave). */
+function adminSafeDocName(filename: string): string {
+  const base = filename.split(/[\\/]/).pop() ?? 'document';
+  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
+  return cleaned.slice(-120) || 'document';
+}
+/** Originele bestandsnaam voor weergave/opslag als documents.filename. */
+function adminDisplayDocName(filename: string): string {
+  const base = (filename.split(/[\\/]/).pop() ?? '').trim();
+  return (base || 'document').slice(0, 200);
+}
+function adminDocExtOf(filename: string): string {
+  return filename.split('.').pop()?.toLowerCase() ?? '';
+}
+
+/**
+ * Stap 1: kortlevende signed upload-URL zodat de browser het bestand DIRECT naar Storage
+ * post (Vercel-body-cap-bypass). Pad is SERVER-gegenereerd (`<orgId>/<chatbotId>/<uuid>-
+ * <naam>`); ext + size worden server-side voorgevalideerd; de harde 10MB-cap zit op de
+ * bucket zelf. Org uit de route-param, chatbot via getOrgChatbot (geen auto-create).
+ */
+export async function adminCreateUploadUrlAction(
+  orgId: string,
+  filename: string,
+  sizeBytes: number,
+): Promise<ActionResult<{ signedUrl: string; token: string; path: string }>> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    const ext = adminDocExtOf(filename);
+    if (!isAllowedDocExt(ext)) fail('INGEST_TYPE', 'Alleen PDF, DOCX, TXT of MD worden ondersteund.');
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) fail('INPUT_INVALID', 'Ongeldige bestandsgrootte.');
+    if (sizeBytes > ADMIN_MAX_DOC_BYTES) fail('INGEST_TOO_LARGE', 'Bestand te groot (max 10 MB).');
+
+    const svc = getV1ServiceRoleClient();
+    const chatbot = await getOrgChatbot(svc, orgId);
+    if (!chatbot) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
+
+    const path = `${orgId}/${chatbot.id}/${crypto.randomUUID()}-${adminSafeDocName(filename)}`;
+    const { data, error } = await svc.storage.from(ADMIN_DOC_BUCKET).createSignedUploadUrl(path);
+    if (error || !data) throw new Error(`createSignedUploadUrl: ${error?.message ?? 'geen URL'}`);
+    return { signedUrl: data.signedUrl, token: data.token, path: data.path };
+  });
+}
+
+/**
+ * Stap 2: verwerk het reeds-geüploade bestand. Download via service-role → magic-bytes
+ * (defense-in-depth tegen een gespooft MIME/ext) → extractDocText → ingestDocument
+ * (org+chatbot-gestempeld) → answer-cache purgen → audit-log → het ORIGINEEL verwijderen
+ * (de chunks zijn de source of truth; AVG-clean). `path` wordt her-gevalideerd tegen de
+ * org/chatbot-prefix: zelfs met een geknutseld pad blijft de write in de eigen namespace.
+ */
+export async function adminProcessUploadedDocAction(
+  orgId: string,
+  path: string,
+  filename: string,
+): Promise<ActionResult<{ documentId: string; chunks: number }>> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    const ext = adminDocExtOf(filename);
+    if (!isAllowedDocExt(ext)) fail('INGEST_TYPE', 'Alleen PDF, DOCX, TXT of MD worden ondersteund.');
+
+    const svc = getV1ServiceRoleClient();
+    const chatbot = await getOrgChatbot(svc, orgId);
+    if (!chatbot) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
+
+    // Object-level: het pad MOET in de org/chatbot-namespace liggen (server-gegenereerd
+    // in stap 1). Service-role bypast RLS → dit is de guard tegen een geknutseld pad.
+    if (!path.startsWith(`${orgId}/${chatbot.id}/`)) fail('AUTH_FORBIDDEN', 'Pad buiten de org-namespace.');
+
+    const { data: blob, error: dlErr } = await svc.storage.from(ADMIN_DOC_BUCKET).download(path);
+    if (dlErr || !blob) fail('NOT_FOUND', `Upload niet gevonden: ${dlErr?.message ?? 'geen bestand'}`);
+    const buffer = Buffer.from(await blob.arrayBuffer());
+
+    // Origineel ALTIJD opruimen zodra de bytes binnen zijn (chunks = source of truth,
+    // AVG-clean). Eén remove in finally dekt élk pad — succes, magic-bytes-fail, lege
+    // tekst én een gefaalde ingest. Best-effort — een gefaalde remove maskeert de echte
+    // fout/het resultaat niet.
+    try {
+      if (!verifyMagicBytes(buffer, ext)) {
+        fail('INGEST_TYPE', 'Bestandsinhoud komt niet overeen met het bestandstype.');
+      }
+      const text = await extractDocText(buffer, ext);
+      if (!text.trim()) {
+        fail('INGEST_READ_FAILED', 'Geen tekst gevonden in het bestand (gescande PDF zonder tekstlaag?).');
+      }
+      const res = await ingestDocument(svc, {
+        organizationId: orgId,
+        chatbotId: chatbot.id,
+        filename: adminDisplayDocName(filename),
+        text,
+        source: 'upload',
+      });
+      await purgeAnswerCache(svc, orgId, chatbot.id);
+      await writeAuditLog(svc, {
+        organizationId: orgId,
+        userId: actorId,
+        action: 'document.admin_upload',
+        targetType: 'document',
+        targetId: res.documentId,
+        metadata: { filename: adminDisplayDocName(filename), chunks: res.chunks, chatbot_id: chatbot.id },
+      });
+      revalidatePath(`/v1/admin/organizations/${orgId}`);
+      return { documentId: res.documentId, chunks: res.chunks };
+    } finally {
+      const { error: rmErr } = await svc.storage.from(ADMIN_DOC_BUCKET).remove([path]);
+      if (rmErr) console.warn(`[adminProcessUploadedDocAction] origineel verwijderen faalde voor ${path}: ${rmErr.message}`);
+    }
   });
 }
