@@ -28,6 +28,8 @@ De blueprint en het bouwplan zijn **context, geen kookboek.** Ze zijn geschreven
 - **Concept Blueprint v4.0** — `c:\Users\solys\Documents\Claude\Projects\Jorion Solutions\Concept_Blueprint_ChatManta.md` (~3400 regels)
 - **Bouwplan v2.0 (8 fases)** — `c:\Users\solys\Documents\Claude\Projects\Jorion Solutions\Bouwplan_Planning_ChatManta_v1.md` (~1500 regels)
 
+> ⚠️ **Deze twee paden zijn machine-lokaal** (Sebastiaans primaire PC) en staan **niet in de repo** — vanuit een worktree op een andere machine, een devcontainer of een headless/cloud-sessie zijn ze onbereikbaar. Zijn ze er niet: bouw dan verder op de **in-repo bronnen** die wél overal meereizen — deze AGENTS.md (de hard rules + scope hieronder zijn de operatieve subset van de blueprint), `docs/AGENT_LANDMIJNEN.md` (duurzame valkuilen), `docs/V1_LAUNCH_TODO.md` en `docs/V1_STATUS_EN_PLAN.md` — en vraag Sebastiaan om een specifieke blueprint-sectie wanneer je die echt nodig hebt. Verzin geen blueprint-inhoud die je niet kunt lezen.
+
 Bij conflict: V1 Minimal Build Scope (blueprint sectie 1.5) heeft voorrang, daarna Security Addendum, daarna specifieke sectie boven Executive Summary.
 
 ## Wat NIET ter discussie staat (echt hard rules)
@@ -88,10 +90,11 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 - `npm run eval:run-all` — seed → run → report; valideer RAG-wijzigingen meetbaar vóór een PR. Losse stappen: `eval:seed`, `eval:run`, `eval:report`
 - Judge gebruikt `parentExcerpt` (~800 chars) ipv small-chunk excerpts — eerlijker grounding-meting; zie `lib/v0/server/eval.ts` `buildJudgeUserPrompt`.
 
-**Migrations:**
-- Eigen tooling, géén `supabase db push`: `npm run migrate`, `migrate:status`, `migrate:bootstrap`
-- Files in `supabase/migrations/NNNN_*.sql`, strikt volgnummer; nieuwe migration = RLS-policies in dezelfde file
-- ⚠️ Vóór je `NNNN` kiest: check lokaal én open PRs voor het hoogste nummer — parallelle branches claimen anders hetzelfde nummer. Snelcheck: `ls supabase/migrations | sort | tail -3` + `gh pr list --state open --search "supabase/migrations" --limit 5`. De `/check-migration`-skill doet dit voor je.
+**Migrations — LET OP: twee gescheiden ledgers (V0 en V1).**
+- Eigen tooling, géén `supabase db push`. V0: `npm run migrate` / `migrate:status` / `migrate:bootstrap`. **V1 heeft eigen scripts én eigen map:** `npm run migrate:v1` / `migrate:v1:status` (draaien tegen het aparte V1-prod-Supabase-project).
+- Files: V0 in `supabase/migrations/NNNN_*.sql`, V1 in `supabase/migrations-v1/NNNN_*.sql`. Beide strikt volgnummer, **elk met een eigen nummerreeks** (V0 zit ~0054, V1 zit ~0025 — ze lopen níet gelijk). Nieuwe migration = RLS-policies in dezelfde file.
+- ⚠️ Vóór je `NNNN` kiest: check de **juiste** map + open PRs voor het hoogste nummer — parallelle branches claimen anders hetzelfde nummer. Snelcheck V0: `ls supabase/migrations | sort | tail -3`; V1: `ls supabase/migrations-v1 | sort | tail -3`; plus `gh pr list --state open --search "supabase/migrations" --limit 5`. De `/check-migration`-skill doet dit voor je.
+- ⚠️ **V1-ledger-gat:** het V1-prod-ledger bevat migraties 0017–0020 (admin_*-tabellen) die out-of-band zijn toegepast zónder repo-file — `supabase/migrations-v1/` springt van 0016 naar 0021. Ga daar niet vanuit een file-telling overheen zonder dit te verifiëren.
 
 **V0-scripts (demo-data):** `v0:ingest`, `v0:chat`, `v0:list`, `v0:reset`, `v0:tune`, `v0:reingest-parents`, `v0:seed-orgs`, `v0:test-org-isolation` — zie `package.json`
 
