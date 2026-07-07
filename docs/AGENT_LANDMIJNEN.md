@@ -1,12 +1,11 @@
 # ChatManta — Agent-landmijnen
 
-_Gedistilleerd uit de opgebouwde sessie-kennis op 2026-07-06. Levend document — vul aan
-wanneer een nieuwe val is uitgevonden; corrigeer wanneer de code is veranderd._
+_Gedistilleerd uit de opgebouwde sessie-kennis op 2026-07-06 (51 items). Levend document —
+vul aan wanneer een nieuwe val is uitgevonden; corrigeer wanneer de code is veranderd._
 
 Duurzame technische valkuilen en empirie voor iedereen (AI-agent of mens) die in deze
 codebase werkt **zonder toegang tot de sessie-memory**. Elk item: symptoom / oorzaak / wat
-te doen, met bron tussen haakjes (PR-nummer of memory-slug — de PR-nummers zijn na te
-zoeken in de git-historie; de memory-slugs zijn interne provenance-markers).
+te doen, met bron tussen haakjes (PR-nummer of memory-slug).
 
 Dit document is een aanvulling op `AGENTS.md` — de hard rules (RLS, multi-tenancy,
 service-role-discipline, SA-1, vector-isolatie, V0-sandbox-disclaimer), de basis-worktree-
