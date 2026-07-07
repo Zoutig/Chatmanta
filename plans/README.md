@@ -26,10 +26,10 @@ handmatig herbevestigd in de bron. Alle bewijs-excerpts in de plannen komen uit 
 | 009  | migrate.mjs: checksum-drift-detectie + TLS-certvalidatie | P2 | M | — | DONE (1e9b6fb; TLS teruggedraaid — CA-cert nodig, zie eindrapport) |
 | 010  | Command Center-assistent: half-gepersisteerde tool-turn brickt thread niet meer (leespad-repair + tool-loop hardening) | P2 | M | — | TODO |
 | 011  | **V1 `is_jorion_admin` zelf-escalatie sluiten** — port V0-0013 → V1-migr 0026 ⚠️ SECURITY/launch-blocker | **P1** | S | — | TODO |
-| 012  | Schema/RLS-hardening batch: 0053-search_path-pin, FK-index `document_chunks.website_page_id`, 2× soft-delete-filter (V0 `document_chunks` + V1 `contact_requests`), `v1_feedback_ticket_event.org_id`, `handle_new_auth_user`-email | P2 | M | — | TODO — plan nog te schrijven (fleet-resume) |
-| 013  | RAG prompt-injectie-grens: retrieved context expliciet als *untrusted data* afbakenen (SEC-2 + red-team finding 3) | P2 | M | — | TODO — plan nog te schrijven (fleet-resume) |
-| 014  | `migrate.mjs` + ledger-hardening: TD-8 stale-close, ledger-entry-zonder-file `warn`→fail, 4 dubbele V0-volgnummers documenteren | P3 | M | — | TODO — plan nog te schrijven (fleet-resume) |
-| 015  | Quick-wins-batch (6× S): PERF-1, PERF-5, TD-1, TD-7, DX-2, SEC-3 + injection dubbel-adjectief-regexfix | P2 | S | — | TODO — plan nog te schrijven (fleet-resume) |
+| 012  | Schema/RLS-hardening batch → V0-migr 0055 + V1-migr 0027: 0053-search_path-pin, FK-index `document_chunks.website_page_id`, 2× soft-delete-filter (`document_chunks` V0+V1 + `contact_requests` V1), `v1_feedback_ticket_event.org_id`; `handle_new_auth_user`-email bewust uitgesteld | P2 | M | — | TODO (plan geschreven; ⚠️ prod-apply-gate) |
+| 013  | RAG prompt-injectie-grens: retrieved context als *untrusted data* afbakenen via nieuwe append-only bot-versie v0.11 (default-uit vlag) (SEC-2 + red-team finding 3) | P2 | M | — | TODO (plan geschreven; ⚠️ billable eval + LATEST-bump-gate) |
+| 014  | `migrate.mjs` + ledger-hardening: TD-8 stale-close, orphan-ledger-entry zichtbaar + opt-in `--strict-ledger`, `migrate:v1:audit`, 4 dubbele V0-volgnummers documenteren | P3 | M | — | TODO (plan geschreven) |
+| 015  | Quick-wins-batch (6× S, elk los uitvoerbaar): PERF-1, PERF-5, TD-1, TD-7, DX-2, SEC-3 | P2 | S | — | TODO (plan geschreven) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (met één regel reden) | REJECTED (met één regel rationale)
 
@@ -47,12 +47,17 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (met één regel reden) | REJ
 > - **Ledger: TD-8-premisse is STALE** — de V1-migraties 0017–0020 bestaan nu wél in de
 >   repo (PR #236, `b9f4d71`); géén reconstructie nodig (zie Rejected).
 >
-> **Plannen 010 + 011 zijn geschreven en tegen de bron herbevestigd.** Plannen 012–015 zijn
-> gescopet maar hun bestanden zijn nog niet geschreven — de plan-schrijf-fleet is twee keer
-> op een sessie-limiet afgebroken. **Resume:** de workflow is cache-resumbaar —
-> `Workflow({scriptPath: "…/scratchpad/fable-plannen.mjs", resumeFromRunId: "wf_9f56ca07-5c4"})`
-> na de reset schrijft 012–015 (het red-team-agent-resultaat komt gratis uit cache). De
-> briefings staan in `…/scratchpad/brief-012..015.md`.
+> **Alle plannen 010–015 zijn nu geschreven** (010+011 met de hand + bron-herbevestigd; 012–015
+> door de Fable-plan-fleet, elk met eigen bron-verificatie en drift-noten). Nog te doen: ze
+> uitvoeren. Drie hebben een menselijke gate: **011** (V1-migr 0026, `migrate:v1`), **012**
+> (V0-migr 0055 + V1-migr 0027, `migrate` + `migrate:v1`), **013** (billable eval-run +
+> LATEST_BOT_VERSION-promotie naar v0.11 + V1-cache-purge). 014 + 015 hebben geen prod-gate.
+>
+> **Losse eindjes zonder plan:** de injection-regex-fix uit finding 8 (kernfrase
+> "ignore all previous instructions" matcht niet — één-regel-fix in `injection-patterns.ts:30/36`)
+> is een quick win die in géén plan is opgenomen; hij staat volledig in
+> `docs/SECURITY_INJECTION_REDTEAM_2026-07.md` (finding 1). Doe 'm los, of samen met plan 013
+> (de architecturale prompt-grens die de rest van de injectie-klassen dekt).
 
 ## Ronde-2 nieuwe bevindingen (migratie-RLS-sweep + red-team, geverifieerd 2026-07-07)
 
