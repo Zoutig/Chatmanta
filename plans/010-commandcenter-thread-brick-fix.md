@@ -261,6 +261,13 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
   const called = new Set(
     history.flatMap((h) => (h.role === 'assistant' && h.toolCalls ? h.toolCalls.map((c) => c.id) : [])),
   );
+  // Elk tool_call_id mag hoogstens ÉÉN tool-message opleveren. Zonder deze dedup
+  // zouden twee DB-rijen met hetzelfde tool_call_id allebei worden ge-emit →
+  // opnieuw een malformed history (twee tool-responses op één call → OpenAI-400).
+  // Dat kan reëel ontstaan als de tool-loop een echte tool-rij schrijft én daarna
+  // (bij een throw ná de write) een fallback-rij — zie de `persisted`-guard in Step 3.
+  // Deze dedup is de leespad-helft van die belt-and-suspenders.
+  const emittedTool = new Set<string>();
   for (const m of history) {
     if (m.role === 'user' && m.content) {
       out.push({ role: 'user', content: m.content });
@@ -269,7 +276,8 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
       out.push({ role: 'assistant', content: m.content, tool_calls: calls });
       if (calls && calls.length > 0) {
         for (const c of calls) {
-          if (!answered.has(c.id)) {
+          if (!answered.has(c.id) && !emittedTool.has(c.id)) {
+            emittedTool.add(c.id);
             out.push({
               role: 'tool',
               tool_call_id: c.id,
@@ -278,7 +286,8 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
           }
         }
       }
-    } else if (m.role === 'tool' && m.toolCallId && called.has(m.toolCallId)) {
+    } else if (m.role === 'tool' && m.toolCallId && called.has(m.toolCallId) && !emittedTool.has(m.toolCallId)) {
+      emittedTool.add(m.toolCallId);
       out.push({
         role: 'tool',
         tool_call_id: m.toolCallId,
@@ -316,41 +325,56 @@ In `route.ts`:
 ### Step 3: Hardt de tool-loop zodat een half-gepersisteerde turn nooit meer ontstaat
 
 In de tool-loop (`route.ts:196-242`) vervang je `Promise.all` door een variant die
-per tool-call gegarandeerd een tool-resultaat in de DB achterlaat, óók als
-`tool.execute`, de `appendMessage`, of een `emit` throwt. Wrap de per-call body in
-een `try/catch`; in de `catch` probeer je alsnog een placeholder-tool-message te
-persisten en (best-effort) naar de client te emitten:
+per tool-call gegarandeerd **precies één** tool-resultaat in de DB achterlaat, óók
+als `tool.execute`, de `appendMessage`, of een `emit` throwt. Wrap de per-call body
+in een `try/catch` mét een `persisted`-flag; in de `catch` schrijf je **alleen** een
+fallback-tool-message als de echte nog NIET is weggeschreven:
 
 ```ts
 await Promise.all(
   toolCalls.map(async (tc) => {
+    let persisted = false; // true zodra de echte tool-rij in de DB staat
     try {
-      // ... bestaande body: parse args, emit tool_call, tool.execute,
-      //     appendMessage(tool-result), messages.push, emit tool_result ...
+      // ... parse args, emit tool_call, tool.execute ...
+      const stored = await appendMessage({
+        threadId: threadIdResolved, role: 'tool', content: null,
+        toolCallId: tc.id, toolName: tc.function.name, toolResult: result,
+      });
+      persisted = true;                 // <-- direct ná de geslaagde write
+      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+      emit({ type: 'tool_result', tool_call_id: tc.id, message_id: stored.id, ... });
     } catch (toolErr) {
       const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
-      // Zorg dat er ALTIJD een tool-message voor dit tool_call_id in de DB komt,
-      // anders brickt de thread. Best-effort: slik een tweede fout.
       const fallback = { ok: false as const, error: `tool-uitvoering faalde: ${errMsg}` };
-      try {
-        await appendMessage({
-          threadId: threadIdResolved, role: 'tool', content: null,
-          toolCallId: tc.id, toolName: tc.function.name, toolResult: fallback,
-        });
-      } catch { /* DB onbereikbaar — de leespad-repair (Step 1) vangt dit alsnog */ }
-      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(fallback) });
+      // KRITIEK: alleen een fallback-rij schrijven als de echte tool-rij NIET al
+      // is gepersisteerd. Zonder deze guard schrijft een throw ná de geslaagde
+      // appendMessage (bv. de `emit` op een gecancelde stream, of messages.push)
+      // een TWEEDE tool-rij voor hetzelfde tool_call_id → dubbele tool-response.
+      // De in-memory push is idem gated (anders staat de dubbele ook in `messages`).
+      if (!persisted) {
+        try {
+          await appendMessage({
+            threadId: threadIdResolved, role: 'tool', content: null,
+            toolCallId: tc.id, toolName: tc.function.name, toolResult: fallback,
+          });
+        } catch { /* DB onbereikbaar — de leespad-repair (Step 1) vangt dit alsnog */ }
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(fallback) });
+      }
       try { emit({ type: 'tool_result', tool_call_id: tc.id, name: tc.function.name, ok: false, error: errMsg }); } catch { /* client weg */ }
     }
   }),
 );
 ```
 
-Belangrijk: laat de `emit`-aanroepen binnen de happy-path body ook tegen een
-gecancelde stream kunnen — als je twijfelt, wrap de losse `emit(...)`-calls in de
-body in een kleine helper die throws slikt, zodat een client-abort de DB-writes
-niet meesleept. De `message_id` in het happy-path `tool_result`-event blijft
-`stored.id`; in het fallback-event laat je `message_id`/`undo_token` weg (de
-client behandelt die als optioneel).
+Twee redundante verdedigingen die elk apart al volstaan, samen fail-safe:
+1. **Bron (`persisted`-guard, hierboven)**: voorkomt dat er überhaupt een dubbele
+   tool-rij in de DB belandt.
+2. **Leespad (`emittedTool`-dedup, Step 1)**: mocht er toch ooit een dubbele rij
+   staan (oude data, of een tweede write-pad), dan emit de helper er hooguit één.
+
+De `message_id` in het happy-path `tool_result`-event blijft `stored.id`; in het
+fallback-event laat je `message_id`/`undo_token` weg (de client behandelt die als
+optioneel).
 
 **Verify**: `npm run typecheck` → exit 0.
 
@@ -382,12 +406,16 @@ Dek minstens deze gevallen af (bouw `AssistantMessage`-fixtures met de velden ui
 5. **Orphan-tool-rij** — een tool-message waarvan het `toolCallId` in géén enkele
    assistant-turn voorkomt → verschijnt niet in de output (gedropt; vandaag
    onbereikbaar scenario, maar de helper garandeert het).
-6. Invariant die de OpenAI-eis borgt: voor elke `assistant`-message met
+6. **Dubbele tool-rij** — assistant met 1 tool_call + TWEE tool-rijen met datzelfde
+   `toolCallId` (het duplicate-write-scenario uit Step 3) → output bevat precies
+   ÉÉN tool-message voor dat id (de `emittedTool`-dedup), geen twee.
+7. Invariant die de OpenAI-eis borgt: voor elke `assistant`-message met
    `tool_calls` in de output heeft **elk** `tool_call_id` ergens ná die message
    een `tool`-message met datzelfde id, én elke `tool`-message in de output heeft
-   een eerdere `assistant`-message die zijn `tool_call_id` aankondigt.
+   een eerdere `assistant`-message die zijn `tool_call_id` aankondigt — en er is
+   **hoogstens één** tool-message per `tool_call_id`.
 
-**Verify**: `npm run test:unit` → alle tests groen, inclusief de 6 nieuwe cases.
+**Verify**: `npm run test:unit` → alle tests groen, inclusief de 7 nieuwe cases.
 
 ### Step 5: Volledige verificatie
 
@@ -398,11 +426,11 @@ Dek minstens deze gevallen af (bouw `AssistantMessage`-fixtures met de velden ui
 
 ## Test plan
 
-- Nieuw: `lib/commandcenter/server/__tests__/assistant-history.test.ts` met de 6
+- Nieuw: `lib/commandcenter/server/__tests__/assistant-history.test.ts` met de 7
   cases hierboven. Structuurvoorbeeld: `lib/rag/__tests__/history-entities.test.ts`
   (`node:test`, `assert/strict`, pure functie, geen I/O).
 - Geen wijziging aan bestaande tests.
-- Verificatie: `npm run test:unit` → alle bestaande + 6 nieuwe cases groen.
+- Verificatie: `npm run test:unit` → alle bestaande + 7 nieuwe cases groen.
 - **Handmatige E2E (optioneel, na de unit-tests)**: verwijder in de V0-Supabase
   handmatig één `tool`-rij van een bestaande `cc_assistant_messages`-thread
   (simuleert de half-gepersisteerde turn), stuur dan een nieuw bericht in
@@ -414,7 +442,7 @@ Dek minstens deze gevallen af (bouw `AssistantMessage`-fixtures met de velden ui
 Machine-checkbaar. ALLE moeten gelden:
 
 - [ ] `npm run typecheck` exit 0
-- [ ] `npm run test:unit` exit 0; `assistant-history.test.ts` bestaat en de 6
+- [ ] `npm run test:unit` exit 0; `assistant-history.test.ts` bestaat en de 7
       cases passen
 - [ ] `npm run build` exit 0 (na schone `.next/`)
 - [ ] `route.ts` bevat geen inline `for (const m of history)`-reconstructie meer
@@ -448,7 +476,10 @@ Stop en rapporteer (niet improviseren) als:
   een assistant-`tool_calls` kan achterlaten zonder tool-message; (3) dat er geen
   nieuw NDJSON-eventtype is geïntroduceerd (de client-parser is out-of-scope);
   (4) dat de orphan-drop (`called`-set) intact blijft — dat is het vangnet dat
-  toekomstige wijzigingen aan `listMessages`/undo dekt.
+  toekomstige wijzigingen aan `listMessages`/undo dekt; (5) dat de duplicate-tool-rij
+  dubbel is afgedekt — de `persisted`-guard in de tool-loop (geen tweede DB-write ná
+  een geslaagde) én de `emittedTool`-dedup in de helper (geen tweede tool-message bij
+  reconstructie) — laat geen van beide vallen.
 - Bewust uitgesteld: het dedupliceren van de `ChatMsg`↔SDK-typecast en een echte
   integratietest tegen een gemockte OpenAI-client — de pure helper dekt de
   regressie; een end-to-end test vergt een OpenAI-mock die deze repo (nog) niet heeft.
