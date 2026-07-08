@@ -172,6 +172,11 @@ export async function POST(req: NextRequest) {
             // voor de leespad-repair die dit als vangnet ook al zelf opvangt.
             await Promise.all(
               toolCalls.map(async (tc) => {
+                // Zodra de echte tool-rij is weggeschreven staat dit op true; de
+                // catch mag dan GEEN tweede (bogus fail-)rij toevoegen — anders
+                // ontstaat er bij een throwende emit ná de persist een duplicaat
+                // (echte ok:true-rij + fake ok:false-rij) voor hetzelfde id.
+                let toolRowPersisted = false;
                 try {
                   const tool = getTool(tc.function.name);
                   let parsedArgs: Record<string, unknown> = {};
@@ -196,6 +201,7 @@ export async function POST(req: NextRequest) {
                     toolName: tc.function.name,
                     toolResult: result,
                   });
+                  toolRowPersisted = true;
 
                   // Stuur ook naar de in-memory messages voor volgende OpenAI-call
                   messages.push({
@@ -217,9 +223,13 @@ export async function POST(req: NextRequest) {
                     undo_token: isWrite && result.ok ? stored.id : undefined,
                   });
                 } catch (toolErr) {
+                  // De echte tool-rij bestaat al (alleen de emit faalde, client is
+                  // weg) → niets meer doen; een fallback zou een duplicaat maken.
+                  if (toolRowPersisted) return;
+
                   // Best-effort compensatie: garandeer alsnog een tool-message
-                  // voor dit tool_call_id, ook als de happy-path body hierboven
-                  // ergens faalde (DB-blip, gecancelde stream, tool.execute-throw).
+                  // voor dit tool_call_id als de happy-path body faalde vóór de
+                  // persist (DB-blip, gecancelde stream, tool.execute-throw).
                   const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
                   const fallback = { ok: false as const, error: `tool-uitvoering faalde: ${errMsg}` };
                   try {

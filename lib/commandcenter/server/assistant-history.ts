@@ -32,6 +32,9 @@ export type ChatMsg =
  * 2. Orphan-tool-rijen: een tool-message waarvan het tool_call_id in géén enkele
  *    assistant-turn is aangekondigd wordt gedropt (óók een OpenAI-400). Vandaag
  *    onbereikbaar — vangnet-laag.
+ * 3. Duplicaat-tool-rijen: van twee tool-messages met hetzelfde tool_call_id wint
+ *    de eerste; de rest wordt overgeslagen (OpenAI verwacht precies één tool-
+ *    message per tool_call_id). Ook vangnet-laag — zelfde filosofie als (2).
  */
 export function buildChatHistory(system: string, history: AssistantMessage[]): ChatMsg[] {
   const out: ChatMsg[] = [{ role: 'system', content: system }];
@@ -42,6 +45,9 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
   const called = new Set(
     history.flatMap((h) => (h.role === 'assistant' && h.toolCalls ? h.toolCalls.map((c) => c.id) : [])),
   );
+  // First-wins dedupe: houd bij welke tool_call_id's al een tool-message kregen
+  // (zowel echte rijen als dangling-placeholders tellen mee).
+  const emitted = new Set<string>();
 
   for (const m of history) {
     if (m.role === 'user' && m.content) {
@@ -51,21 +57,23 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
       out.push({ role: 'assistant', content: m.content, tool_calls: calls });
       if (calls && calls.length > 0) {
         for (const c of calls) {
-          if (!answered.has(c.id)) {
+          if (!answered.has(c.id) && !emitted.has(c.id)) {
             out.push({
               role: 'tool',
               tool_call_id: c.id,
               content: JSON.stringify({ ok: false, error: 'tool-resultaat verloren gegaan' }),
             });
+            emitted.add(c.id);
           }
         }
       }
-    } else if (m.role === 'tool' && m.toolCallId && called.has(m.toolCallId)) {
+    } else if (m.role === 'tool' && m.toolCallId && called.has(m.toolCallId) && !emitted.has(m.toolCallId)) {
       out.push({
         role: 'tool',
         tool_call_id: m.toolCallId,
         content: JSON.stringify(m.toolResult ?? { ok: false, error: 'missing result' }),
       });
+      emitted.add(m.toolCallId);
     }
   }
 

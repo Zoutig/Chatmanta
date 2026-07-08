@@ -238,3 +238,46 @@ test('invariant: elk aangekondigd tool_call_id krijgt een tool-message, elke too
   // De orphan-id mag nergens als tool-message voorkomen.
   assert.ok(!out.some((m) => m.role === 'tool' && m.tool_call_id === 'nooit-aangekondigd'));
 });
+
+// ---------------------------------------------------------------------------
+// 7. Duplicaat-tool-rij → first-wins dedupe
+// ---------------------------------------------------------------------------
+
+test('duplicaat-tool-rijen met hetzelfde toolCallId → precies één tool-message (first-wins)', () => {
+  const call = toolCall('dup-1');
+  const history: AssistantMessage[] = [
+    userMsg('doe iets'),
+    assistantToolMsg([call]),
+    // Twee tool-rijen voor hetzelfde id (bv. echte succes-rij + latere fallback):
+    baseMsg({
+      role: 'tool',
+      toolCallId: 'dup-1',
+      toolName: 'dummy_tool',
+      toolResult: { ok: true, item: { eerste: true } },
+    }),
+    baseMsg({
+      role: 'tool',
+      toolCallId: 'dup-1',
+      toolName: 'dummy_tool',
+      toolResult: { ok: false, error: 'tweede — moet weggededupt worden' },
+    }),
+  ];
+
+  const out = buildChatHistory('system-prompt', history);
+
+  const tools = toolMsgs(out);
+  assert.equal(tools.length, 1, 'er mag precies één tool-message voor dup-1 zijn');
+  assert.equal(tools[0].tool_call_id, 'dup-1');
+  // First-wins: de eerste (succes-)rij overleeft, de tweede niet.
+  assert.ok(tools[0].content.includes('eerste'));
+  assert.ok(!tools[0].content.includes('weggededupt'));
+
+  // Invariant blijft gelden: elke aangekondigde id heeft een tool-message en
+  // elke tool-message heeft een eerdere aankondiging.
+  const announced = new Set<string>();
+  out.forEach((m) => {
+    if (m.role === 'assistant' && m.tool_calls) for (const c of m.tool_calls) announced.add(c.id);
+    if (m.role === 'tool') assert.ok(announced.has(m.tool_call_id), `${m.tool_call_id} zonder aankondiging`);
+  });
+  assert.ok(announced.has('dup-1') && tools.some((m) => m.tool_call_id === 'dup-1'));
+});
