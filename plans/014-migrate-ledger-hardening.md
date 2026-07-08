@@ -17,8 +17,9 @@
 > **Verwacht**: `scripts/migrate.mjs`, `package.json`, `supabase/migrations`
 > en `supabase/migrations-v1` geven **GEEN** output (ongewijzigd sinds de
 > plan-SHA). `plans/README.md` en `AGENTS.md` **worden** getoond als gewijzigd
-> — dat is **verwacht** (de ronde-2-consolidatie na de plan-SHA raakte deze
-> twee docs; de "Current state"-excerpts hieronder komen al uit die live-versie).
+> — dat is **verwacht** (de ronde-2-consolidatie én de ledgernoot-correctie
+> `d94c90a` raakten deze twee docs ná de plan-SHA; de "Current
+> state"-excerpts hieronder komen uit die gecorrigeerde live-versie).
 > **STOP** alleen als `scripts/migrate.mjs`, `package.json` of één van de
 > migratie-mappen wél als gewijzigd verschijnt, óf als een excerpt hieronder
 > niet meer één-op-één in het live-bestand staat.
@@ -120,26 +121,29 @@ Rol: leest `.sql`-files uit de doelmap, vergelijkt met `public._migrations`, pas
 
 ### `plans/README.md` — twee te-hygiëniseren plekken
 
-- **Plan-014-statusrij** (`plans/README.md:31`): staat op `TODO — plan nog te schrijven (fleet-resume)`. Werk je bij in Step 6.
-- **Backlog-rij TD-8** (`plans/README.md:104`) — al STALE-gemarkeerd; jij scherpt hem aan naar het nieuwe audit-commando:
+- **Plan-014-statusrij** (de `| 014 |`-rij in de statustabel): staat op `TODO (plan geschreven)`. Werk je bij in Step 6.
+- **Backlog-rij TD-8** (de `~~V1-prod-ledger~~`-rij in de Backlog-tabel; zoek op "V1-prod-ledger", niet op regelnummer — de README schuift) — al STALE-gemarkeerd; jij scherpt hem aan naar het nieuwe audit-commando:
   ```
   | ~~V1-prod-ledger heeft migraties 0017-0020 (admin_*) zónder repo-file~~ **STALE (ronde 2)** | tech-debt | — | De 0017-0020-files bestaan nu wél in de repo (PR #236, `b9f4d71`, ná ontdekking); géén reconstructie meer nodig. Rest = prod-ledger tegen die files verifiëren → plan 014 |
   ```
 
-### `AGENTS.md` — stale "V1-ledger-gat"-waarschuwing (`AGENTS.md:93-97`)
+### `AGENTS.md` — ledgernoot is al gecorrigeerd; rest = één aanscherping
 
-Dit blok is ná de plan-SHA toegevoegd en is **nu onjuist** — de file-gap bestaat niet meer (map is sequentieel 0001-0025):
+**Let op (correctie op de oorspronkelijke brief):** de stale "V1-ledger-gat"-bullet
+("springt van 0016 naar 0021") die dit plan aanvankelijk moest corrigeren, is in
+commit `d94c90a` (dezelfde PR als dit plan) **al vervangen** door een correcte
+versie. De live bullet (`AGENTS.md:97`) luidt nu:
 ```
-**Migrations — LET OP: twee gescheiden ledgers (V0 en V1).**
-- Eigen tooling, géén `supabase db push`. V0: `npm run migrate` / `migrate:status` / `migrate:bootstrap`. **V1 heeft eigen scripts én eigen map:** `npm run migrate:v1` / `migrate:v1:status` ...
-- Files: V0 in `supabase/migrations/NNNN_*.sql`, V1 in `supabase/migrations-v1/NNNN_*.sql`. Beide strikt volgnummer ...
-- ⚠️ Vóór je `NNNN` kiest: check de **juiste** map + open PRs ... Snelcheck V0: `ls supabase/migrations | sort | tail -3`; V1: `ls supabase/migrations-v1 | sort | tail -3`; plus `gh pr list ...`. De `/check-migration`-skill doet dit voor je.
-- ⚠️ **V1-ledger-gat:** het V1-prod-ledger bevat migraties 0017–0020 (admin_*-tabellen) die out-of-band zijn toegepast zónder repo-file — `supabase/migrations-v1/` springt van 0016 naar 0021. Ga daar niet vanuit een file-telling overheen zonder dit te verifiëren.
+- ⚠️ **Dubbele volgnummers bestaan al in V0** (`0028`, `0039`, `0040`, `0044` — parallelle `admin_*`/`v0_*`-branches claimden hetzelfde nummer). De `migrate.mjs`-tracker keyt op de **volledige bestandsnaam**, dus beide files worden los getrackt en toegepast — benign, **niet hernoemen** (al op prod). Kies wél het eerstvolgende vrije nummer verder. De V1-migraties `0017-0020` (admin_*) bestaan wél in de repo (PR #236) — er is geen file-gat, alleen een openstaande prod-ledger-verificatie (zie `plans/014`).
 ```
+Deze bullet dekt zowel de vier dubbele V0-volgnummers als de 0017-0020-status al
+correct af. Wat rest voor dit plan (Step 5): de verwijzing "zie `plans/014`"
+aanscherpen naar het concrete audit-commando `npm run migrate:v1:audit` zodra dat
+bestaat — een plan-bestand kan verdwijnen, het npm-script niet.
 
 ### Test-conventie (model voor Step 4)
 
-- Unit-tests staan in een `__tests__/`-map en heten `*.test.ts`; de runner (`scripts/run-unit-tests.mjs`) doorzoekt de roots `lib`, `app`, `scripts`, `tests` en **faalt hard op een `.test.ts` buiten een `__tests__/`-map**. Hij draait ze via `node --import tsx --test`, dus een `.test.ts` mag een `.mjs` importeren.
+- Unit-tests staan in een `__tests__/`-map en heten `*.test.ts`; de runner (`scripts/run-unit-tests.mjs`) doorzoekt de roots `lib`, `app`, `scripts`, `tests` en **faalt hard op een `.test.ts` buiten een `__tests__/`-map**. Hij draait ze via `node --import tsx --test`, dus een `.test.ts` mag een `.mjs` importeren. **Geverifieerd (2026-07-08):** er is nog géén precedent van een `.mjs`-import in een testfile — jouw test wordt de eerste. Dat kan: `tsconfig.json` heeft `allowJs: true` en include `**/*.ts`, dus `npm run typecheck` accepteert de import en leest de types uit de JSDoc-annotaties van de helper (schrijf die dus zorgvuldig, zie Step 1). Faalt typecheck tóch op de import, rapporteer het als STOP-conditie — ga niet zelf `.d.ts`-bestanden verzinnen.
 - Exemplaar om te kopiëren qua stijl — `lib/ai/__tests__/cost.test.ts`:
   ```js
   import assert from 'node:assert/strict';
@@ -172,7 +176,7 @@ Dit blok is ná de plan-SHA toegevoegd en is **nu onjuist** — de file-gap best
 - `scripts/migrate.mjs` — importeert de helper; wees-rij-zichtbaarheid + `--strict-ledger`-flag + backfill-logging.
 - `scripts/__tests__/migrate-ledger.test.ts` — **nieuw**: unit-test op de helper.
 - `package.json` — één nieuw script: `migrate:v1:audit` (read-only prod-audit voor Sebastiaan).
-- `AGENTS.md` — stale "V1-ledger-gat"-blok corrigeren + de vier dubbele V0-volgnummers documenteren.
+- `AGENTS.md` — één aanscherping van de (al gecorrigeerde) ledgernoot: verwijs naar `npm run migrate:v1:audit`.
 - `plans/README.md` — TD-8-backlogrij aanscherpen + plan-014-statusrij bijwerken.
 
 **Out of scope** (NIET aanraken, ook al lijken ze gerelateerd):
@@ -408,28 +412,32 @@ test('classifyLedger — matchende checksum → schoon (geen drift/backfill/orph
 
 **Verify**: `npm run test:unit` → exit 0; de output noemt `migrate-ledger.test.ts` en alle 4 tests slagen. (Ziet de runner het bestand niet, dan staat het niet onder een `__tests__/`-map — corrigeer het pad.)
 
-### Step 5: Corrigeer de stale docs in `AGENTS.md`
+### Step 5: Scherp de AGENTS.md-ledgernoot aan naar het audit-commando
 
-1. **Vervang** de stale ledger-gat-regel (`AGENTS.md:97`, de bullet die begint met `⚠️ **V1-ledger-gat:**`) door een correcte, geverifieerde versie die het file-gap-verhaal terugtrekt maar de prod-ledger-onzekerheid eerlijk laat staan:
-   ```
-   - ⚠️ **V1-ledger — 0017–0020**: de admin_*-migraties `0017`–`0020` bestaan sinds PR #236 (`b9f4d71`) wél als repo-file; `supabase/migrations-v1/` is nu sequentieel `0001`–`0025` (géén file-gap meer). Ze zijn destijds out-of-band op V1-prod toegepast; of de prod-ledger-checksums één-op-één met de (later gecommite) files matchen is nog niet geverifieerd — audit read-only met `npm run migrate:v1:audit` (zie plan 014).
-   ```
-2. **Voeg** ná de "Vóór je `NNNN` kiest"-bullet (`AGENTS.md:96`) één nieuwe bullet toe die de vier bekende dubbele V0-nummers documenteert:
-   ```
-   - ℹ️ **Bekende dubbele V0-volgnummers (bewust, NIET hernummeren):** `0028` (`cc_assistant_threads` / `v0_org_settings`), `0039` (`admin_error_groups` / `v0_source_disabled`), `0040` (`admin_error_capture_severity_guard` / `v0_firecrawl_credit_log`), `0044` (`admin_quiz` / `v0_query_log_tone_persoonlijk`) — parallelle `admin_`/`cc_`- vs `v0_`-stromen. Onschadelijk (ledger-id = vólledige bestandsnaam, alfabetische apply-volgorde, onafhankelijke tabellen), maar hernummeren breekt de al-toegepaste ledger-id's. Kies bij een nieuw V0-nummer daarom niet blind `tail -1`+1 — check op numerieke collisie.
-   ```
+De stale correcties uit de oorspronkelijke brief zijn **al gedaan** (commit
+`d94c90a` — zie Current state): de "V1-ledger-gat"-bullet is vervangen en de vier
+dubbele V0-volgnummers staan al gedocumenteerd. Wat jij nog doet is één gerichte
+aanscherping:
+
+1. **Vervang** in de live bullet (`AGENTS.md:97`) het slot
+   `alleen een openstaande prod-ledger-verificatie (zie \`plans/014\`)` door
+   `alleen een openstaande prod-ledger-verificatie — audit read-only met \`npm run migrate:v1:audit\``
+   (het npm-script uit Step 3 is duurzamer dan een plan-bestandsverwijzing).
+2. **Controleer** (niets wijzigen): de stale zin is écht weg en de
+   dubbele-nummers-documentatie staat er.
 
 **Verify**:
-- `git grep -n "springt van 0016 naar 0021" AGENTS.md` → **geen** match (de stale zin is weg).
-- `git grep -n "Bekende dubbele V0-volgnummers" AGENTS.md` → toont de nieuwe bullet.
+- `git grep -n "springt van 0016 naar 0021" AGENTS.md` → **geen** match.
+- `git grep -n "Dubbele volgnummers bestaan al in V0" AGENTS.md` → 1 match (bestaande documentatie intact).
+- `git grep -n "migrate:v1:audit" AGENTS.md` → 1 match (de aanscherping).
 
 ### Step 6: Werk `plans/README.md` bij (backlog-hygiëne + statusrij)
 
-1. **Backlog-rij TD-8** (`plans/README.md:104`) — scherp de "Rest ="-tekst aan naar het concrete audit-commando:
+1. **Backlog-rij TD-8** (zoek op "V1-prod-ledger" in de Backlog-tabel) — scherp de "Rest ="-tekst aan naar het concrete audit-commando:
    ```
    | ~~V1-prod-ledger heeft migraties 0017-0020 (admin_*) zónder repo-file~~ **STALE (ronde 2)** | tech-debt | — | Files bestaan sinds PR #236 (`b9f4d71`); géén reconstructie. Code-hardening geland (plan 014). Rest = **prod-ledger read-only auditen** met `npm run migrate:v1:audit` — openstaande Sebastiaan-stap (prod-toegang). |
    ```
-2. **Plan-014-statusrij** (`plans/README.md:31`) — vervang `TODO — plan nog te schrijven (fleet-resume)` door:
+2. **Plan-014-statusrij** (de `| 014 |`-rij in de statustabel) — vervang `TODO (plan geschreven)` door:
    ```
    DONE (tooling+docs); prod-ledger-audit = openstaande Sebastiaan-stap (menselijke gate)
    ```
@@ -467,7 +475,7 @@ Machine-checkbaar. ALLE moeten kloppen:
 - [ ] `npm run typecheck` exit 0 (dekt de nieuwe `.test.ts`)
 - [ ] `npm run build` exit 0 (Windows: eerst `.next/` verwijderen)
 - [ ] `git grep -n "springt van 0016 naar 0021" AGENTS.md` geeft **geen** match
-- [ ] `git grep -n "Bekende dubbele V0-volgnummers" AGENTS.md` geeft een match
+- [ ] `git grep -n "migrate:v1:audit" AGENTS.md` geeft een match (aangescherpte ledgernoot)
 - [ ] `git grep -n "migrate:v1:audit" package.json plans/README.md` toont het nieuwe script + de twee bijgewerkte README-regels
 - [ ] `git diff --stat 3437648..HEAD -- supabase/migrations supabase/migrations-v1` toont **geen** wijziging aan migratiebestanden (niets hernummerd)
 - [ ] Geen files buiten de in-scope lijst gewijzigd (`git status`)

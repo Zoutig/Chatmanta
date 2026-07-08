@@ -29,7 +29,7 @@ handmatig herbevestigd in de bron. Alle bewijs-excerpts in de plannen komen uit 
 | 012  | Schema/RLS-hardening batch → V0-migr 0055 + V1-migr 0027: 0053-search_path-pin, FK-index `document_chunks.website_page_id`, 2× soft-delete-filter (`document_chunks` V0+V1 + `contact_requests` V1), `v1_feedback_ticket_event.org_id`; `handle_new_auth_user`-email bewust uitgesteld | P2 | M | — | TODO (plan geschreven; ⚠️ prod-apply-gate) |
 | 013  | RAG prompt-injectie-grens: retrieved context als *untrusted data* afbakenen via nieuwe append-only bot-versie v0.11 (default-uit vlag) (SEC-2 + red-team finding 3) | P2 | M | — | TODO (plan geschreven; ⚠️ billable eval + LATEST-bump-gate) |
 | 014  | `migrate.mjs` + ledger-hardening: TD-8 stale-close, orphan-ledger-entry zichtbaar + opt-in `--strict-ledger`, `migrate:v1:audit`, 4 dubbele V0-volgnummers documenteren | P3 | M | — | TODO (plan geschreven) |
-| 015  | Quick-wins-batch (6× S, elk los uitvoerbaar): PERF-1, PERF-5, TD-1, TD-7, DX-2, SEC-3 | P2 | S | — | TODO (plan geschreven) |
+| 015  | Quick-wins-batch (7× S, elk los uitvoerbaar): PERF-1, PERF-5, TD-1, TD-7, DX-2, SEC-3 + SEC-4 injection-regexfix (sectie G) | P2 | S | — | TODO (plan geschreven) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (met één regel reden) | REJECTED (met één regel rationale)
 
@@ -53,11 +53,21 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (met één regel reden) | REJ
 > (V0-migr 0055 + V1-migr 0027, `migrate` + `migrate:v1`), **013** (billable eval-run +
 > LATEST_BOT_VERSION-promotie naar v0.11 + V1-cache-purge). 014 + 015 hebben geen prod-gate.
 >
-> **Losse eindjes zonder plan:** de injection-regex-fix uit finding 8 (kernfrase
-> "ignore all previous instructions" matcht niet — één-regel-fix in `injection-patterns.ts:30/36`)
-> is een quick win die in géén plan is opgenomen; hij staat volledig in
-> `docs/SECURITY_INJECTION_REDTEAM_2026-07.md` (finding 1). Doe 'm los, of samen met plan 013
-> (de architecturale prompt-grens die de rest van de injectie-klassen dekt).
+> **Ronde 3 (2026-07-08, plan-heraudit vóór uitvoering).** Alle zes plannen 010–015
+> adversarieel geverifieerd tegen HEAD `d94c90a` (4 parallelle verificatie-agents, elke
+> excerpt/regelnummer/aanname tegen de bron). Uitkomst: de load-bearing claims stonden;
+> gecorrigeerd zijn (a) **015B**: de aanname "querySet[0]===original gegarandeerd" klopte
+> niet — decompose vervángt de query-array (`run-rag-query.ts:1639`) en staat áán op
+> LATEST/V1; de reuse-guard is nu expliciet de kern van de fix i.p.v. een voorzichtigheid,
+> (b) **014**: de AGENTS.md-correctiestap was al gedaan in `d94c90a` — teruggebracht tot
+> één aanscherping, plus geverifieerd dat `allowJs: true` de `.mjs`-import in de test dekt,
+> (c) **012**: twee grep-verifies telden comment-tekst mee (false-STOP) — SQL-comments
+> herschreven, (d) **011**: geverifieerd dat géén V1-app-pad `public.users` schrijft en dat
+> de INSERT-route al dicht is; post-migratie-SQL kreeg de ontbrekende
+> `privilege_type='UPDATE'`-filter, (e) **010**: het omgekeerde (orphan-tool) brick-scenario
+> is onbereikbaar bevonden; de helper dropt orphans nu tóch als vangnet (+ 6e testcase),
+> (f) de **injection-regexfix** (finding 1) heeft eindelijk een thuis: **plan 015 sectie G**,
+> met empirisch geverifieerde minimale fix + eerste unit-test voor injection-patterns.
 
 ## Ronde-2 nieuwe bevindingen (migratie-RLS-sweep + red-team, geverifieerd 2026-07-07)
 
@@ -74,7 +84,7 @@ migratie-sweep (de erkende blinde vlek). Elk adversarieel geverifieerd (CONFIRME
 | `v1_feedback_ticket_event` mist `organization_id` (multi-tenancy-hard-rule; sibling `v1_quiz_event` heeft het wél) | multi-tenancy | LOW | `migrations-v1/0016_v1_feedback_tickets.sql:74` | 012 |
 | `handle_new_auth_user` kopieert nullable `auth.users.email` → NOT NULL `public.users.email` (latent: anon/phone/OAuth-zonder-email breekt de signup-trigger) | correctness | LOW | `migrations/0001_core_tenancy.sql:174` | 012 |
 | **SEC-2**: retrieved RAG-context bereikt de answer-LLM zonder data-vs-instructie-afbakening; chunk-markers zijn vervalsbaar; alléén gecrawlde content is 3e-partij-beïnvloedbaar; blast-radius = tekst-antwoord | security | MED | `lib/rag/run-rag-query.ts:~2214` | 013 |
-| **Injection regex-gat**: kernfrase "ignore all previous instructions"/"negeer alle vorige instructies" matcht niet (éénwoords-slot); geen normalisatie-voorstap; indirect-injection ongedekt | security | HIGH/arch | `lib/v0/server/injection-patterns.ts:30,36`; `injection.ts:33` | 013 (grens) + 015 (regexfix) |
+| **Injection regex-gat**: kernfrase "ignore all previous instructions"/"negeer alle vorige instructies" matcht niet (éénwoords-slot); geen normalisatie-voorstap; indirect-injection ongedekt | security | HIGH/arch | `lib/v0/server/injection-patterns.ts:30,36`; `injection.ts:33` | 013 (grens) + 015 sectie G (regexfix); normalisatie-voorstap → backlog |
 
 ## Dependency notes
 
@@ -107,6 +117,7 @@ migratie-sweep (de erkende blinde vlek). Elk adversarieel geverifieerd (CONFIRME
 | ~37 oudere scripts (`scripts/cc/*` e.a.) lezen nog oude unprefixed Supabase-env-namen die check-env niet meer valideert | dx | S | Uit batch-code-review 2026-07-03; stragglers migreren naar V0_/V1_-namen óf oude namen als soft-check terugzetten |
 | TLS-certvalidatie migrate.mjs open (`rejectUnauthorized:false`) — `ssl:true` faalt op de Supabase-CA (self-signed chain) | security | S | Uit plan 009: CA-cert downloaden (Dashboard → Database → SSL) en MIGRATE_SSL_CA-variant bouwen+testen; vergt menselijke go |
 | ~~V1-prod-ledger heeft migraties 0017-0020 (admin_*) zónder repo-file~~ **STALE (ronde 2)** | tech-debt | — | De 0017-0020-files bestaan nu wél in de repo (PR #236, `b9f4d71`, ná ontdekking); géén reconstructie meer nodig. Rest = prod-ledger tegen die files verifiëren → plan 014 |
+| Injection-filter normalisatie-voorstap (NFKC + confusable-fold + zero-width-strip + separator→spatie vóór `detectInjection`) — dicht 5 bypass-klassen tegelijk | security | S/M | Red-team finding 2 (`docs/SECURITY_INJECTION_REDTEAM_2026-07.md`); bewust apart besluit: raakt het gedeelde V0+V1-detectiepad, false-positive-afweging nodig. Regexfix zelf = plan 015 sectie G |
 
 ## Direction — opties voor Sebastiaan (bewust geen plannen; productkeuzes)
 

@@ -15,7 +15,10 @@
 
 - **Priority**: P1 (security / launch-blocker)
 - **Effort**: S
-- **Risk**: MED (RLS/GRANT-wijziging op de `users`-tabel — verkeerd toegepast breekt profiel-updates of admin-onboarding)
+- **Risk**: LOW-MED — geverifieerd (2026-07-08): géén enkel V1-app-pad schrijft
+  `public.users` via de session-client (zie Current state), dus de lockdown kan
+  feitelijk geen bestaand profiel-update-pad breken. Het restrisico zit in de
+  prod-DDL zelf + de service-role-onboarding-flow (trigger mag die niet blokkeren).
 - **Depends on**: none
 - **Category**: security / migration
 - **Planned at**: commit `3437648`, 2026-07-06
@@ -84,6 +87,22 @@ En `lib/supabase/admin.ts` (rond regel 39): `getJorionAdminClient()` roept
 `requireJorionAdmin()` aan en geeft dan de **cross-org V1 service-role-client**
 terug — dus die hele wrapper hangt aan de zelf-escaleerbare vlag.
 
+**Geverifieerd (2026-07-08): de app-laag heeft geen enkel session-client-schrijfpad
+op `public.users`.** Grep over alle `.ts`/`.tsx` op `.from('users')` levert precies
+één hit: de SELECT in `lib/auth.ts:70`. `app/v1/app/account/actions.ts:58-61`
+schrijft alleen `organizations.name` (service-role); e-mail/wachtwoord lopen via
+Supabase Auth (`auth.users`, niet `public.users`). De `grant update (full_name)`
+hieronder is dus pure pariteit met V0-0013 plus toekomst-vangnet — er is geen
+bestaand gedrag dat ervan afhangt.
+
+**Geverifieerd: de INSERT-escalatieroute is al dicht** (waarom dit plan alleen
+UPDATE hoeft te sluiten): `public.users` heeft géén INSERT-policy voor
+authenticated (`0001:99`: "handled by trigger"; RLS aan = deny-all), rijen ontstaan
+uitsluitend via `handle_new_auth_user()` (`0001:167-188`, security definer,
+search_path gepind, zet alléén id/email/full_name → `is_jorion_admin` valt op
+kolom-default `false`, `0001:65`), en die functie is niet als RPC aanroepbaar
+(`revoke execute`, `0001:195`).
+
 **De te porten V0-fix — `supabase/migrations/0013_lockdown_users_update.sql`**
 (lees dit bestand volledig; het is de blauwdruk). Twee lagen:
 
@@ -98,11 +117,12 @@ terug — dus die hele wrapper hangt aan de zelf-escaleerbare vlag.
    (zelf-mutatie), maar service-role doorlaat (`auth.uid()` is dan `NULL` — de
    legitieme Jorion-onboarding via `getJorionAdminClient()`).
 
-**Belangrijk verschil V0↔V1 om te checken (STOP-conditie als het afwijkt):**
-V0's 0049 doet daarnaast `revoke execute ... from public, anon, authenticated`
-op zulke `security definer`-functies. Kijk of V1 een equivalente conventie heeft
-(grep `migrations-v1` op `revoke execute on function`) en volg die voor de
-nieuwe trigger-functie, zodat je de V1-conventie matcht i.p.v. V0 blind te kopiëren.
+**Geverifieerd: V1 hanteert de `revoke execute`-conventie op zulke functies** —
+`0001_core_tenancy.sql:195` (op `handle_new_auth_user()`) en
+`0021_v1_cache_epoch.sql:28` (op `bump_cache_epoch(uuid)`), telkens
+`from public, anon, authenticated`. Neem voor de nieuwe trigger-functie dus
+dezelfde regel op (Step 2); de trigger vuurt ook zonder execute-grant omdat hij
+`security definer` is en aan de tabel hangt.
 
 ## Commands you will need
 
@@ -157,11 +177,10 @@ Port V0's `0013` tegen het V1-project. Neem letterlijk over: de
 `revoke update` + `grant update (full_name)` en de
 `prevent_self_admin_escalation()`-functie + trigger uit
 `supabase/migrations/0013_lockdown_users_update.sql:33-76`. Behoud de
-`security definer` + `set search_path = public` op de functie. Voeg — als Step
-0's grep uitwees dat V1 die conventie hanteert — ook
+`security definer` + `set search_path = public` op de functie. Voeg óók
 `revoke execute on function public.prevent_self_admin_escalation() from public, anon, authenticated;`
-toe (V1-conventie matchen; de trigger vuurt ook zonder execute-grant omdat hij
-`security definer` is en aan de tabel hangt).
+toe — dat is de geverifieerde V1-conventie (0001:195, 0021:28); de trigger vuurt
+ook zonder execute-grant omdat hij aan de tabel hangt.
 
 Begin de file met een NL-commentheader in de stijl van de andere
 `migrations-v1`-bestanden die uitlegt: (a) welk gat dit sluit, (b) dat het de
@@ -192,13 +211,18 @@ niet als authenticated user testen, verifieer dan minimaal via
 `get_advisors`/`information_schema` dat de kolom-grant en de trigger bestaan:
 
 ```
-select privilege_type, column_name from information_schema.column_privileges
-  where table_name='users' and grantee='authenticated';   -- verwacht: alleen full_name
-select tgname from pg_trigger where tgrelid='public.users'::regclass;  -- verwacht: users_no_self_admin_escalation
+-- LET OP de privilege_type-filter: zonder die filter toont column_privileges óók
+-- de table-level SELECT/INSERT-grants die Supabase default aan authenticated geeft
+-- (per kolom geëxpandeerd) — dat is verwacht en geen fout.
+select column_name from information_schema.column_privileges
+  where table_name='users' and grantee='authenticated'
+    and privilege_type='UPDATE';   -- verwacht: precies één rij: full_name
+select tgname from pg_trigger where tgrelid='public.users'::regclass
+  and not tgisinternal;            -- verwacht: users_no_self_admin_escalation
 ```
 
-**Verify**: kolom-grant beperkt tot `full_name`; trigger `users_no_self_admin_escalation`
-aanwezig.
+**Verify**: UPDATE-kolom-grant beperkt tot `full_name`; trigger
+`users_no_self_admin_escalation` aanwezig.
 
 ## Test plan
 
@@ -209,8 +233,10 @@ verandert geen TS).
 - Handmatige negatieve test (sterkste bewijs): een authenticated user die
   `is_jorion_admin = true` op zichzelf probeert te zetten, krijgt een fout
   (grant-weigering of `42501` van de trigger).
-- Handmatige positieve test: `full_name` bijwerken op de eigen rij blijft werken
-  (profiel-edits mogen niet breken).
+- Handmatige positieve test: `full_name` bijwerken op de eigen rij blijft werken.
+  NB: er is (geverifieerd) geen app-UI-pad dat dit doet — test op SQL-niveau met
+  een authenticated sessie; dit is een pariteits-/toekomst-vangnet-check, geen
+  regressietest van bestaand gedrag.
 - Regressie: Jorion-onboarding via de service-role (`getJorionAdminClient()`)
   kan `is_jorion_admin` nog steeds op een ándere user zetten (trigger laat
   `auth.uid() IS NULL` door).

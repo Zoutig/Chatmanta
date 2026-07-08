@@ -25,7 +25,7 @@
 - **Priority**: P2
 - **Effort**: M
 - **Risk**: MED (RLS-policy-herschrijvingen + `NOT NULL` op een live tabel + prod-migraties; volledig menselijk gated)
-- **Depends on**: geen code-afhankelijkheid. **Numerieke reservering**: plan 011 claimt V1-migratienummer `0026` (zie `plans/README.md:28`) — deze migratie gebruikt daarom V1 `0027`. De twee migraties zijn onderling onafhankelijk (volgorde maakt niet uit voor de runner).
+- **Depends on**: geen code-afhankelijkheid. **Numerieke reservering**: plan 011 claimt V1-migratienummer `0026` (zie de plan-011-rij in `plans/README.md`) — deze migratie gebruikt daarom V1 `0027`. De twee migraties zijn onderling onafhankelijk (volgorde maakt niet uit voor de runner).
 - **Category**: migration / security / rls
 - **Planned at**: commit `3437648`, 2026-07-06
 
@@ -51,7 +51,11 @@ Deze zijn tijdens verificatie tegen de bron (commit `3437648`) vastgesteld — n
 
 ## Current state
 
-De relevante bestanden en de exacte code zoals die nu bestaat (commit `3437648`):
+De relevante bestanden en de exacte code zoals die nu bestaat (commit `3437648`).
+**Geverifieerd (2026-07-08):** geen enkele latere migratie dropt of herschrijft
+`document_chunks_select_org_members` (V0 én V1) of
+`contact_requests_select_org_members` (V1) — de excerpts hieronder zijn de live,
+actieve policies; de drop+recreate in dit plan is dus de éérste herschrijving.
 
 ### Migratie-runner (verklaart de "geen CONCURRENTLY"-regel)
 - `scripts/migrate.mjs:198-220` — de apply-lus. Elk bestand draait in een transactie:
@@ -224,7 +228,7 @@ De relevante bestanden en de exacte code zoals die nu bestaat (commit `3437648`)
 1. Maak de branch: `git checkout -b feat/seb/schema-rls-hardening`.
 2. Bevestig de vrije volgnummers:
    - V0: `ls supabase/migrations | sort | tail -3` → hoogste is `0054_v0_cache_epoch.sql`. Jouw nieuwe file wordt **`0055`**.
-   - V1: `ls supabase/migrations-v1 | sort | tail -3` → hoogste is `0025_v1_org_suspend.sql`. **`0026` is gereserveerd door plan 011** (`plans/README.md:28`) — gebruik **`0027`**, óók als er lokaal nog geen `0026`-bestand is.
+   - V1: `ls supabase/migrations-v1 | sort | tail -3` → hoogste is `0025_v1_org_suspend.sql`. **`0026` is gereserveerd door plan 011** (zie de plan-011-rij in `plans/README.md`) — gebruik **`0027`**, óók als er lokaal nog geen `0026`-bestand is.
 3. Collisie-check op open PR's (parallelle branches kunnen hetzelfde nummer claimen):
    `gh pr list --state open --search "migration in:title,body" --limit 10` en scan op `0055` / `0026` / `0027`.
 
@@ -250,10 +254,12 @@ Maak `supabase/migrations/0055_v0_schema_rls_hardening.sql` met exact deze inhou
 --      parent-documents weg (consistent met de documents-policy in 0002).
 
 -- ---------------------------------------------------------------------------
--- A. search_path-pin. Vgl. 0049 dat `set search_path = ''` op alle 9
+-- A. search_path-pin. Vgl. 0049 dat de lege search_path op alle 9
 --    touch-/sql-functies zette. De body raakt geen enkele tabel
 --    (new.updated_at := now() -> resolvet uit pg_catalog), dus de lege
 --    search_path is aantoonbaar veilig.
+--    (NB comment bevat bewust niet de letterlijke pin-syntax: de grep-verify
+--    hieronder telt exact 1 voorkomen.)
 -- ---------------------------------------------------------------------------
 alter function public.v0_contact_requests_touch_updated_at() set search_path = '';
 
@@ -317,8 +323,9 @@ Maak `supabase/migrations-v1/0027_v1_schema_rls_hardening.sql` met exact deze in
 -- NB volgnummer: 0026 is GERESERVEERD door plan 011 (is_jorion_admin-lockdown).
 -- Deze migratie is 0027 en is onafhankelijk van 011 (geen volgorde-afhankelijkheid).
 --
---   A. contact_requests SELECT-policy krijgt `deleted_at is null` (consistent met
---      threads/documents; PII-tabel -> soft-delete moet ook via RLS verbergen).
+--   A. contact_requests SELECT-policy verbergt voortaan soft-deleted rijen
+--      (consistent met threads/documents; PII-tabel -> soft-delete moet ook via
+--      RLS verbergen, niet alleen via app-filters).
 --   B. v1_feedback_ticket_event krijgt organization_id (multi-tenancy hard rule;
 --      sibling v1_quiz_event draagt org wél). Gevuld uit de parent-ticket via een
 --      BEFORE INSERT-trigger -> geen app-wijziging nodig.
@@ -440,7 +447,7 @@ create policy "document_chunks_select_org_members"
 
 ### Stap 5: Commit
 
-Commit de twee migratiebestanden (bij voorkeur als twee logische commits, zie Git workflow). Werk daarna de statusrij van plan 012 bij in `plans/README.md` (van "TODO — plan nog te schrijven (fleet-resume)" naar bijv. "IN PROGRESS (migraties geschreven, wacht op prod-apply-gate)") en commit dat.
+Commit de twee migratiebestanden (bij voorkeur als twee logische commits, zie Git workflow). Werk daarna de statusrij van plan 012 bij in `plans/README.md` (de `| 012 |`-rij; van "TODO (plan geschreven; ⚠️ prod-apply-gate)" naar bijv. "IN PROGRESS (migraties geschreven, wacht op prod-apply-gate)") en commit dat.
 
 **Verify**: `git log --oneline -3` toont je commits; `git status` schoon (of alleen verwachte staged wijzigingen).
 
@@ -480,7 +487,7 @@ Machine-checkbaar. ALLE moeten gelden:
 - [ ] `npm run typecheck` exit 0.
 - [ ] `supabase/migrations/0055_v0_schema_rls_hardening.sql` bestaat en bevat fixes A, B, C (grep-checks Stap 2 slagen).
 - [ ] `supabase/migrations-v1/0027_v1_schema_rls_hardening.sql` bestaat en bevat fixes A, B, C (grep-checks Stap 3 slagen).
-- [ ] `grep -rL "set search_path" supabase/migrations/0055_v0_schema_rls_hardening.sql` — de nieuwe trigger-/functie-wijzigingen zijn gepind (V0-A pint; V1-B's nieuwe functie pint).
+- [ ] `grep -l "set search_path" supabase/migrations/0055_v0_schema_rls_hardening.sql supabase/migrations-v1/0027_v1_schema_rls_hardening.sql` → toont **beide** bestanden (V0-A pint de 0053-functie; V1-B's nieuwe trigger-functie is gepind).
 - [ ] `git status --short supabase/migrations supabase/migrations-v1` toont **alleen** de twee nieuwe files (geen bestaande migratie gewijzigd).
 - [ ] Geen bestand buiten de in-scope-lijst gewijzigd (`git status`).
 - [ ] `plans/README.md`-statusrij voor 012 bijgewerkt.

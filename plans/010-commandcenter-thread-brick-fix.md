@@ -93,9 +93,13 @@ await Promise.all(
 ```
 
 De `emit(...)` (`route.ts:206`, `route.ts:231`) enqueue't op de stream-controller
-en **throwt óók** als de client de stream heeft gecanceld — een tweede realistische
-trigger. De outer `catch` (`route.ts:287-293`) sluit alleen de stream, zonder
-compensatie-write:
+(gedefinieerd `route.ts:136-138` als `controller.enqueue(...)`) en **throwt óók**
+als de client de stream heeft gecanceld — een tweede realistische trigger. Let op:
+de eerste `emit` (`tool_call`-event, r206) vuurt VÓÓR de `appendMessage` (r213); een
+client-abort op precies dat moment laat de tool-message dus ongeschreven — de
+try/catch-wrap uit Step 3 moet daarom de héle per-call-body dekken, inclusief die
+eerste emit. De outer `catch` (`route.ts:287-291`) logt en emit't een `error`-event,
+de `finally` sluit de stream — maar er is géén compensatie-write naar de DB:
 
 ```ts
 } catch (err) {
@@ -127,6 +131,21 @@ Er is geen check dat elk `tool_call_id` in een assistant-turn een aansluitende
 `tool`-message heeft; `m.role === 'tool' && m.toolCallId` skipt bovendien stil een
 tool-rij met `null` toolCallId. Deze `messages`-array gaat 1-op-1 naar
 `openai().chat.completions.create` (`route.ts:149-155`) → 400.
+
+**Geverifieerd (2026-07-08, HEAD `d94c90a`): het omgekeerde brick-scenario — een
+`tool`-message zonder voorafgaande assistant-turn-met-`tool_calls` (óók een
+OpenAI-400) — is met de huidige code onbereikbaar.** `listMessages`
+(`assistant-threads.ts:211-219`) filtert niets (er bestaat geen `undone`-kolom;
+migratie 0028), de undo-route gate't hard op `role === 'tool'` en
+`markMessageUndone` (`assistant-threads.ts:232-244`) zet alleen een
+`undone: true`-flag ín de `tool_result`-JSON — verwijdert niets en raakt de
+assistant-turn nooit aan. Losse messages worden nergens verwijderd (alleen hele
+threads, CASCADE). De helper in Step 1 dropt orphan-tool-rijen desondanks als
+vangnet: hij is dé plek die OpenAI-validiteit van de gereconstrueerde history
+garandeert, en een toekomstige wijziging aan `listMessages`/undo mag die garantie
+niet stil kunnen breken. Bijvangst (bewust buiten scope): een ge-undo'de
+tool-message houdt `undone: true` in zijn content-JSON — semantische ruis voor het
+model, geen 400.
 
 **De relevante types** (uit `lib/commandcenter/types.ts` — lees ze, wijzig ze niet):
 `AssistantMessage` heeft o.a. `role: AssistantRole`, `content: string | null`,
@@ -210,14 +229,26 @@ export type ChatMsg =
   | { role: 'tool'; tool_call_id: string; content: string };
 
 /**
- * Bouwt de OpenAI-messages-array uit de opgeslagen thread-geschiedenis.
- * Repareert "dangling" tool_calls: voor elke assistant-turn met tool_calls
- * waarvan een tool_call_id géén aansluitende tool-message heeft, wordt direct
- * ná die assistant-turn een placeholder-tool-message ingevoegd. Zonder dit
- * faalt OpenAI met een 400 en is de thread permanent onbruikbaar.
+ * Bouwt de OpenAI-messages-array uit de opgeslagen thread-geschiedenis en
+ * repareert beide invaliditeits-richtingen:
+ * 1. "Dangling" tool_calls: voor elke assistant-turn met tool_calls waarvan een
+ *    tool_call_id géén tool-message heeft, wordt direct ná die assistant-turn
+ *    een placeholder-tool-message ingevoegd (anders OpenAI-400, thread bricked).
+ * 2. Orphan-tool-rijen: een tool-message waarvan het tool_call_id in géén enkele
+ *    assistant-turn is aangekondigd wordt gedropt (óók een OpenAI-400). Vandaag
+ *    onbereikbaar (zie plan-Current-state) — dit is de vangnet-laag.
  */
 export function buildChatHistory(system: string, history: AssistantMessage[]): ChatMsg[] {
   const out: ChatMsg[] = [{ role: 'system', content: system }];
+  // Eén keer vooraf verzamelen (niet per assistant-turn opnieuw):
+  // - answered: tool_call_ids die ergens in de thread een tool-rij hebben;
+  // - called:   tool_call_ids die door een assistant-turn zijn aangekondigd.
+  const answered = new Set(
+    history.filter((h) => h.role === 'tool' && h.toolCallId).map((h) => h.toolCallId as string),
+  );
+  const called = new Set(
+    history.flatMap((h) => (h.role === 'assistant' && h.toolCalls ? h.toolCalls.map((c) => c.id) : [])),
+  );
   for (const m of history) {
     if (m.role === 'user' && m.content) {
       out.push({ role: 'user', content: m.content });
@@ -225,11 +256,6 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
       const calls = m.toolCalls ?? undefined;
       out.push({ role: 'assistant', content: m.content, tool_calls: calls });
       if (calls && calls.length > 0) {
-        // Zoek de tool-messages die ná deze assistant-turn horen. Verzamel de
-        // tool_call_ids die verderop in `history` als tool-rij voorkomen.
-        const answered = new Set(
-          history.filter((h) => h.role === 'tool' && h.toolCallId).map((h) => h.toolCallId as string),
-        );
         for (const c of calls) {
           if (!answered.has(c.id)) {
             out.push({
@@ -240,15 +266,16 @@ export function buildChatHistory(system: string, history: AssistantMessage[]): C
           }
         }
       }
-    } else if (m.role === 'tool' && m.toolCallId) {
+    } else if (m.role === 'tool' && m.toolCallId && called.has(m.toolCallId)) {
       out.push({
         role: 'tool',
         tool_call_id: m.toolCallId,
         content: JSON.stringify(m.toolResult ?? { ok: false, error: 'missing result' }),
       });
     }
-    // tool-rij met null toolCallId wordt bewust genegeerd (kan geen geldige
-    // OpenAI tool-message vormen); de placeholder hierboven dekt het gat.
+    // Tool-rij met null toolCallId óf zonder aankondigende assistant-turn (orphan)
+    // wordt bewust genegeerd: geen van beide kan een geldige OpenAI tool-message
+    // vormen. De placeholder hierboven dekt het dangling-gat.
   }
   return out;
 }
@@ -340,11 +367,15 @@ Dek minstens deze gevallen af (bouw `AssistantMessage`-fixtures met de velden ui
    toegevoegd én levert geen dangling call op.
 4. **Thread zonder tool-calls** — gewone user/assistant-tekst blijft ongewijzigd;
    geen placeholders.
-5. Invariant die de OpenAI-eis borgt: voor elke `assistant`-message met
+5. **Orphan-tool-rij** — een tool-message waarvan het `toolCallId` in géén enkele
+   assistant-turn voorkomt → verschijnt niet in de output (gedropt; vandaag
+   onbereikbaar scenario, maar de helper garandeert het).
+6. Invariant die de OpenAI-eis borgt: voor elke `assistant`-message met
    `tool_calls` in de output heeft **elk** `tool_call_id` ergens ná die message
-   een `tool`-message met datzelfde id.
+   een `tool`-message met datzelfde id, én elke `tool`-message in de output heeft
+   een eerdere `assistant`-message die zijn `tool_call_id` aankondigt.
 
-**Verify**: `npm run test:unit` → alle tests groen, inclusief de 5 nieuwe cases.
+**Verify**: `npm run test:unit` → alle tests groen, inclusief de 6 nieuwe cases.
 
 ### Step 5: Volledige verificatie
 
@@ -355,11 +386,11 @@ Dek minstens deze gevallen af (bouw `AssistantMessage`-fixtures met de velden ui
 
 ## Test plan
 
-- Nieuw: `lib/commandcenter/server/__tests__/assistant-history.test.ts` met de 5
+- Nieuw: `lib/commandcenter/server/__tests__/assistant-history.test.ts` met de 6
   cases hierboven. Structuurvoorbeeld: `lib/rag/__tests__/history-entities.test.ts`
   (`node:test`, `assert/strict`, pure functie, geen I/O).
 - Geen wijziging aan bestaande tests.
-- Verificatie: `npm run test:unit` → alle bestaande + 5 nieuwe cases groen.
+- Verificatie: `npm run test:unit` → alle bestaande + 6 nieuwe cases groen.
 - **Handmatige E2E (optioneel, na de unit-tests)**: verwijder in de V0-Supabase
   handmatig één `tool`-rij van een bestaande `cc_assistant_messages`-thread
   (simuleert de half-gepersisteerde turn), stuur dan een nieuw bericht in
@@ -371,7 +402,7 @@ Dek minstens deze gevallen af (bouw `AssistantMessage`-fixtures met de velden ui
 Machine-checkbaar. ALLE moeten gelden:
 
 - [ ] `npm run typecheck` exit 0
-- [ ] `npm run test:unit` exit 0; `assistant-history.test.ts` bestaat en de 5
+- [ ] `npm run test:unit` exit 0; `assistant-history.test.ts` bestaat en de 6
       cases passen
 - [ ] `npm run build` exit 0 (na schone `.next/`)
 - [ ] `route.ts` bevat geen inline `for (const m of history)`-reconstructie meer
@@ -403,7 +434,9 @@ Stop en rapporteer (niet improviseren) als:
   positie (direct ná de assistant-turn, vóór de volgende assistant/user) belandt —
   dit is de kern van de OpenAI-eis; (2) dat geen enkel pad in de tool-loop meer
   een assistant-`tool_calls` kan achterlaten zonder tool-message; (3) dat er geen
-  nieuw NDJSON-eventtype is geïntroduceerd (de client-parser is out-of-scope).
+  nieuw NDJSON-eventtype is geïntroduceerd (de client-parser is out-of-scope);
+  (4) dat de orphan-drop (`called`-set) intact blijft — dat is het vangnet dat
+  toekomstige wijzigingen aan `listMessages`/undo dekt.
 - Bewust uitgesteld: het dedupliceren van de `ChatMsg`↔SDK-typecast en een echte
   integratietest tegen een gemockte OpenAI-client — de pure helper dekt de
   regressie; een end-to-end test vergt een OpenAI-mock die deze repo (nog) niet heeft.

@@ -1,7 +1,7 @@
-# Plan 015: Zes onafhankelijke quick-win-fixes (PERF, tech-debt, DX, security-DRY)
+# Plan 015: Zeven onafhankelijke quick-win-fixes (PERF, tech-debt, DX, security)
 
-> **Executor-instructies**: Dit plan bundelt **zes volledig onafhankelijke** fixes
-> (A t/m F). Elke sectie heeft een eigen "Current state", eigen scope, eigen
+> **Executor-instructies**: Dit plan bundelt **zeven volledig onafhankelijke** fixes
+> (A t/m G). Elke sectie heeft een eigen "Current state", eigen scope, eigen
 > stappen én eigen verificatie. Je mag ze los oppakken, in elke volgorde, of
 > allemaal achter elkaar. Er zijn GEEN onderlinge afhankelijkheden. Kies per
 > sectie een eigen branch (aanbevolen — zie "Git-workflow"), of doe alles op één
@@ -10,11 +10,11 @@
 > Voer per stap het verificatie-commando uit en bevestig het verwachte resultaat
 > vóór je verder gaat. Gebeurt er iets uit de "STOP-condities" van die sectie:
 > stop en rapporteer — improviseer niet. Werk aan het eind je statusrij in
-> `plans/README.md` (regel 32) bij.
+> `plans/README.md` bij (de `| 015 |`-rij in de statustabel).
 >
 > **Drift-check (draai dit eerst, per sectie de bijhorende paden):**
 > ```
-> git diff --stat 3437648..HEAD -- lib/rag/run-rag-query.ts app/components/home/hub-background.tsx lib/errors/action.ts app/home/components/home-accent-picker.tsx scripts/check-env.mjs lib/security/cron-auth.ts lib/v0/auth-cookie.ts lib/v0/server/embed-token.ts lib/v1/widget/embed-token.ts
+> git diff --stat 3437648..HEAD -- lib/rag/run-rag-query.ts app/components/home/hub-background.tsx lib/errors/action.ts app/home/components/home-accent-picker.tsx scripts/check-env.mjs lib/security/cron-auth.ts lib/v0/auth-cookie.ts lib/v0/server/embed-token.ts lib/v1/widget/embed-token.ts lib/v0/server/injection-patterns.ts
 > ```
 > Is één van de in-scope bestanden gewijzigd sinds dit plan? Vergelijk dan de
 > "Current state"-excerpts met de live code vóór je begint; bij een mismatch:
@@ -24,15 +24,15 @@
 ## Status
 
 - **Priority**: P2
-- **Effort**: S (per sectie; 6× S)
+- **Effort**: S (per sectie; 7× S)
 - **Risk**: LOW
 - **Depends on**: none
-- **Category**: perf | tech-debt | dx | security (DRY)
+- **Category**: perf | tech-debt | dx | security
 - **Planned at**: commit `3437648`, 2026-07-06
 - **Menselijke gate**: **NEE voor migraties** — geen enkele sectie raakt een
   migratie, datamodel of RLS-policy (V0 noch V1). Wél twee *zachte* gates:
   - **Sectie D (TD-7)** vereist een **visuele UX-check** in de browser vóór de
-    dependency verwijderd wordt (zie `plans/README.md:100`).
+    dependency verwijderd wordt (zie de TD-7-backlogrij in `plans/README.md`).
   - **Sectie E (DX-2)** hangt af van de inhoud van `.env.local` (gitignored, niet
     zichtbaar) — zie de STOP-conditie daar.
 
@@ -60,6 +60,10 @@
   Geen bug, wél DRY-schuld: één getest helperoppervlak voorkomt dat een toekomstige
   copy-paste per ongeluk een non-constant-time (short-circuit) vergelijk op een
   auth-/tokenpad introduceert.
+- **G / SEC-4**: de populairste jailbreak-frase ("ignore all previous instructions"
+  / "negeer alle vorige instructies") glipt door het injection-regexfilter — het
+  kwalificatie-slot staat maar één woord toe. Eén-regel-fix per regex + de eerste
+  unit-test voor injection-patterns (red-team finding 1, HIGH).
 
 ## Commands die je nodig hebt
 
@@ -89,6 +93,7 @@
   - D → `feat/seb/td7-drop-ark-ui`
   - E → `feat/seb/dx2-supabase-env-names`
   - F → `feat/seb/sec3-timing-safe-helper`
+  - G → `feat/seb/sec4-injection-regexfix`
 - Commit-stijl: conventional commits (bijv. `perf(home): lazy-load shader via next/dynamic`).
 - **Vóór élke commit** je branch checken: `git rev-parse --abbrev-ref HEAD` (parallelle
   sessies kunnen je branch verschuiven).
@@ -219,8 +224,17 @@ Alle regels in `lib/rag/run-rag-query.ts` (god-file, generator-functie).
   cacheEmbedVector = cacheEmbed.vectors[0];
   ```
 - **De sub-query-set** default = `[queryForEmbed]` (regel 1613): `let subQueries: string[] = [queryForEmbed];`
-  `querySet` wordt daarvan afgeleid (regel 1650); HyDE/decompose/multi-query **pushen
-  extra entries ná index 0**, dus `querySet[0].text === queryForEmbed`.
+  `querySet` wordt daarvan afgeleid (regel 1650). HyDE (regel 1670) en multi-query
+  (regel 1680, `slice(1)`) pushen alleen extra entries **ná** index 0. **MAAR:
+  decompose VERVANGT de hele array** (`subQueries = dec.subQueries`, regel 1639) en
+  het model mag daarbij regel 0 herformuleren — op een multi-hop-vraag is
+  `querySet[0].text ≠ original` dus goed mogelijk. Dit is geen randgeval:
+  `queryDecomposition` staat áán op LATEST/V1 (`bots.ts:142`, geërfd) met de
+  heuristische gate (`bots.ts:826`) die alleen single-hop overslaat. De
+  string-gelijkheids-guard in de helper (B1) is daarom géén voorzichtigheidje maar
+  de kern van de fix: reuse triggert alléén wanneer `queryTexts[0] === original`
+  daadwerkelijk geldt. `original` zelf wordt nergens gemuteerd (één `.trim()` bij
+  declaratie, regel 1327), dus die vergelijking is betrouwbaar.
 - **De batch-embed** (regels 1686-1691) — hier gebeurt de tweede embed:
   ```
   yield { kind: 'status', phase: 'embed' };
@@ -248,11 +262,15 @@ Alle regels in `lib/rag/run-rag-query.ts` (god-file, generator-functie).
   2503-2504: embedTokens + preCacheEmbedTokens + selectiveHyDEEmbedTokens + claimVerifyEmbedTokens,
   ```
   → **Belangrijk inzicht**: vandaag telt `embedTokens + preCacheEmbedTokens` de tokens
-  van `original` DUBBEL op het no-rewrite-pad (de tweede embed gebeurt écht). Zodra we
-  die tweede embed overslaan, wordt `embedTokens` lager en klopt de som weer
-  (original 1× via preCache + de rest via de batch). De fix **repareert dus meteen een
-  latente dubbel-telling** — je hoeft niets extra's te compenseren, mits `embedTexts`
-  alleen de niet-hergebruikte teksten embedt.
+  van `original` DUBBEL op het no-rewrite-pad (de tweede embed gebeurt écht — de
+  boekhouding is dus correct, de cáll is verspild). Zodra we die tweede embed
+  overslaan, wordt `embedTokens` lager en verdwijnt de verspilling (original 1× via
+  preCache + de rest via de batch). Je hoeft niets extra's te compenseren, mits
+  `embedTexts` alleen de niet-hergebruikte teksten embedt. **Nuance**: dit alles
+  geldt alleen wanneer `queryTexts[0] === original` — dus no-rewrite én geen
+  decompose-herschrijving. Op een decompose-multi-hop-pad is `queryTexts[0]` een
+  deelvraag ≠ original: geen letterlijke dubbele embed, en de fix verandert daar
+  (correct) niets.
 
 ## Scope (B)
 
@@ -349,9 +367,11 @@ pure-functie-test-patroon (`node:test` + `assert/strict`).
 
 - De regels 1444, 1458, 1470, 1512, 1533-1537, 1613 of 1686-1691 wijken af van de
   excerpts → drift, stop en rapporteer.
-- Je twijfelt of index 0 gegarandeerd `original` is op het hergebruik-pad → verifieer
-  dat HyDE/decompose/multi-query alleen **ná** index 0 pushen (regels 1670, 1680; en
-  `subQueries` default `[queryForEmbed]`). Klopt dat niet, stop en rapporteer.
+- NB (géén stop-conditie): decompose VERVANGT de query-array (regel 1639) en kan
+  regel 0 herformuleren — dat is bekend, geverifieerd en al afgedekt: de
+  `queryTexts[0] === original`-guard in de helper laat reuse daar simpelweg niet
+  triggeren. Stop alléén als je een pad vindt waar de guard `true` geeft terwijl
+  `cacheEmbedVector` NIET de embed van exact die tekst is.
 - Downstream verwijst naar `embedTokens`/`embedCost`/`vectors` op een manier die niet
   meer typecheckt na de `const`→`let`-omzetting → stop en rapporteer.
 - Je overweegt de selective-HyDE-embed (1780) of de cache-write (2926) aan te raken →
@@ -386,10 +406,15 @@ pure-functie-test-patroon (`node:test` + `assert/strict`).
   - `app/v1/app/contactverzoeken/actions.ts:25`
   - `app/v1/app/feedback/actions.ts:63`
   - `app/v1/app/kennisbank/actions.ts:53`
-  - `app/v1/app/kennisbank/qa/qa-actions.ts:45`
+  - `app/v1/app/kennisbank/qa/qa-actions.ts:45` (one-liner + trailing comment — semantisch identiek, niet byte-identiek; gewoon vervangen)
   - `app/v1/admin/issues/[groupId]/actions.ts:16`
   - `app/v1/admin/feedback/actions.ts:31`
-  - `app/v1/app/gesprekken/top-questions-actions.ts:32` (retourneert `ActionFail`; check dat de bodyregels semantisch identiek zijn — deze is mogelijk multi-line geformatteerd)
+  - `app/v1/app/gesprekken/top-questions-actions.ts:32` (multi-line geformatteerd + trailing comment — geverifieerd semantisch identiek aan de export-vorm; gewoon vervangen)
+
+  > Geverifieerd (2026-07-08): 9 van deze 11 zijn byte-identiek aan de one-liner;
+  > de 2 gemarkeerde wijken alleen in formattering/comment af, niet in gedrag.
+  > "Canoniek" = produceert `{ok:false, error:e.message, code:e.code,
+  > retryAfterSec:e.retryAfterSec}` en re-throwt anders — dát is het criterium.
 
   **GEDIVERGEERD (3 — NIET blind vervangen; laat lokaal):**
   - `app/v1/app/quiz/actions.ts:43` → `function authFail(e): SubmitResult` — filtert
@@ -461,9 +486,11 @@ Voeg boven elk van de 3 gedivergeerde `authFail`-functies één comment toe, bij
 
 ## STOP-condities (C)
 
-- Een van de 11 "canonieke" bodies blijkt tóch af te wijken van de export-vorm
-  (ander return-type, andere velden) → behandel dat bestand als een 4e divergentie:
-  laat lokaal, vervang NIET, en rapporteer het.
+- Een van de 11 "canonieke" bodies blijkt tóch **semantisch** af te wijken van de
+  export-vorm (ander return-type, andere velden, extra filtering) → behandel dat
+  bestand als een 4e divergentie: laat lokaal, vervang NIET, en rapporteer het.
+  Pure formattering of een trailing comment (de 2 gemarkeerde gevallen) telt NIET
+  als afwijking.
 - De helper mag `e` NIET "returnen" bij een niet-`AppError`; hij moet `throw e` doen,
   anders krijg je een stille auth-bypass (Next.js' redirect-throw naar `/v1/login`
   moet doorlopen). Ziet je export er anders uit → stop en corrigeer.
@@ -475,8 +502,8 @@ Voeg boven elk van de 3 gedivergeerde `authFail`-functies één comment toe, bij
 # Sectie D — TD-7: `@ark-ui/react` vervangen door de native Popover-API
 
 > **Zachte menselijke gate**: deze sectie eist een **visuele UX-check** in de browser
-> vóór de dependency verwijderd wordt (`plans/README.md:100`). Verwijder de dep pas ná
-> een groene build én een geslaagde visuele check.
+> vóór de dependency verwijderd wordt (zie de TD-7-backlogrij in `plans/README.md`).
+> Verwijder de dep pas ná een groene build én een geslaagde visuele check.
 
 ## Current state (D)
 
@@ -793,6 +820,98 @@ mismatch → false; ongelijke lengte → false; lege strings (`''` vs `''`) → 
 
 ---
 
+# Sectie G — SEC-4: injection-regex dubbel-adjectief-fix (red-team finding 1)
+
+> Herkomst: `docs/SECURITY_INJECTION_REDTEAM_2026-07.md`, finding 1 (HIGH — "de
+> laag faalt op zijn eigen kernvoorbeeld"). De README-bevindingenrij wees deze fix
+> al aan plan 015 toe; deze sectie maakt dat concreet. De architecturale
+> tegenhanger (context-als-data-grens) is plan 013; de normalisatie-voorstap
+> (finding 2) is bewust een apart, groter besluit — zie STOP-condities.
+
+## Current state (G)
+
+Beide regexes empirisch geverifieerd (2026-07-08, node-harnas):
+
+- `lib/v0/server/injection-patterns.ts:30` (`ignore_previous`):
+  ```
+  /\bignore\s+(?:the\s+)?(?:previous|above|prior|all)\s+(?:instructions?|prompts?|rules?|messages?)\b/i
+  ```
+- `lib/v0/server/injection-patterns.ts:36` (`ignore_previous_nl`):
+  ```
+  /\bnegeer\s+(?:de\s+)?(?:vorige|bovenstaande|alle|eerdere)\s+(?:instructies|regels|berichten|prompts?)\b/i
+  ```
+- **Het gat**: de alternatie-groep staat precies ÉÉN kwalificatie-woord toe tussen
+  werkwoord en noun. Bij "ignore **all previous** instructions" vult "all" het slot,
+  waarna de regex een noun verwacht maar "previous" vindt → geen match. Idem NL
+  ("negeer **alle vorige** instructies"). Gemeten: beide kernfrases → NO-MATCH;
+  de enkelvoudige varianten (`ignore previous instructions`, `ignore all
+  instructions`, `ignore the previous instructions`, `negeer alle instructies`)
+  matchen wél.
+- **Call-sites**: `app/api/v0/chat/route.ts:237` en `app/api/v1/chat/route.ts:131`
+  (`detectInjection(question)`); matching op de ruwe string (`injection.ts:33`).
+  V1 blokkeert hard bij een match; V0-publiek ook (cookie-authed = log-only).
+- **Er bestaan géén unit-tests** voor injection-patterns (grep in `__tests__` = 0).
+  Wel een handmatig script `scripts/test-injection-mode.ts` (`npm run
+  test:injection`), maar dat draait niet mee in `npm run test:unit`. De comment bij
+  `resolveInjectionMode` (`injection.ts:59-60`) verwijst naar een "borg-test" die
+  niet bestaat — deze sectie levert de eerste échte test.
+
+## Scope (G)
+
+**In scope:**
+- `lib/v0/server/injection-patterns.ts` — uitsluitend de twee regexes op regel 30 en 36.
+- `lib/v0/server/__tests__/injection-patterns.test.ts` (nieuw — unit-test).
+
+**Out of scope — NIET aanraken:**
+- `injection.ts` (detectInjection/mode-resolutie), de chat-routes, de overige 11
+  patterns.
+- Elke normalisatie-voorstap (NFKC / confusable-fold / zero-width-strip — red-team
+  finding 2): apart besluit, hoort niet stiekem hierin.
+
+## Stappen (G)
+
+### G1: Maak het kwalificatie-slot herhalend (geverifieerde minimale fix)
+
+Wikkel per regex de alternatie + `\s+` in een `(?:...)+`-groep — dit is de enige
+wijziging:
+- regel 30: `(?:previous|above|prior|all)\s+` → `(?:(?:previous|above|prior|all)\s+)+`
+- regel 36: `(?:vorige|bovenstaande|alle|eerdere)\s+` → `(?:(?:vorige|bovenstaande|alle|eerdere)\s+)+`
+
+### G2: Schrijf de unit-test
+
+`lib/v0/server/__tests__/injection-patterns.test.ts` (`node:test` +
+`assert/strict`; importeer `detectInjection` uit `../injection` of de patterns
+direct — kies wat de bestaande module-exports toelaten). Dek minimaal:
+1. **De fix**: `ignore all previous instructions` en `negeer alle vorige
+   instructies` → detected (dit waren de bypasses).
+2. **Regressie**: `ignore previous instructions`, `ignore the previous
+   instructions`, `ignore all instructions`, `negeer alle instructies`, `negeer de
+   vorige regels` → detected (matchten al, moeten blijven matchen).
+3. **Stapeling**: `negeer alle eerdere vorige instructies` → detected (de
+   herhaalgroep dekt ≥2 kwalificaties).
+4. **Benigne input**: een gewone NL-klantvraag (bv. "wat kost een abonnement per
+   maand?") → NIET detected.
+5. **Gedocumenteerde known-limits** (assert het huidige gedrag, zodat een latere
+   normalisatie-laag de verwachting bewust moet flippen): `ignore-previous-instructions`
+   (punctuatie-separator) en `ignore all the previous instructions` ("the" tússen
+   kwalificaties) → NIET detected. Dit is bewust: de minimale fix dekt
+   adjectief-stapeling, niet willekeurige tussenvoegsels — dat is finding-2-terrein.
+
+**Verify (G)**:
+- `npm run typecheck` → exit 0.
+- `npm run test:unit` → alle tests groen, incl. de nieuwe.
+- Optionele rooktest: `npm run test:injection` (handmatig script, geen unit-runner).
+
+## STOP-condities (G)
+
+- De regexes op regel 30/36 wijken af van de excerpts hierboven → drift, stop en
+  rapporteer.
+- Je overweegt méér patronen te herschrijven, een normalisatie-voorstap toe te
+  voegen of `injection.ts` aan te passen → buiten scope (finding 2 = apart
+  besluit van Sebastiaan); stop en rapporteer.
+
+---
+
 ## Done-criteria (hele plan — vink per sectie af)
 
 Per uitgevoerde sectie moeten ALLE checks van die sectie gelden. Overkoepelend:
@@ -809,16 +928,20 @@ Per uitgevoerde sectie moeten ALLE checks van die sectie gelden. Overkoepelend:
       `... SUPABASE_SERVICE_ROLE_KEY ...` leeg; `check-env` groen; 1 script gesmoketest.
 - [ ] **F**: `timingSafeEqualStr` bestaat + getest; 4 callsites gebruiken 'm; bestaande
       embed-token/cron-auth-tests groen; typecheck + build groen.
+- [ ] **G**: beide regexes herhaalgroep-gefixt; `injection-patterns.test.ts` bestaat en
+      alle 5 testgroepen passen (incl. de twee kernfrases → detected); `test:unit` groen.
 - [ ] Geen bestanden buiten de in-scope-lijst van de betrokken sectie(s) gewijzigd
       (`git status`).
-- [ ] `plans/README.md`-statusrij (regel 32) bijgewerkt naar de uitgevoerde secties.
+- [ ] `plans/README.md`-statusrij (de `| 015 |`-rij) bijgewerkt naar de uitgevoerde secties.
 
 ## Maintenance-notities
 
-- **B (PERF-5)**: als iemand later HyDE/decompose/multi-query zó wijzigt dat ze een
-  entry vóór index 0 in `querySet` invoegen, breekt de hergebruik-aanname. De helper
-  gaat er strikt van uit dat `querySet[0]` de main-query is. Reviewer: check dat
-  `vectors[0]` nog altijd de embed van `queryTexts[0]` is.
+- **B (PERF-5)**: de helper leunt uitsluitend op de string-vergelijking
+  `queryTexts[0] === original` — bewust, want decompose kan regel 0 al herschrijven
+  (regel 1639). Wijzigt iemand later de query-pipeline, dan degradeert de reuse
+  hooguit naar "triggert niet" (veilig), nooit naar "verkeerde vector". Reviewer:
+  check dat `vectors[i]` altijd de embed van `queryTexts[i]` blijft (volgorde is
+  load-bearing voor retrieveChunksHybrid/retrieveChunks).
 - **C (TD-1)**: nieuwe `actions.ts`-bestanden moeten voortaan `authFail` **importeren**,
   niet kopiëren. De 3 gedivergeerde kopieën blijven bewust lokaal.
 - **D (TD-7)**: de native Popover-API vereist een recente browserbaseline. Als de
@@ -826,6 +949,11 @@ Per uitgevoerde sectie moeten ALLE checks van die sectie gelden. Overkoepelend:
 - **F (SEC-3)**: toekomstige auth-/tokenpaden die een constant-time-compare nodig
   hebben, importeren `timingSafeEqualStr` — géén nieuwe lokale copy-paste (dat was
   precies het risico dat deze consolidatie wegneemt).
+- **G (SEC-4)**: het regexfilter blijft een telemetrie-/drempel-laag, geen muur —
+  known-limits (homoglyphen, zero-width, leetspeak, punctuatie-separators, markup)
+  staan in het red-team-rapport en horen bij een eventuele normalisatie-voorstap
+  (finding 2, apart besluit). De echte verdediging tegen injectie-klassen die regex
+  nooit vangt is plan 013. Voeg geen patronen toe zonder de unit-test uit te breiden.
 
 ## STOP-condities (overkoepelend)
 
@@ -838,9 +966,10 @@ Per uitgevoerde sectie moeten ALLE checks van die sectie gelden. Overkoepelend:
 
 ## Noot: NIET in dit plan (bewuste scope-grens)
 
-`plans/README.md:32` noemt bij plan 015 ook een **"injection dubbel-adjectief-regexfix"**
-(zie ook README-tabelregel 72: "015 (regexfix)"). Die zit **niet** in de zes findings
-van deze batch en staat niet in de brief voor dit plan — hij is dus **buiten scope**
-gelaten. Als Sebastiaan die regexfix tóch bij 015 wil, hoort hij als aparte sectie
-(met eigen bewijs uit `lib/v0/server/injection-patterns.ts`) — niet stilletjes hierin
-gebundeld.
+De **normalisatie-voorstap** voor het injectiefilter (red-team finding 2: NFKC +
+confusable-folding + zero-width-strip + separator→spatie vóór `detectInjection`)
+zit bewust NIET in deze batch — hij raakt het gedeelde detectiepad van V0 én V1 en
+verdient een eigen afweging (false-positive-risico op normale input). Sectie G dekt
+alléén de dubbel-adjectief-regexfix (finding 1), die in ronde 3 (2026-07-08) als
+volwaardige sectie aan dit plan is toegevoegd — daarmee klopt de
+README-bevindingenrij ("015 (regexfix)") nu ook daadwerkelijk.
