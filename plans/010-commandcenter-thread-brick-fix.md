@@ -147,6 +147,18 @@ niet stil kunnen breken. Bijvangst (bewust buiten scope): een ge-undo'de
 tool-message houdt `undone: true` in zijn content-JSON — semantische ruis voor het
 model, geen 400.
 
+**Her-geverifieerd (ronde 4, 2026-07-08 tegen `main` `00884a1`):** de code-excerpts
+en regelnummers hierboven kloppen nog exact tegen de huidige `main` — die is sinds
+`3437648` doorgeschoven naar `00884a1` (#238/#248/#249/#250/#251) zónder
+`route.ts` of `assistant-threads.ts` aan te raken, dus de drift-check blijft leeg.
+De tooling-aannames van Step 4/5 zijn bevestigd in de bron: `npm run test:unit` =
+`node scripts/run-unit-tests.mjs`, dat globt `.test.(ts|tsx)` **binnen**
+`__tests__/`-mappen (roots `lib`/`app`/`scripts`/`tests`), **faalt hard op strays**
+buiten zo'n map, en draait een `server-only`-testfile (geen `react-dom/server`-import)
+in de `react-server`-pass — dus de nieuwe `lib/commandcenter/server/__tests__/`-test
+draait automatisch mee, mits exact in die map. `typecheck` (`tsc --noEmit`) en
+`build` (`next build`) bestaan als npm-scripts.
+
 **De relevante types** (uit `lib/commandcenter/types.ts` — lees ze, wijzig ze niet):
 `AssistantMessage` heeft o.a. `role: AssistantRole`, `content: string | null`,
 `toolCalls: AssistantToolCall[] | null`, `toolCallId: string | null`,
