@@ -24,7 +24,7 @@ handmatig herbevestigd in de bron. Alle bewijs-excerpts in de plannen komen uit 
 | 007  | Tests op de V1 PII-poorten: embed-token HMAC + contact-validatie-extractie | P2 | M | 001 | DONE (c31bdc3+fb66d24) |
 | 008  | Ponytail-opruiming: nanoid, EUR-kostentabel, crawler-utils dedup (~170 r, −1 dep) | P3 | S | 001 (zacht) | DONE (6268817+d6f7c19+4d53a54) |
 | 009  | migrate.mjs: checksum-drift-detectie + TLS-certvalidatie | P2 | M | — | DONE (1e9b6fb; TLS teruggedraaid — CA-cert nodig, zie eindrapport) |
-| 010  | Command Center-assistent: half-gepersisteerde tool-turn brickt thread niet meer (leespad-repair + tool-loop hardening) | P2 | M | — | TODO |
+| 010  | Command Center-assistent: half-gepersisteerde tool-turn brickt thread niet meer (leespad-repair + tool-loop hardening) | P2 | M | — | DONE (PR #253, squash `2057fa4`, 2026-07-25) |
 | 011  | **V1 `is_jorion_admin` zelf-escalatie sluiten** — port V0-0013 → V1-migr 0026 ⚠️ SECURITY/launch-blocker | **P1** | S | — | TODO |
 | 012  | Schema/RLS-hardening batch → V0-migr 0055 + V1-migr 0027: 0053-search_path-pin, FK-index `document_chunks.website_page_id`, 2× soft-delete-filter (`document_chunks` V0+V1 + `contact_requests` V1), `v1_feedback_ticket_event.org_id`; `handle_new_auth_user`-email bewust uitgesteld | P2 | M | — | TODO (plan geschreven; ⚠️ prod-apply-gate) |
 | 013  | RAG prompt-injectie-grens: retrieved context als *untrusted data* afbakenen via nieuwe append-only bot-versie v0.11 (default-uit vlag) (SEC-2 + red-team finding 3) | P2 | M | — | TODO (plan geschreven; ⚠️ billable eval + LATEST-bump-gate) |
