@@ -119,6 +119,48 @@ high-severity op sandbox-gedrag.
 - **MODEL_COSTS-splitsing** — V0 rapporteert USD-cost via `MODEL_COSTS_USD`
   (`query_log.cost_usd`); de EUR-`MODEL_COSTS`-tabel is V1-billing. Verwar ze niet.
 
+## 3b. Migratie-review-checklist (bij elke diff/plan die `supabase/migrations*` raakt)
+
+Loop deze punten expliciet af zodra een migratie in scope is. Elk punt komt uit een
+**echt geconfirmeerde** schema-bevinding in deze codebase (RLS-sweep 2026-07-06) —
+dit zijn geen hypothetische zorgen. Meld overtredingen op de aangegeven severity.
+
+1. **Twee gescheiden ledgers.** V0 = `supabase/migrations/` (`npm run migrate`), V1 =
+   `supabase/migrations-v1/` (`npm run migrate:v1`), elk een **eigen** nummerreeks
+   (V0 ~0054, V1 ~0025 — lopen niet gelijk). Landt een V1-fix per ongeluk in de
+   V0-map (of andersom)? Klopt het volgnummer voor de **juiste** map? → MEDIUM.
+2. **V0-fix ≠ automatisch in V1.** De grootste val: een hardening die op V0 bestaat,
+   maar nooit naar V1 geport is. Concreet gebeurd: de `users`-`is_jorion_admin`
+   **zelf-escalatie-lockdown** (V0 `0013_lockdown_users_update.sql`: `revoke update` +
+   `grant update(full_name)` + `prevent_self_admin_escalation`-trigger) ontbreekt in
+   heel `migrations-v1/` → elke authenticated user kan zich tot cross-org-admin
+   promoveren. Raakt een diff/plan de `users`-tabel of admin-rechten: verifieer dat
+   V1 dezelfde kolom-grant-lockdown + escalatie-trigger heeft. Ontbreekt het → **HIGH**.
+3. **Soft-delete-filter in SELECT-policies.** Elke `deleted_at`-tabel: de
+   SELECT-policy moet `deleted_at is null` filteren (of bewust niet — dan een noot).
+   Gemist op `document_chunks` (V0) en `contact_requests` (V1) → LOW/MEDIUM
+   afhankelijk van of PII lekt.
+4. **`organization_id NOT NULL` op élke klantdata-tabel** (uitz. `users`, `audit_logs`,
+   V1 `admin_*`). Nieuwe tabel zonder org-kolom = hard-rule-schending. Gemist op
+   `v1_feedback_ticket_event` (terwijl sibling `v1_quiz_event` het wél heeft) → HIGH
+   voor een echte klantdata-tabel, LOW voor een event-log zonder directe klant-PII —
+   maar altijd melden.
+5. **`SECURITY DEFINER` → `set search_path` verplicht.** Elke definer-functie zonder
+   `search_path`-pin = Supabase-advisor-warning `function_search_path_mutable` én een
+   latente search-path-injectie-vector. `0053` introduceerde er één en draaide zo de
+   `0049`-hardening deels terug. Ook trigger-functies. → LOW (of MEDIUM bij een
+   functie die wél tabellen aanraakt).
+6. **FK met `ON DELETE CASCADE` → backing-index op de child-kolom.** Postgres
+   indexeert de refererende kant niet automatisch; zonder index seq-scant elke delete
+   de child-tabel. Gemist op `document_chunks.website_page_id` (elke recrawl scant de
+   grootste tabel). → LOW (perf), hoger bij hot-path + grote tabel.
+7. **Een migratie mag een eerdere hardening niet stil terugdraaien.** Check of een
+   nieuwe policy/functie/grant een expliciet in een vorige migratie dichtgezette
+   zwakte heropent (zie punt 2 en 5). → severity = die van de heropende zwakte.
+
+Bij twijfel of een tabel "klantdata" is, of een policy bewust permissief: LAGE
+severity met de noot "verifieer bedoeling" — forceer geen HIGH op onzekerheid.
+
 ## 4. Severity-rubriek
 
 - **HIGH** — schendt een V1 hard rule met datalek-/AVG-/cost-impact: ontbrekende
