@@ -31,6 +31,7 @@ import {
 } from '@/lib/commandcenter/server/assistant-threads';
 import { buildAssistantContext, buildSystemPrompt, getTool } from '@/lib/commandcenter/server/assistant-context';
 import { ASSISTANT_TOOL_SCHEMAS } from '@/lib/commandcenter/server/assistant-tools';
+import { buildChatHistory, type ChatMsg } from '@/lib/commandcenter/server/assistant-history';
 import type { AssistantToolCall } from '@/lib/commandcenter/types';
 
 export const dynamic = 'force-dynamic';
@@ -48,20 +49,6 @@ function openai(): OpenAI {
   _openai = new OpenAI({ apiKey: key });
   return _openai;
 }
-
-// ---------------------------------------------------------------------------
-// OpenAI message-types — we typen ze los van de SDK omdat we ze ook serialiseren.
-// ---------------------------------------------------------------------------
-
-type ChatMsg =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
-  | {
-      role: 'assistant';
-      content: string | null;
-      tool_calls?: AssistantToolCall[];
-    }
-  | { role: 'tool'; tool_call_id: string; content: string };
 
 // ---------------------------------------------------------------------------
 // POST handler
@@ -110,24 +97,9 @@ export async function POST(req: NextRequest) {
 
   // Bouw initiële messages-array voor OpenAI.
   // history bevat al de zojuist toegevoegde user-message.
-  const messages: ChatMsg[] = [{ role: 'system', content: systemPrompt }];
-  for (const m of history) {
-    if (m.role === 'user' && m.content) {
-      messages.push({ role: 'user', content: m.content });
-    } else if (m.role === 'assistant') {
-      messages.push({
-        role: 'assistant',
-        content: m.content,
-        tool_calls: m.toolCalls ?? undefined,
-      });
-    } else if (m.role === 'tool' && m.toolCallId) {
-      messages.push({
-        role: 'tool',
-        tool_call_id: m.toolCallId,
-        content: JSON.stringify(m.toolResult ?? { ok: false, error: 'missing result' }),
-      });
-    }
-  }
+  // buildChatHistory repareert meteen eventuele dangling tool_calls / orphan
+  // tool-rijen uit eerdere half-gepersisteerde turns (zie assistant-history.ts).
+  const messages: ChatMsg[] = buildChatHistory(systemPrompt, history);
 
   // 4. NDJSON streaming
   const encoder = new TextEncoder();
@@ -193,51 +165,102 @@ export async function POST(req: NextRequest) {
             });
 
             // Voer alle tool-calls parallel uit en stream resultaten.
+            // Elke callback vangt zijn eigen fout (DB-blip, gecancelde stream, …):
+            // zo rejectt Promise.all nooit meer halverwege, en staat er na deze
+            // batch gegarandeerd een tool-message per tool_call_id — nooit meer
+            // een half-gepersisteerde (dangling) turn. Zie assistant-history.ts
+            // voor de leespad-repair die dit als vangnet ook al zelf opvangt.
             await Promise.all(
               toolCalls.map(async (tc) => {
-                const tool = getTool(tc.function.name);
-                let parsedArgs: Record<string, unknown> = {};
+                // Zodra de echte tool-rij is weggeschreven staat dit op true; de
+                // catch mag dan GEEN tweede (bogus fail-)rij toevoegen — anders
+                // ontstaat er bij een throwende emit ná de persist een duplicaat
+                // (echte ok:true-rij + fake ok:false-rij) voor hetzelfde id.
+                let toolRowPersisted = false;
                 try {
-                  parsedArgs = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
-                } catch {
-                  parsedArgs = {};
+                  const tool = getTool(tc.function.name);
+                  let parsedArgs: Record<string, unknown> = {};
+                  try {
+                    parsedArgs = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
+                  } catch {
+                    parsedArgs = {};
+                  }
+
+                  emit({ type: 'tool_call', id: tc.id, name: tc.function.name, args: parsedArgs });
+
+                  const result = tool
+                    ? await tool.execute(parsedArgs)
+                    : { ok: false, error: `Onbekende tool: ${tc.function.name}` };
+
+                  // Persist tool-result als 'tool'-message in DB
+                  const stored = await appendMessage({
+                    threadId: threadIdResolved,
+                    role: 'tool',
+                    content: null,
+                    toolCallId: tc.id,
+                    toolName: tc.function.name,
+                    toolResult: result,
+                  });
+                  toolRowPersisted = true;
+
+                  // Stuur ook naar de in-memory messages voor volgende OpenAI-call
+                  messages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    content: JSON.stringify(result),
+                  });
+
+                  // Emit naar client. Undo-token alleen voor write-tools met beforeState.
+                  const isWrite = tool?.isWrite ?? false;
+                  emit({
+                    type: 'tool_result',
+                    tool_call_id: tc.id,
+                    message_id: stored.id,
+                    name: tc.function.name,
+                    ok: result.ok,
+                    item: result.item,
+                    error: result.error,
+                    undo_token: isWrite && result.ok ? stored.id : undefined,
+                  });
+                } catch (toolErr) {
+                  // De echte tool-rij bestaat al (alleen de emit faalde, client is
+                  // weg) → niets meer doen; een fallback zou een duplicaat maken.
+                  if (toolRowPersisted) return;
+
+                  // Best-effort compensatie: garandeer alsnog een tool-message
+                  // voor dit tool_call_id als de happy-path body faalde vóór de
+                  // persist (DB-blip, gecancelde stream, tool.execute-throw).
+                  const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+                  const fallback = { ok: false as const, error: `tool-uitvoering faalde: ${errMsg}` };
+                  try {
+                    await appendMessage({
+                      threadId: threadIdResolved,
+                      role: 'tool',
+                      content: null,
+                      toolCallId: tc.id,
+                      toolName: tc.function.name,
+                      toolResult: fallback,
+                    });
+                  } catch {
+                    // DB onbereikbaar — leespad-repair (assistant-history.ts) vangt dit alsnog op.
+                  }
+                  messages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    content: JSON.stringify(fallback),
+                  });
+                  try {
+                    emit({
+                      type: 'tool_result',
+                      tool_call_id: tc.id,
+                      name: tc.function.name,
+                      ok: false,
+                      error: errMsg,
+                    });
+                  } catch {
+                    // Client is weg — niets meer te sturen.
+                  }
                 }
-
-                emit({ type: 'tool_call', id: tc.id, name: tc.function.name, args: parsedArgs });
-
-                const result = tool
-                  ? await tool.execute(parsedArgs)
-                  : { ok: false, error: `Onbekende tool: ${tc.function.name}` };
-
-                // Persist tool-result als 'tool'-message in DB
-                const stored = await appendMessage({
-                  threadId: threadIdResolved,
-                  role: 'tool',
-                  content: null,
-                  toolCallId: tc.id,
-                  toolName: tc.function.name,
-                  toolResult: result,
-                });
-
-                // Stuur ook naar de in-memory messages voor volgende OpenAI-call
-                messages.push({
-                  role: 'tool',
-                  tool_call_id: tc.id,
-                  content: JSON.stringify(result),
-                });
-
-                // Emit naar client. Undo-token alleen voor write-tools met beforeState.
-                const isWrite = tool?.isWrite ?? false;
-                emit({
-                  type: 'tool_result',
-                  tool_call_id: tc.id,
-                  message_id: stored.id,
-                  name: tc.function.name,
-                  ok: result.ok,
-                  item: result.item,
-                  error: result.error,
-                  undo_token: isWrite && result.ok ? stored.id : undefined,
-                });
               }),
             );
 
