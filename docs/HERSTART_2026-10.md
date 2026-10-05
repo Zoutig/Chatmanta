@@ -75,22 +75,22 @@
 
 - [x] **A1. Vercel-login vernieuwen** · 🧑 *(gedaan 5 okt)* — typ in Claude Code: `! vercel login`. *(Device-flow, geen wachtwoord in de chat.)*
 - [x] **A2. Laat Claude de rest-check doen** · 🤖 *(gedaan 5 okt — zie §4)* — env-vars op Vercel prod (`vercel env ls production`), laatste deploy groen, geen runtime-errors.
-- [ ] **A3. Lokale repo bijwerken** · 🤖 — `main` loopt gelijk met origin; `npm ci`, `npm run typecheck`, `npm run build` om te zien of alles na 2,5 maand nog bouwt.
-- [ ] **A4. Opruimen** · 🤖 — `docs/DASHBOARD_GAPS_PLAN_2026-07.md` staat ongetrackt in de repo (het plan is al volledig uitgevoerd → archiveren of weggooien). PR #207 (devcontainer): laten liggen of sluiten.
-- [ ] **A5. Dependency-check** · 🤖 — `npm audit` + kijken of Next.js/Supabase/OpenAI-SDK security-updates hebben uitgebracht sinds juli. Alleen security-fixes meenemen, geen grote upgrades vlak voor launch.
+- [x] **A3. Lokale repo bijwerken** · 🤖 *(5 okt: npm ci + typecheck + build groen)* — `main` loopt gelijk met origin; `npm ci`, `npm run typecheck`, `npm run build` om te zien of alles na 2,5 maand nog bouwt.
+- [x] **A4. Opruimen** · 🤖 *(5 okt: gaps-plan weggegooid; PR #207 blijft voorlopig open)* — `docs/DASHBOARD_GAPS_PLAN_2026-07.md` staat ongetrackt in de repo (het plan is al volledig uitgevoerd → archiveren of weggooien). PR #207 (devcontainer): laten liggen of sluiten.
+- [x] **A5. Dependency-check** · 🤖 *(5 okt: Next 16.2.6 had 3 kritieke RCE-lekken + middleware-bypass → PR #256 gemerged: Next 16.3.8 + `npm audit fix`, 0 kwetsbaarheden)* — `npm audit` + kijken of Next.js/Supabase/OpenAI-SDK security-updates hebben uitgebracht sinds juli. Alleen security-fixes meenemen, geen grote upgrades vlak voor launch.
 
 ### Fase B — Derde partijen nalopen (±45 min) · 🧑
 
 Doe dit met de tabel in §4 ernaast. Per dienst: **inloggen → account actief → betaalmethode geldig → service groen.**
 
-- [ ] **B1. Vercel** — abonnement + betaalmethode, laatste productie-deploy groen.
+- [x] **B1. Vercel** — abonnement + betaalmethode, laatste productie-deploy groen. *(5 okt: draait op **Hobby**. ⚠️ Hobby is volgens de Vercel-voorwaarden alleen voor niet-commercieel gebruik → vóór de eerste **betalende** klant naar Pro (~$20/mnd); zie E8.)*
 - [x] **B2. Supabase** — *(5 okt via MCP: beide projecten ACTIVE_HEALTHY. V1-advisors: 1× WARN leaked-password-protection uit → stap C4; 13× INFO "RLS zonder policy" op admin-/systeemtabellen = bewust (alleen service-role mag erbij, deny-all voor gebruikers). Tier/billing nog zelf checken.)*
-- [ ] **B3. OpenAI** — saldo + usage-limiet (zet een maandlimiet van bv. $20 als vangnet) + modelstatus gpt-4o-mini.
-- [ ] **B4. cron-job.org** — beide jobs aan + laatste runs groen (`200`). Staat er een uit? Zet aan; URL moet exact `https://www.chatmanta.nl/...` zijn (met https én www — cron-job.org volgt geen redirects).
+- [x] **B3. OpenAI** *(5 okt: maandlimiet ingesteld; saldo $8 — ruim genoeg voor de pilot, maar zet auto-recharge aan of vul bij vóór launch, anders stopt de bot bij $0)* — saldo + usage-limiet (zet een maandlimiet van bv. $20 als vangnet) + modelstatus gpt-4o-mini.
+- [x] **B4. cron-job.org** *(5 okt: beide jobs aan + groen)* — beide jobs aan + laatste runs groen (`200`). Staat er een uit? Zet aan; URL moet exact `https://www.chatmanta.nl/...` zijn (met https én www — cron-job.org volgt geen redirects).
 - [x] **B5. Firecrawl** — *(5 okt: actief, 1058 credits)*
 - [x] **B6. Resend** — *(5 okt: DNS-records intact)*
 - [x] **B7. Upstash** — *(5 okt: was verwijderd → nieuwe DB aangemaakt + live geverifieerd)*
-- [ ] **B8. TransIP** — beide domeinen staan op auto-verlenging.
+- [x] **B8. TransIP** — beide domeinen staan op auto-verlenging. *(5 okt: bewuste keuze — **geen** auto-verlenging, Sebastiaan betaalt maandelijks handmatig. Risico: één gemiste betaling = domein (en daarmee site, widget én mail op chatmanta.com) eruit. Zet een terugkerende agenda-herinnering.)*
 
 ### Fase C — Launch-blockers dichtzetten (±1 dagdeel) · 🧑 + 🤖
 
@@ -136,6 +136,8 @@ Doe dit met de tabel in §4 ernaast. Per dienst: **inloggen → account actief �
 - [ ] **E6. Widget op hun site** · 🧑/klant — snippet uit het klantdashboard plakken → 1 echte chat + 1 testcontactverzoek doen → check dat de mail aankomt.
 - [ ] **E0. 🔴 Sleutels roteren vóór de eerste klant-invite** · 🧑 + 🤖 — OpenAI API-key, OpenAI Admin-key en Firecrawl-key zijn op 5 okt per ongeluk in een CC-sessielog beland. Bewust uitgesteld tot vlak vóór launch (keuze Sebastiaan). Volgorde: nieuwe key aanmaken → in `.env.local` → 🤖 zet op Vercel + redeploy + test → pas dán oude key intrekken. Neem `CRON_SECRET`/`EMBED_TOKEN_SECRET` niet mee tenzij nodig (cron-job.org-header moet dan mee).
 - [ ] **E7. 🔴 Supabase Pro aanzetten** · 🧑 — ~$25/mnd. **Trigger:** zodra een klant contactverzoeken aanzet op een live site (echte bezoekers-PII) of de eerste betaling binnenkomt. Bij 3 klanten tegelijk live: **zet het aan op launch-dag**. Geeft dagelijkse backups + geen auto-pause.
+
+- [ ] **E8. 🔴 Vercel Hobby → Pro** · 🧑 — ~$20/mnd. **Trigger:** vóór de eerste betaalde factuur (Hobby verbiedt commercieel gebruik). Gratis pilotmaand mag nog op Hobby.
 
 ### Fase F — Eerste 30 dagen · 👥
 
