@@ -26,11 +26,12 @@ import {
 import { resolveBot, type BotConfig } from './bots';
 import { getPersonaForOrgId, formatPersonaSection } from './eval-personas';
 import { containsHardFacts } from '@/lib/rag/hard-facts';
+import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
+import { JUDGE_MODEL } from './eval-judge-model';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const JUDGE_MODEL = 'gpt-4o';
 const JUDGE_TEMPERATURE = 0.0;
 // V0.7 eval-v2: bumped van 600 → 900 omdat het JSON-object nu 4 extra velden
 // heeft (production_ready, answer_length_appropriate, source_citation_binding,
@@ -41,9 +42,6 @@ const JUDGE_MAX_TOKENS = 900;
 // antwoorden + persona). Output is ook beperkt (winner + confidence + 2-4
 // zin rationale). 500 is ruim voldoende.
 const PAIRWISE_JUDGE_MAX_TOKENS = 500;
-// gpt-4o pricing (USD per 1M tokens) — hardcoded, judge is altijd gpt-4o.
-const JUDGE_INPUT_PER_M_USD = 2.5;
-const JUDGE_OUTPUT_PER_M_USD = 10.0;
 
 // ---------------------------------------------------------------------------
 // Lazy OpenAI client
@@ -439,8 +437,10 @@ export async function runJudge(args: {
   try {
     const resp = await openai().chat.completions.create({
       model: JUDGE_MODEL,
-      temperature: JUDGE_TEMPERATURE,
-      max_tokens: JUDGE_MAX_TOKENS,
+      ...openaiChatParams(JUDGE_MODEL, {
+        temperature: JUDGE_TEMPERATURE,
+        maxTokens: JUDGE_MODEL.startsWith('gpt-6') ? 1500 : JUDGE_MAX_TOKENS,
+      }),
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: JUDGE_SYSTEM },
@@ -463,9 +463,7 @@ export async function runJudge(args: {
   }
 
   const latencyMs = Math.round(performance.now() - start);
-  const costUsd =
-    (inputTokens / 1_000_000) * JUDGE_INPUT_PER_M_USD +
-    (outputTokens / 1_000_000) * JUDGE_OUTPUT_PER_M_USD;
+  const costUsd = costForModelUsd(JUDGE_MODEL, inputTokens, outputTokens);
 
   // Parse JSON. response_format=json_object garandeert het basis-format,
   // maar score-velden kunnen nog steeds van type afwijken.
@@ -627,8 +625,10 @@ export async function runPairwiseJudge(args: {
   try {
     const resp = await openai().chat.completions.create({
       model: JUDGE_MODEL,
-      temperature: JUDGE_TEMPERATURE,
-      max_tokens: PAIRWISE_JUDGE_MAX_TOKENS,
+      ...openaiChatParams(JUDGE_MODEL, {
+        temperature: JUDGE_TEMPERATURE,
+        maxTokens: PAIRWISE_JUDGE_MAX_TOKENS,
+      }),
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: PAIRWISE_SYSTEM },
@@ -652,9 +652,7 @@ export async function runPairwiseJudge(args: {
   }
 
   const latencyMs = Math.round(performance.now() - start);
-  const costUsd =
-    (inputTokens / 1_000_000) * JUDGE_INPUT_PER_M_USD +
-    (outputTokens / 1_000_000) * JUDGE_OUTPUT_PER_M_USD;
+  const costUsd = costForModelUsd(JUDGE_MODEL, inputTokens, outputTokens);
 
   let parsed: unknown;
   try {

@@ -34,7 +34,7 @@ import {
 import { BOTS, BOT_VERSIONS_ORDERED, EVAL_DEFAULT_VERSIONS, resolveBot } from '../lib/v0/server/bots';
 import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
 
-const JUDGE_MODEL = 'gpt-4o';
+import { JUDGE_MODEL } from '../lib/v0/server/eval-judge-model';
 const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
   'dev-org': '00000000-0000-0000-0000-0000000000d0',
   'acme-corp': '00000000-0000-0000-0000-0000000000a1',
@@ -194,6 +194,7 @@ async function main(): Promise<void> {
   console.log(`  runs/cell    : ${runsCount}${runsCount > 1 ? ' (multi-run voor variance)' : ''}`);
   console.log(`  jobs         : ${jobs.length}`);
   console.log(`  concurrency  : ${CONCURRENCY}`);
+  console.log(`  judge        : ${JUDGE_MODEL}`);
   console.log(`  hyde-mode    : ${hydeMode}${hydeMode === 'auto' ? ' (volgt bot-config)' : ' (override)'}`);
   console.log(`  pairwise     : ${skipPairwise ? 'OFF (--no-pairwise)' : 'AAN tussen ' + EVAL_DEFAULT_VERSIONS.join(' vs ')}`);
   console.log('');
