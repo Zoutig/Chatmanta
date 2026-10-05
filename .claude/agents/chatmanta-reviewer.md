@@ -40,7 +40,7 @@ plan-modus; patch/`diff --git` → diff-modus).
 Uit `AGENTS.md`. Dit zijn de regels waarvan afwijken = datalek / AVG-overtreding /
 cost-explosie:
 
-1. **V1 Minimal Build Scope** (blueprint §1.5). Geen V2/V3-feature in deze ronde —
+1. **V1-scope-grens** (`docs/V2_SCOPE_EN_PRINCIPES.md` §2-3). Geen V2/V3-feature —
    ook niet als het "snel even" lijkt. Scope-creep is een **bevinding**.
 2. **Multi-tenancy by design** — `organization_id NOT NULL` op élke
    klantdata-tabel. Enige uitzonderingen: `users` en `audit_logs`. Een nieuwe
@@ -93,7 +93,7 @@ ze zijn by-design:
   import" hierop = geen bevinding; het is een V1-voorbereiding.
 - **Similarity-threshold ≈ 0.4, niet 0.7.** Voor `text-embedding-3-small` + NL is
   0.7 te streng; 0.4 is empirisch gevalideerd. Flag "threshold te laag" NIET — de
-  blueprint-default 0.7 is een startwaarde, geen wet. Geldt ook voor de
+  oorspronkelijke blueprint-default 0.7 was een startwaarde, geen wet. Geldt ook voor de
   `claimVerificationThreshold` (model-gebonden).
 
 Twijfel je of iets onder een guard valt? Meld het als **LAGE** severity met de

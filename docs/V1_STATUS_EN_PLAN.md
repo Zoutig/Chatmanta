@@ -2,7 +2,9 @@
 
 > **Doel:** één beslissings-bruikbaar overzicht van waar de V1-bouw staat, wat er nog moet, en in welke volgorde — zodat de volgende bouwronde gekozen kan worden zonder het opnieuw uit te zoeken. Read-only opgesteld 2026-06-29; geen code/migratie/PR gewijzigd.
 >
-> **Autoriteit bij conflict:** Blueprint §1.5 "V1 Minimal Build Scope" > Security Addendum > specifieke sectie. Status-claims citeren bewijs (migratienummer / live-query / PR / `file:regel`), niet geheugen.
+> **⚠️ Momentopname juni 2026.** Alleen de sectie "Besliste keuzes" is nog leidend; de actuele scope-grens staat in `docs/V2_SCOPE_EN_PRINCIPES.md`, launch-status in `docs/V1_LAUNCH_TODO.md`.
+>
+> **Autoriteit bij conflict (historisch, juni 2026):** Blueprint §1.5 "V1 Minimal Build Scope" > Security Addendum > specifieke sectie. Status-claims citeren bewijs (migratienummer / live-query / PR / `file:regel`), niet geheugen.
 
 ## Besliste keuzes 2026-06-29 (Sebastiaan) — leidend boven oudere blueprint-regels
 

@@ -133,18 +133,18 @@ Volledige lijst van hard rules staat in `AGENTS.md` § "Wat NIET ter discussie s
 | `graphify-out/GRAPH_REPORT.md` | Auto-gegenereerd kennis-overzicht van de codebase |
 | `eval-fixtures/` + `eval-out/` | RAG-evaluatie testset + resultaten |
 
-Bron-van-waarheid documenten (buiten de repo, op Sebastiaan's machine):
-- `Concept_Blueprint_ChatManta.md` (~3400 regels, het volledige plan)
-- `Bouwplan_Planning_ChatManta_v1.md` (~1500 regels, de 8 bouwfases)
-
-Vraag Sebastiaan om deze te delen als je ze nog niet hebt.
+Bron-van-waarheid documenten (in de repo):
+- `AGENTS.md` — hard rules en werkwijze
+- `docs/V2_SCOPE_EN_PRINCIPES.md` — V1-scope-grens, V2/V3-backlog, billing/AVG/security-principes, open beslissingen (gedistilleerd uit de oorspronkelijke blueprint + bouwplan uit mei 2026; die zijn historisch archief)
+- `docs/V1_LAUNCH_TODO.md` — wat er nog vóór de V1-launch moet
+- `docs/AGENT_LANDMIJNEN.md` — bekende valkuilen
 
 ---
 
 ## Hulp krijgen
 
 1. **Vraag het Claude Code in de terminal.** Open Claude Code in de project-folder; hij leest `AGENTS.md` en weet hoe dit project werkt.
-2. **Vraag Sebastiaan.** Voor security-gevoelige dingen, blueprint-vragen, of "mag dit?".
+2. **Vraag Sebastiaan.** Voor security-gevoelige dingen, scope-vragen, of "mag dit?".
 3. **Lees `AGENTS.md`** — daar staat veel context die ook voor mensen nuttig is.
 
 ---
