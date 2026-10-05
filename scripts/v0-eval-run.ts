@@ -87,6 +87,7 @@ const allVersions = process.argv.includes('--all');
 const noJudge = process.argv.includes('--no-judge');
 const interleave = process.argv.includes('--interleave');
 const outPath = parseStringArg('out');
+if (outPath && !noJudge) fail('--out werkt alleen samen met --no-judge (anders gaan resultaten naar eval_runs)');
 if (noJudge && !outPath) fail('--no-judge vereist --out=<pad.json> (antwoorden gaan niet naar eval_runs)');
 // --no-judge → geen judge-scores, dus ook geen pairwise.
 const skipPairwise = process.argv.includes('--no-pairwise') || noJudge;
@@ -198,7 +199,7 @@ async function main(): Promise<void> {
   console.log(`  judge        : ${noJudge ? 'OFF (--no-judge)' : JUDGE_MODEL}`);
   console.log(`  volgorde     : ${interleave ? 'interleaved' : 'version-major'}`);
   console.log(`  hyde-mode    : ${hydeMode}${hydeMode === 'auto' ? ' (volgt bot-config)' : ' (override)'}`);
-  console.log(`  pairwise     : ${skipPairwise ? 'OFF (--no-pairwise)' : 'AAN tussen ' + EVAL_DEFAULT_VERSIONS.join(' vs ')}`);
+  console.log(`  pairwise     : ${noJudge ? 'OFF (--no-judge)' : skipPairwise ? 'OFF (--no-pairwise)' : 'AAN tussen ' + EVAL_DEFAULT_VERSIONS.join(' vs ')}`);
   console.log('');
 
   // ---------------------------------------------------------------------------
@@ -373,17 +374,22 @@ async function main(): Promise<void> {
       console.log(`  ${v.padEnd(7)} | (geen succesvolle runs)`);
       continue;
     }
-    const c = avg(vRows.map((r) => r.score_correctness));
-    const p = avg(vRows.map((r) => r.score_completeness));
-    const g = avg(vRows.map((r) => r.score_grounding));
+    // --no-judge: scores zijn niet gemeten (crash-rijen hebben synthetische 0/0/0) -> "-".
+    const c = noJudge ? null : avg(vRows.map((r) => r.score_correctness));
+    const p = noJudge ? null : avg(vRows.map((r) => r.score_completeness));
+    const g = noJudge ? null : avg(vRows.map((r) => r.score_grounding));
     const all = [c, p, g].filter((n): n is number => n !== null);
     const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
-    const prodRate = rate(vRows, (r) => r.production_ready === true);
+    const prodRate = noJudge ? '  -  ' : rate(vRows, (r) => r.production_ready === true);
     const bCost = vRows.reduce((s, r) => s + r.bot_cost_usd, 0);
     const jCost = vRows.reduce((s, r) => s + r.judge_cost_usd, 0);
     console.log(
       `  ${v.padEnd(7)} | ${fmtAvg(c)} ${fmtAvg(p)} ${fmtAvg(g)} | ${fmtAvg(overall)} | ${prodRate.padStart(10)} | $${bCost.toFixed(4)}  $${jCost.toFixed(4)}`,
     );
+    if (noJudge) {
+      const crashed = vRows.filter((r) => r.bot_answer.startsWith('[bot error]')).length;
+      console.log(`          bot-error/crash-rijen: ${crashed}/${vRows.length}`);
+    }
   }
   console.log(`\n  totale cost: bot $${totalBotCost.toFixed(4)} + judge $${totalJudgeCost.toFixed(4)} + pairwise $${totalPairwiseCost.toFixed(4)} = $${(totalBotCost + totalJudgeCost + totalPairwiseCost).toFixed(4)}`);
 
@@ -441,10 +447,14 @@ async function main(): Promise<void> {
     if (failed > 0) reasons.push(`${failed} failed job(s)`);
     if (violations.length > 0) reasons.push(`${violations.length} must-not violation(s)`);
     if (budgetExceeded) reasons.push('budget overschreden');
-    console.log(`\n⚠ Exit-code 1: ${reasons.join(', ')}. Eval-runs voor geslaagde jobs zijn opgeslagen.`);
+    console.log(`\n⚠ Exit-code 1: ${reasons.join(', ')}. ${noJudge ? `Antwoorden staan in ${outPath}; beoordeling extern (Claude).` : 'Eval-runs voor geslaagde jobs zijn opgeslagen.'}`);
     process.exit(1);
   }
-  console.log(`\n✓ Klaar. Run \`npm run eval:report\` voor een markdown-rapport.`);
+  if (noJudge) {
+    console.log(`\n✓ Klaar. Antwoorden staan in ${outPath}; beoordeling extern (Claude).`);
+  } else {
+    console.log(`\n✓ Klaar. Run \`npm run eval:report\` voor een markdown-rapport.`);
+  }
 }
 
 main().catch((err) => {
