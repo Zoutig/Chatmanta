@@ -993,6 +993,38 @@ const V0_11B: BotConfig = {
   auxModel: 'gpt-4o-mini',
 };
 
+// v0.12a* — Luna-pipeline-ablatie (spec 2026-10-05). Basis = v0.11b. Elk zet één
+// groep LLM-hulpstappen vóór het eerste token uit; pre-process (routing+rewrite)
+// blijft. Experimenten, NIET gepromoveerd. (v0.11b retrievalTopK = 8, dus 8 chunks haalbaar.)
+const V0_12A1: BotConfig = {
+  ...V0_11B,
+  version: 'v0.12a1',
+  label: 'v0.12a1 — v0.11b zonder LLM-rerank (experiment)',
+  description: 'Ablatie: rerank uit; Luna krijgt meer chunks (8) en selecteert zelf.',
+  rerank: 'none',
+  finalContextMaxChunks: 8,
+};
+const V0_12A2: BotConfig = {
+  ...V0_11B,
+  version: 'v0.12a2',
+  label: 'v0.12a2 — v0.11b zonder decompose + HyDE (experiment)',
+  description: 'Ablatie: queryDecomposition en HyDE uit.',
+  queryDecomposition: false,
+  useHyDE: false,
+  selectiveHyDE: false,
+};
+const V0_12A3: BotConfig = {
+  ...V0_11B,
+  version: 'v0.12a3',
+  label: 'v0.12a3 — lean: alleen pre-process vóór het antwoord (experiment)',
+  description: 'Ablatie: rerank, decompose en HyDE uit; 8 chunks naar Luna.',
+  rerank: 'none',
+  finalContextMaxChunks: 8,
+  queryDecomposition: false,
+  useHyDE: false,
+  selectiveHyDE: false,
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1014,6 +1046,9 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_10.version]: V0_10,
   [V0_11.version]: V0_11,
   [V0_11B.version]: V0_11B,
+  [V0_12A1.version]: V0_12A1,
+  [V0_12A2.version]: V0_12A2,
+  [V0_12A3.version]: V0_12A3,
 };
 
 /**
@@ -1095,6 +1130,9 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_10.version,
   V0_11.version,
   V0_11B.version,
+  V0_12A1.version,
+  V0_12A2.version,
+  V0_12A3.version,
 ];
 
 /**
