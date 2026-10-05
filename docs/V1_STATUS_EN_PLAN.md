@@ -65,7 +65,7 @@ Status t.o.v. (a) Blueprint §1.5 V1-scope en (b) V0-feature-pariteit. **Scope-o
 | 8 — Klantdashboard (settings/embed/account) | ⚠️ deels | kennisbank/crawl-beheer bestaat; chatbot-settings, embed-code, account, upload-UI ontbreken |
 | 1 + 9 — Invite-only onboarding + Jorion-admin dashboard | ❌ niet-gestart | orgs/chatbots nu via seed-script; geen `/admin/...`-V1-UI |
 | 12 — Cost guardrails (rate-limit + 300/mnd hard-block) | ❌ niet-gestart | `askV1`/crawler-actions hebben geen rate-limit (bewust deferred PR-1b #213) |
-| 11 — Sentry + UptimeRobot | ❌ niet-gestart | Phase 7 |
+| 11 — Sentry + uptime-monitoring (Better Stack) | 🟡 Better Stack live 2026-10-05; Sentry niet-gestart | Phase 7 |
 | 14 — AVG-basis (DPA, privacy, IP-hashing) | ❌ niet-gestart | pre-klant-gate |
 
 ### V0-pariteit: bewust BUITEN V1 (§1.5 → V2) — niet als "gap" behandelen
@@ -110,7 +110,7 @@ Binnen de bestaande 8-fasenstructuur + de `project_v1_strategy`-ordening. **Hard
 1. **Phase 2 + 3 — klant-beheer + document-upload-UI** *(K2).* Invite-only onboarding + minimaal klantdashboard + signed-Storage-upload. Leunt op auth/membership (klaar) + `ingestDocument` (klaar). Zonder dit kan een testklant niet worden opgezet/gevoed.
 2. **Phase 6 — Widget publieke laag** *(K1).* Eerste klant-zichtbare chat op gpt-4o-mini. Leunt op een chatbot-config-oppervlak uit #1. **`sourceLinksEnabled` per-surface uit** voor de widget.
 3. **Phase 5 prod-wiring — crawler operationeel** *(K6).* Klein: cron in `vercel.json` + env. Geen code-afhankelijkheid; kan zodra de Vercel-env staat.
-4. **Phase 7 — hardening** *(K3 + K4 + observability).* Upstash per-org rate-limit + `conversations_per_month:300` + `logQuery`-port (telemetrie) + Sentry/UptimeRobot.
+4. **Phase 7 — hardening** *(K3 + K4 + observability).* Upstash per-org rate-limit + `conversations_per_month:300` + `logQuery`-port (telemetrie) + Sentry/Better Stack (uptime ✅ 2026-10-05).
 5. **Phase 8 + pre-klant-gates** *(K5).* Supabase Pro/PITR, DPA's + privacy, MX, leaked-password, IP-hashing, één backup-restore-test — afronden vóór echte klantdata.
 6. **(V2, niet nu)** — Haiku-backup + `callLLM`/`streamLLM` uit de stub + automatische fallback + EUR-billing + her-eval; daarna de overige §1.5-V2-features.
 

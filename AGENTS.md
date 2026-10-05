@@ -77,7 +77,7 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 
 - **V1 draait op OpenAI `gpt-4o-mini`** (scope-beslissing 2026-06-29). De RAG-engine roept `openai()` direct aan; de `callLLM()`/`streamLLM()`-provider-abstractie + Claude Haiku + automatische fallback zijn bewust **V2** (de stub in `lib/ai/llm.ts` mag stub blijven). Zie `docs/V1_STATUS_EN_PLAN.md`.
 - Kosten: V0 én V1 gebruiken `MODEL_COSTS_USD` voor USD-cost-rapportage in `query_log.cost_usd`; EUR via `costUsdToEur` komt pas met een echte V2-billing-caller.
-- Sentry, UptimeRobot, Upstash Ratelimit, Resend — Phase 7 (hardening)
+- Sentry, Better Stack (uptime-monitoring, gratis plan — live sinds 2026-10-05; vervangt UptimeRobot, waarvan het gratis plan non-commercieel is), Upstash Ratelimit, Resend — Phase 7 (hardening)
 
 **Bekende valkuil in de stack:** Tailwind v4 PostCSS-pipeline dropt soms silent nieuwe properties op bestaande selectors in `app/globals.css`. Bypass: inline `style={{...}}` of een lokaal `<style>`-tag in het component.
 
