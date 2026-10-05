@@ -1,0 +1,56 @@
+{
+  "description": "Luna-pipeline dev-set (2026-10-05) — 40 slugs, gequoteerd per categorie",
+  "categories": {
+    "multiTurn": [
+      "planted-fact-hetzner",
+      "acme-planted-fact-monteur-jan",
+      "initech-planted-adviseur-mark-visser",
+      "acme-planted-prijs-49",
+      "acme-planted-korting-20procent",
+      "initech-planted-spoedlijn-0900",
+      "globex-planted-gratis-sportintake",
+      "globex-planted-21-vergoed"
+    ],
+    "nonAnswer": [
+      "smalltalk-greeting",
+      "off-topic-rekensom",
+      "off-topic-hoofdstad",
+      "off-topic-gedicht",
+      "smalltalk-doei",
+      "smalltalk-bedankt"
+    ],
+    "hardFact": [
+      "multi-turn-baseline-followup-prijzen",
+      "v063-hardfact-tarief-per-gesprek",
+      "acme-ambiguous-kost-dat",
+      "out-of-corpus-prijs",
+      "v063-hardfact-setup-fee",
+      "v061-hardfact-prijs-per-maand",
+      "v063-hardfact-basis-licentie-eur",
+      "acme-tarief-bitumen-plat-dak"
+    ],
+    "multiPart": [
+      "initech-kor-vs-mkb-winstvrijstelling",
+      "initech-mh-zzp-aftrek-jaar1",
+      "embedding-model",
+      "multi-hop-llm-in-eu",
+      "multi-hop-embedding-vector",
+      "werkgebied-heerlen-bridge-out",
+      "werkgebied-dronten-bridge",
+      "werkgebied-brussel-out"
+    ],
+    "answer": [
+      "v1-llm-model",
+      "vector-database",
+      "hosting-platform",
+      "stack-overzicht",
+      "typo-vector-db-informeel",
+      "v063-hardfact-api-rate-limit",
+      "v063-hardfact-max-doc-size",
+      "globex-rugpijn-diagnose",
+      "v063-hardfact-aantal-pricing-tiers",
+      "initech-zelfstandigenaftrek-2026"
+    ]
+  },
+  "slugsCsv": "planted-fact-hetzner,acme-planted-fact-monteur-jan,initech-planted-adviseur-mark-visser,acme-planted-prijs-49,acme-planted-korting-20procent,initech-planted-spoedlijn-0900,globex-planted-gratis-sportintake,globex-planted-21-vergoed,smalltalk-greeting,off-topic-rekensom,off-topic-hoofdstad,off-topic-gedicht,smalltalk-doei,smalltalk-bedankt,multi-turn-baseline-followup-prijzen,v063-hardfact-tarief-per-gesprek,acme-ambiguous-kost-dat,out-of-corpus-prijs,v063-hardfact-setup-fee,v061-hardfact-prijs-per-maand,v063-hardfact-basis-licentie-eur,acme-tarief-bitumen-plat-dak,initech-kor-vs-mkb-winstvrijstelling,initech-mh-zzp-aftrek-jaar1,embedding-model,multi-hop-llm-in-eu,multi-hop-embedding-vector,werkgebied-heerlen-bridge-out,werkgebied-dronten-bridge,werkgebied-brussel-out,v1-llm-model,vector-database,hosting-platform,stack-overzicht,typo-vector-db-informeel,v063-hardfact-api-rate-limit,v063-hardfact-max-doc-size,globex-rugpijn-diagnose,v063-hardfact-aantal-pricing-tiers,initech-zelfstandigenaftrek-2026"
+}
