@@ -38,7 +38,8 @@ Samengesteld op 2026-10-05 ($0, alleen DB-reads) met `scripts/v0-dev-set-select.
 | answer | 10 |
 | totaal | 40 |
 
-- Grounding <= 1 bij v0.11b: 16 van de 17 aanwezige slugs zitten in de set (1 viel buiten de categorie-quota).
-- `too_curt` bij v0.11b: 10 slugs in de set (doel was ~6; extra komen via de overige selectie, G<=1 had voorrang).
-- Multi-turn: niet < 8 (22 beschikbaar), geen tekort; geen aanvulling uit `answer` nodig.
-- nonAnswer = `bot_kind` smalltalk/fallback van de v0.11b-run (de tabel `eval_questions` heeft geen `expected_kind`-kolom).
+- Grounding <= 1 bij v0.11b: alle 17 aanwezige slugs zitten in de set.
+- `too_curt` bij v0.11b: 11 slugs in de set (doel ~6; G<=1 had voorrang, de rest komt incidenteel mee).
+- Multi-turn: niet < 8 (22 beschikbaar), geen tekort.
+- nonAnswer is gebaseerd op `eval_questions.expected_kind` (smalltalk/fallback), niet op wat de bot deed; `answer` = `expected_kind` 'answer' of null. Er bestaan 26 nonAnswer-vragen (7 smalltalk, 19 fallback); in de set zitten 6: 1 smalltalk + 5 fallback (G<=1-voorrang trok vooral fallback-vragen binnen). Wil je meer smalltalk-routingdekking, dan is dat een bewuste swap.
+- Correctie op een eerdere versie van dit stuk: `expected_kind` bestaat wel; de eerste versie nam ten onrechte aan dat de kolom ontbrak (de select was niet echt geprobeerd).

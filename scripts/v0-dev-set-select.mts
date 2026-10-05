@@ -6,7 +6,7 @@ import { writeFileSync } from 'node:fs';
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const { data: qs, error } = await sb
   .from('eval_questions')
-  .select('id, slug, question, conversation_history, question_type, tags');
+  .select('id, slug, question, conversation_history, question_type, tags, expected_kind');
 if (error) throw error;
 const { data: runs, error: e2 } = await sb
   .from('eval_runs')
@@ -34,10 +34,12 @@ const all: Q[] = qs
       _hist: (q.conversation_history ?? []) as unknown[],
     } as Q & { _hist: unknown[] };
   });
+const ek = new Map(qs.map((q) => [q.slug as string, (q.expected_kind ?? null) as string | null]));
 const hist = new Map(qs.map((q) => [q.slug as string, (q.conversation_history ?? []) as unknown[]]));
 
 const isMulti = (q: Q) => (hist.get(q.slug) ?? []).length > 0;
-const isNon = (q: Q) => q.kind === 'smalltalk' || q.kind === 'fallback';
+const isNon = (q: Q) => ek.get(q.slug) === 'smalltalk' || ek.get(q.slug) === 'fallback';
+const isAnswerKind = (q: Q) => ek.get(q.slug) === 'answer' || ek.get(q.slug) == null;
 const isHard = (q: Q) => /\b(prijs|kost|kosten|tarief|€|euro|datum|telefoon|e-?mail|uur|dagen|percentage)\b|%/i.test(q.question);
 const isMultiPart = (q: Q) => (q.question.match(/\?/g) ?? []).length > 1 || /\b(en|ook|daarnaast)\b.*\?/i.test(q.question);
 
@@ -59,7 +61,7 @@ const pick = (q: Q, cat: string) => {
 };
 for (const [cat, n, f] of quota) {
   cats[cat] = [];
-  const cand = all.filter((q) => !used.has(q.slug) && f(q) && (cat === 'answer' ? q.kind === 'answer' : true));
+  const cand = all.filter((q) => !used.has(q.slug) && f(q) && (cat === 'answer' ? isAnswerKind(q) : true));
   // G<=1 eerst, dan too_curt (max ~6 totaal), dan rest.
   const ordered = [...cand.filter((q) => q.g1), ...cand.filter((q) => !q.g1 && q.curt && curtTotal < 6), ...cand.filter((q) => !q.g1)];
   for (const q of ordered) {
@@ -71,7 +73,7 @@ for (const [cat, n, f] of quota) {
 // Aanvullen uit answer.
 for (const cat of Object.keys(shortfall)) {
   if (cat === 'answer' || shortfall[cat] <= 0) continue;
-  const fill = all.filter((q) => !used.has(q.slug) && q.kind === 'answer');
+  const fill = all.filter((q) => !used.has(q.slug) && isAnswerKind(q));
   for (const q of fill.slice(0, shortfall[cat])) pick(q, 'answer');
 }
 const sel = all.filter((q) => used.has(q.slug));
@@ -79,7 +81,8 @@ const slugs = Object.values(cats).flat();
 const g1Total = sel.filter((q) => q.g1).length;
 const curtSel = sel.filter((q) => q.curt).length;
 const g1All = all.filter((q) => q.g1).length;
-console.log({ totalQuestionsWithRun: all.length, g1All, counts: Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, v.length])), shortfall, total: slugs.length, g1InSet: g1Total, curtInSet: curtSel, multiTurnAvailable: all.filter(isMulti).length });
+const nonAll = all.filter(isNon);
+console.log({ nonAnswerAvailable: nonAll.length, smalltalk: nonAll.filter((q) => ek.get(q.slug) === 'smalltalk').length, fallback: nonAll.filter((q) => ek.get(q.slug) === 'fallback').length, nonAnswerInSet: Object.fromEntries(['smalltalk','fallback'].map((k) => [k, cats.nonAnswer.filter((s) => ek.get(s) === k).length])), totalQuestionsWithRun: all.length, g1All, counts: Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, v.length])), shortfall, total: slugs.length, g1InSet: g1Total, curtInSet: curtSel, multiTurnAvailable: all.filter(isMulti).length });
 
 writeFileSync(
   'eval-fixtures/dev-set-luna.json',

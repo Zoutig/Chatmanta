@@ -12,22 +12,22 @@
       "globex-planted-21-vergoed"
     ],
     "nonAnswer": [
+      "globex-injection-systeem-instructies",
       "smalltalk-greeting",
-      "off-topic-rekensom",
-      "off-topic-hoofdstad",
-      "off-topic-gedicht",
-      "smalltalk-doei",
-      "smalltalk-bedankt"
+      "out-of-corpus-prijs",
+      "out-of-corpus-openingstijden",
+      "out-of-corpus-klantenlijst",
+      "out-of-corpus-telefoon"
     ],
     "hardFact": [
       "multi-turn-baseline-followup-prijzen",
       "v063-hardfact-tarief-per-gesprek",
       "acme-ambiguous-kost-dat",
-      "out-of-corpus-prijs",
       "v063-hardfact-setup-fee",
       "v061-hardfact-prijs-per-maand",
       "v063-hardfact-basis-licentie-eur",
-      "acme-tarief-bitumen-plat-dak"
+      "acme-tarief-bitumen-plat-dak",
+      "globex-tarief-eerste-consult"
     ],
     "multiPart": [
       "initech-kor-vs-mkb-winstvrijstelling",
@@ -52,5 +52,5 @@
       "initech-zelfstandigenaftrek-2026"
     ]
   },
-  "slugsCsv": "planted-fact-hetzner,acme-planted-fact-monteur-jan,initech-planted-adviseur-mark-visser,acme-planted-prijs-49,acme-planted-korting-20procent,initech-planted-spoedlijn-0900,globex-planted-gratis-sportintake,globex-planted-21-vergoed,smalltalk-greeting,off-topic-rekensom,off-topic-hoofdstad,off-topic-gedicht,smalltalk-doei,smalltalk-bedankt,multi-turn-baseline-followup-prijzen,v063-hardfact-tarief-per-gesprek,acme-ambiguous-kost-dat,out-of-corpus-prijs,v063-hardfact-setup-fee,v061-hardfact-prijs-per-maand,v063-hardfact-basis-licentie-eur,acme-tarief-bitumen-plat-dak,initech-kor-vs-mkb-winstvrijstelling,initech-mh-zzp-aftrek-jaar1,embedding-model,multi-hop-llm-in-eu,multi-hop-embedding-vector,werkgebied-heerlen-bridge-out,werkgebied-dronten-bridge,werkgebied-brussel-out,v1-llm-model,vector-database,hosting-platform,stack-overzicht,typo-vector-db-informeel,v063-hardfact-api-rate-limit,v063-hardfact-max-doc-size,globex-rugpijn-diagnose,v063-hardfact-aantal-pricing-tiers,initech-zelfstandigenaftrek-2026"
+  "slugsCsv": "planted-fact-hetzner,acme-planted-fact-monteur-jan,initech-planted-adviseur-mark-visser,acme-planted-prijs-49,acme-planted-korting-20procent,initech-planted-spoedlijn-0900,globex-planted-gratis-sportintake,globex-planted-21-vergoed,globex-injection-systeem-instructies,smalltalk-greeting,out-of-corpus-prijs,out-of-corpus-openingstijden,out-of-corpus-klantenlijst,out-of-corpus-telefoon,multi-turn-baseline-followup-prijzen,v063-hardfact-tarief-per-gesprek,acme-ambiguous-kost-dat,v063-hardfact-setup-fee,v061-hardfact-prijs-per-maand,v063-hardfact-basis-licentie-eur,acme-tarief-bitumen-plat-dak,globex-tarief-eerste-consult,initech-kor-vs-mkb-winstvrijstelling,initech-mh-zzp-aftrek-jaar1,embedding-model,multi-hop-llm-in-eu,multi-hop-embedding-vector,werkgebied-heerlen-bridge-out,werkgebied-dronten-bridge,werkgebied-brussel-out,v1-llm-model,vector-database,hosting-platform,stack-overzicht,typo-vector-db-informeel,v063-hardfact-api-rate-limit,v063-hardfact-max-doc-size,globex-rugpijn-diagnose,v063-hardfact-aantal-pricing-tiers,initech-zelfstandigenaftrek-2026"
 }
