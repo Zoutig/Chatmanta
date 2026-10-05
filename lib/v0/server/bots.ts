@@ -980,6 +980,19 @@ const V0_11: BotConfig = {
   chatModel: 'gpt-6-luna',
 };
 
+// v0.11b — v0.11-vervolg: ALLEEN antwoord-generatie op gpt-6-luna; hulpstappen
+// (pre-process, rewrite, HyDE, decompose, rerank, follow-ups, reclassify) blijven op
+// gpt-4o-mini. Reden: eval v0.11 toonde betere grounding maar +1,1s TTFT, vooral door
+// tragere hulpstappen (generation_ms was gelijk). NIET gepromoveerd.
+const V0_11B: BotConfig = {
+  ...V0_11,
+  version: 'v0.11b',
+  label: 'v0.11b — Luna alleen voor antwoord, hulpstappen op gpt-4o-mini (experiment)',
+  description:
+    'v0.10-gedrag; chatModel gpt-6-luna (antwoord/regenerate), auxModel gpt-4o-mini (hulpstappen). Eval-experiment; niet gepromoveerd.',
+  auxModel: 'gpt-4o-mini',
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -1000,6 +1013,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_9_3.version]: V0_9_3,
   [V0_10.version]: V0_10,
   [V0_11.version]: V0_11,
+  [V0_11B.version]: V0_11B,
 };
 
 /**
@@ -1080,6 +1094,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_9_3.version,
   V0_10.version,
   V0_11.version,
+  V0_11B.version,
 ];
 
 /**

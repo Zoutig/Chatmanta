@@ -1,7 +1,7 @@
 import 'server-only';
 
 import OpenAI from 'openai';
-import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
+import { auxModelOf, costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import type { RagConfig as BotConfig, RagPersona as OrgPersona } from '@/lib/rag/types';
 import {
   parseReclassifyOutput,
@@ -70,8 +70,8 @@ export async function reclassifyAfterZeroHits(
     : RECLASSIFY_SYSTEM;
   try {
     const resp = await openai().chat.completions.create({
-      model: bot.chatModel,
-      ...openaiChatParams(bot.chatModel, { temperature: 0.0, maxTokens: 10 }),
+      model: auxModelOf(bot),
+      ...openaiChatParams(auxModelOf(bot), { temperature: 0.0, maxTokens: 10 }),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
@@ -81,7 +81,7 @@ export async function reclassifyAfterZeroHits(
     const inputTokens = resp.usage?.prompt_tokens ?? 0;
     const outputTokens = resp.usage?.completion_tokens ?? 0;
 
-    const costUsd = costForModelUsd(bot.chatModel, inputTokens, outputTokens);
+    const costUsd = costForModelUsd(auxModelOf(bot), inputTokens, outputTokens);
 
     const parsed = parseReclassifyOutput(text);
     if (!parsed) {

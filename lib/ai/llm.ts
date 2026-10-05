@@ -75,6 +75,11 @@ export function openaiChatParams(
   return { temperature: opts.temperature, max_tokens: opts.maxTokens };
 }
 
+/** Model voor hulpstappen van de RAG-pipeline: bot.auxModel, anders bot.chatModel. */
+export function auxModelOf(bot: { chatModel: string; auxModel?: string }): string {
+  return bot.auxModel ?? bot.chatModel;
+}
+
 /**
  * Lookup-helper. Onbekend model → 0/0 (neutrale fallback ipv crash). Cost-
  * onderschatting bij een onbekend model is acceptabel voor V0; we loggen

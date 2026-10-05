@@ -28,6 +28,8 @@ export type RagConfig = {
   enableRewriteByDefault: boolean;
   /** OpenAI chat model id. Embedding model is global (text-embedding-3-small). */
   chatModel: string;
+  /** Optioneel model voor de HULPSTAPPEN (pre-process, rewrite/multi-query, HyDE, decompose, rerank, follow-ups, reclassify). Default = chatModel. Antwoord-generatie/regenerate/cascade blijven chatModel. */
+  auxModel?: string;
   /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */

@@ -29,7 +29,7 @@ import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
 import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
-import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
+import { auxModelOf, costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import { AppError, type AppErrorCode } from '@/lib/errors/app-error';
 import {
   buildGeneralClosingStripRegex,
@@ -204,7 +204,7 @@ async function preProcessInput(
     ? `${rendered.preProcessMultiTurnAddon}\n\n${rendered.preProcessSystem}`
     : rendered.preProcessSystem;
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: systemPrompt,
     user: userMessage,
     temperature: RAG_DEFAULTS.REWRITE_TEMPERATURE,
@@ -269,7 +269,7 @@ async function generateHydeDocument(
   bot: RagConfig,
 ): Promise<{ hypothetical: string; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: HYDE_SYSTEM,
     user: query,
     temperature: 0.5,
@@ -310,7 +310,7 @@ async function decomposeQuery(
   bot: RagConfig,
 ): Promise<{ subQueries: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: DECOMP_SYSTEM,
     user: query,
     temperature: 0.2,
@@ -526,7 +526,7 @@ async function generateMultiQueries(
     return { queries: [baseQuery], inputTokens: 0, outputTokens: 0, costUsd: 0 };
   }
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: MULTI_QUERY_SYSTEM,
     user: `Geef ${count - 1} alternatieve formuleringen van deze zoekvraag (één per regel):\n\n${baseQuery}`,
     temperature: 0.5,
@@ -611,7 +611,7 @@ async function generateFollowUps(
   bot: RagConfig,
 ): Promise<{ followUps: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: FOLLOWUP_SYSTEM,
     user: `Vraag: ${question}\n\nAntwoord: ${answer}\n\nVervolgvragen:`,
     temperature: 0.6,
@@ -651,7 +651,7 @@ async function rerankChunks(
     .join('\n\n');
 
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: RERANK_SYSTEM,
     user: `Vraag: ${question}\n\nFragmenten:\n${numbered}\n\nGeef de top ${topN} fragmenten op relevantie:`,
     temperature: 0.0,
