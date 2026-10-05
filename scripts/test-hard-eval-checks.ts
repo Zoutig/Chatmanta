@@ -62,6 +62,9 @@ check('feitelijk antwoord → geen refusal', looksLikeRefusal('Een dakrenovatie 
 // looksLikeHardRefusal matcht ALLÉÉN echte weiger-markers.
 check('hardRefusal: "weet ik niet" → hard', looksLikeHardRefusal('Dat weet ik helaas niet.'), true);
 check('hardRefusal: "buiten ons werkgebied" → hard', looksLikeHardRefusal('Dat valt buiten ons werkgebied.'), true);
+check('hardRefusal: scope-weigering "kan je alleen helpen met" → hard', looksLikeHardRefusal('Ik kan je alleen helpen met vragen over Dakwerken De Boer.'), true);
+check('refusal: scope-weigering wordt herkend', looksLikeRefusal('Ik kan je alleen helpen met vragen over Dakwerken De Boer.'), true);
+check('geen vals-positief: antwoord met "helpen met"', looksLikeHardRefusal('Wij kunnen je helpen met een offerte voor een nieuw dak.'), false);
 check('hardRefusal: soft contact-CTA → NIET hard', looksLikeHardRefusal('Neem gerust contact op met ons kantoor.'), false);
 check('looksLikeRefusal: soft-CTA blijft refusal (ongewijzigd)', looksLikeRefusal('Neem gerust contact op met ons kantoor.'), true);
 
