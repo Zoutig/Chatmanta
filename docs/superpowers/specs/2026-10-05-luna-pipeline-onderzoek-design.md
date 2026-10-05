@@ -86,15 +86,21 @@ Besluit: **Sol wordt de hoofd-judge** (vervangt gpt-4o).
 - **Cross-family-controle:** Sol en Luna zijn één familie (risico op mildere beoordeling). De gratis Claude-judge blijft als tweede oordeel op veto's en grensgevallen.
 - Sol via `openaiChatParams` (max_completion_tokens; reasoning-effort voor de judge: te bepalen in de herijking — judging streamt niet, dus reasoning kost hier geen TTFT).
 
-## Werkwijze en kosten (schatting)
+## Werkwijze en kosten — ZUINIGE ROUTE (gekozen 2026-10-05, OpenAI-saldo beperkt)
 
-1. **Judge-overstap + herijking** (Sol op opgeslagen antwoorden v0.10 + v0.11b) — ~$3-4. Nagaan of eval:run bestaande antwoorden kan herjudgen; zo niet, kleine aanpassing.
-2. **Dev-set** (~40 lastige vragen: decompose, multi-turn, smalltalk, off-topic, hard facts), Claude-judge, 2 runs per variant — centen per ronde. Snel itereren op v0.12a/b/c.
-3. **Volledige run** (186 + hard-eval) alleen voor finalisten — ~$1,5-2 per versie.
-4. **Priority-tier-meting** op de winnaar: zelfde pipeline met `service_tier: 'priority'` (≈2× prijs); TTFT + kosten → productbeslissing (duurdere klant-tier). Minder calls × priority versterken elkaar.
-5. **Spoor 1 parallel:** V1-config naar v0.11b-instelling + `v1:eval`.
+| Stap | Kosten (schatting) |
+|---|---|
+| 1. **Sol-herijking alleen op v0.11b** (de referentie; v0.10 wordt níet herjudged) | ~$1,4 |
+| 2. **Spoor 1:** V1-config naar v0.11b-instelling + `v1:eval` (bot-gen, Claude-judge) | < $0,10 |
+| 3. **Dev-set** (~40 lastige vragen), Claude-judge ($0), 2 runs per variant v0.12a/b/c | ~$0,5-1 |
+| 4. **Volledige run** (186 + hard-eval, Sol-judge) voor **één** finalist | ~$1,6 |
+| 5. **Priority-tier-meting** alleen op de dev-set, alleen TTFT (geen judge) | ~$0,1 |
+| **Totaal** | **~$3-4** |
 
-Totale eval-spend verwacht: ~$10-15.
+Kostendiscipline: elke billable stap pas na expliciet akkoord; hard-eval altijd met lage
+`--max-cost`; Sol-judge alleen in stap 1 en 4. Gemeten basis (2026-10-05): gpt-4o-judge
+≈ $1,56/versie (186 q), Luna-bot ≈ $0,14/versie + hard-eval ≈ $0,07. Sol ≈ $1,4/versie
+met reasoning uit; reasoning `low` kan dit tot ~$2-2,5 brengen (reasoning = output-tokens).
 
 ## Buiten scope
 
