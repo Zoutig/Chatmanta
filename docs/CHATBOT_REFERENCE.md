@@ -115,7 +115,7 @@ Een lopende test (`scripts/test-bot-defaults.ts`) bewaakt dat oudere versies nie
 
 - Anthropic Claude Haiku 4.5 (primaire LLM)
 - Firecrawl (website-crawler, max 50 pagina's)
-- Sentry, UptimeRobot, Upstash Ratelimit, Resend (hardening, fase 7 van het bouwplan)
+- Sentry, Better Stack (uptime), Upstash Ratelimit, Resend (hardening, fase 7 van het bouwplan)
 
 ---
 
@@ -1053,7 +1053,7 @@ eval-out/                     # gitignored, gegenereerd door eval:report
 - Productie multi-tenancy (org_id row-level security)
 - Per-user authenticatie + Supabase Auth
 - Anthropic Claude Haiku 4.5 als primair model
-- Sentry, UptimeRobot, Resend, Upstash (observability + comms)
+- Sentry, Better Stack (uptime), Resend, Upstash (observability + comms)
 - Firecrawl (website crawler)
 - Billing + klantbeheer-dashboard
 - Widget-bouwer voor klanten

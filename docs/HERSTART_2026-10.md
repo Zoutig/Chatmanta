@@ -62,7 +62,7 @@
 | **Resend** | Uitgaande e-mail (contactverzoeken, feedback) | ✅ DNS-records voor chatmanta.com staan er nog (DKIM `resend._domainkey`, SPF + MX op `send.`, DMARC) → verificatie hoort intact te zijn. MCP gekoppeld. Afzenderdomein = **chatmanta.com** (niet .nl!). | Laatste zekerheid: 1 echte testmail bij stap E6. |
 | **Upstash** (Redis) | Rate-limiting | ✅ **Hersteld 5 okt.** De oude free-database was door inactiviteit verwijderd (site viel stil terug op per-server-tellers). Nieuwe DB `chatmanta-ratelimit` (Frankfurt) aangemaakt, URL+token op Vercel prod+preview gezet, redeploy gedaan. Live geverifieerd: burst op `/api/v1/chat` → 30× 401, daarna 429; teller staat in Redis. | ⚠️ **Valkuil:** een free-DB wordt na lange stilte verwijderd. Na launch houdt echt verkeer hem actief; bij een nieuwe stille periode opnieuw checken. |
 | **Sentry** | Foutmeldingen | ❌ **Nooit aangezet** (`SENTRY_DSN` ontbreekt) | Optioneel vóór launch, sterk aanbevolen bij 3 klanten tegelijk (stap C6). |
-| **UptimeRobot** | Waarschuwt als site down is | ❌ Nooit opgezet | Aanbevolen bij 3 klanten tegelijk (stap C6). |
+| **Better Stack** (vervangt UptimeRobot) | Waarschuwt als site down is | ✅ **Opgezet 5 okt** (gratis plan): monitors op `/v1/login`, `/widget-v1.js`, `/widget.js`; alarm naar Sebastiaan@chatmanta.com. | Statuspagina pas bij betalende klanten. |
 | **Domein chatmanta.nl** | Hoofddomein (TransIP) | ✅ DNS bij TransIP, SSL-certificaat geldig t/m **10 dec 2026** (Vercel vernieuwt automatisch) | Niets. |
 | **Domein chatmanta.com** | Mail-afzender + redirect | ✅ Geregistreerd t/m **10 mei 2027**. Redirect naar chatmanta.nl werkt. ❌ **Nog steeds geen MX-records** → mail aan `…@chatmanta.com` bounct. | Stap C5. |
 | **GitHub** | Code | ✅ `gh` werkt. 2 open PR's: **#254** (security, belangrijk) en #207 (devcontainer, draft, niet nodig voor launch). | — |
@@ -106,7 +106,7 @@ Doe dit met de tabel in §4 ernaast. Per dienst: **inloggen → account actief �
   - Supabase → Auth → "Leaked password protection" aan. Daarna 2FA enrollen op je Jorion-admin-account (het admin-dashboard eist daarna automatisch 2FA).
 - [ ] **C5. 🟡 MX-records op chatmanta.com** · 🧑 (TransIP)
   - Anders kunnen klanten niet terugmailen naar je afzenderadres. Simpelste: TransIP-mailbox of doorsturen naar je Gmail.
-- [ ] **C6. 🟡 Monitoring: Sentry + UptimeRobot** · 🧑 account, 🤖 zet de DSN
+- [ ] **C6. 🟡 Monitoring: Sentry + uptime** · 🧑 account, 🤖 zet de DSN — uptime-deel ✅ via Better Stack (5 okt), Sentry staat nog open
   - Bij 3 klanten tegelijk wil je fouten zien vóórdat een klant belt. Beide gratis.
 - [ ] **C7. 🟢 (optioneel) Plan 015 sectie G — injectie-regexfix** · 🤖
   - Klein, geen prod-gate: dicht een gat waarbij "negeer alle vorige instructies" door het filter glipt. Plannen 012–014 kunnen ná launch.
