@@ -63,16 +63,22 @@ export function openaiChatParams(
   model: string,
   opts: { temperature: number; maxTokens: number },
 ):
-  | { temperature: number; max_tokens: number }
-  | { temperature: number; max_completion_tokens: number; reasoning_effort: 'none' } {
+  | ({ temperature: number; max_tokens: number } & { service_tier?: 'priority' })
+  | ({ temperature: number; max_completion_tokens: number; reasoning_effort: 'none' } & {
+      service_tier?: 'priority';
+    }) {
+  // Meet-hefboom (Luna-onderzoek): OPENAI_SERVICE_TIER=priority → snellere, ~2× duurdere
+  // verwerking op ALLE calls. Alleen voor metingen; een klant-tier wordt later per org.
+  const tier = process.env.OPENAI_SERVICE_TIER === 'priority' ? { service_tier: 'priority' as const } : {};
   if (model.startsWith('gpt-6')) {
     return {
       temperature: opts.temperature,
       max_completion_tokens: opts.maxTokens,
       reasoning_effort: 'none',
+      ...tier,
     };
   }
-  return { temperature: opts.temperature, max_tokens: opts.maxTokens };
+  return { temperature: opts.temperature, max_tokens: opts.maxTokens, ...tier };
 }
 
 /** Model voor hulpstappen van de RAG-pipeline: bot.auxModel, anders bot.chatModel. */

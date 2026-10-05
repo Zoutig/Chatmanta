@@ -30,3 +30,19 @@ test('auxModelOf — default chatModel, override via auxModel', () => {
   assert.equal(auxModelOf({ chatModel: 'gpt-4o-mini' }), 'gpt-4o-mini');
   assert.equal(auxModelOf({ chatModel: 'gpt-6-luna', auxModel: 'gpt-4o-mini' }), 'gpt-4o-mini');
 });
+
+test('openaiChatParams — OPENAI_SERVICE_TIER=priority voegt service_tier toe', () => {
+  const prev = process.env.OPENAI_SERVICE_TIER;
+  process.env.OPENAI_SERVICE_TIER = 'priority';
+  try {
+    for (const m of ['gpt-6-luna', 'gpt-4o-mini']) {
+      assert.equal(
+        (openaiChatParams(m, { temperature: 0, maxTokens: 10 }) as { service_tier?: string }).service_tier,
+        'priority',
+      );
+    }
+  } finally {
+    if (prev === undefined) delete process.env.OPENAI_SERVICE_TIER;
+    else process.env.OPENAI_SERVICE_TIER = prev;
+  }
+});
