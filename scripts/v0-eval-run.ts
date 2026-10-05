@@ -22,6 +22,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { performance } from 'node:perf_hooks';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import {
   runEvalRow,
@@ -34,6 +36,7 @@ import {
 import { BOTS, BOT_VERSIONS_ORDERED, EVAL_DEFAULT_VERSIONS, resolveBot } from '../lib/v0/server/bots';
 import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
 import { JUDGE_MODEL } from '../lib/v0/server/eval-judge-model';
+import { buildJobs, type EvalJob } from '../lib/v0/server/eval-jobs';
 
 const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
   'dev-org': '00000000-0000-0000-0000-0000000000d0',
@@ -81,7 +84,12 @@ if (runsArg && (!Number.isFinite(runsCount) || runsCount < 1)) {
 }
 const smokeMode = process.argv.includes('--smoke');
 const allVersions = process.argv.includes('--all');
-const skipPairwise = process.argv.includes('--no-pairwise');
+const noJudge = process.argv.includes('--no-judge');
+const interleave = process.argv.includes('--interleave');
+const outPath = parseStringArg('out');
+if (noJudge && !outPath) fail('--no-judge vereist --out=<pad.json> (antwoorden gaan niet naar eval_runs)');
+// --no-judge → geen judge-scores, dus ook geen pairwise.
+const skipPairwise = process.argv.includes('--no-pairwise') || noJudge;
 const hydeMode: HydeModeRequest = hydeModeArg
   ? (isHydeModeRequest(hydeModeArg)
       ? hydeModeArg
@@ -163,15 +171,8 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------------------
   // Build (question × version × runIndex) jobs
   // ---------------------------------------------------------------------------
-  type Job = { question: EvalQuestion; botVersion: string; runIndex: number };
-  const jobs: Job[] = [];
-  for (const v of versions) {
-    for (const q of questions) {
-      for (let r = 0; r < runsCount; r++) {
-        jobs.push({ question: q, botVersion: v, runIndex: r });
-      }
-    }
-  }
+  type Job = EvalJob<EvalQuestion>;
+  const jobs: Job[] = buildJobs(questions, versions, runsCount, interleave);
 
   const t0 = performance.now();
   const versionsMode = versionsFilter
@@ -194,7 +195,8 @@ async function main(): Promise<void> {
   console.log(`  runs/cell    : ${runsCount}${runsCount > 1 ? ' (multi-run voor variance)' : ''}`);
   console.log(`  jobs         : ${jobs.length}`);
   console.log(`  concurrency  : ${CONCURRENCY}`);
-  console.log(`  judge        : ${JUDGE_MODEL}`);
+  console.log(`  judge        : ${noJudge ? 'OFF (--no-judge)' : JUDGE_MODEL}`);
+  console.log(`  volgorde     : ${interleave ? 'interleaved' : 'version-major'}`);
   console.log(`  hyde-mode    : ${hydeMode}${hydeMode === 'auto' ? ' (volgt bot-config)' : ' (override)'}`);
   console.log(`  pairwise     : ${skipPairwise ? 'OFF (--no-pairwise)' : 'AAN tussen ' + EVAL_DEFAULT_VERSIONS.join(' vs ')}`);
   console.log('');
@@ -212,6 +214,8 @@ async function main(): Promise<void> {
   // Key = `${question_id}::${bot_version}::${runIndex}`. Alleen runIndex=0
   // wordt gepaird (multi-run is voor variance op absolute, niet pairwise).
   const answerStash = new Map<string, string>();
+  // --no-judge: rijen gaan naar --out JSON i.p.v. eval_runs.
+  const devRows: EvalRunRow[] = [];
 
   const rows = await withConcurrency<Job, EvalRunRow | null>(jobs, CONCURRENCY, async (job, idx) => {
     const bot = resolveBot(job.botVersion);
@@ -224,12 +228,17 @@ async function main(): Promise<void> {
         bot,
         hydeMode,
         runIndex: job.runIndex,
+        skipJudge: noJudge,
       });
-      const { error: insErr } = await sb.from('eval_runs').insert(row);
-      if (insErr) {
-        console.error(`  ✗ ${tag} — insert: ${insErr.message}`);
-        failed++;
-        return null;
+      if (noJudge) {
+        devRows.push(row);
+      } else {
+        const { error: insErr } = await sb.from('eval_runs').insert(row);
+        if (insErr) {
+          console.error(`  ✗ ${tag} — insert: ${insErr.message}`);
+          failed++;
+          return null;
+        }
       }
       // Stash antwoord voor pairwise (alleen runIndex=0).
       if (job.runIndex === 0 && !skipPairwise) {
@@ -255,6 +264,12 @@ async function main(): Promise<void> {
 
   const absoluteSec = Math.round((performance.now() - t0) / 100) / 10;
   const okRows = rows.filter((r): r is EvalRunRow => r !== null);
+
+  if (noJudge && outPath) {
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify(devRows, null, 2));
+    console.log(`  → ${devRows.length} antwoorden geschreven naar ${outPath} (geen DB-writes)`);
+  }
 
   // ---------------------------------------------------------------------------
   // V0.7 Pairwise judging — tussen de 2 EVAL_DEFAULT_VERSIONS. Slaat over

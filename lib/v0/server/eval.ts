@@ -825,6 +825,9 @@ export async function runEvalRow(args: {
   hydeMode?: HydeModeRequest;
   /** Index in een multi-run batch (--runs=N). Default 0. */
   runIndex?: number;
+  /** true = sla de LLM-judge over (scores null, judge_cost 0). Voor goedkope
+      dev-set-runs waarvan de antwoorden apart door Claude ($0) beoordeeld worden. */
+  skipJudge?: boolean;
 }): Promise<EvalRunRow> {
   const { organizationId, question, bot } = args;
   const hydeModeRequested: HydeModeRequest = args.hydeMode ?? 'auto';
@@ -979,7 +982,17 @@ export async function runEvalRow(args: {
   }
 
   // Judge call. V0.7: organizationId doorgeven voor persona-injectie.
-  const judge = await runJudge({ question, response, organizationId });
+  const judge: JudgeScores = args.skipJudge
+    ? {
+        ...EMPTY_JUDGE_FAIL,
+        reasoning: 'skipJudge — beoordeling extern (Claude)',
+        parseError: false,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        latencyMs: 0,
+      }
+    : await runJudge({ question, response, organizationId });
 
   // Sources snapshot (compact, geen embedding/uuid noise).
   const botSources =
