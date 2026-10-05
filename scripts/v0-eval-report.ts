@@ -97,7 +97,12 @@ const sb = createClient(url!, key!, {
 // ---------------------------------------------------------------------------
 // 1. Load all eval_runs gejoined met eval_questions
 // ---------------------------------------------------------------------------
-const { data: runRows, error: runErr } = await sb
+const judgeModelFilter =
+  process.argv
+    .slice(2)
+    .map((a) => a.match(/^--judge-model=(.+)$/)?.[1])
+    .find(Boolean) ?? null;
+let runQuery = sb
   .from('eval_runs')
   .select(
     `id, organization_id, question_id, bot_version, judge_model, bot_kind, bot_answer, bot_sources,
@@ -112,8 +117,9 @@ const { data: runRows, error: runErr } = await sb
      hard_fact_supported, missing_hard_facts, hard_fact_status,
      stage_timings_ms,
      created_at`,
-  )
-  .order('created_at', { ascending: false });
+  );
+if (judgeModelFilter) runQuery = runQuery.eq('judge_model', judgeModelFilter);
+const { data: runRows, error: runErr } = await runQuery.order('created_at', { ascending: false });
 if (runErr) fail(`eval_runs select: ${runErr.message}`);
 if (!runRows || runRows.length === 0) {
   console.log('Geen eval_runs in DB. Run eerst `npm run eval:run`.');
@@ -340,7 +346,7 @@ const stamp = now
 const lines: string[] = [];
 lines.push(`# V0 Eval Report — ${now.toISOString()}`);
 lines.push('');
-lines.push(`Snapshot van de meest-recente runs per (vraag × versie). Judge: ${latestRuns[0]?.judge_model ?? 'unknown'}.`);
+lines.push(`Snapshot van de meest-recente runs per (vraag × versie). Judge: ${judgeModelFilter ?? latestRuns[0]?.judge_model ?? 'unknown'}${judgeModelFilter ? ' (gefilterd)' : ''}.`);
 lines.push('');
 lines.push(`- Vragen: **${questions.length}**`);
 lines.push(`- Versies: **${versionsForHeader.join(', ')}**`);
