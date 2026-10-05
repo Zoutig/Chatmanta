@@ -29,7 +29,7 @@ import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
 import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
-import { costForModelUsd } from '@/lib/ai/llm';
+import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import { AppError, type AppErrorCode } from '@/lib/errors/app-error';
 import {
   buildGeneralClosingStripRegex,
@@ -62,12 +62,6 @@ function classifyLlmError(err: unknown): 'LLM_TIMEOUT' | 'LLM_UNAVAILABLE' {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-// Cost rates voor gpt-4o-mini (USD per 1M tokens). Wanneer een toekomstige
-// bot-versie naar een ander chat-model gaat, moet dit een lookup-tabel
-// worden — voor nu is gpt-4o-mini de enige V0-keuze.
-const CHAT_INPUT_PER_M_USD = 0.15;
-const CHAT_OUTPUT_PER_M_USD = 0.60;
 
 // Structurele defaults — niet bot-versie-specifiek. Voor per-versie variatie
 // (prompts, threshold, temperatuur, model) zie lib/v0/server/bots.ts.
@@ -121,8 +115,7 @@ async function chatComplete({
 }): Promise<ChatCompleteResult> {
   const resp = await openai().chat.completions.create({
     model,
-    temperature,
-    max_tokens: maxTokens,
+    ...openaiChatParams(model, { temperature, maxTokens }),
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -131,9 +124,7 @@ async function chatComplete({
   const text = resp.choices[0]?.message?.content ?? '';
   const inputTokens = resp.usage?.prompt_tokens ?? 0;
   const outputTokens = resp.usage?.completion_tokens ?? 0;
-  const costUsd =
-    (inputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-    (outputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+  const costUsd = costForModelUsd(model, inputTokens, outputTokens);
   return { text, inputTokens, outputTokens, costUsd };
 }
 
@@ -1867,8 +1858,7 @@ KRITISCHE FORMAT-REGELS:
         try {
           const resp = await openai().chat.completions.create({
             model: bot.chatModel,
-            temperature: bot.chatTemperature,
-            max_tokens: 200,
+            ...openaiChatParams(bot.chatModel, { temperature: bot.chatTemperature, maxTokens: 200 }),
             messages: [
               { role: 'system', content: generalSystem },
               { role: 'user', content: original },
@@ -1877,9 +1867,7 @@ KRITISCHE FORMAT-REGELS:
           modelText = resp.choices[0]?.message?.content ?? '';
           genChatInputTokens = resp.usage?.prompt_tokens ?? 0;
           genChatOutputTokens = resp.usage?.completion_tokens ?? 0;
-          genChatCostUsd =
-            (genChatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-            (genChatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+          genChatCostUsd = costForModelUsd(bot.chatModel, genChatInputTokens, genChatOutputTokens);
         } catch (err) {
           stopGenerationGen();
           const code = classifyLlmError(err);
@@ -2238,8 +2226,10 @@ KRITISCHE FORMAT-REGELS:
   try {
     const stream = await openai().chat.completions.create({
       model: bot.chatModel,
-      temperature: bot.chatTemperature,
-      max_tokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      ...openaiChatParams(bot.chatModel, {
+        temperature: bot.chatTemperature,
+        maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      }),
       stream: true,
       stream_options: { include_usage: true },
       messages: [
@@ -2260,9 +2250,7 @@ KRITISCHE FORMAT-REGELS:
       if (chunk.usage) {
         chatInputTokens = chunk.usage.prompt_tokens ?? 0;
         chatOutputTokens = chunk.usage.completion_tokens ?? 0;
-        chatCostUsd =
-          (chatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-          (chatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+        chatCostUsd = costForModelUsd(bot.chatModel, chatInputTokens, chatOutputTokens);
       }
     }
   } catch (err) {

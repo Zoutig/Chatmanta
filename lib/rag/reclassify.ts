@@ -1,6 +1,7 @@
 import 'server-only';
 
 import OpenAI from 'openai';
+import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import type { RagConfig as BotConfig, RagPersona as OrgPersona } from '@/lib/rag/types';
 import {
   parseReclassifyOutput,
@@ -70,8 +71,7 @@ export async function reclassifyAfterZeroHits(
   try {
     const resp = await openai().chat.completions.create({
       model: bot.chatModel,
-      temperature: 0.0,
-      max_tokens: 10,
+      ...openaiChatParams(bot.chatModel, { temperature: 0.0, maxTokens: 10 }),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
@@ -81,12 +81,7 @@ export async function reclassifyAfterZeroHits(
     const inputTokens = resp.usage?.prompt_tokens ?? 0;
     const outputTokens = resp.usage?.completion_tokens ?? 0;
 
-    // OpenAI gpt-4o-mini pricing (as of May 2026)
-    const CHAT_INPUT_PER_M_USD = 0.15;
-    const CHAT_OUTPUT_PER_M_USD = 0.6;
-    const costUsd =
-      (inputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-      (outputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+    const costUsd = costForModelUsd(bot.chatModel, inputTokens, outputTokens);
 
     const parsed = parseReclassifyOutput(text);
     if (!parsed) {

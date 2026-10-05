@@ -966,6 +966,20 @@ const V0_10: BotConfig = {
   preProcessSystem: V0_10_PREPROCESS_SYSTEM,
 };
 
+// v0.11 — EXPERIMENT: v0.10-gedrag op gpt-6-luna (release 2026-09-22; $0.10/$0.50 per 1M).
+// Alleen chatModel wisselt (geldt voor ALLE bot.chatModel-calls: pre-process, rewrite,
+// rerank, HyDE, answer, regenerate, reclassify). Prompts/flags byte-identiek aan v0.10.
+// Redeneren staat uit (reasoning_effort:'none', zie openaiChatParams in lib/ai/llm.ts).
+// NIET gepromoveerd: LATEST_BOT_VERSION blijft v0.10 tot de eval-gate gehaald is.
+const V0_11: BotConfig = {
+  ...V0_10,
+  version: 'v0.11',
+  label: 'v0.11 — v0.10 op gpt-6-luna (experiment)',
+  description:
+    'v0.10-gedrag, enige wijziging: chatModel gpt-4o-mini → gpt-6-luna (redeneren uit). Eval-experiment om kosten/kwaliteit/TTFT te vergelijken; niet gepromoveerd.',
+  chatModel: 'gpt-6-luna',
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -985,6 +999,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_9_2.version]: V0_9_2,
   [V0_9_3.version]: V0_9_3,
   [V0_10.version]: V0_10,
+  [V0_11.version]: V0_11,
 };
 
 /**
@@ -1064,6 +1079,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_9_2.version,
   V0_9_3.version,
   V0_10.version,
+  V0_11.version,
 ];
 
 /**

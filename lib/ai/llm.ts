@@ -44,9 +44,36 @@ export const MODEL_COSTS_USD = {
   'claude-sonnet-4-6':  { input_per_m: 3.0,  output_per_m: 15.0 },
   'gpt-4o-mini':        { input_per_m: 0.15, output_per_m: 0.60 },
   'gpt-4o':             { input_per_m: 2.50, output_per_m: 10.0 },
+  // GPT-6-familie (release 2026-09-22; prijzen van developers.openai.com/api/docs/models).
+  'gpt-6-luna':         { input_per_m: 0.10, output_per_m: 0.50 },
+  'gpt-6-sol':          { input_per_m: 2.0,  output_per_m: 10.0 },
 } as const satisfies Record<string, { input_per_m: number; output_per_m: number }>;
 
 export type SupportedModelUsd = keyof typeof MODEL_COSTS_USD;
+
+/**
+ * Chat-Completions-parameters per OpenAI-model. GPT-6 (redeneermodellen) weigert
+ * `max_tokens` (400: gebruik `max_completion_tokens`) en redeneert standaard
+ * (verborgen reasoning-tokens: extra kosten + latency). Voor onze korte
+ * RAG-antwoorden zetten we redeneren uit via `reasoning_effort: 'none'`;
+ * `temperature` blijft dan gewoon werken (gemeten 2026-10). Niet-GPT-6 modellen
+ * krijgen exact de oude parameters — byte-identiek gedrag voor v0.10 en ouder.
+ */
+export function openaiChatParams(
+  model: string,
+  opts: { temperature: number; maxTokens: number },
+):
+  | { temperature: number; max_tokens: number }
+  | { temperature: number; max_completion_tokens: number; reasoning_effort: 'none' } {
+  if (model.startsWith('gpt-6')) {
+    return {
+      temperature: opts.temperature,
+      max_completion_tokens: opts.maxTokens,
+      reasoning_effort: 'none',
+    };
+  }
+  return { temperature: opts.temperature, max_tokens: opts.maxTokens };
+}
 
 /**
  * Lookup-helper. Onbekend model → 0/0 (neutrale fallback ipv crash). Cost-
