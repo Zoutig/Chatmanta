@@ -16,6 +16,11 @@ import { resolveBot, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 const V1_OVERRIDES = {
   version: 'v1.0',
   label: 'V1',
+  // Luna voor de antwoord-generatie, hulpstappen op gpt-4o-mini (= v0.11b-instelling;
+  // eval 2026-10-05: grounding G 3,76→4,16, botkosten −29%, TTFT ≈ gelijk). Zie
+  // docs/superpowers/specs/2026-10-05-luna-pipeline-onderzoek-design.md.
+  chatModel: 'gpt-6-luna',
+  auxModel: 'gpt-4o-mini',
   description: 'V1 RAG document-only chatbot-scoped (PR-1b)',
   similarityThreshold: 0.4,
   chatbotScoped: true,
