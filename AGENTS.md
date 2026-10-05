@@ -12,31 +12,30 @@ ChatManta is een website-chatbot SaaS van Jorion Solutions. Knowledge-bot voor M
 
 ## Hoe je met dit project werkt
 
-De blueprint en het bouwplan zijn **context, geen kookboek.** Ze zijn geschreven voordat de eerste regel code er stond. Behandel ze als de kennis van een ervaren collega die jou de richting wijst — niet als instructies om over te tikken.
-
 **Verwachte werkstroom voor elke niet-triviale taak:**
 
-1. **Lees** de relevante secties van blueprint + bouwplan vóór je iets typt.
-2. **Denk zelf na**: past de blueprint-aanpak hier? Is er een eenvoudiger of veiliger alternatief? Klopt het nog met de huidige library-versies?
-3. **Maak een kort plan** (3-7 bullets): wat ga je doen, welke files, welke blueprint-aannames volg of verlaat je. Bij wijzigingen aan datamodel, security-laag of widget-API: leg het plan voor aan de gebruiker vóór je bouwt.
-4. **Stel vragen** als de blueprint iets open laat (sectie 34 "Open technische vragen" en 35 "Beslissingen die later genomen mogen worden" zijn expliciet niet-beslist). Verzin geen antwoord — vraag.
+1. **Lees** de relevante code + in-repo docs (zie hieronder) vóór je iets typt.
+2. **Denk zelf na**: is er een eenvoudiger of veiliger alternatief? Klopt het nog met de huidige library-versies?
+3. **Maak een kort plan** (3-7 bullets): wat ga je doen, welke files, welke aannames. Bij wijzigingen aan datamodel, security-laag of widget-API: leg het plan voor aan de gebruiker vóór je bouwt.
+4. **Stel vragen** als iets niet beslist is (zie de open beslissingen in `docs/V2_SCOPE_EN_PRINCIPES.md` §7). Verzin geen antwoord — vraag.
 5. **Bouw**, en commit klein en vaak.
-6. **Wijk af van de blueprint** als je daar goede grond voor hebt — maar leg dat uit en vraag bevestiging. De blueprint is een levend document.
 
-## Bron-van-waarheid documenten
+## Bron-van-waarheid documenten (alle in de repo)
 
-- **Concept Blueprint v4.0** — `c:\Users\solys\Documents\Claude\Projects\Jorion Solutions\Concept_Blueprint_ChatManta.md` (~3400 regels)
-- **Bouwplan v2.0 (8 fases)** — `c:\Users\solys\Documents\Claude\Projects\Jorion Solutions\Bouwplan_Planning_ChatManta_v1.md` (~1500 regels)
+- **Code + migraties** — `supabase/migrations*/`, `lib/`, `app/`. Dit is de waarheid; docs kunnen achterlopen.
+- **`docs/V2_SCOPE_EN_PRINCIPES.md`** — gedistilleerde opvolger van de oorspronkelijke Concept Blueprint + Bouwplan (mei 2026): actuele V1-scope-grens, V2/V3-backlog, billing/AVG/security-hardening-principes (SA-6..14), open beslissingen en een tabel "blueprint zei X → we doen Y".
+- **`docs/V1_STATUS_EN_PLAN.md`** (sectie "Besliste keuzes") en **`docs/V1_LAUNCH_TODO.md`** — V1-beslissingen en wat er nog vóór launch moet.
+- **`docs/AGENT_LANDMIJNEN.md`** — duurzame valkuilen.
 
-> ⚠️ **Deze twee paden zijn machine-lokaal** (Sebastiaans primaire PC) en staan **niet in de repo** — vanuit een worktree op een andere machine, een devcontainer of een headless/cloud-sessie zijn ze onbereikbaar. Zijn ze er niet: bouw dan verder op de **in-repo bronnen** die wél overal meereizen — deze AGENTS.md (de hard rules + scope hieronder zijn de operatieve subset van de blueprint), `docs/AGENT_LANDMIJNEN.md` (duurzame valkuilen), `docs/V1_LAUNCH_TODO.md` en `docs/V1_STATUS_EN_PLAN.md` — en vraag Sebastiaan om een specifieke blueprint-sectie wanneer je die echt nodig hebt. Verzin geen blueprint-inhoud die je niet kunt lezen.
+De originele blueprint en het bouwplan zijn **historisch archief** buiten de repo; ze zijn ~75% achterhaald en niet meer leidend. Lees ze niet als bron; vraag Sebastiaan als je de oorspronkelijke motivatie achter een keuze nodig hebt.
 
-Bij conflict: V1 Minimal Build Scope (blueprint sectie 1.5) heeft voorrang, daarna Security Addendum, daarna specifieke sectie boven Executive Summary.
+Bij conflict: code + migraties > "Besliste keuzes" in `V1_STATUS_EN_PLAN.md` > `V2_SCOPE_EN_PRINCIPES.md`.
 
 ## Wat NIET ter discussie staat (echt hard rules)
 
 Deze keuzes zijn gemaakt. Wijken hiervan = risico op datalek, AVG-overtreding of cost-explosie.
 
-- **V1 Minimal Build Scope** (blueprint sectie 1.5). Bouw nooit een feature die daar onder V2/V3 staat — ook niet als het "snel even" lijkt.
+- **V1-scope-grens** (`docs/V2_SCOPE_EN_PRINCIPES.md` §2-3). Bouw nooit een feature die daar onder V2/V3 staat zonder expliciete opdracht van Sebastiaan — ook niet als het "snel even" lijkt. Staat hij nergens: vraag.
 - **Multi-tenancy by design**: `organization_id NOT NULL` op élke klantdata-tabel; uitzonderingen alleen `users` en `audit_logs`.
 - **RLS overal**: bij elke nieuwe tabel hoort RLS aan + policies in dezelfde migration. Niet later.
 - **Service-role discipline (SA-5)**: `supabaseAdmin` alleen via wrappers in `lib/supabase/admin.ts`. Geen losse imports.
@@ -58,9 +57,9 @@ Op uitvoeringsniveau is veel ruimte voor jouw keuzes — daar wordt jouw inbreng
 - **UI-implementatie** binnen shadcn/ui — compositie, state-handling, error/loading states
 - **SQL-formuleringen** zolang CHECK constraints, RLS, indexes en cascade-regels gerespecteerd blijven
 - **Helper-functies en utils** — extract gerust, dedupliceer, refactor
-- **Library-keuzes binnen de stack** — ken je een betere package dan de blueprint noemt: leg voor met argumenten
+- **Library-keuzes binnen de stack** — ken je een betere package: leg voor met argumenten
 - **Testen, comments, error-messages** — naar wat de situatie vraagt
-- **Concrete drempels** waar de blueprint "valideren via testset" zegt (similarity threshold 0.7, chunk size 500, top-K 5): startwaarden, geen wetten
+- **Concrete RAG-drempels** (similarity threshold, chunk size, top-K): empirisch getuned via de eval-pipeline, geen wetten — wijzig alleen met eval-bewijs
 
 ## Stack
 
@@ -107,7 +106,7 @@ Fase 5 en 6 hebben al een werkende V0-implementatie in main; de volgorde beschri
 ## Hoe je met de gebruiker (Sebastiaan) communiceert
 
 - Eerst plannen, dan bouwen — vooral bij datamodel, RLS, security, widget-API
-- Wees expliciet wanneer je een blueprint-default volgt vs wanneer je zelf kiest
+- Wees expliciet wanneer je een vastgelegde keuze (code/docs) volgt vs wanneer je zelf kiest
 - Wijzig nooit een gemarkeerde V1 hard rule zonder te vragen
 - Weet je iets niet zeker: zeg dat en stel een verifieerbare check voor
 - Bij library-versies en npm-packages: lees `node_modules/<pkg>/README` of recente docs vóór je API-aannames doet — Next.js, Supabase en Vercel AI SDK veranderen snel
