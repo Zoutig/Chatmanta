@@ -33,8 +33,8 @@ import {
 } from '../lib/v0/server/eval';
 import { BOTS, BOT_VERSIONS_ORDERED, EVAL_DEFAULT_VERSIONS, resolveBot } from '../lib/v0/server/bots';
 import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
-
 import { JUDGE_MODEL } from '../lib/v0/server/eval-judge-model';
+
 const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
   'dev-org': '00000000-0000-0000-0000-0000000000d0',
   'acme-corp': '00000000-0000-0000-0000-0000000000a1',

@@ -38,6 +38,8 @@ const JUDGE_TEMPERATURE = 0.0;
 // score_tone_match) plus uitgebreidere reasoning. 900 = veilige headroom; in
 // praktijk komt judge zelden boven 750.
 const JUDGE_MAX_TOKENS = 900;
+// GPT-6 telt reasoning als completion-tokens; ruimte nodig voor de volledige JSON.
+const JUDGE_MAX_TOKENS_GPT6 = 1500;
 // Pairwise-judge prompt is korter (geen gold-rubric, alleen vraag + 2
 // antwoorden + persona). Output is ook beperkt (winner + confidence + 2-4
 // zin rationale). 500 is ruim voldoende.
@@ -439,7 +441,7 @@ export async function runJudge(args: {
       model: JUDGE_MODEL,
       ...openaiChatParams(JUDGE_MODEL, {
         temperature: JUDGE_TEMPERATURE,
-        maxTokens: JUDGE_MODEL.startsWith('gpt-6') ? 1500 : JUDGE_MAX_TOKENS,
+        maxTokens: JUDGE_MODEL.startsWith('gpt-6') ? JUDGE_MAX_TOKENS_GPT6 : JUDGE_MAX_TOKENS,
       }),
       response_format: { type: 'json_object' },
       messages: [

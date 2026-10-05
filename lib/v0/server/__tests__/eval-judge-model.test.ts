@@ -14,3 +14,7 @@ test('resolveJudgeModel — env als geen CLI', () => {
 test('resolveJudgeModel — onbekend model faalt hard (geen stille $0-kosten)', () => {
   assert.throws(() => resolveJudgeModel(['--judge-model=gpt-9'], {}), /onbekend judge-model/);
 });
+test('resolveJudgeModel — niet-OpenAI model en prototype-keys falen', () => {
+  assert.throws(() => resolveJudgeModel(['--judge-model=claude-haiku-4-5'], {}), /OpenAI-model/);
+  assert.throws(() => resolveJudgeModel(['--judge-model=toString'], {}), /OpenAI-model/);
+});

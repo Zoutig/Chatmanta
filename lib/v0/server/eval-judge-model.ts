@@ -11,8 +11,10 @@ export function resolveJudgeModel(
 ): string {
   const cli = argv.map((a) => a.match(/^--judge-model=(.+)$/)?.[1]).find(Boolean);
   const model = cli ?? env.EVAL_JUDGE_MODEL ?? DEFAULT_JUDGE_MODEL;
-  if (!(model in MODEL_COSTS_USD)) {
-    throw new Error(`onbekend judge-model "${model}" — voeg het eerst toe aan MODEL_COSTS_USD`);
+  if (!(Object.hasOwn(MODEL_COSTS_USD, model) && model.startsWith('gpt-'))) {
+    throw new Error(
+      `onbekend judge-model "${model}" — moet een OpenAI-model (gpt-*) zijn met een tarief in MODEL_COSTS_USD`,
+    );
   }
   return model;
 }
