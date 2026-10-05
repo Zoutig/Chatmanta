@@ -69,7 +69,12 @@ export function openaiChatParams(
     }) {
   // Meet-hefboom (Luna-onderzoek): OPENAI_SERVICE_TIER=priority → snellere, ~2× duurdere
   // verwerking op ALLE calls. Alleen voor metingen; een klant-tier wordt later per org.
-  const tier = process.env.OPENAI_SERVICE_TIER === 'priority' ? { service_tier: 'priority' as const } : {};
+  // Genegeerd op Vercel-productie: costForModelUsd kent geen priority-tarief, dus de
+  // per-org dag-budget-cap zou ~2× onderschatten als de env daar per ongeluk aan staat.
+  const tier =
+    process.env.OPENAI_SERVICE_TIER === 'priority' && process.env.VERCEL_ENV !== 'production'
+      ? { service_tier: 'priority' as const }
+      : {};
   if (model.startsWith('gpt-6')) {
     return {
       temperature: opts.temperature,

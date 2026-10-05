@@ -46,3 +46,22 @@ test('openaiChatParams — OPENAI_SERVICE_TIER=priority voegt service_tier toe',
     else process.env.OPENAI_SERVICE_TIER = prev;
   }
 });
+
+test('openaiChatParams — priority wordt genegeerd op Vercel-productie (budget-cap-veilig)', () => {
+  const prevTier = process.env.OPENAI_SERVICE_TIER;
+  const prevEnv = process.env.VERCEL_ENV;
+  process.env.OPENAI_SERVICE_TIER = 'priority';
+  process.env.VERCEL_ENV = 'production';
+  try {
+    assert.deepEqual(openaiChatParams('gpt-6-luna', { temperature: 0, maxTokens: 10 }), {
+      temperature: 0,
+      max_completion_tokens: 10,
+      reasoning_effort: 'none',
+    });
+  } finally {
+    if (prevTier === undefined) delete process.env.OPENAI_SERVICE_TIER;
+    else process.env.OPENAI_SERVICE_TIER = prevTier;
+    if (prevEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = prevEnv;
+  }
+});

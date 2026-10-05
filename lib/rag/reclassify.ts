@@ -19,7 +19,7 @@ import {
 //                                          → reclassifyAfterZeroHits(...)
 //                                          → 'general' | 'off_topic' | 'fallback'
 //
-// Eén LLM-call, bot.chatModel (gpt-4o-mini default) — ~$0.0001.
+// Eén LLM-call, auxModelOf(bot) (auxModel, anders chatModel) — ~$0.0001.
 // Bij parse-error of API-error: 'fallback' (= huidige FALLBACK_MESSAGE pad).
 // Dat is een conservatieve degradation: bij twijfel weigeren we ipv riskeren
 // dat een verzonnen "general"-antwoord een echte zoekvraag was.
@@ -45,7 +45,7 @@ export type ReclassifyOutput = {
  * (die heeft geen retrieval-info); alleen vanuit runRagQueryStreaming bij
  * zero-hit retrieval EN bot.generalKnowledgeEnabled.
  *
- * Cost: één LLM-call met bot.chatModel (gpt-4o-mini default) ~$0.0001.
+ * Cost: één LLM-call met auxModelOf(bot) (auxModel, anders chatModel) ~$0.0001.
  * Faalt veilig: bij API/parse-error retourneert 'fallback' zodat de bestaande
  * FALLBACK_MESSAGE-flow draait (= geen LLM-call voor het antwoord).
  */
