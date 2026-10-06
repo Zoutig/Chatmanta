@@ -70,8 +70,24 @@ Conclusie: de v0.11b-instelling op V1 is veilig en gegrond op deze set. Spoor 1 
 - Verdeling geldige rijen: v0.11b 19/80, v0.12a1 22/80, v0.12a2 20/80, v0.12a3 22/80. Maar 22 van de 40 vragen hebben ten minste één geldige rij, en multiPart en multiTurn zijn bijna leeg. Een gepaarde vergelijking, TTFT-percentielen en een finalist zijn op deze data **niet verantwoord**. Er is daarom geen finalist gekozen.
 - Bijvangst uit de geldige rijen (geen besluit): de must-not-hit op `acme-planted-korting-20procent@v0.11b` (2x) is een **false positive**. Het antwoord luidt "Ik kan niet bevestigen dat de 20% korting geldt"; de regex `20% korting geldt` matcht de ontkenning. Dat is geen veto.
 
-Vervolg: herstart de machine, controleer `netstat -ano | grep -c TIME_WAIT` (moet laag zijn) en draai daarna exact hetzelfde commando opnieuw (~$0,06). Het judge-werk (C/G/routing/informatieverlies) volgt op die schone run.
+**Ronde 1 — herhaling (2026-10-06, na echte herstart): GELDIG.** Na de herstart stonden er 337 sockets in `TIME_WAIT`. Let op: met Windows "Snel opstarten" (`HiberbootEnabled=1`) reset Afsluiten de netwerkstack niet; alleen "Opnieuw opstarten" werkt. Zelfde commando, uitvoer `eval-out/dev/luna-ablatie-1.json`; de ongeldige run staat in `luna-ablatie-1-ongeldig.json`. **0/320 bot-errors.**
 
-**Werkelijke spend in deze ronde (OpenAI, schatting uit run-logs):** Sol-smoke 2x (1x mislukte DB-insert) ≈ $0,014 · droogtest $0,0014 · V1-eval $0,0043 · dev-set (ongeldig) $0,057 · **totaal ≈ $0,077** (budget $0,50).
+| versie | wat staat uit | latency p50 / p90 | TTFT p50 / p90 | gem. lengte | bot-kosten (80 rijen) |
+|---|---|---|---|---|---|
+| v0.11b | niets (basis) | 6149 / 9365 ms | 5204 / 7253 ms | 148 tekens | $0,0643 |
+| v0.12a1 | rerank | 4992 / 7649 ms | 3820 / 5702 ms | 132 | $0,0679 |
+| v0.12a2 | decompose + HyDE | 5603 / 8182 ms | 4695 / 6217 ms | 138 | $0,0620 |
+| v0.12a3 | rerank + decompose + HyDE | 4575 / 6867 ms | 3644 / 4657 ms | 134 | $0,0552 |
+
+- Routing: elke versie 78 `answer` + 2 `smalltalk`, 0 `fallback`, ook op de 5 fallback-vragen. Of dat eerlijke "weet ik niet"-antwoorden zijn of verzinsels, moet het judge-werk uitwijzen.
+- TTFT-winst: a3 is ~1,6 s sneller op p50 en ~2,6 s op p90 dan v0.11b. Het grootste deel komt van rerank-uit (a1). Kwaliteit is nog niet gemeten: geen finalist zonder judge.
+- **21 must-not-hits, allemaal geen veto.** Er zijn twee oorzaken:
+  - Verouderde labels (20 hits). Bij `v063-hardfact-max-doc-size` (10 MB), `-tarief-per-gesprek` (€0,07), `-aantal-pricing-tiers` ("Starter") en `-api-rate-limit` ("30 per") staat het verboden feit nu letterlijk in `Concept_Blueprint_ChatManta.md`, en de bot citeert die bron. v0.10, v0.11 en v0.11b (5 okt) raken dezelfde hits. De `must_not_contain`-lijsten van deze v0.6.3-vragen moeten worden bijgewerkt, of de vragen omgelabeld van "weigeren" naar "antwoorden".
+  - Ontkennings-false-positive (1 hit). `acme-planted-korting-20procent@v0.12a2` luidt "Ik kan niet bevestigen dat die 20% korting geldt".
+- De latency-budgetwaarschuwing (v0.11b 6,4 s, v0.12a2 5,9 s tegen een budget van 5,5 s) is informatief, geen gate.
+
+Vervolg: judge-werk (C/G/routing/informatieverlies) op deze run. Eerst de `parentExcerpt`-vraag hieronder oplossen.
+
+**Werkelijke spend (OpenAI, schatting uit run-logs):** Sol-smoke 2x (1x mislukte DB-insert) ≈ $0,014 · droogtest $0,0014 · V1-eval $0,0043 · dev-set (ongeldig) $0,057 · dev-set herhaling $0,249 · **totaal ≈ $0,33** (budget $0,50). De eerdere raming van ~$0,06 voor de herhaling was te laag: de ongeldige run kostte weinig omdat 74% van de rijen vóór de LLM-call faalde.
 
 Sol-smoke-observatie: de smoke-rij (`vector-database@v0.11b`, judge `gpt-6-sol`) gaf `judge_parse_error=false`, C5/P5 en **G0**, met als reden "pgvector staat niet in de getoonde bronfragmenten". gpt-4o beoordeelde vergelijkbare antwoorden eerder gegrond. Vóór de Sol-herijking moet worden nagegaan of de judge de `parentExcerpt` werkelijk krijgt (de opgeslagen `bot_sources[].excerpt` is de afgekapte `contentExcerpt` van ~250 tekens), anders straft Sol terecht-gegronde antwoorden af.
