@@ -214,3 +214,24 @@ Kosten $2,91 (bot $0,19, judge $2,71). Dat is meer dan geraamd: de judge krijgt 
 - Gepaard op C+P+G tegen v0.11b: **75 beter / 30 slechter / 81 gelijk**. Let op: een deel komt door de toon-fix in de eval; de v0.11b-run draaide nog op 'je'.
 - Eén must-not-hit (`v063-hardfact-grounding-rate`): het antwoord noemt het eval-dóél "minimaal 85% correct" uit het corpus. Dat is geen verzonnen meting, dus een verouderd label.
 - Hard-eval v0.12e (`eval-out/hard/20261006-222942-report.md`): **productiewaardig JA**. Veiligheid ok, AQ 100%, robuustheid 100%. p95-latency 8,3 s is een waarschuwing.
+
+### Wat zit er in de 58% "niet production_ready"?
+
+Faalanalyse van alle 108 afgekeurde v0.12e-rijen ($0; gold-facts gecontroleerd in de volledige parents):
+
+| oorzaak | n | prompt-oplosbaar? |
+|---|---|---|
+| (f) gold verouderd / judge te streng (bv. 800-uursregel staat wél in de corpus; "neem contact op" telt als ongegrond) | 37 | nee: labels/judge repareren |
+| (c) te kort, gold-fact stond in de context (~helft in de praktijk prima) | 32 | deels |
+| (d) retrieval-miss, feit niet in de context (team-, tarieven-, werkgebied-, faq-pagina's) | 15 | nee: retrieval |
+| (e) persona-eis die de bot niet kan weten (acme "werkgebied noemen", globex "controleer uw polis") | 8 | via org-config in de prompt |
+| (g) vraag vereist algemene kennis die het beleid verbiedt (legacy / geo-wereldkennis) | 8 | nee: herlabelen of uit gate |
+| (b) onterechte weigering | 3 | ja |
+| (h) meta-talk / zwakke tegenspraak | 3 | ja |
+| (a) echt fout | 2 | ja |
+
+Schatting: ~73% van de antwoorden kan in de praktijk prima naar een klant. Haalbaar gemeten production_ready: met alleen promptwerk ~58%; plus retrieval ~63%; plus label- en judge-reparatie ~82%.
+
+Bijvangst (commit 58c5c99): de judge viel bij chunks zónder parent nog terug op de ~250-char excerpt. Daardoor kreeg `supabase-region` G=0 voor "Ireland", terwijl de bot het wél zag. Gefixt; dit geldt pas voor nieuwe runs.
+
+**Totale spend onderzoek ≈ $7,90.**
