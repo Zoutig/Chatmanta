@@ -41,6 +41,7 @@ export function V1SignInCard({ initialError }: { initialError?: string }) {
           <label htmlFor="v1-login-email" className="v1-label">E-mailadres</label>
           <input
             id="v1-login-email"
+            autoFocus
             name="email"
             type="email"
             autoComplete="email"

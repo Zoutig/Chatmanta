@@ -55,6 +55,7 @@ export function ForgotPasswordForm() {
           <label htmlFor="v1-forgot-email" className="v1-label">E-mailadres</label>
           <input
             id="v1-forgot-email"
+            autoFocus
             name="email"
             type="email"
             autoComplete="email"

@@ -49,6 +49,7 @@ export function SetPasswordForm() {
           <div className="v1-input-wrap">
             <input
               id="v1-new-password"
+              autoFocus
               name="password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
