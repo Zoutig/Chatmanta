@@ -11,7 +11,8 @@ const OPTIONS: { key: V1ConversationFilter; label: string }[] = [
   { key: 'last_7_days', label: 'Laatste 7 dagen' },
   { key: 'last_30_days', label: 'Laatste 30 dagen' },
   { key: 'unanswered', label: 'Onbeantwoord' },
-  { key: 'negative_feedback', label: 'Negatieve feedback' },
+  // 'negative_feedback' bewust geen pil meer: de 👍/👎 zijn uit de V1-widget
+  // (soft-launch 2026-10-06). De filter-route zelf blijft werken.
 ];
 
 export function FilterBar({ active }: { active: V1ConversationFilter }) {
