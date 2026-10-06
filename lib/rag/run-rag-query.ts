@@ -1473,7 +1473,12 @@ export async function* runRagQuery(
   // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
   // ge-await/gecatcht wordt (alleen het smalltalk-pad catcht 'm) → unhandled
   // rejection. Lookup/write zijn al disableCache-gated; dit sluit de embed mee.
-  const cacheActive = bot.cacheEnabled && input.disableCache !== true;
+  // Multi-turn: de cache keyt alleen op de losse vraag-embedding. Een
+  // vervolgvraag ("en wat kost dat?") betekent per gesprek iets anders, dus
+  // lookup/write zou een antwoord uit een ánder gesprek kunnen serveren
+  // (launch-onderzoek 2026-10-07). Met gebruikers-history: cache overslaan.
+  const hasUserHistory = (input.history ?? []).some((t) => t.role === 'user');
+  const cacheActive = bot.cacheEnabled && input.disableCache !== true && !hasUserHistory;
   const cacheEmbedPromise = cacheActive ? embedTexts([original]) : null;
   // Epoch-snapshot bij pipeline-start (plan 006): parallel met de embed, geen
   // wall-clock-impact. readCacheEpoch kan niet rejecten (vangt alles → null),
