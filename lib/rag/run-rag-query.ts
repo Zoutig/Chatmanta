@@ -850,6 +850,8 @@ export type ChatSource = {
    * productie-/chat-pad → de response-cache blijft onaangeraakt.
    */
   parentContentFull?: string;
+  /** EVAL-ONLY: volledige chunk-tekst voor chunks zonder parent (zelfde gate). */
+  contentFull?: string;
 };
 
 export type ChatRewriteInfo = {
@@ -1118,6 +1120,11 @@ function toSource(c: RetrievedChunk, includeFullParent = false): ChatSource {
     // wat de bot zag. Productie zet includeFullParent niet → veld afwezig.
     ...(includeFullParent && typeof c.parent_content === 'string' && c.parent_content.length > 0
       ? { parentContentFull: c.parent_content }
+      : {}),
+    // EVAL-ONLY: chunk zonder parent → de LLM kreeg de volledige chunk-tekst; geef
+    // die ook aan de judge i.p.v. de ~250-char contentExcerpt.
+    ...(includeFullParent && !(typeof c.parent_content === 'string' && c.parent_content.length > 0)
+      ? { contentFull: c.content }
       : {}),
     parentIndex: c.parent_index ?? null,
     ...(c.source_url ? { url: c.source_url } : {}),

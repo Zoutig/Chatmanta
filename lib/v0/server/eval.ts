@@ -319,7 +319,7 @@ function buildJudgeUserPrompt(args: {
     ? '(geen sources — bot deed geen retrieval)'
     : sources
         .map((s, i) => {
-          const text = s.parentContentFull ?? s.parentExcerpt ?? s.contentExcerpt;
+          const text = s.parentContentFull ?? s.contentFull ?? s.parentExcerpt ?? s.contentExcerpt;
           return `[${i + 1}] ${s.filename ?? 'onbekend'}: ${text}`;
         })
         .join('\n');
@@ -1008,7 +1008,9 @@ export async function runEvalRow(args: {
           similarity: s.similarity,
           excerpt: s.contentExcerpt,
           // Alleen in --no-judge-JSON (Claude-judge); niet in eval_runs.bot_sources.
-          ...(args.skipJudge && s.parentContentFull ? { parent_full: s.parentContentFull } : {}),
+          ...(args.skipJudge && (s.parentContentFull ?? s.contentFull)
+            ? { parent_full: s.parentContentFull ?? s.contentFull }
+            : {}),
         }));
 
   // Retrieval metrics — gebaseerd op filenames van retrieved chunks vs
