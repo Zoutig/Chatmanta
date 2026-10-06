@@ -265,7 +265,10 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "must_not_contain": [
-        "Marc"
+        "oprichter is Marc",
+        "opgericht door Marc",
+        "Marc van der Berg is de oprichter",
+        "Marc van der Berg heeft"
       ],
       "ideal_source_filenames": [
         "Concept_Blueprint_ChatManta.md"
