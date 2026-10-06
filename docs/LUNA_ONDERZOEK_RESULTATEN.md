@@ -133,3 +133,24 @@ Gemeten op 2026-10-06. De volledige set (186 vragen per versie, judge `gpt-6-sol
 **Vervolg (niet gebouwd):** een v0.12b = a3 + hogere context-cap voor Luna (bv. 30-40k tekens, ~8 parents), plus ontdubbeling van identieke parents. Dan toetsen we echt "Luna kiest zelf". Kosten: meer input-tokens per antwoord (Luna-input is goedkoop, wel effect op TTFT meten). Daarnaast los: een verifier-`unsupported`-antwoord mag niet ongewijzigd uit (vpb-case).
 
 **Totale spend onderzoek:** ≈ $0,33 (Tasks 1-8) + $3,98 (Task 9) = **≈ $4,31**.
+
+## Vpb-rekenfout (`initech-mh-bv-vpb-dga-250k`)
+
+Onderzocht op 2026-10-06 voor ≈ $0,01: 9 pipeline-reproducties (v0.12a3, v0.11b en v0.10 elk 3x, met draft én eindantwoord gelogd) en 18 losse Luna-calls. Juist antwoord: 19% × 200.000 + 25,8% × 50.000 = 38.000 + 12.900 = **€ 50.900**.
+
+| versie | draft-totalen | eindantwoord-totalen |
+|---|---|---|
+| v0.12a3 (Luna) | 51.500 / 48.500 / 63.500 | 51.500 / **60.500** / 51.900 |
+| v0.11b (Luna) | 50.900 / 50.900 / 60.800 | 50.900 / 51.900 / 61.400 |
+| v0.10 (4o-mini) | 50.900 / 50.900 / 50.900 (één tussenstap 12.950) | 50.900 / (totaal weggelaten) / 50.900 |
+
+Oorzaak: drie dingen versterken elkaar. Het is geen ablatie-effect; v0.11b doet het ook.
+
+1. **Antwoord-eerst-prompt plus Luna zonder redeneren.** De systeemprompt eist "Eerste zin = direct antwoord" en vetgedrukte kerngetallen (`lib/v0/server/bots.ts`). Luna draait met `reasoning_effort: 'none'` (`lib/ai/llm.ts`) en schrijft daardoor het totaal ("**€ X Vpb**:") vóórdat de tussenstappen er staan. Het getal wordt dus gegokt in plaats van berekend. gpt-4o-mini schrijft de stappen wél eerst (38.000 + 12.900 = 50.900) en rekent dan goed. Losse Luna-test met een minimale prompt: 5/6 goed; met "schrijf eerst de tussenstappen, dan het totaal" 6/6 goed (zelfde latency); met `reasoning_effort: 'low'` 6/6 goed (+0,8 s).
+2. **De hard-fact-verifier slaat bij élke rekenvraag alarm.** Getallen uit de vraag (250.000) en afgeleide getallen (50.000) staan niet letterlijk in de bron en tellen dus als "unsupported". Ook een correct antwoord van €50.900 wordt geflagd. Daardoor triggert de claim-regenerate altijd.
+3. **De regenerate rekent opnieuw en maakt het erger.** De tweede Luna-poging ("laat ongegronde getallen weg") rekent het totaal opnieuw uit, weer zonder tussenstappen. Correcte drafts (50.900) werden zo 51.900 en 61.400. De deterministische weiger-template grijpt niet in omdat retrieval STRONG is; dat is bewust zo, om correcte staffelberekeningen te sparen.
+
+Fix-opties (niet gebouwd):
+- (a) Promptregel "bij een berekening: eerst tussenstappen, dan totaal". Goedkoop en geen latency.
+- (b) De verifier telt getallen uit de vraag, en eenvoudige afleidingen daarvan, als gegrond. Dat stopt de onnodige regenerate en scheelt een volledige LLM-call op elke rekenvraag.
+- (c) Optioneel een deterministische rekencheck (som/percentage van brongetallen).
