@@ -301,6 +301,9 @@ export type RagConfig = {
    *  shingles) al in de context staan, en bron-headers met documenttitel
    *  i.p.v. "[chunk N, similarity=…]". */
   contentDedupe?: boolean;
+  /** v0.13: klacht-modus — bij een gedetecteerde klacht een no-toezegging-
+   *  directive ná de vraag (lib/rag/complaint-mode.ts). */
+  complaintModeDirective?: boolean;
   /**
    * v0.8.1: anti-adoptie. Na generatie detecteert de pipeline of een
    * entiteit (persoonsnaam) die de user in de chat-history introduceerde —

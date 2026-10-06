@@ -1289,6 +1289,13 @@ const V0_13E: BotConfig = {
     'Thinking-schema: deelvragen, bron per deel, premisse-check, rekenstappen, max 2 aanvullingen uit dezelfde bron (P4).',
   systemPrompt: V0_13E_SYSTEM_PROMPT,
 };
+const V0_13F: BotConfig = {
+  ...V0_12E,
+  version: 'v0.13f',
+  label: 'v0.13f — v0.12e + klacht-modus (experiment)',
+  description: 'Bij een gedetecteerde klacht een no-toezegging-directive ná de vraag (complaintModeDirective).',
+  complaintModeDirective: true,
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1359,6 +1366,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_13C.version]: V0_13C,
   [V0_13D.version]: V0_13D,
   [V0_13E.version]: V0_13E,
+  [V0_13F.version]: V0_13F,
 };
 
 /**

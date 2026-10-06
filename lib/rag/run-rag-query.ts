@@ -49,6 +49,7 @@ import {
   historyEntityRefusal,
   premiseCheckDirective,
 } from '@/lib/rag/premise-check';
+import { COMPLAINT_DIRECTIVE, isComplaint } from '@/lib/rag/complaint-mode';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -2262,7 +2263,12 @@ KRITISCHE FORMAT-REGELS:
         ),
       )
     : '';
-  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${languageDirective}`;
+  const complaintDirective =
+    bot.complaintModeDirective &&
+    isComplaint([original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)])
+      ? COMPLAINT_DIRECTIVE
+      : '';
+  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${complaintDirective}${languageDirective}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.

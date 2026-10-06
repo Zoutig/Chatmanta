@@ -214,6 +214,9 @@ const EVAL_EXTRA_PERSONAS_BY_ID: Record<string, OrgPersona> = {
     offTopicScope: 'rijlessen en alles rond je rijbewijs — denk aan pakketten, examens, prijzen en contact',
   },
 };
+// Zelfde klant, KB opgeschoond met lib/rag/clean-crawl.ts (A/B voor de crawl-cleaner).
+EVAL_EXTRA_PERSONAS_BY_ID['00000000-0000-0000-0000-0000000000a6'] =
+  EVAL_EXTRA_PERSONAS_BY_ID['00000000-0000-0000-0000-0000000000a5'];
 
 // ---------------------------------------------------------------------------
 // Lookup helpers
