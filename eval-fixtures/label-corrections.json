@@ -56,6 +56,27 @@
         "200 per minuut",
         "500 per minuut",
         "1000 per minuut"
+      ],
+      "v061-hardfact-prijs-per-maand": [
+        "€199",
+        "€299",
+        "€499",
+        "€999",
+        "€149",
+        "199 euro",
+        "299 euro",
+        "499 euro",
+        "999 euro"
+      ],
+      "v063-hardfact-grounding-rate": [
+        "70%",
+        "75%",
+        "80%",
+        "90%",
+        "95%",
+        "grounded in 7",
+        "grounded in 8",
+        "grounded in 9"
       ]
     }
   },
