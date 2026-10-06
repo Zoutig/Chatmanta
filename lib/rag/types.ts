@@ -304,6 +304,10 @@ export type RagConfig = {
   /** v0.13: klacht-modus — bij een gedetecteerde klacht een no-toezegging-
    *  directive ná de vraag (lib/rag/complaint-mode.ts). */
   complaintModeDirective?: boolean;
+  /** v0.13: klacht-directive V2 (contactroute centraal, geen andere dienst als oplossing, vergoeding alleen als erom gevraagd). */
+  complaintModeV2?: boolean;
+  /** v0.13: premisse-check alleen op namen en telefoonnummers (bedragen/percentages in de vraag zijn vaak een hypothese). */
+  premiseCheckNamesOnly?: boolean;
   /**
    * v0.8.1: anti-adoptie. Na generatie detecteert de pipeline of een
    * entiteit (persoonsnaam) die de user in de chat-history introduceerde —

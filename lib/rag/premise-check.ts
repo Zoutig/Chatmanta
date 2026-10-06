@@ -65,8 +65,14 @@ export function findUnsupportedPremises(
   questionTexts: string[],
   contextText: string,
   exclude: string[] = [],
+  opts: { amounts?: boolean } = {},
 ): string[] {
-  const { names, facts } = extractPremiseCandidates(questionTexts);
+  const cand = extractPremiseCandidates(questionTexts);
+  const names = cand.names;
+  // amounts:false — bedragen/percentages uit de vraag zijn vaak een hypothese
+  // van de klant ("bij € 250.000 winst"), geen premisse: die niet melden
+  // (screening: "ik kan de genoemde winst niet bevestigen" op een rekenvraag).
+  const facts = opts.amounts === false ? cand.facts.filter((f) => !f.startsWith('€ ') && !f.endsWith('%')) : cand.facts;
   const ctx = ` ${norm(contextText).replace(/[^a-z0-9à-ÿ ]+/g, ' ')} `;
   const ex = exclude.map(norm);
   const missing: string[] = [];

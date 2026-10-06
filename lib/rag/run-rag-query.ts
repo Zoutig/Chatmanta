@@ -49,7 +49,7 @@ import {
   historyEntityRefusal,
   premiseCheckDirective,
 } from '@/lib/rag/premise-check';
-import { COMPLAINT_DIRECTIVE, isComplaint } from '@/lib/rag/complaint-mode';
+import { COMPLAINT_DIRECTIVE, COMPLAINT_DIRECTIVE_V2, isComplaint } from '@/lib/rag/complaint-mode';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -2264,13 +2264,16 @@ KRITISCHE FORMAT-REGELS:
           [original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)],
           context,
           [input.persona.company],
+          { amounts: !bot.premiseCheckNamesOnly },
         ),
       )
     : '';
   const complaintDirective =
     bot.complaintModeDirective &&
     isComplaint([original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)])
-      ? COMPLAINT_DIRECTIVE
+      ? bot.complaintModeV2
+        ? COMPLAINT_DIRECTIVE_V2
+        : COMPLAINT_DIRECTIVE
       : '';
   const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${complaintDirective}${languageDirective}`;
 
