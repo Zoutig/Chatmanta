@@ -31,7 +31,30 @@
         "hosten op Hetzner",
         "gebruiken Hetzner",
         "gekozen voor Hetzner"
-      ]
+      ],
+      "v063-hardfact-max-doc-size": ["5 MB", "20 MB", "25 MB", "50 MB", "100 MB", "5MB", "20MB", "25MB", "50MB"],
+      "v063-hardfact-aantal-pricing-tiers": ["drie tiers", "vijf tiers", "Enterprise tier", "Premium tier"],
+      "v063-hardfact-api-rate-limit": ["60 per minuut", "10 per minuut", "50 per minuut", "200 per minuut", "500 per minuut", "1000 per minuut"]
+    }
+  },
+  "_gold": {
+    "_doc": "gold_answer/gold_facts/question_type-correcties voor ORPHANS. De v0.6.3-hardfact-vragen waren out-of-corpus, maar Concept_Blueprint_ChatManta.md bevat deze feiten nu letterlijk (10 MB, tier-systeem, rate-limit-tabel). Elke bot (v0.10 t/m v0.12a*) citeerde ze correct en kreeg toch een must-not-hit. Ze zijn nu omgelabeld naar 'factual' met het corpus-feit als gold. Toegepast door scripts/v0-eval-relabel.ts (idempotent).",
+    "00000000-0000-0000-0000-0000000000d0": {
+      "v063-hardfact-max-doc-size": {
+        "gold_answer": "Maximaal 10 MB per document-upload, gecontroleerd op de client én op de server.",
+        "gold_facts": ["max 10 MB per document-upload"],
+        "question_type": "factual"
+      },
+      "v063-hardfact-aantal-pricing-tiers": {
+        "gold_answer": "In v1 is alleen de tier 'standard' actief. Trial, Starter, Pro en Business zijn voorbereid voor v2, maar nog niet publiek.",
+        "gold_facts": ["v1: alleen standard actief", "trial/starter/pro/business voorbereid voor v2"],
+        "question_type": "factual"
+      },
+      "v063-hardfact-api-rate-limit": {
+        "gold_answer": "Er is geen algemene limiet per minuut; die verschilt per scope. Per chatbot_public_id geldt 100 config-calls per minuut, per IP-hash op /api/widget/config 30 calls per minuut. Daarnaast geldt per chatbot 300 chatberichten per uur en per organisatie 1000 per dag.",
+        "gold_facts": ["100 config-calls per minuut per chatbot_public_id", "30 calls per minuut per IP-hash op /api/widget/config"],
+        "question_type": "factual"
+      }
     }
   },
   "00000000-0000-0000-0000-0000000000d0": {

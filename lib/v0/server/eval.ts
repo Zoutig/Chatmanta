@@ -319,7 +319,7 @@ function buildJudgeUserPrompt(args: {
     ? '(geen sources — bot deed geen retrieval)'
     : sources
         .map((s, i) => {
-          const text = s.parentExcerpt ?? s.contentExcerpt;
+          const text = s.parentContentFull ?? s.parentExcerpt ?? s.contentExcerpt;
           return `[${i + 1}] ${s.filename ?? 'onbekend'}: ${text}`;
         })
         .join('\n');
@@ -877,6 +877,10 @@ export async function runEvalRow(args: {
       // runRagQueryStreaming terug op DEV_ORG_ID en haalt acme/globex/initech
       // vragen chunks uit de ChatManta-docs — onbruikbaar voor multi-org eval.
       organizationId,
+      // Judge (LLM én Claude via --no-judge-JSON) ziet de volledige parent die
+      // de antwoord-LLM kreeg, niet de ≤800-char preview: anders tellen gegronde
+      // feiten voorbij teken ~800 als verzonnen. Zelfde fix als de hard-eval.
+      includeFullParentContent: true,
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         markFirstToken();
@@ -1002,6 +1006,8 @@ export async function runEvalRow(args: {
           filename: s.filename,
           similarity: s.similarity,
           excerpt: s.contentExcerpt,
+          // Alleen in --no-judge-JSON (Claude-judge); niet in eval_runs.bot_sources.
+          ...(args.skipJudge && s.parentContentFull ? { parent_full: s.parentContentFull } : {}),
         }));
 
   // Retrieval metrics — gebaseerd op filenames van retrieved chunks vs
