@@ -1167,9 +1167,9 @@ const V0_12D: BotConfig = {
 const V0_12E: BotConfig = {
   ...V0_12D,
   version: 'v0.12e',
-  label: 'v0.12e — v0.12d + klacht/meta-talk/aantallen-aanscherping (experiment)',
+  label: 'v0.12e — Luna-pipeline (geen rerank/decompose/HyDE, 32k context) + Luna-antwoordprompt',
   description:
-    'v0.12d met: (1) klacht/schadeclaim — geen vergoedingscategorieën noemen, ook niet voorwaardelijk (hard-eval-veto hh-initech-klacht-01); (2) meta-talk-lijst uitgebreid met "staat niet vermeld"/"wordt niet genoemd"/"de genoemde …" + voorbeeldformulering bij niet-weten; (3) aantallen: opsomming = aantal + wat nu geldt vs gepland, plan nooit als huidig feit; (4) tweede bedrag alleen als het bij dezelfde vraag hoort. Experiment, niet gepromoveerd.',
+    'v0.12d met: (1) klacht/schadeclaim — geen vergoedingscategorieën noemen, ook niet voorwaardelijk (hard-eval-veto hh-initech-klacht-01); (2) meta-talk-lijst uitgebreid met "staat niet vermeld"/"wordt niet genoemd"/"de genoemde …" + voorbeeldformulering bij niet-weten; (3) aantallen: opsomming = aantal + wat nu geldt vs gepland, plan nooit als huidig feit; (4) tweede bedrag alleen als het bij dezelfde vraag hoort. LATEST sinds 2026-10-06.',
   systemPrompt: V0_12E_SYSTEM_PROMPT,
 };
 const V0_12C2: BotConfig = {
@@ -1269,7 +1269,10 @@ export const BOTS: Record<string, BotConfig> = {
 // v0.10 is op élke deterministische as ≥ v0.9.3. Promotie ALLEEN op deze branch (niet
 // gemerged/gedeployd) — zie V0_10_BUILD_REPORT.md voor de gate-output + caveats.
 // v0.9.3 blijft byte-identiek + append-only behouden.
-export const LATEST_BOT_VERSION = V0_10.version;
+// 2026-10-06: v0.12e gepromoveerd (Luna-pipeline-onderzoek, docs/LUNA_ONDERZOEK_RESULTATEN.md):
+// hard-eval gate JA (63/63, 0 veto), Sol prod-ready 42% vs 30% (v0.10-lijn op Luna),
+// TTFT p90 4,3s vs 6,1s. V1 erft dit via app/v1/app/rag-config.ts.
+export const LATEST_BOT_VERSION = V0_12E.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1293,6 +1296,11 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_12A1.version,
   V0_12A2.version,
   V0_12A3.version,
+  V0_12B.version,
+  V0_12C.version,
+  V0_12C2.version,
+  V0_12D.version,
+  V0_12E.version,
 ];
 
 /**
