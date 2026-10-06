@@ -1024,6 +1024,17 @@ const V0_12A3: BotConfig = {
   useHyDE: false,
   selectiveHyDE: false,
 };
+// v0.12b — a3 testte onbedoeld "top-3 op similarity": MAX_CONTEXT_CHARS 12000
+// laat met matched-span+parent maar ~3 chunks door. v0.12b geeft Luna echt de
+// 8 chunks (cap 32k) en slaat dubbele parents over. Experiment, NIET gepromoveerd.
+const V0_12B: BotConfig = {
+  ...V0_12A3,
+  version: 'v0.12b',
+  label: 'v0.12b — lean + grote context: Luna kiest zelf uit 8 chunks (experiment)',
+  description: 'v0.12a3 met maxContextChars 32000 en dedupeParents: geen rerank, Luna selecteert zelf.',
+  maxContextChars: 32000,
+  dedupeParents: true,
+};
 
 // ---------------------------------------------------------------------------
 // Registry
@@ -1049,6 +1060,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_12A1.version]: V0_12A1,
   [V0_12A2.version]: V0_12A2,
   [V0_12A3.version]: V0_12A3,
+  [V0_12B.version]: V0_12B,
 };
 
 /**

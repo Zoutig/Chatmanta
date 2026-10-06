@@ -240,6 +240,17 @@ export type RagConfig = {
    */
   finalContextMaxChunks?: number;
   /**
+   * v0.12b: byte-cap op de answer-context. Default RAG_DEFAULTS.MAX_CONTEXT_CHARS
+   * (12000) — daarmee passen met matched-span+parent maar ~3 chunks, ongeacht
+   * finalContextMaxChunks. Hoger = het answer-model kiest echt zelf.
+   */
+  maxContextChars?: number;
+  /**
+   * v0.12b: sla een chunk over als zijn parent al in de context staat (de
+   * parent bevat het child al). Default false (oude gedrag: parent herhaald).
+   */
+  dedupeParents?: boolean;
+  /**
    * v0.6.2: bij history-aanwezigheid de multi-turn addon ALLEEN prepend
    * wanneer needsHistoryResolution(question)=true (keyword-heuristic op
    * referentie-aanwijzingen). Default false (v0.6.1-pad: prepend bij elke

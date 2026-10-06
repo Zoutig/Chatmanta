@@ -2111,6 +2111,8 @@ KRITISCHE FORMAT-REGELS:
   // (v0.5 en eerder) blijft de oude blob-aanpak.
   let context = '';
   let used = 0;
+  // Chunks die echt in de context belandden (bij dedupeParents niet gelijk aan final.slice(0, used)).
+  const usedChunks: typeof final = [];
   let anyParentSwap = false;
   let usedMatchedSpan = false;
   // v0.9.1 bron-links: bij sourceLinksEnabled krijgt elke website-chunk een
@@ -2119,8 +2121,14 @@ KRITISCHE FORMAT-REGELS:
   // de allowlist voor de sanitizer (alles daarbuiten = verzonnen → gestript).
   const linkEnabled = bot.sourceLinksEnabled === true;
   const providedUrls: string[] = [];
+  const maxContextChars = bot.maxContextChars ?? RAG_DEFAULTS.MAX_CONTEXT_CHARS;
+  const seenParents = new Set<string>();
   for (const c of final) {
     const hasParent = typeof c.parent_content === 'string' && c.parent_content.length > 0;
+    if (bot.dedupeParents && hasParent && c.parent_chunk_id) {
+      if (seenParents.has(c.parent_chunk_id)) continue;
+      seenParents.add(c.parent_chunk_id);
+    }
     if (hasParent) anyParentSwap = true;
     const header = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
     const urlLine = linkEnabled && c.source_url ? `\nBron-URL: ${c.source_url}` : '';
@@ -2132,9 +2140,10 @@ KRITISCHE FORMAT-REGELS:
       const text = c.parent_content ?? c.content;
       block = `${header}${urlLine}\n${text}\n\n`;
     }
-    if (context.length + block.length > RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
+    if (context.length + block.length > maxContextChars) break;
     context += block;
     if (linkEnabled && c.source_url) providedUrls.push(c.source_url);
+    usedChunks.push(c);
     used++;
   }
   const allowedUrls = buildAllowedUrlSet(providedUrls);
@@ -2204,7 +2213,7 @@ KRITISCHE FORMAT-REGELS:
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
   yield { kind: 'status', phase: 'answer' };
-  const usedSources = final.slice(0, used).map((c) => toSource(c, input.includeFullParentContent ?? false));
+  const usedSources = usedChunks.map((c) => toSource(c, input.includeFullParentContent ?? false));
   yield {
     kind: 'answer-start',
     botVersion: bot.version,
@@ -2380,7 +2389,7 @@ KRITISCHE FORMAT-REGELS:
     const stopVerify = tMark('verify_ms');
     try {
       const { verifyClaims } = await import('@/lib/rag/claims');
-      const chunkInputs = final.slice(0, used).map((c) => ({
+      const chunkInputs = usedChunks.map((c) => ({
         id: c.id,
         text: c.parent_content ?? c.content,
       }));
@@ -2427,7 +2436,7 @@ KRITISCHE FORMAT-REGELS:
       const historyUserContents = history
         .filter((t) => t.role === 'user')
         .map((t) => t.content);
-      const sourceTexts = final.slice(0, used).map((c) => c.parent_content ?? c.content);
+      const sourceTexts = usedChunks.map((c) => c.parent_content ?? c.content);
       adoptedHistoryEntities = detectAdoptedHistoryEntities(
         historyUserContents,
         finalAnswerText,
@@ -2735,7 +2744,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
 
       try {
         const { verifyClaims } = await import('@/lib/rag/claims');
-        const chunkInputs2 = final.slice(0, used).map((c) => ({
+        const chunkInputs2 = usedChunks.map((c) => ({
           id: c.id,
           text: c.parent_content ?? c.content,
         }));
