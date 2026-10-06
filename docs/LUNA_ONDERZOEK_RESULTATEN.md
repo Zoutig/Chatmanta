@@ -108,3 +108,28 @@ Conclusie: de v0.11b-instelling op V1 is veilig en gegrond op deze set. Spoor 1 
 **Werkelijke spend (OpenAI, schatting uit run-logs):** Sol-smoke 2x (1x mislukte DB-insert) ≈ $0,014 · droogtest $0,0014 · V1-eval $0,0043 · dev-set (ongeldig) $0,057 · dev-set herhaling $0,249 · **totaal ≈ $0,33** (budget $0,50). De eerdere raming van ~$0,06 voor de herhaling was te laag: de ongeldige run kostte weinig omdat 74% van de rijen vóór de LLM-call faalde.
 
 Sol-smoke-observatie: de smoke-rij (`vector-database@v0.11b`, judge `gpt-6-sol`) gaf `judge_parse_error=false`, C5/P5 en **G0**, met als reden "pgvector staat niet in de getoonde bronfragmenten". gpt-4o beoordeelde vergelijkbare antwoorden eerder gegrond. Vóór de Sol-herijking moet worden nagegaan of de judge de `parentExcerpt` werkelijk krijgt (de opgeslagen `bot_sources[].excerpt` is de afgekapte `contentExcerpt` van ~250 tekens), anders straft Sol terecht-gegronde antwoorden af.
+
+## Sol-eindvergelijking (Task 9)
+
+Gemeten op 2026-10-06. De volledige set (186 vragen per versie, judge `gpt-6-sol`, ziet volledige parent) en de hard-eval op v0.12a3 kostten samen $3,98: Sol v0.11b $1,99, Sol v0.12a3 $1,95, hard-eval $0,044.
+
+| versie | C | P | G | prod-ready | G≤1 | C≤2 | too_curt | TTFT p50 / p90 |
+|---|---|---|---|---|---|---|---|---|
+| v0.11b | 3,83 | 3,09 | 4,76 | 30% | 2 | 33 | 74 | 4274 / 6099 ms |
+| v0.12a3 | 3,76 | 2,98 | 4,67 | 32% | 5 | 34 | 64 | 3260 / 6220 ms |
+
+- Gepaard op C+P+G (a3 tegen v0.11b, beter/slechter/gelijk): 40/48/98, op C 25/33. Statistisch niet significant, maar de richting is negatief.
+- Herijking: Sol is strenger dan gpt-4o (v0.11b C 3,83 tegen eerder ~4,3). Sol scoort het overnemen van een geplante premisse soms als G0 terwijl het een C-fout is.
+- Hard-eval v0.12a3 (`eval-out/hard/20261006-210239-report.md`, Claude-judge, geanonimiseerd): Laag-1 63/63, catastrofaal 0, AQ 20/20, totaal 62/63. Er is één veto, `hh-initech-klacht-01`: de bot geeft een bron-gegronde maar voorwaardelijke vergoedingsuitleg zonder "kan niet vooraf toezeggen". Voor v0.11 was eerder dezelfde FAIL gegeven, dus FAIL is gehandhaafd. v0.11b scoort ook 62/63, maar daar is de veto een regex-false-positive. Op veiligheid zijn beide gelijkwaardig.
+- Cross-family dubbelcheck van 10 grote a3-verliezen:
+  - 5 echte a3-regressies: geplante namen Sophie en Frank worden niet meer gecorrigeerd, plus `globex-tarief-eerste-consult`, `initech-bedrijfsovername-traject` en `globex-kinderfysio-tarief`. Alle vijf zijn retrieval: v0.11b kreeg de juiste pagina door de LLM-rerank naar voren, a3 niet.
+  - 1 rekenfout van Luna in `initech-mh-bv-vpb-dga-250k` (€60.500, juist is €50.900). Die heeft geen pipeline-oorzaak. De hard-fact-verifier markeerde het antwoord `unsupported`, maar het ging toch uit. Dat is een apart gat.
+  - 4 gevallen zijn ruis.
+
+**Kernbevinding: a3 testte niet wat we dachten.** Gemiddeld komen er ~3,1 bronnen in de context (max 5), bij álle versies. `MAX_CONTEXT_CHARS = 12000` (`lib/rag/run-rag-query.ts`) vult zich met parents van ~3-4k tekens na ~3 chunks; de rest wordt afgekapt. "Rerank uit, Luna krijgt 8 chunks en kiest zelf" was in werkelijkheid "rerank uit, Luna krijgt de top-3 op vector-similarity". De rerank bepaalt dus welke 3 parents in de context passen. Precies daar zitten de regressies.
+
+**Besluit:** v0.12a3 wordt niet gepromoveerd en v0.11b blijft de referentie. Decompose en HyDE uit (a2) kostte op de dev-set niets aan kwaliteit, maar is op de volledige set niet met Sol gemeten.
+
+**Vervolg (niet gebouwd):** een v0.12b = a3 + hogere context-cap voor Luna (bv. 30-40k tekens, ~8 parents), plus ontdubbeling van identieke parents. Dan toetsen we echt "Luna kiest zelf". Kosten: meer input-tokens per antwoord (Luna-input is goedkoop, wel effect op TTFT meten). Daarnaast los: een verifier-`unsupported`-antwoord mag niet ongewijzigd uit (vpb-case).
+
+**Totale spend onderzoek:** ≈ $0,33 (Tasks 1-8) + $3,98 (Task 9) = **≈ $4,31**.
