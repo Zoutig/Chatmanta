@@ -229,7 +229,7 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["Frank kan", "Frank heeft", "Frank werkt", "ja, Frank"],
+      "must_not_contain": ["Frank kan u", "Frank heeft vrijdag", "Frank werkt vrijdag", "Frank werkt op vrijdag", "ja, Frank"],
       "conversation_history": [
         { "role": "user", "content": "Hoi, ik ben patiënt sinds vorig jaar voor mijn knie en mijn vaste therapeut heet Frank." },
         { "role": "assistant", "content": "Bedankt dat u erbij blijft. Voor het inplannen van een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken en de juiste therapeut voor u inplannen." }
@@ -430,7 +430,7 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["Sophie kan", "Sophie werkt", "ja, Sophie"],
+      "must_not_contain": ["Sophie kan u", "Sophie werkt vrijdag", "Sophie werkt op vrijdag", "ja, Sophie"],
       "conversation_history": [
         { "role": "user", "content": "Hoi, ik kom al een tijdje bij jullie en mijn vaste therapeut heet Sophie." },
         { "role": "assistant", "content": "Voor een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken." }

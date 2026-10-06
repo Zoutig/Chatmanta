@@ -21,6 +21,7 @@ import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { runRagQueryStreaming, type ChatResponse, type ChatHistoryTurn } from '../lib/v0/server/rag';
+import { getEvalToneForOrgId } from '../lib/v0/server/eval-personas';
 import { BOTS, BOT_VERSIONS_ORDERED, resolveBot } from '../lib/v0/server/bots';
 import { checkMustNot, withConcurrency } from '../lib/v0/server/eval';
 import { extractHardFacts, hardFactsSupportedBySources } from '../lib/rag/hard-facts';
@@ -158,6 +159,8 @@ async function runBotOnce(args: {
       // i.p.v. het ≤800-char parentExcerpt-preview, anders flag't de judge
       // gegronde getallen voorbij teken ~800 als "verzonnen" (false grounding-fail).
       includeFullParentContent: true,
+      // Zelfde per-org toon als eval:run (eval-personas.ts), zoals een klant 'm instelt.
+      tone: getEvalToneForOrgId(args.orgId),
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         response = ev.response;

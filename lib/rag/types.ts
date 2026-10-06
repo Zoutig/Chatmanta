@@ -28,6 +28,8 @@ export type RagConfig = {
   enableRewriteByDefault: boolean;
   /** OpenAI chat model id. Embedding model is global (text-embedding-3-small). */
   chatModel: string;
+  /** Optioneel model voor de HULPSTAPPEN (pre-process, rewrite/multi-query, HyDE, decompose, rerank, follow-ups, reclassify). Default = chatModel. Antwoord-generatie/regenerate/cascade blijven chatModel. */
+  auxModel?: string;
   /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */
@@ -238,6 +240,17 @@ export type RagConfig = {
    */
   finalContextMaxChunks?: number;
   /**
+   * v0.12b: byte-cap op de answer-context. Default RAG_DEFAULTS.MAX_CONTEXT_CHARS
+   * (12000) — daarmee passen met matched-span+parent maar ~3 chunks, ongeacht
+   * finalContextMaxChunks. Hoger = het answer-model kiest echt zelf.
+   */
+  maxContextChars?: number;
+  /**
+   * v0.12b: sla een chunk over als zijn parent al in de context staat (de
+   * parent bevat het child al). Default false (oude gedrag: parent herhaald).
+   */
+  dedupeParents?: boolean;
+  /**
    * v0.6.2: bij history-aanwezigheid de multi-turn addon ALLEEN prepend
    * wanneer needsHistoryResolution(question)=true (keyword-heuristic op
    * referentie-aanwijzingen). Default false (v0.6.1-pad: prepend bij elke
@@ -352,7 +365,7 @@ export type RagConfig = {
    * CTA teruggeeft (too_curt-fix). Per-versie zodat oudere eval-runs
    * reproduceerbaar blijven.
    */
-  outputStyleVersion?: 'v1' | 'v2' | 'v3';
+  outputStyleVersion?: 'v1' | 'v2' | 'v3' | 'v4';
   /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie

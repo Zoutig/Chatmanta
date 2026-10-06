@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   // een tag; _must_not corrigeert must_not_contain op orphans. Beide zijn geen
   // ideal_source_filenames-correctie.
   const orgIds = Object.keys(raw).filter(
-    (k) => k !== '_meta' && k !== '_legacy' && k !== '_must_not',
+    (k) => k !== '_meta' && k !== '_legacy' && k !== '_must_not' && k !== '_gold',
   );
   let updated = 0;
   let unchanged = 0;
@@ -221,6 +221,65 @@ async function main(): Promise<void> {
     }
   }
 
+  // --- gold-correctie-pass (orphans) ------------------------------------------
+  // Vervangt gold_answer/gold_facts/question_type op DB-only orphans waarvan het
+  // label verouderd is (corpus bevat het feit inmiddels). Idempotent.
+  let goldUpdated = 0;
+  let goldUnchanged = 0;
+  let goldNotFound = 0;
+  const goldBlock = raw['_gold'];
+  if (goldBlock && typeof goldBlock === 'object') {
+    for (const [orgId, slugs] of Object.entries(goldBlock as Record<string, unknown>)) {
+      if (orgId === '_doc') continue;
+      if (typeof slugs !== 'object' || slugs === null) fail(`_gold/${orgId} is geen object`);
+      for (const [slug, g] of Object.entries(slugs as Record<string, unknown>)) {
+        const gold = g as { gold_answer?: unknown; gold_facts?: unknown; question_type?: unknown };
+        if (
+          typeof gold.gold_answer !== 'string' ||
+          !Array.isArray(gold.gold_facts) ||
+          !gold.gold_facts.every((f) => typeof f === 'string') ||
+          typeof gold.question_type !== 'string'
+        ) {
+          fail(`_gold/${orgSlug(orgId)}/${slug} mist gold_answer/gold_facts/question_type`);
+        }
+        const { data: rows, error: selErr } = await sb
+          .from('eval_questions')
+          .select('id, gold_answer, gold_facts, question_type')
+          .eq('organization_id', orgId)
+          .eq('slug', slug);
+        if (selErr) fail(`gold select ${orgSlug(orgId)}/${slug}: ${selErr.message}`);
+        if (!rows || rows.length === 0) {
+          console.log(`  ⚠ gold niet gevonden: ${orgSlug(orgId)}/${slug} (geen rij in eval_questions)`);
+          goldNotFound++;
+          continue;
+        }
+        for (const row of rows) {
+          if (
+            row.gold_answer === gold.gold_answer &&
+            eqFilenames(row.gold_facts as string[] | null, gold.gold_facts as string[]) &&
+            row.question_type === gold.question_type
+          ) {
+            goldUnchanged++;
+            continue;
+          }
+          console.log(`  ${dryRun ? '→' : '✓'} gold ${orgSlug(orgId)}/${slug}: ${row.question_type} → ${gold.question_type}`);
+          if (!dryRun) {
+            const { error: updErr } = await sb
+              .from('eval_questions')
+              .update({
+                gold_answer: gold.gold_answer,
+                gold_facts: gold.gold_facts,
+                question_type: gold.question_type,
+              })
+              .eq('id', row.id as string);
+            if (updErr) fail(`gold update ${orgSlug(orgId)}/${slug}: ${updErr.message}`);
+          }
+          goldUpdated++;
+        }
+      }
+    }
+  }
+
   console.log('');
   console.log('───────────────────────────────────────────────────────────');
   console.log(
@@ -234,6 +293,10 @@ async function main(): Promise<void> {
   console.log(
     `must_not: ${mnUpdated} ${dryRun ? 'zou wijzigen' : 'gewijzigd'} · ` +
       `${mnUnchanged} al goed · ${mnNotFound} niet gevonden`,
+  );
+  console.log(
+    `gold: ${goldUpdated} ${dryRun ? 'zou wijzigen' : 'gewijzigd'} · ` +
+      `${goldUnchanged} al goed · ${goldNotFound} niet gevonden`,
   );
   if (dryRun) console.log('DRY RUN — niets geschreven. Run zonder --dry om toe te passen.');
   console.log('───────────────────────────────────────────────────────────');

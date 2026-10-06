@@ -1,6 +1,7 @@
 import 'server-only';
 
 import OpenAI from 'openai';
+import { auxModelOf, costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import type { RagConfig as BotConfig, RagPersona as OrgPersona } from '@/lib/rag/types';
 import {
   parseReclassifyOutput,
@@ -18,7 +19,7 @@ import {
 //                                          → reclassifyAfterZeroHits(...)
 //                                          → 'general' | 'off_topic' | 'fallback'
 //
-// Eén LLM-call, bot.chatModel (gpt-4o-mini default) — ~$0.0001.
+// Eén LLM-call, auxModelOf(bot) (auxModel, anders chatModel) — ~$0.0001.
 // Bij parse-error of API-error: 'fallback' (= huidige FALLBACK_MESSAGE pad).
 // Dat is een conservatieve degradation: bij twijfel weigeren we ipv riskeren
 // dat een verzonnen "general"-antwoord een echte zoekvraag was.
@@ -44,7 +45,7 @@ export type ReclassifyOutput = {
  * (die heeft geen retrieval-info); alleen vanuit runRagQueryStreaming bij
  * zero-hit retrieval EN bot.generalKnowledgeEnabled.
  *
- * Cost: één LLM-call met bot.chatModel (gpt-4o-mini default) ~$0.0001.
+ * Cost: één LLM-call met auxModelOf(bot) (auxModel, anders chatModel) ~$0.0001.
  * Faalt veilig: bij API/parse-error retourneert 'fallback' zodat de bestaande
  * FALLBACK_MESSAGE-flow draait (= geen LLM-call voor het antwoord).
  */
@@ -69,9 +70,8 @@ export async function reclassifyAfterZeroHits(
     : RECLASSIFY_SYSTEM;
   try {
     const resp = await openai().chat.completions.create({
-      model: bot.chatModel,
-      temperature: 0.0,
-      max_tokens: 10,
+      model: auxModelOf(bot),
+      ...openaiChatParams(auxModelOf(bot), { temperature: 0.0, maxTokens: 10 }),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
@@ -81,12 +81,7 @@ export async function reclassifyAfterZeroHits(
     const inputTokens = resp.usage?.prompt_tokens ?? 0;
     const outputTokens = resp.usage?.completion_tokens ?? 0;
 
-    // OpenAI gpt-4o-mini pricing (as of May 2026)
-    const CHAT_INPUT_PER_M_USD = 0.15;
-    const CHAT_OUTPUT_PER_M_USD = 0.6;
-    const costUsd =
-      (inputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-      (outputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+    const costUsd = costForModelUsd(auxModelOf(bot), inputTokens, outputTokens);
 
     const parsed = parseReclassifyOutput(text);
     if (!parsed) {

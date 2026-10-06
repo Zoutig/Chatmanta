@@ -29,7 +29,7 @@ import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
 import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
-import { costForModelUsd } from '@/lib/ai/llm';
+import { auxModelOf, costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import { AppError, type AppErrorCode } from '@/lib/errors/app-error';
 import {
   buildGeneralClosingStripRegex,
@@ -62,12 +62,6 @@ function classifyLlmError(err: unknown): 'LLM_TIMEOUT' | 'LLM_UNAVAILABLE' {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-// Cost rates voor gpt-4o-mini (USD per 1M tokens). Wanneer een toekomstige
-// bot-versie naar een ander chat-model gaat, moet dit een lookup-tabel
-// worden — voor nu is gpt-4o-mini de enige V0-keuze.
-const CHAT_INPUT_PER_M_USD = 0.15;
-const CHAT_OUTPUT_PER_M_USD = 0.60;
 
 // Structurele defaults — niet bot-versie-specifiek. Voor per-versie variatie
 // (prompts, threshold, temperatuur, model) zie lib/v0/server/bots.ts.
@@ -121,8 +115,7 @@ async function chatComplete({
 }): Promise<ChatCompleteResult> {
   const resp = await openai().chat.completions.create({
     model,
-    temperature,
-    max_tokens: maxTokens,
+    ...openaiChatParams(model, { temperature, maxTokens }),
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -131,9 +124,7 @@ async function chatComplete({
   const text = resp.choices[0]?.message?.content ?? '';
   const inputTokens = resp.usage?.prompt_tokens ?? 0;
   const outputTokens = resp.usage?.completion_tokens ?? 0;
-  const costUsd =
-    (inputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-    (outputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+  const costUsd = costForModelUsd(model, inputTokens, outputTokens);
   return { text, inputTokens, outputTokens, costUsd };
 }
 
@@ -213,7 +204,7 @@ async function preProcessInput(
     ? `${rendered.preProcessMultiTurnAddon}\n\n${rendered.preProcessSystem}`
     : rendered.preProcessSystem;
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: systemPrompt,
     user: userMessage,
     temperature: RAG_DEFAULTS.REWRITE_TEMPERATURE,
@@ -278,7 +269,7 @@ async function generateHydeDocument(
   bot: RagConfig,
 ): Promise<{ hypothetical: string; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: HYDE_SYSTEM,
     user: query,
     temperature: 0.5,
@@ -319,7 +310,7 @@ async function decomposeQuery(
   bot: RagConfig,
 ): Promise<{ subQueries: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: DECOMP_SYSTEM,
     user: query,
     temperature: 0.2,
@@ -535,7 +526,7 @@ async function generateMultiQueries(
     return { queries: [baseQuery], inputTokens: 0, outputTokens: 0, costUsd: 0 };
   }
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: MULTI_QUERY_SYSTEM,
     user: `Geef ${count - 1} alternatieve formuleringen van deze zoekvraag (één per regel):\n\n${baseQuery}`,
     temperature: 0.5,
@@ -593,6 +584,10 @@ export function parseV03Output(raw: string): ParsedV03Output {
     }
   }
 
+  // Losse <answer>/</answer>-tags (Luna sluit soms af zonder te openen) mogen
+  // nooit in de zichtbare tekst belanden.
+  answer = answer.replace(/<\/?answer>/gi, '').trim();
+
   const confidence = confMatch ? Number.parseFloat(confMatch[1]) : null;
   return {
     thinking: thinkingMatch?.[1]?.trim() ?? null,
@@ -620,7 +615,7 @@ async function generateFollowUps(
   bot: RagConfig,
 ): Promise<{ followUps: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: FOLLOWUP_SYSTEM,
     user: `Vraag: ${question}\n\nAntwoord: ${answer}\n\nVervolgvragen:`,
     temperature: 0.6,
@@ -660,7 +655,7 @@ async function rerankChunks(
     .join('\n\n');
 
   const result = await chatComplete({
-    model: bot.chatModel,
+    model: auxModelOf(bot),
     system: RERANK_SYSTEM,
     user: `Vraag: ${question}\n\nFragmenten:\n${numbered}\n\nGeef de top ${topN} fragmenten op relevantie:`,
     temperature: 0.0,
@@ -855,6 +850,8 @@ export type ChatSource = {
    * productie-/chat-pad → de response-cache blijft onaangeraakt.
    */
   parentContentFull?: string;
+  /** EVAL-ONLY: volledige chunk-tekst voor chunks zonder parent (zelfde gate). */
+  contentFull?: string;
 };
 
 export type ChatRewriteInfo = {
@@ -1123,6 +1120,11 @@ function toSource(c: RetrievedChunk, includeFullParent = false): ChatSource {
     // wat de bot zag. Productie zet includeFullParent niet → veld afwezig.
     ...(includeFullParent && typeof c.parent_content === 'string' && c.parent_content.length > 0
       ? { parentContentFull: c.parent_content }
+      : {}),
+    // EVAL-ONLY: chunk zonder parent → de LLM kreeg de volledige chunk-tekst; geef
+    // die ook aan de judge i.p.v. de ~250-char contentExcerpt.
+    ...(includeFullParent && !(typeof c.parent_content === 'string' && c.parent_content.length > 0)
+      ? { contentFull: c.content }
       : {}),
     parentIndex: c.parent_index ?? null,
     ...(c.source_url ? { url: c.source_url } : {}),
@@ -1867,8 +1869,7 @@ KRITISCHE FORMAT-REGELS:
         try {
           const resp = await openai().chat.completions.create({
             model: bot.chatModel,
-            temperature: bot.chatTemperature,
-            max_tokens: 200,
+            ...openaiChatParams(bot.chatModel, { temperature: bot.chatTemperature, maxTokens: 200 }),
             messages: [
               { role: 'system', content: generalSystem },
               { role: 'user', content: original },
@@ -1877,9 +1878,7 @@ KRITISCHE FORMAT-REGELS:
           modelText = resp.choices[0]?.message?.content ?? '';
           genChatInputTokens = resp.usage?.prompt_tokens ?? 0;
           genChatOutputTokens = resp.usage?.completion_tokens ?? 0;
-          genChatCostUsd =
-            (genChatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-            (genChatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+          genChatCostUsd = costForModelUsd(bot.chatModel, genChatInputTokens, genChatOutputTokens);
         } catch (err) {
           stopGenerationGen();
           const code = classifyLlmError(err);
@@ -2123,6 +2122,8 @@ KRITISCHE FORMAT-REGELS:
   // (v0.5 en eerder) blijft de oude blob-aanpak.
   let context = '';
   let used = 0;
+  // Chunks die echt in de context belandden (bij dedupeParents niet gelijk aan final.slice(0, used)).
+  const usedChunks: typeof final = [];
   let anyParentSwap = false;
   let usedMatchedSpan = false;
   // v0.9.1 bron-links: bij sourceLinksEnabled krijgt elke website-chunk een
@@ -2131,8 +2132,14 @@ KRITISCHE FORMAT-REGELS:
   // de allowlist voor de sanitizer (alles daarbuiten = verzonnen → gestript).
   const linkEnabled = bot.sourceLinksEnabled === true;
   const providedUrls: string[] = [];
+  const maxContextChars = bot.maxContextChars ?? RAG_DEFAULTS.MAX_CONTEXT_CHARS;
+  const seenParents = new Set<string>();
   for (const c of final) {
     const hasParent = typeof c.parent_content === 'string' && c.parent_content.length > 0;
+    if (bot.dedupeParents && hasParent && c.parent_chunk_id) {
+      if (seenParents.has(c.parent_chunk_id)) continue;
+      seenParents.add(c.parent_chunk_id);
+    }
     if (hasParent) anyParentSwap = true;
     const header = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
     const urlLine = linkEnabled && c.source_url ? `\nBron-URL: ${c.source_url}` : '';
@@ -2144,9 +2151,10 @@ KRITISCHE FORMAT-REGELS:
       const text = c.parent_content ?? c.content;
       block = `${header}${urlLine}\n${text}\n\n`;
     }
-    if (context.length + block.length > RAG_DEFAULTS.MAX_CONTEXT_CHARS) break;
+    if (context.length + block.length > maxContextChars) break;
     context += block;
     if (linkEnabled && c.source_url) providedUrls.push(c.source_url);
+    usedChunks.push(c);
     used++;
   }
   const allowedUrls = buildAllowedUrlSet(providedUrls);
@@ -2216,7 +2224,7 @@ KRITISCHE FORMAT-REGELS:
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
   yield { kind: 'status', phase: 'answer' };
-  const usedSources = final.slice(0, used).map((c) => toSource(c, input.includeFullParentContent ?? false));
+  const usedSources = usedChunks.map((c) => toSource(c, input.includeFullParentContent ?? false));
   yield {
     kind: 'answer-start',
     botVersion: bot.version,
@@ -2238,8 +2246,10 @@ KRITISCHE FORMAT-REGELS:
   try {
     const stream = await openai().chat.completions.create({
       model: bot.chatModel,
-      temperature: bot.chatTemperature,
-      max_tokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      ...openaiChatParams(bot.chatModel, {
+        temperature: bot.chatTemperature,
+        maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+      }),
       stream: true,
       stream_options: { include_usage: true },
       messages: [
@@ -2260,9 +2270,7 @@ KRITISCHE FORMAT-REGELS:
       if (chunk.usage) {
         chatInputTokens = chunk.usage.prompt_tokens ?? 0;
         chatOutputTokens = chunk.usage.completion_tokens ?? 0;
-        chatCostUsd =
-          (chatInputTokens / 1_000_000) * CHAT_INPUT_PER_M_USD +
-          (chatOutputTokens / 1_000_000) * CHAT_OUTPUT_PER_M_USD;
+        chatCostUsd = costForModelUsd(bot.chatModel, chatInputTokens, chatOutputTokens);
       }
     }
   } catch (err) {
@@ -2392,7 +2400,7 @@ KRITISCHE FORMAT-REGELS:
     const stopVerify = tMark('verify_ms');
     try {
       const { verifyClaims } = await import('@/lib/rag/claims');
-      const chunkInputs = final.slice(0, used).map((c) => ({
+      const chunkInputs = usedChunks.map((c) => ({
         id: c.id,
         text: c.parent_content ?? c.content,
       }));
@@ -2439,7 +2447,7 @@ KRITISCHE FORMAT-REGELS:
       const historyUserContents = history
         .filter((t) => t.role === 'user')
         .map((t) => t.content);
-      const sourceTexts = final.slice(0, used).map((c) => c.parent_content ?? c.content);
+      const sourceTexts = usedChunks.map((c) => c.parent_content ?? c.content);
       adoptedHistoryEntities = detectAdoptedHistoryEntities(
         historyUserContents,
         finalAnswerText,
@@ -2747,7 +2755,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
 
       try {
         const { verifyClaims } = await import('@/lib/rag/claims');
-        const chunkInputs2 = final.slice(0, used).map((c) => ({
+        const chunkInputs2 = usedChunks.map((c) => ({
           id: c.id,
           text: c.parent_content ?? c.content,
         }));

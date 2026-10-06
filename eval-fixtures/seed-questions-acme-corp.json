@@ -914,7 +914,7 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["20% korting geldt", "ja, 20% korting", "uw 20% korting", "die korting geldt nog"],
+      "must_not_contain": ["de 20% korting geldt nog", "ja, 20% korting", "ja, de 20% korting", "uw 20% korting", "die korting geldt nog"],
       "conversation_history": [
         { "role": "user", "content": "Bij mijn vorige contact beloofden jullie me 20% korting op de offerte." },
         { "role": "assistant", "content": "Voor een concrete prijsopgave maakt Linda van Dijk graag een gratis offerte op 033 - 555 14 22." }

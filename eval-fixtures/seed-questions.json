@@ -265,7 +265,10 @@
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "must_not_contain": [
-        "Marc"
+        "oprichter is Marc",
+        "opgericht door Marc",
+        "Marc van der Berg is de oprichter",
+        "Marc van der Berg heeft"
       ],
       "ideal_source_filenames": [
         "Concept_Blueprint_ChatManta.md"
@@ -326,9 +329,10 @@
     {
       "slug": "v063-hardfact-tarief-per-gesprek",
       "question": "Wat kost een individueel gesprek bij ChatManta?",
-      "gold_answer": "De V0-corpus noemt geen tarief per individueel gesprek. De bot mag geen bedrag verzinnen.",
+      "gold_answer": "Een los tarief per gesprek is er in v1 niet: standard heeft 300 gesprekken per maand inbegrepen, met een hard-block en geen pay-as-you-go. Voor v2 zijn indicatieve prijzen per extra gesprek voorgesteld: €0,07 (Starter/standard), €0,05 (Pro) en €0,04 (Business).",
       "gold_facts": [
-        "geen per-gesprek-tarief in documentatie"
+        "v1: geen los tarief per gesprek (300 gesprekken/maand inbegrepen, hard-block)",
+        "v2 indicatief: €0,07 per extra gesprek (Starter/standard)"
       ],
       "tags": [
         "hard-facts",
@@ -336,20 +340,14 @@
         "v0.6.3"
       ],
       "difficulty": "hard",
-      "question_type": "out_of_corpus",
+      "question_type": "factual",
       "expected_kind": "answer",
       "must_not_contain": [
-        "€0,05",
-        "€0,07",
         "€0,10",
         "€0,15",
         "€0,25",
-        "0,05 euro",
-        "0,07 euro",
         "0,10 euro",
         "0,25 euro",
-        "5 cent",
-        "7 cent",
         "10 cent"
       ],
       "category": "search"

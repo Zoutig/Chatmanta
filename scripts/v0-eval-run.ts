@@ -22,6 +22,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { performance } from 'node:perf_hooks';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import {
   runEvalRow,
@@ -33,8 +35,9 @@ import {
 } from '../lib/v0/server/eval';
 import { BOTS, BOT_VERSIONS_ORDERED, EVAL_DEFAULT_VERSIONS, resolveBot } from '../lib/v0/server/bots';
 import { isHydeModeRequest, type HydeModeRequest } from '../lib/v0/server/rag';
+import { JUDGE_MODEL } from '../lib/v0/server/eval-judge-model';
+import { buildJobs, type EvalJob } from '../lib/v0/server/eval-jobs';
 
-const JUDGE_MODEL = 'gpt-4o';
 const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
   'dev-org': '00000000-0000-0000-0000-0000000000d0',
   'acme-corp': '00000000-0000-0000-0000-0000000000a1',
@@ -81,7 +84,13 @@ if (runsArg && (!Number.isFinite(runsCount) || runsCount < 1)) {
 }
 const smokeMode = process.argv.includes('--smoke');
 const allVersions = process.argv.includes('--all');
-const skipPairwise = process.argv.includes('--no-pairwise');
+const noJudge = process.argv.includes('--no-judge');
+const interleave = process.argv.includes('--interleave');
+const outPath = parseStringArg('out');
+if (outPath && !noJudge) fail('--out werkt alleen samen met --no-judge (anders gaan resultaten naar eval_runs)');
+if (noJudge && !outPath) fail('--no-judge vereist --out=<pad.json> (antwoorden gaan niet naar eval_runs)');
+// --no-judge → geen judge-scores, dus ook geen pairwise.
+const skipPairwise = process.argv.includes('--no-pairwise') || noJudge;
 const hydeMode: HydeModeRequest = hydeModeArg
   ? (isHydeModeRequest(hydeModeArg)
       ? hydeModeArg
@@ -163,15 +172,8 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------------------
   // Build (question × version × runIndex) jobs
   // ---------------------------------------------------------------------------
-  type Job = { question: EvalQuestion; botVersion: string; runIndex: number };
-  const jobs: Job[] = [];
-  for (const v of versions) {
-    for (const q of questions) {
-      for (let r = 0; r < runsCount; r++) {
-        jobs.push({ question: q, botVersion: v, runIndex: r });
-      }
-    }
-  }
+  type Job = EvalJob<EvalQuestion>;
+  const jobs: Job[] = buildJobs(questions, versions, runsCount, interleave);
 
   const t0 = performance.now();
   const versionsMode = versionsFilter
@@ -194,8 +196,10 @@ async function main(): Promise<void> {
   console.log(`  runs/cell    : ${runsCount}${runsCount > 1 ? ' (multi-run voor variance)' : ''}`);
   console.log(`  jobs         : ${jobs.length}`);
   console.log(`  concurrency  : ${CONCURRENCY}`);
+  console.log(`  judge        : ${noJudge ? 'OFF (--no-judge)' : JUDGE_MODEL}`);
+  console.log(`  volgorde     : ${interleave ? 'interleaved' : 'version-major'}`);
   console.log(`  hyde-mode    : ${hydeMode}${hydeMode === 'auto' ? ' (volgt bot-config)' : ' (override)'}`);
-  console.log(`  pairwise     : ${skipPairwise ? 'OFF (--no-pairwise)' : 'AAN tussen ' + EVAL_DEFAULT_VERSIONS.join(' vs ')}`);
+  console.log(`  pairwise     : ${noJudge ? 'OFF (--no-judge)' : skipPairwise ? 'OFF (--no-pairwise)' : 'AAN tussen ' + EVAL_DEFAULT_VERSIONS.join(' vs ')}`);
   console.log('');
 
   // ---------------------------------------------------------------------------
@@ -211,6 +215,8 @@ async function main(): Promise<void> {
   // Key = `${question_id}::${bot_version}::${runIndex}`. Alleen runIndex=0
   // wordt gepaird (multi-run is voor variance op absolute, niet pairwise).
   const answerStash = new Map<string, string>();
+  // --no-judge: rijen gaan naar --out JSON i.p.v. eval_runs.
+  const devRows: EvalRunRow[] = [];
 
   const rows = await withConcurrency<Job, EvalRunRow | null>(jobs, CONCURRENCY, async (job, idx) => {
     const bot = resolveBot(job.botVersion);
@@ -223,12 +229,17 @@ async function main(): Promise<void> {
         bot,
         hydeMode,
         runIndex: job.runIndex,
+        skipJudge: noJudge,
       });
-      const { error: insErr } = await sb.from('eval_runs').insert(row);
-      if (insErr) {
-        console.error(`  ✗ ${tag} — insert: ${insErr.message}`);
-        failed++;
-        return null;
+      if (noJudge) {
+        devRows.push(row);
+      } else {
+        const { error: insErr } = await sb.from('eval_runs').insert(row);
+        if (insErr) {
+          console.error(`  ✗ ${tag} — insert: ${insErr.message}`);
+          failed++;
+          return null;
+        }
       }
       // Stash antwoord voor pairwise (alleen runIndex=0).
       if (job.runIndex === 0 && !skipPairwise) {
@@ -254,6 +265,12 @@ async function main(): Promise<void> {
 
   const absoluteSec = Math.round((performance.now() - t0) / 100) / 10;
   const okRows = rows.filter((r): r is EvalRunRow => r !== null);
+
+  if (noJudge && outPath) {
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify(devRows, null, 2));
+    console.log(`  → ${devRows.length} antwoorden geschreven naar ${outPath} (geen DB-writes)`);
+  }
 
   // ---------------------------------------------------------------------------
   // V0.7 Pairwise judging — tussen de 2 EVAL_DEFAULT_VERSIONS. Slaat over
@@ -357,17 +374,22 @@ async function main(): Promise<void> {
       console.log(`  ${v.padEnd(7)} | (geen succesvolle runs)`);
       continue;
     }
-    const c = avg(vRows.map((r) => r.score_correctness));
-    const p = avg(vRows.map((r) => r.score_completeness));
-    const g = avg(vRows.map((r) => r.score_grounding));
+    // --no-judge: scores zijn niet gemeten (crash-rijen hebben synthetische 0/0/0) -> "-".
+    const c = noJudge ? null : avg(vRows.map((r) => r.score_correctness));
+    const p = noJudge ? null : avg(vRows.map((r) => r.score_completeness));
+    const g = noJudge ? null : avg(vRows.map((r) => r.score_grounding));
     const all = [c, p, g].filter((n): n is number => n !== null);
     const overall = all.length === 0 ? null : all.reduce((a, b) => a + b, 0) / all.length;
-    const prodRate = rate(vRows, (r) => r.production_ready === true);
+    const prodRate = noJudge ? '  -  ' : rate(vRows, (r) => r.production_ready === true);
     const bCost = vRows.reduce((s, r) => s + r.bot_cost_usd, 0);
     const jCost = vRows.reduce((s, r) => s + r.judge_cost_usd, 0);
     console.log(
       `  ${v.padEnd(7)} | ${fmtAvg(c)} ${fmtAvg(p)} ${fmtAvg(g)} | ${fmtAvg(overall)} | ${prodRate.padStart(10)} | $${bCost.toFixed(4)}  $${jCost.toFixed(4)}`,
     );
+    if (noJudge) {
+      const crashed = vRows.filter((r) => r.bot_answer.startsWith('[bot error]')).length;
+      console.log(`          bot-error/crash-rijen: ${crashed}/${vRows.length}`);
+    }
   }
   console.log(`\n  totale cost: bot $${totalBotCost.toFixed(4)} + judge $${totalJudgeCost.toFixed(4)} + pairwise $${totalPairwiseCost.toFixed(4)} = $${(totalBotCost + totalJudgeCost + totalPairwiseCost).toFixed(4)}`);
 
@@ -425,10 +447,14 @@ async function main(): Promise<void> {
     if (failed > 0) reasons.push(`${failed} failed job(s)`);
     if (violations.length > 0) reasons.push(`${violations.length} must-not violation(s)`);
     if (budgetExceeded) reasons.push('budget overschreden');
-    console.log(`\n⚠ Exit-code 1: ${reasons.join(', ')}. Eval-runs voor geslaagde jobs zijn opgeslagen.`);
+    console.log(`\n⚠ Exit-code 1: ${reasons.join(', ')}. ${noJudge ? `Antwoorden staan in ${outPath}; beoordeling extern (Claude).` : 'Eval-runs voor geslaagde jobs zijn opgeslagen.'}`);
     process.exit(1);
   }
-  console.log(`\n✓ Klaar. Run \`npm run eval:report\` voor een markdown-rapport.`);
+  if (noJudge) {
+    console.log(`\n✓ Klaar. Antwoorden staan in ${outPath}; beoordeling extern (Claude).`);
+  } else {
+    console.log(`\n✓ Klaar. Run \`npm run eval:report\` voor een markdown-rapport.`);
+  }
 }
 
 main().catch((err) => {

@@ -60,6 +60,23 @@ export function getPersonaForOrgSlug(slug: string): string | null {
  * onbekende org. Caller moet null-graceful zijn — bij null wordt tone_match
  * niet ge-scored.
  */
+/**
+ * Toon waarmee de bot in de eval draait, per org. Spiegelt het register uit de
+ * persona-file waar de judge op scoort (globex: "u kunt"; initech: formeel-precies)
+ * — zoals een klant die toon in productie zelf instelt. Zonder dit draaide élke org
+ * op de default 'neutral' (je/jij) en strafte de judge ~25% van de afgekeurde
+ * rijen af op aanspreekvorm (Sol-analyse 2026-10-06). Undefined = default.
+ */
+const EVAL_TONE_BY_SLUG: Readonly<Record<string, 'formal'>> = Object.freeze({
+  'globex-inc': 'formal',
+  initech: 'formal',
+});
+
+export function getEvalToneForOrgId(orgId: string): 'formal' | undefined {
+  const slug = SLUG_BY_ORG_ID[orgId];
+  return slug ? EVAL_TONE_BY_SLUG[slug] : undefined;
+}
+
 export function getPersonaForOrgId(orgId: string): string | null {
   const slug = SLUG_BY_ORG_ID[orgId];
   if (!slug) return null;

@@ -18,7 +18,7 @@ import {
   type Tone,
 } from './style-types';
 
-export type OutputStyleVersion = 'v1' | 'v2' | 'v3';
+export type OutputStyleVersion = 'v1' | 'v2' | 'v3' | 'v4';
 
 const TONE_INSTRUCTION: Record<Tone, string> = {
   formal:
@@ -60,7 +60,18 @@ const LENGTH_INSTRUCTION_V3: Record<Length, string> = {
     'Geef het volledige antwoord met structuur: paragrafen met witregels (lege regel tussen blokken), opsommingen waar er 3+ parallelle items zijn (regels die beginnen met "- "), en gebruik **vetgedrukte koppen** voor sub-onderwerpen (bv. "**Openingstijden**" gevolgd door details). Meer structuur, niet meer woorden — voeg geen vulling toe voor de schijn van diepgang.',
 };
 
+// V4 (v0.12c, Luna): Sol-analyse 2026-10-06 — ~40% van de antwoorden "too_curt":
+// V3-medium ("zo kort als de vraag toelaat, bij een simpel feit 1-2 zinnen") won
+// van "laat niets nuttigs weg". V4 maakt concreet wát erbij hoort.
+const LENGTH_INSTRUCTION_V4: Record<Length, string> = {
+  short: LENGTH_INSTRUCTION_V3.short,
+  medium:
+    'Geef een volledig en bruikbaar antwoord zonder vulling: eerst het directe antwoord, dan wat de klant nodig heeft om ermee verder te kunnen — de voorwaarde of uitzondering die erbij hoort, een tweede relevant bedrag of optie uit de bronnen, en de concrete vervolgstap. Meestal 2-4 zinnen; meer alleen als de vraag meerdere onderdelen heeft.',
+  detailed: LENGTH_INSTRUCTION_V3.detailed,
+};
+
 function pickLengthMap(version: OutputStyleVersion): Record<Length, string> {
+  if (version === 'v4') return LENGTH_INSTRUCTION_V4;
   if (version === 'v3') return LENGTH_INSTRUCTION_V3;
   if (version === 'v2') return LENGTH_INSTRUCTION_V2;
   return LENGTH_INSTRUCTION_V1;

@@ -24,26 +24,26 @@ import {
   type PhaseTimings,
 } from './rag';
 import { resolveBot, type BotConfig } from './bots';
-import { getPersonaForOrgId, formatPersonaSection } from './eval-personas';
+import { getPersonaForOrgId, formatPersonaSection, getEvalToneForOrgId } from './eval-personas';
 import { containsHardFacts } from '@/lib/rag/hard-facts';
+import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
+import { JUDGE_MODEL } from './eval-judge-model';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const JUDGE_MODEL = 'gpt-4o';
 const JUDGE_TEMPERATURE = 0.0;
 // V0.7 eval-v2: bumped van 600 → 900 omdat het JSON-object nu 4 extra velden
 // heeft (production_ready, answer_length_appropriate, source_citation_binding,
 // score_tone_match) plus uitgebreidere reasoning. 900 = veilige headroom; in
 // praktijk komt judge zelden boven 750.
 const JUDGE_MAX_TOKENS = 900;
+// GPT-6 telt reasoning als completion-tokens; ruimte nodig voor de volledige JSON.
+const JUDGE_MAX_TOKENS_GPT6 = 1500;
 // Pairwise-judge prompt is korter (geen gold-rubric, alleen vraag + 2
 // antwoorden + persona). Output is ook beperkt (winner + confidence + 2-4
 // zin rationale). 500 is ruim voldoende.
 const PAIRWISE_JUDGE_MAX_TOKENS = 500;
-// gpt-4o pricing (USD per 1M tokens) — hardcoded, judge is altijd gpt-4o.
-const JUDGE_INPUT_PER_M_USD = 2.5;
-const JUDGE_OUTPUT_PER_M_USD = 10.0;
 
 // ---------------------------------------------------------------------------
 // Lazy OpenAI client
@@ -319,7 +319,7 @@ function buildJudgeUserPrompt(args: {
     ? '(geen sources — bot deed geen retrieval)'
     : sources
         .map((s, i) => {
-          const text = s.parentExcerpt ?? s.contentExcerpt;
+          const text = s.parentContentFull ?? s.contentFull ?? s.parentExcerpt ?? s.contentExcerpt;
           return `[${i + 1}] ${s.filename ?? 'onbekend'}: ${text}`;
         })
         .join('\n');
@@ -439,8 +439,10 @@ export async function runJudge(args: {
   try {
     const resp = await openai().chat.completions.create({
       model: JUDGE_MODEL,
-      temperature: JUDGE_TEMPERATURE,
-      max_tokens: JUDGE_MAX_TOKENS,
+      ...openaiChatParams(JUDGE_MODEL, {
+        temperature: JUDGE_TEMPERATURE,
+        maxTokens: JUDGE_MODEL.startsWith('gpt-6') ? JUDGE_MAX_TOKENS_GPT6 : JUDGE_MAX_TOKENS,
+      }),
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: JUDGE_SYSTEM },
@@ -463,9 +465,7 @@ export async function runJudge(args: {
   }
 
   const latencyMs = Math.round(performance.now() - start);
-  const costUsd =
-    (inputTokens / 1_000_000) * JUDGE_INPUT_PER_M_USD +
-    (outputTokens / 1_000_000) * JUDGE_OUTPUT_PER_M_USD;
+  const costUsd = costForModelUsd(JUDGE_MODEL, inputTokens, outputTokens);
 
   // Parse JSON. response_format=json_object garandeert het basis-format,
   // maar score-velden kunnen nog steeds van type afwijken.
@@ -627,8 +627,10 @@ export async function runPairwiseJudge(args: {
   try {
     const resp = await openai().chat.completions.create({
       model: JUDGE_MODEL,
-      temperature: JUDGE_TEMPERATURE,
-      max_tokens: PAIRWISE_JUDGE_MAX_TOKENS,
+      ...openaiChatParams(JUDGE_MODEL, {
+        temperature: JUDGE_TEMPERATURE,
+        maxTokens: PAIRWISE_JUDGE_MAX_TOKENS,
+      }),
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: PAIRWISE_SYSTEM },
@@ -652,9 +654,7 @@ export async function runPairwiseJudge(args: {
   }
 
   const latencyMs = Math.round(performance.now() - start);
-  const costUsd =
-    (inputTokens / 1_000_000) * JUDGE_INPUT_PER_M_USD +
-    (outputTokens / 1_000_000) * JUDGE_OUTPUT_PER_M_USD;
+  const costUsd = costForModelUsd(JUDGE_MODEL, inputTokens, outputTokens);
 
   let parsed: unknown;
   try {
@@ -825,6 +825,9 @@ export async function runEvalRow(args: {
   hydeMode?: HydeModeRequest;
   /** Index in een multi-run batch (--runs=N). Default 0. */
   runIndex?: number;
+  /** true = sla de LLM-judge over (scores null, judge_cost 0). Voor goedkope
+      dev-set-runs waarvan de antwoorden apart door Claude ($0) beoordeeld worden. */
+  skipJudge?: boolean;
 }): Promise<EvalRunRow> {
   const { organizationId, question, bot } = args;
   const hydeModeRequested: HydeModeRequest = args.hydeMode ?? 'auto';
@@ -874,6 +877,11 @@ export async function runEvalRow(args: {
       // runRagQueryStreaming terug op DEV_ORG_ID en haalt acme/globex/initech
       // vragen chunks uit de ChatManta-docs — onbruikbaar voor multi-org eval.
       organizationId,
+      // Judge (LLM én Claude via --no-judge-JSON) ziet de volledige parent die
+      // de antwoord-LLM kreeg, niet de ≤800-char preview: anders tellen gegronde
+      // feiten voorbij teken ~800 als verzonnen. Zelfde fix als de hard-eval.
+      includeFullParentContent: true,
+      tone: getEvalToneForOrgId(organizationId),
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         markFirstToken();
@@ -979,7 +987,17 @@ export async function runEvalRow(args: {
   }
 
   // Judge call. V0.7: organizationId doorgeven voor persona-injectie.
-  const judge = await runJudge({ question, response, organizationId });
+  const judge: JudgeScores = args.skipJudge
+    ? {
+        ...EMPTY_JUDGE_FAIL,
+        reasoning: 'skipJudge — beoordeling extern (Claude)',
+        parseError: false,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        latencyMs: 0,
+      }
+    : await runJudge({ question, response, organizationId });
 
   // Sources snapshot (compact, geen embedding/uuid noise).
   const botSources =
@@ -989,6 +1007,10 @@ export async function runEvalRow(args: {
           filename: s.filename,
           similarity: s.similarity,
           excerpt: s.contentExcerpt,
+          // Alleen in --no-judge-JSON (Claude-judge); niet in eval_runs.bot_sources.
+          ...(args.skipJudge && (s.parentContentFull ?? s.contentFull)
+            ? { parent_full: s.parentContentFull ?? s.contentFull }
+            : {}),
         }));
 
   // Retrieval metrics — gebaseerd op filenames van retrieved chunks vs
