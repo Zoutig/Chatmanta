@@ -1172,6 +1172,24 @@ const V0_12E: BotConfig = {
     'v0.12d met: (1) klacht/schadeclaim — geen vergoedingscategorieën noemen, ook niet voorwaardelijk (hard-eval-veto hh-initech-klacht-01); (2) meta-talk-lijst uitgebreid met "staat niet vermeld"/"wordt niet genoemd"/"de genoemde …" + voorbeeldformulering bij niet-weten; (3) aantallen: opsomming = aantal + wat nu geldt vs gepland, plan nooit als huidig feit; (4) tweede bedrag alleen als het bij dezelfde vraag hoort. LATEST sinds 2026-10-06.',
   systemPrompt: V0_12E_SYSTEM_PROMPT,
 };
+// v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
+// Basis = v0.12e. NIET gepromoveerd.
+const V0_13R1: BotConfig = {
+  ...V0_12E,
+  version: 'v0.13r1',
+  label: 'v0.13r1 — v0.12e zonder hybrid (alleen vector, = huidige V1-situatie) (experiment)',
+  description: 'Meet wat keyword-zoeken (hybrid FTS+vector) bijdraagt; V1 heeft nog geen hybrid-RPC.',
+  hybridSearch: false,
+};
+const V0_13R2: BotConfig = {
+  ...V0_12E,
+  version: 'v0.13r2',
+  label: 'v0.13r2 — v0.12e met 16 kandidaten en 48k context (experiment)',
+  description: 'Meer kandidaten per zoekvraag (topK 16, finalContextMaxChunks 16) en ruimere context-cap.',
+  retrievalTopK: 16,
+  finalContextMaxChunks: 16,
+  maxContextChars: 48000,
+};
 const V0_12C2: BotConfig = {
   ...V0_12C,
   version: 'v0.12c2',
@@ -1209,6 +1227,8 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_12C2.version]: V0_12C2,
   [V0_12D.version]: V0_12D,
   [V0_12E.version]: V0_12E,
+  [V0_13R1.version]: V0_13R1,
+  [V0_13R2.version]: V0_13R2,
 };
 
 /**
