@@ -1,6 +1,7 @@
 # ChatManta — Agent-landmijnen
 
-_Gedistilleerd uit de opgebouwde sessie-kennis op 2026-07-06 (51 items). Levend document —
+_Gedistilleerd uit de opgebouwde sessie-kennis op 2026-07-06 (51 items); aangevuld op
+2026-10-05 met een tweede memory-sweep (alles tegen de code geverifieerd). Levend document —
 vul aan wanneer een nieuwe val is uitgevonden; corrigeer wanneer de code is veranderd._
 
 Duurzame technische valkuilen en empirie voor iedereen (AI-agent of mens) die in deze
@@ -72,6 +73,45 @@ pdfjs onder de motorkap.
 Wat te doen: gebruik de class-API en zet `pdf-parse` + `mammoth` in `serverExternalPackages`
 (next.config). (PR #148, memory: controlroom_admin_dashboard_v0)
 
+**`.map(fn)` breekt zodra `fn` een optionele 2e parameter krijgt**
+Symptoom: na het toevoegen van een optionele boolean aan een helper gedragen bestaande
+`.map(helper)`-callsites zich ineens anders (of tsc klaagt).
+Oorzaak: `Array.map` geeft `(item, index, array)` door — de index belandt in je nieuwe parameter.
+Wat te doen: wrap expliciet, `.map((c) => toSource(c))` (zo staat het in `lib/rag/run-rag-query.ts`).
+(PR #168, memory: project_prod_gate_eval)
+
+**Next overschrijft een al-gezette env-var niet vanuit `.env.local`**
+Symptoom: je wilt lokaal een integratie uitschakelen (bv. mails niet echt versturen) door de key
+leeg te zetten in `.env.local`, maar de oude waarde blijft actief — of andersom.
+Oorzaak: Next laadt `.env*` alleen voor vars die nog níet in de proces-omgeving staan.
+Wat te doen: zet de var in de shell vóór `next dev` (PowerShell: `$env:RESEND_API_KEY=''`), of
+herstart vanuit een schone shell. (memory: niels_punchlist_2026_06)
+
+**`.env.local` sourcen in bash lekt secrets naar de output; check of keys niet uitgecommentarieerd zijn**
+Symptoom: `source .env.local` (of `set -a; . .env.local`) print waarden of voert regels uit als
+commando — secrets belanden in de sessielog. Los daarvan: een worktree-smoke-test/eval faalt pas
+halverwege omdat `OPENAI_API_KEY` als `# OPENAI_API_KEY=…` in `.env.local` staat.
+Oorzaak: regels met een spatie na `=` worden door de shell als commando geïnterpreteerd; en
+`.env.local` is gitignored, dus elke worktree heeft een eigen (mogelijk verouderde) kopie.
+Wat te doen: lees env alleen via `node --env-file=.env.local …` of een node-parser, nooit via
+shell-sourcing. Vóór LLM-afhankelijk werk in een worktree: controleer alléén de var-*namen*
+(`grep -oE '^[A-Z_]+=' .env.local`), niet de waarden. (memories: herstart_2026_10,
+feedback_worktree_env_keys, feedback_autonomous_build_no_signoff_skill)
+
+**Scripts: `process.exit()` slaat `finally` over; import van een script met top-level `main()` = side-effect**
+Symptoom: test-cleanup draait niet (achtergebleven test-rijen maskeren een volgende kapotte run);
+of het importeren van één constante uit een ander script draait diens hele seed opnieuw.
+Oorzaak: `process.exit` beëindigt direct; een script dat bij import `main()` aanroept voert dat
+uit bij elke import.
+Wat te doen: in scripts `throw` + `finally` + pre-clean op een herkenbare naam; deel constanten via
+een los modulebestand (zoals `scripts/v1-iso-token.ts`). (PR #213/#214, memory: project_v1_strategy)
+
+**eslint `react-hooks/purity` + `set-state-in-effect` zijn streng**
+Symptoom: lint-fouten op `Date.now()` tijdens render of `setState` in een effect-body.
+Wat te doen: leg "nu" vast in een event-handler (bv. de `onChange` van een periode-select), niet
+in render of een effect. NB: de lint-baseline op main is niet groen — beoordeel alleen of je
+eigen diff nieuwe fouten toevoegt. (memories: controlroom_admin_dashboard_v0, audit_2026_07_full)
+
 ## Supabase & migraties
 
 **`npm run migrate` bereikt prod soms niet vanaf de dev-machine → ledger-drift**
@@ -140,6 +180,47 @@ Wat te doen: `create extension … with schema extensions` + in de RPC én de mi
 NOT NULL + SELECT-policy (membership-patroon van `0001_core_tenancy`) in dezelfde migratie;
 service-role-only tabellen krijgen RLS-aan-zonder-policy (deny-all voor session-clients). (PR #213,
 memory: project_v1_strategy)
+
+**`create or replace function` kan signatuur/RETURNS niet wijzigen → `drop` + `create`**
+Symptoom: een migratie die een kolom aan het resultaat van een RPC toevoegt (bv. `source_url` in
+`match_chunks_with_parents`) faalt op "cannot change return type of existing function".
+Oorzaak: Postgres staat bij `create or replace` alleen een body-wijziging met identieke
+signatuur/return-shape toe.
+Wat te doen: wijzigt de shape → `drop function … ; create function …` in dezelfde migratie
+(grants/`search_path` opnieuw zetten); blijft de shape gelijk → `create or replace` volstaat.
+(PR #107/#215, memories: crawler_dashboard_plan, project_v1_strategy)
+
+**Migratie vóór de merge — code die een nieuwe kolom expliciet selecteert breekt anders prod**
+Symptoom: na een merge geeft prod HTTP 400/500's tot iemand de migratie draait; of álle orgs vallen
+stil terug op mock-instellingen.
+Oorzaak: Vercel deployt de main-tip automatisch, migraties zijn handmatig. Een
+`.select('…, nieuwe_kolom')` faalt op de hele query zolang de kolom ontbreekt.
+Wat te doen: pas de migratie toe (en verifieer) vóór je mergt. Voor een kolom in een centrale read
+(zoals `getOrgSettings`): schrijf de read defensief — bij een kolom-fout herhalen zonder die kolom
+(zie de `contact_requests`-fallback in `lib/v0/klantendashboard/server/settings.ts`).
+(PR #206/#239-#249, memories: contactverzoeken_bigship, dashboard_gaps_bigship_2026_07)
+
+**Service-role bypasst RLS → filter soft-deletes zelf**
+Symptoom: een script/CLI/admin-pad vindt een verwijderde org/chatbot en schrijft ernaar.
+Oorzaak: de `deleted_at`-afscherming zit (deels) in RLS-policies en RPC-joins; de service-role ziet
+alles.
+Wat te doen: zet op elke service-role-lookup expliciet `.is('deleted_at', null)` (plus de
+org/chatbot-filter). (PR #214, memory: project_v1_strategy)
+
+**Storage-bucket: géén `allowed_mime_types` bij browser-uploads via signed URL**
+Symptoom: een `.md`-upload wordt met 400 geweigerd terwijl `.md` toegestaan zou moeten zijn.
+Oorzaak: `uploadToSignedUrl` negeert de `contentType`-optie bij een browser-`File` → het object komt
+binnen als `application/octet-stream`.
+Wat te doen: valideer op magic-bytes + extensie-allowlist + bucket-`file_size_limit` (zoals
+V1-migratie `0006_v1_document_uploads.sql`), niet op MIME-type. (PR #221, memory: project_v1_strategy)
+
+**PostgREST-embeds zijn in TypeScript array-getypeerd; `tsx` is lakser dan `tsc`**
+Symptoom: `row.organizations.name` werkt in een `tsx`-script maar `npm run typecheck` faalt (of
+andersom: runtime `undefined`).
+Oorzaak: een embed als `organizations(name)` wordt door de gegenereerde types als array gezien;
+`tsx` doet geen typecheck.
+Wat te doen: behandel embeds als array (of narrow expliciet) en draai `npm run typecheck` ook over
+scripts die je met `tsx` test. (PR #228, memory: project_v1_strategy)
 
 ## V0 → V1 porting
 
@@ -288,6 +369,130 @@ evals/dev/embeddings).
 Wat te doen: gebruik `query_log.cost_usd` voor klant-chatbot-kosten; behandel de Costs-API als
 apart, niet-vergelijkbaar account-totaal. (PR #150, memory: controlroom_admin_dashboard_v0)
 
+**`answer_cache` is óók de delivery-store van de FAQ-pre-cache — niet "zomaar een perf-cache"**
+Symptoom: na het uitzetten/weghalen van de cache-lookup lijkt alles te werken, maar FAQ-antwoorden
+worden nooit meer geserveerd (rijen worden geschreven, niemand leest ze).
+Oorzaak: `precacheTopN` (`lib/v0/server/faq-snapshot.ts`) schrijft goedgekeurde FAQ-antwoorden
+rechtstreeks in `answer_cache`; de chat-pipeline levert ze via de gewone cache-lookup af.
+Wat te doen: elke cache-wijziging (uitzetten, TTL, key-wijziging) moet expliciet beslissen wat er
+met de FAQ-pre-cache gebeurt. Purges lopen via `purgeAnswerCache` in de ingest-primitieven
+(`ingestText`/`deleteDoc`, `processCrawl`) en de settings-/bron-mutaties — een nieuw pad dat
+kennisbank-content wijzigt moet óók purgen, anders serveert de cache stale antwoorden.
+(PR #198/#205, memory: answer_cache_removal_analysis)
+
+**Het Test-/Preview-scherm schrijft geen `answer_cache` — alleen het echte chat-pad doet dat**
+Symptoom: je probeert een cache-bug te reproduceren via het klantendashboard-Test-scherm en ziet
+nooit een cache-rij ontstaan.
+Oorzaak: `askTestQuestion` (`app/klantendashboard/test/actions.ts`) stopt de stream bij
+`answer-done`; de cache-write zit aan het eind van de pipeline en draait alleen op het volledige
+`/api/v0/chat`-pad (gegate op `bot.cacheEnabled` en `disableCache !== true`).
+Wat te doen: reproduceer cache-gedrag via de widget/chat-route of seed de rij direct in de DB.
+(PR #178, memory: niels_punchlist_2026_06)
+
+**Twee "veilige" features kunnen elkaar saboteren: bronlinks × hard-fact-gate**
+Symptoom: correcte antwoorden met een echte bronlink werden (~2 van 3 runs) vervangen door het
+"kan geen exacte bedragen/datums vinden"-weigertemplate.
+Oorzaak: de hard-fact-extractor zag de link-URL als ongegrond `url:`-feit (de URL staat in
+pagina-metadata, niet in chunk-content) → de deterministische weiger-gate vuurde.
+Wat te doen: links worden nu via `stripMarkdownLinks()` tot label teruggebracht vóór de
+claim-verificatie (`lib/rag/run-rag-query.ts`). Algemeen: test feature-interacties op de échte
+pipeline mét cache omzeild, niet elke feature los. Gecachte antwoorden worden bij een HIT opnieuw
+gesaneerd (`sanitizeSourceLinks` op de cache-read) — saneer bij lezen i.p.v. een destructieve
+cache-DELETE-migratie. (PR #145/#149, memory: bron_links_pr145)
+
+**Algemene-kennis-toggle: org-instelling wint, en raakt alleen het zero-hit-pad**
+Symptoom: de klant-toggle "beantwoord algemene vragen" leek niets te doen; na de fix blijft het
+zichtbare effect klein.
+Oorzaak: (1) vroeger moesten zowel de botversie-flag als de org-toggle aan staan, en de LATEST-bot
+had de flag uit; nu geldt `input.enableGeneralKnowledge ?? bot.generalKnowledgeEnabled`. (2) De
+gate stuurt alléén het pad waarin géén enkele chunk de threshold haalt; bij threshold ~0,4 krijgen
+de meeste in-domein-vragen een zwakke hit en gaan via het normale antwoordpad.
+Wat te doen: verwacht weinig verschil bij orgs met redelijke KB-dekking; test het met een
+geforceerde zero-hit-vraag. Callers zonder het veld (eval) houden de versie-default → baselines
+blijven gelijk. (PR #203, memory: klantendashboard_fixes_batch_pr203_204)
+
+**Eval moet het FINALE terminale event meten (`replacement` wint van `answer-done`)**
+Symptoom: een regenerate-gebaseerde fix (hard-fact-weigering, anti-adoptie) heeft geen enkel
+effect op de eval-score.
+Oorzaak: de pipeline kan ná `answer-done` nog een `replacement`-event sturen dat het antwoord
+vervangt; een harness die bij `answer-done` stopt meet het verworpen concept.
+Wat te doen: consumeer de stream tot het einde en neem het laatste van
+`answer-done`/`fallback`/`smalltalk`/`replacement` (zoals `lib/v0/server/eval.ts` en
+`scripts/v1-eval-run.ts` doen). Evals vóór deze fix onderschatten regenerate-fixes. (memories:
+v0_version_history, project_v1_strategy)
+
+**V0-botversies zijn append-only; nieuw gedrag gaten zodat de eval-baseline byte-identiek blijft**
+Symptoom: een "kleine" wijziging verschuift alle eval-baselines of verandert stil oude versies.
+Oorzaak: oudere versies in `lib/v0/server/bots.ts` zijn vergelijkings-snapshots; eval-runners geven
+veel per-org-input (toon, Q&A, overrides) niet door.
+Wat te doen: nieuwe RAG-feature = nieuwe versie (`LATEST_BOT_VERSION` + `BOT_VERSIONS_ORDERED`
+bijwerken), nieuwe pipeline-flag = default uit, alleen de nieuwste versie zet 'm aan. Een
+klant-*instelling* hoort op de override-laag (`chatbotOverrides`), niet als versie-flag — dan werkt
+ze op alle versies. Houd nieuw gedrag buiten het eval-pad (bv. `DEFAULT_TONE` blijft `neutral`,
+Q&A-promptregel alleen als de org Q&A heeft, contact-aanbod in de chat-route i.p.v. de engine).
+In-place patch van de live versie alleen bij een duidelijke correctheidsbug, en dan de cache wissen
+(zie hierboven). (memories: v0_is_active_learning_platform, widget_persoonlijk_tone_and_tone_surface,
+contactverzoeken_bigship, niels_punchlist_2026_06)
+
+**Eval-kosten: de judge domineert; draai standaard alleen de twee nieuwste versies**
+Symptoom: een eval-run kost veel meer dan verwacht.
+Oorzaak: vrijwel alle kosten zitten in de `gpt-4o`-judge, niet in de `gpt-4o-mini`-botgeneratie.
+Wat te doen: `eval:run` draait standaard `EVAL_DEFAULT_VERSIONS` (= laatste 2 uit
+`BOT_VERSIONS_ORDERED`); `eval:hard:run` standaard baseline + nieuwste. Gebruik `--smoke` of een
+subset, noem vooraf welke versies en hoeveel vragen, en draai geen eval "tussendoor om te checken".
+Een eval is een billable externe call → eerst bevestigen. (memories: feedback_eval_cost_discipline,
+eval_hard_dimension_cheap_strategy, project_latency_ttft)
+
+**Nooit `bots.ts` (of andere pipeline-code) wijzigen terwijl een eval draait**
+Symptoom: de run crasht halverwege (exit 9).
+Oorzaak: de tsx-loader leest gewijzigde modules opnieuw in tijdens de run.
+Wat te doen: laat de run uitlopen; wil je tussendoor een schone baseline, maak eerst een backup en
+edit pas daarna. (memory: eval_cache_and_run_gotchas)
+
+**Eval-signaal-lessen: wat wel en niet discrimineert**
+- `claimConfidence` scheidt fabricatie en gegronde berekening NIET (embeddings matchen vorm, niet
+  waarde); `retrievalStrength` wél → bouw weiger-logica op retrieval-sterkte.
+- Prompt-tuning beweegt "engage"-types (false-premise, ambiguous, injection), maar niet
+  pure-weigertypes (out-of-corpus, planted-fact) — die vragen een retrieval-/threshold-/
+  verifier-ingreep.
+- Judge-ruis ≈ 0,12 op de overall-score; behandel kleinere delta's als ruis, sub-buckets (n<20)
+  nog meer.
+- Geld-hard-facts strikt: een bedrag met €-teken mag niet als bewezen gelden alleen omdat het
+  kale getal ergens in de chunks staat (bv. als tabelparameter) → `hardFactNumericFallback: false`.
+(memory: v0_version_history)
+
+**Valideer een nieuwe eval-metriek op echte output vóór je erop stuurt; multi-run-checks zijn advisory**
+Symptoom: unit-tests van de metriek zijn groen, maar het verdict is omgekeerd (bv. 71-82%
+"under-refusal", of een perfecte kandidaat die op consistency zakt).
+Oorzaak: een correcte false-premise-correctie telde als hallucinatie; elke getalsvariatie tussen
+stochastische runs werd een harde fail — ook als alle runs gegrond waren.
+Wat te doen: draai elke nieuwe metriek end-to-end mét judge op echte, gevarieerde output en lees
+hits handmatig na. Cross-run-divergentie is alleen een harde fail voor de `consistency`-dimensie
+én alleen als ≥1 run een ongegrond specifiek gaf (`consistencyWithGrounding` in
+`lib/rag/hard-eval-checks.ts`); multi-run draait op alle versies, niet alleen de kandidaat.
+(PR #165/#169, memory: project_prod_gate_eval)
+
+**`chatComplete` in de engine rekent altijd het `gpt-4o-mini`-tarief**
+Symptoom: kosten van een `gpt-4o`-call worden flink onderschat.
+Oorzaak: `chatComplete` (`lib/rag/run-rag-query.ts`) berekent `costUsd` met vaste
+mini-tarief-constanten, ongeacht het meegegeven model.
+Wat te doen: gebruik je een ander model, reken de kosten opnieuw uit met `costForModelUsd`
+(`lib/ai/llm.ts`), zoals `lib/controlroom/server/quiz-analysis.ts` doet. (PR #156, memory:
+quiz_kennisbank_pr156)
+
+**Live-telemetrie = proxies, nooit "accuraatheid"; let op ontbrekende koppelingen**
+Symptoom: een dashboard-cijfer suggereert een correctheidspercentage, of een join tussen
+`query_log` en gesprekken levert niets.
+Oorzaak: live verkeer heeft geen ground-truth. `query_log` heeft géén `thread_id` (per-beurt
+cijfers en per-gesprek cijfers komen uit losse bronnen: `query_log` resp.
+`v0_threads`/`v0_thread_messages`); `v0_feedback` (👍/👎) heeft géén `bot_version`, dus telt
+over alle versies. Niet verwarren: `v0_feedback` = duimpjes, `admin_feedback` = klant-meldingen.
+Wat te doen: toon fallback-/gap-/feedback-ratio's als proxies; schrijf live-telemetrie nooit naar
+`eval_runs`. Filter metrics/recaps op de retentie-placeholder via `lib/v0/retention-sentinel.ts`
+(anders lekt "[verwijderd — retention]" in top-vragen en LLM-samenvattingen). (PR #172/#173/#188,
+memories: maandelijkse_recap_pr172, bot_prestaties_tab_pr173, nacht_audit_2026_06_14,
+project_feedback_system)
+
 ## Widget & embed
 
 **Iframe-viewport ≠ host-viewport (responsive) + cookie/logging-valkuilen**
@@ -337,6 +542,74 @@ Symptoom/oorzaak: een `/v1`-prefix in het pad botst met de proxy-sessie-branch.
 Wat te doen: gebruik `widget-v1.js` (collision-vrij naast V0's `widget.js`). (PR #224, memory:
 project_v1_strategy)
 
+**`/embed/[slug]` moet tegen `ALL_ORG_SLUGS` valideren, niet `ORG_SLUGS_WIDGET`**
+Symptoom: de embed-snippet uit het klantendashboard geeft 404 voor `dev-org` of `demo-nieuw`.
+Oorzaak: `ORG_SLUGS_WIDGET` sluit die orgs bewust uit (geen nep-site-pagina's), maar het dashboard
+genereert voor élke org een snippet.
+Wat te doen: laat `app/embed/[slug]/page.tsx` op `ALL_ORG_SLUGS` staan. (PR #106, memory:
+widget_embed_public_api)
+
+**Widget lokaal testen: origin-allowlist, dev-indicator en iframe-styling**
+Symptoom: `/embed/<org>?h=<host>` toont "geblokkeerd"; Playwright-kliks op de chat-knop komen niet
+aan; dashboard-kleuren ontbreken in het widget-formulier.
+Oorzaak: (1) orgs met een allowlist blokkeren hosts die er niet op staan; zonder `?h` is
+`parentHost` null → fail-open. (2) De Next dev-indicator overlapt de FAB-hoek en onderschept
+kliks. (3) In de iframe bestaan de `--klant-*`-CSS-variabelen van het dashboard niet.
+Wat te doen: open lokaal `/embed/<org>` zonder `?h`; klik in Playwright via `el.click()` binnen
+`page.evaluate`; style widget-UI in de iframe inline. (PR #133/#206, memories:
+widget_embed_iframe_gotchas, contactverzoeken_bigship)
+
+**V1: lege `chatbots.allowed_domains` = elke site mag embedden**
+Symptoom/oorzaak: de V1-origin-allowlist (`lib/v1/widget/load-embed.ts`) is fail-open bij een lege
+of NULL-lijst. NB: de kolom staat op `chatbots`, niet op `organizations`.
+Wat te doen: vul `allowed_domains` als vaste stap bij het onboarden van elke klant. (PR #224/#238,
+memory: v1_launch_ops_progress)
+
+## Crawler (Firecrawl)
+
+**"0 pagina's" / job faalt terwijl de scrape klaar is = Firecrawl-429 tijdens pollen**
+Symptoom: een crawl eindigt zonder pagina's of als `failed`, maar Firecrawl heeft de batch wel
+afgerond.
+Oorzaak: `getBatchScrapeStatus` pagineert standaard automatisch → veel requests → rate-limit 429
+tijdens het pollen.
+Wat te doen: pol met `autoPaginate:false` en behandel 429 als tijdelijk (job blijft `processing`,
+volgende tick opnieuw) — zo staat het in `lib/v0/crawler/firecrawl.ts`/`processJobs.ts`. Diagnose:
+een afgeronde batch opnieuw uitlezen via `getBatchScrapeStatus` is een gratis status-GET.
+(PR #115, memory: v0_version_history)
+
+**Discovery-cap ≠ scrape-cap; subdomeinen worden niet ontdekt**
+Symptoom: "de crawler toont niet alle sitemap-pagina's".
+Oorzaak: `map()` kost een vaste kleine hoeveelheid credits ongeacht de lengte, dus de keuzelijst
+hoeft niet aan de scrape-kostengrens; `map` draait bovendien zonder `includeSubdomains`.
+Wat te doen: houd `MAX_DISCOVER_PAGES` (keuzelijst) los van `MAX_CRAWL_PAGES` (harde scrape-cap);
+`blog.site.nl` verschijnt niet bij root `www.site.nl` — bewust, i.v.m. ongerelateerde content.
+(PR #112, memory: crawler_dashboard_plan)
+
+**Bron uitzetten zonder RPC-wijziging; admin-gestarte crawls hebben geen auto-ingest**
+Symptoom/oorzaak: de retrieval-RPC's filteren al op `website_pages.included = true`; en
+`processCrawlJobs` wordt alleen gedreven door de klant-Website-tab-tick, de cron-route en
+expliciete knoppen — een crawl die vanuit het admin-dashboard start blijft anders hangen op
+"openstaand".
+Wat te doen: een bron inactief maken = `knowledge_sources.disabled_at` zetten + de pagina's
+`included=false` (reactiveren zet ze allemaal terug op included). Na een admin-crawl: "Verwerk
+openstaande crawls" (of de cron-pinger). (PR #134/#137, memory: controlroom_admin_dashboard_v0)
+
+**Externe verbruiks-API's: lees het historiek-ledger, niet `plan − remaining`**
+Symptoom: "credits verbruikt deze maand" klopt niet na een top-up/coupon; de OpenAI-kosten-call
+faalt met een gewone API-key.
+Oorzaak: resterende credits kunnen boven het plan uitkomen; de OpenAI Costs-API
+(`/v1/organization/costs`) accepteert alleen een org-admin-key (`OPENAI_ADMIN_KEY`), geen
+project-key, en `amount.value` is een string.
+Wat te doen: Firecrawl → `getCreditUsageHistorical()`; OpenAI → admin-key + `Number(value)` + ruime
+timeout/caching (de API is traag); beide fail-safe met gelabelde fallback in de UI. (PR #144/#147,
+memory: controlroom_admin_dashboard_v0)
+
+**Publieke crawl-tests moeten tegen het productiedomein**
+Symptoom/oorzaak: Vercel-preview-deployments zitten achter Vercel-auth (401), dus Firecrawl ziet
+daar niets — ook al suggereert het voorbeeld in `scripts/v0-crawl-eval.ts` een preview-URL.
+Wat te doen: draai fixtures zoals `v0:crawl-eval` tegen het productiedomein (of een preview met
+uitgeschakelde deployment-protection); doel overschrijven via `CRAWL_EVAL_BASE_URL`. (PR #121, memory: crawler_observability_eval_pr121)
+
 ## E-mail & crons
 
 **Resend: geverifieerd domein = chatmanta.com (NIET .nl) → stille 403**
@@ -368,6 +641,68 @@ Oorzaak: env wordt gesnapshot bij deploy; NEXT_PUBLIC wordt at-build inlined; de
 artefact, niet de echte waarde.
 Wat te doen: maak een verse redeploy ná het zetten van de var; verifieer "is env correct" via de
 live site, niet via gepullde waarden. (memories: vercel_deployment, v1_rate_limit_hardening)
+
+**Vercel: frequente crons → externe pinger; Vercel-eigen crons krijgen `CRON_SECRET` vanzelf**
+Symptoom: een cron per minuut/5 minuten in `vercel.json` blokkeert de deploy (Hobby-plan); of je
+twijfelt of een geroteerde `CRON_SECRET` de bestaande crons breekt.
+Oorzaak: Hobby staat alleen dagelijkse crons toe. Vercel injecteert de actuele `CRON_SECRET` zelf in
+z'n eigen cron-aanroepen.
+Wat te doen: `vercel.json` bevat alleen dagelijkse jobs (retention, faq-snapshot); de crawl-ingest
+draait via een externe pinger (cron-job.org, zie hierboven) + de client-tick. Na rotatie van
+`CRON_SECRET`: alleen de header van externe pingers bijwerken. (PR #102/#103, memories:
+v0_version_history, crawler_dashboard_plan, v1_launch_ops_progress)
+
+**Vercel CLI-quirks**
+- Env-vars van het type *Sensitive* zijn achteraf onleesbaar (`vercel env pull` geeft `""`) — kwijt =
+  roteren, niet "terughalen".
+- `vercel link` plakt een `VERCEL_OIDC_TOKEN`-regel aan `.env.local` — haal die na afloop weg.
+- `vercel redeploy <deployment-url>` kent geen `--yes`-flag (vraagt ook niets).
+- De Vercel-MCP heeft geen env-var-tool; gebruik de CLI (`vercel env ls/add/rm`).
+(memories: vercel_deployment, v1_launch_ops_progress)
+
+## Git & parallel werk
+
+**Gestapelde PR's + squash-merge: `--delete-branch` sluit de volgende PR**
+Symptoom: na `gh pr merge <parent> --squash --delete-branch` staat de child-PR op CLOSED en kan niet
+heropend worden; of de child-PR heeft ineens conflicten met main.
+Oorzaak: de child had de parent-branch als base (die nu weg is); en de child bevat nog de originele
+parent-commits, terwijl main een andere squash-SHA heeft.
+Wat te doen: retarget elke open child eerst (`gh pr edit <child> --base main`) vóór je de parent
+mergt; rebase de child daarna met `git rebase --onto origin/main <oude-parent-tip>` en force-push.
+Al gesloten? Maak een verse PR vanaf dezelfde branch. Bij voorkeur geen ketting van
+delete-branch-merges bouwen. (PR #215-#218, memory: squash_merge_workflow)
+
+**`gh pr merge` vanuit een worktree geeft een fout, maar de merge is wél gelukt**
+Symptoom: `fatal: 'main' is already used by worktree at …` na `gh pr merge`.
+Oorzaak: gh probeert na de server-side merge lokaal `main` uit te checken, die al in de hoofd-checkout
+staat.
+Wat te doen: verifieer met `gh pr view <n> --json state` (= MERGED) en negeer de lokale fout, of merge
+vanuit de hoofd-checkout. (memory: squash_merge_workflow)
+
+**Rode CI op tests buiten je eigen diff = je branch loopt achter op main**
+Symptoom: CI faalt op tests die je niet hebt aangeraakt.
+Oorzaak: ze waren al rood op je base-commit en zijn inmiddels op main gefixt.
+Wat te doen: check eerst of de failures in je diff zitten; zo niet → `git fetch` + rebase op
+`origin/main`, dan opnieuw draaien. Main beweegt snel bij parallelle sessies — fetch vóór elke
+rebase/merge. (PR #236, memories: v1_admin_parity, v1_launch_ops_progress)
+
+**Commit op de verkeerde branch / vreemde commits op je branch (parallelle sessie)**
+Symptoom: je commit landt op een andere branch, of er staat een commit tussen die jij niet maakte.
+Oorzaak: een tweede sessie in dezelfde working-directory wisselde van branch (preventie staat in
+AGENTS.md).
+Wat te doen: niet `reset --hard` of interactief rebasen (je wist mogelijk werk van de andere sessie).
+Cherry-pick je eigen commits naar de juiste branch en haal ze op de verkeerde weg met
+`git reset --soft`; meld onbekende commits aan de gebruiker. `git reflog -20` toont wat er gebeurde.
+(memory: parallel_session_branch_shift)
+
+**Lege, gelockte worktree-map na `git worktree remove`**
+Symptoom: de map blijft staan met "being used by another process", terwijl `git worktree list` 'm
+niet meer toont.
+Oorzaak: een proces houdt de map als cwd open — typisch de Playwright-MCP-server (niet je
+dev-server), tot het einde van de sessie.
+Wat te doen: accepteer het als onschuldig (git-metadata is schoon) en verwijder de map later; kill
+niet alle `node`-processen (dat breekt andere sessies). (memories: feedback_playwright_worktree_lock,
+contactverzoeken_bigship)
 
 ## Overig
 
@@ -449,3 +784,27 @@ v0_add_org_and_dashboard_org_resolution)
 Symptoom: `res.data.x` is undefined.
 Oorzaak: op de ok-branch staat de payload flat op het object (`res.rootUrl`, niet `res.data`).
 Wat te doen: lees velden direct van het resultaat. (PR #107, memory: crawler_dashboard_plan)
+
+**Review-false-positive: "switch zonder `default`" in een functie met expliciet return-type**
+Symptoom: een reviewer (mens of AI) wil een `default`-tak toevoegen aan bv. `httpStatusFor`
+(`lib/errors/app-error.ts`).
+Oorzaak: met een gedeclareerd return-type (`: number`) en zonder `default` bewijst TypeScript dat de
+switch uitputtend is — een nieuwe enum-waarde zonder case wordt een compile-fout.
+Wat te doen: géén `default` toevoegen; dat zou die bescherming juist weghalen. (memory:
+nacht_audit_2026_06_14)
+
+**V1-auth: overige confirm-route- en Supabase-valkuilen**
+- `email_change` (Account → e-mail wijzigen) redirect na bevestiging naar `/v1/app/account`, niet naar
+  set-password; *Reauthentication* is een 6-cijferige code in de lopende sessie en loopt níet via
+  `/v1/auth/confirm`.
+- Een toekomstige self-serve signup: controleer dat "Confirm email" aanstaat bij de Email-provider,
+  anders verstuurt Supabase de bevestigingsmail nooit.
+- Supabase weigert invites naar `@example.com`-adressen — een e2e-test die een invite verstuurt
+  faalt daarop in de testomgeving; dat is een env-limiet, geen bug.
+(PR #219/#251, memories: v1_auth_email_templates, project_v1_strategy)
+
+**Playwright-e2e: eerste hit op een route kan time-outen door koude compile**
+Symptoom: een navigatie-test faalt sporadisch op een time-out, bij herhalen groen.
+Oorzaak: de dev-server compileert een route pas bij de eerste request (>5s).
+Wat te doen: warm de route op met één `curl` vóór de run, of draai tegen een productie-build.
+(memory: controlroom_admin_dashboard_v0)

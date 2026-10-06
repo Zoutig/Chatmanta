@@ -69,7 +69,7 @@ De rest (🟡) wil je er kort daarna bij; de 🟢's kunnen wachten.
 ### <a name="7"></a>7. 🔴* Externe "pinger" voor de crawl-verwerking · 🧑 (of 🤖 alternatief)
 - **Wat:** Een **pinger** is een dienst die op een vast ritme (bv. elke 2 min) automatisch een URL aanroept. De crawler verwerkt wachtende crawl-taken pas als die route wordt aangeroepen.
 - **Waarom:** De V1-crawler draait **niet** vanzelf op een Vercel-cron (bewuste keuze, net als V0). Zonder pinger blijven gestarte crawls "hangen" in de wachtrij.
-- **Hoe:** Gratis dienst zoals **cron-job.org** of UptimeRobot → maak een job die elke 2–5 min een **GET** doet op `https://www.chatmanta.nl/api/v1/cron/process-crawls` met header `Authorization: Bearer <CRON_SECRET>` (dezelfde waarde als [#4](#4)).
+- **Hoe:** Gratis dienst zoals **cron-job.org** → maak een job die elke 2–5 min een **GET** doet op `https://www.chatmanta.nl/api/v1/cron/process-crawls` met header `Authorization: Bearer <CRON_SECRET>` (dezelfde waarde als [#4](#4)).
 - **🤖 Alternatief:** ik kan in plaats daarvan een **Vercel-cron** toevoegen aan `vercel.json` (kleine code-wijziging) zodat je geen externe dienst nodig hebt — zeg het maar als je dat liever hebt.
 
 ### <a name="7b"></a>7b. ✅ Pinger voor faq-snapshot (na merge PR #242) · 🧑
@@ -82,7 +82,7 @@ De rest (🟡) wil je er kort daarna bij; de 🟢's kunnen wachten.
 - **Waarom uitgesteld:** zolang er geen KVK-inschrijving en geen echte klant-PII in productie is, is dit geen acuut risico. Beslissing 2026-07-06: pas oppakken zodra AVG/juridisch serieus wordt (rond V2, samen met [#10](#10)/[#11](#11)).
 - **Hoe (als je 'm alsnog eerder wilt aanzetten):** zelfde recept als 7b — `GET https://www.chatmanta.nl/api/v1/cron/retention` met dezelfde `CRON_SECRET`-header, **eerst** handmatig testen met `?dryRun=1` voordat je 'm live zet (dryRun toont wat verwijderd zou worden, zonder daadwerkelijk te verwijderen).
 
-### <a name="8b"></a>UptimeRobot (uptime-monitoring) — zie 🟢 [#14](#14)
+### <a name="8b"></a>Better Stack (uptime-monitoring) — ✅ zie [#14](#14)
 
 ---
 
@@ -157,8 +157,15 @@ De rest (🟡) wil je er kort daarna bij; de 🟢's kunnen wachten.
 
 ## F. Optioneel / met de eerste klant (🟢)
 
-### <a name="14"></a>14. 🟢 UptimeRobot-monitor · 🧑
-- Een gratis dienst die je site pingt en je waarschuwt als hij down gaat. Nice-to-have ops-monitoring.
+### <a name="14"></a>14. ✅ Uptime-monitoring via Better Stack · 🧑
+- **Status:** opgezet 2026-10-05 op het **gratis plan van Better Stack** (betterstack.com/uptime). Alarm-mail naar `Sebastiaan@chatmanta.com`.
+- **Waarom Better Stack i.p.v. UptimeRobot:** het gratis plan van UptimeRobot is alleen voor hobby/non-profit; Better Stack-gratis mag commercieel (10 monitors, 3-min-checks, 1 statuspagina). UptimeRobot is nooit opgezet.
+- **Monitors** (check elke 3 min, timeout 30 s i.v.m. cold starts, confirmation period ~2–3 min, géén keyword-check — de `<title>` van `/v1/login` is nog "ChatManta V0"):
+  - `https://www.chatmanta.nl/v1/login` — draait de app?
+  - `https://www.chatmanta.nl/widget-v1.js` — kan de chatbot op klantsites laden? (Let op: `/v1/widget.js` is 404.)
+  - `https://www.chatmanta.nl/widget.js` — V0-widget, zolang V0-demo's extern ingesloten zijn.
+- **Bewust niet:** de homepage (307-redirect naar de V0-login) en de cron-routes `/api/v1/cron/*` (401 zonder secret; mét secret start elke check echt werk en staat er een geheim in een externe dienst). Cron-falen bewaak je via "Notify on failure" in cron-job.org.
+- **Later (na launch / bij de eerste betalende klant):** statuspagina `status.chatmanta.nl` (DNS-CNAME), eventueel heartbeats voor de cron-jobs (vergt een codewijziging), en een echte test-alarm (tijdelijke monitor op een 404-URL) als die nog niet gedaan is.
 
 ### <a name="15"></a>15. 🟢 Eval opnieuw draaien op een ECHTE klant-kennisbank · 🤖
 - **Wat:** `npm run v1:eval` draait nu tegen de dunne Manta-demo-corpus (~400 tekens). De antwoordkwaliteit op schaal meet je pas goed op een echte klant-KB.

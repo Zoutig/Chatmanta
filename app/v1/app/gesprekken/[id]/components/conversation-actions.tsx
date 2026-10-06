@@ -4,42 +4,26 @@
 // UI verbatim van V0; wired aan echte server actions in ../../actions.ts.
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { CheckCircle2, Plus } from 'lucide-react';
-import {
-  addQAFromConversationAction,
-  markConversationResolvedAction,
-} from '../../actions';
+import { markConversationResolvedAction } from '../../actions';
+
+// "Maak Q&A" slaat niets direct op: het opent het Q&A-venster in de Kennisbank met
+// de vraag al ingevuld. Pas na "Opslaan" (met een ingevuld antwoord) komt het erin.
+const QA_HREF = '/v1/app/kennisbank?tab=qa&prefillQuestion=';
 
 export function ConversationActions({
   threadId,
   suggestedQuestion,
-  suggestedAnswer,
   isUnanswered,
 }: {
   threadId: string;
   suggestedQuestion: string;
-  suggestedAnswer: string;
   isUnanswered: boolean;
 }) {
-  const [savedAsQA, setSavedAsQA] = useState(false);
   const [resolved, setResolved] = useState(false);
-  const [qaError, setQaError] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
-  const [qaPending, startQa] = useTransition();
   const [resolvePending, startResolve] = useTransition();
-
-  function handleAddQA() {
-    setQaError(null);
-    startQa(async () => {
-      const res = await addQAFromConversationAction(threadId, suggestedQuestion, suggestedAnswer);
-      if (res.ok) {
-        setSavedAsQA(true);
-        setTimeout(() => setSavedAsQA(false), 2500);
-      } else {
-        setQaError(res.error ?? 'Er ging iets mis.');
-      }
-    });
-  }
 
   function handleResolve() {
     setResolveError(null);
@@ -57,17 +41,17 @@ export function ConversationActions({
     <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <h3 className="klant-section-title">Acties</h3>
 
-      <button
-        type="button"
-        onClick={handleAddQA}
-        className="klant-btn"
-        data-variant="primary"
-        disabled={qaPending || savedAsQA}
-        style={{ justifyContent: 'flex-start' }}
-      >
-        <Plus size={14} strokeWidth={1.8} />
-        {qaPending ? 'Bezig…' : savedAsQA ? 'Toegevoegd!' : 'Maak Q&A van deze vraag'}
-      </button>
+      {suggestedQuestion && (
+        <Link
+          href={`${QA_HREF}${encodeURIComponent(suggestedQuestion)}`}
+          className="klant-btn"
+          data-variant="primary"
+          style={{ justifyContent: 'flex-start' }}
+        >
+          <Plus size={14} strokeWidth={1.8} />
+          Maak Q&A van deze vraag
+        </Link>
+      )}
       {suggestedQuestion && (
         <div
           style={{
@@ -81,9 +65,6 @@ export function ConversationActions({
         >
           <em>&ldquo;{suggestedQuestion}&rdquo;</em>
         </div>
-      )}
-      {qaError && (
-        <p style={{ fontSize: 11, color: 'var(--klant-danger, #c0392b)', margin: 0 }}>{qaError}</p>
       )}
 
       {isUnanswered && !resolved && (

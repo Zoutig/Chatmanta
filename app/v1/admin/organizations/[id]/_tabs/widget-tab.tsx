@@ -1,11 +1,13 @@
 // V1 admin — Widget tab (server RSC). Read-only levenscyclus-status (is_active /
 // widget_last_seen_at / widget_last_seen_origin, migratie 0023) zodat support de
-// live-status ziet, + de admin-variant van het widget-uiterlijk-formulier.
+// live-status ziet, de Jorion-beheerde widget-domeinen (allowed_domains) en de
+// admin-variant van het widget-uiterlijk-formulier.
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import { Card } from '@/app/klantendashboard/components/ui/card';
 import { AdminWidgetForm } from '../admin-widget-form';
+import { AllowedDomainsEditor } from '../allowed-domains-editor';
 
 const dim = { fontSize: 13, color: 'var(--klant-muted)' } as const;
 const cellLabel = { fontSize: 11, color: 'var(--klant-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.03em' };
@@ -53,6 +55,12 @@ export async function WidgetTab({ orgId, chatbotId }: { orgId: string; chatbotId
         <p style={{ ...dim, margin: '10px 0 0' }}>
           Pauzeren/activeren doet de klant zelf in de widget-instellingen; dit paneel is read-only voor support.
         </p>
+      </Card>
+
+      {/* Toegestane domeinen (Jorion-beheerd; klant ziet ze read-only) */}
+      <Card>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 12px', color: 'var(--klant-ink)' }}>Toegestane websites</h3>
+        <AllowedDomainsEditor orgId={orgId} current={allowedDomains} />
       </Card>
 
       {/* Uiterlijk (bewerkbaar) */}
