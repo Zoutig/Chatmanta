@@ -154,3 +154,26 @@ Fix-opties (niet gebouwd):
 - (a) Promptregel "bij een berekening: eerst tussenstappen, dan totaal". Goedkoop en geen latency.
 - (b) De verifier telt getallen uit de vraag, en eenvoudige afleidingen daarvan, als gegrond. Dat stopt de onnodige regenerate en scheelt een volledige LLM-call op elke rekenvraag.
 - (c) Optioneel een deterministische rekencheck (som/percentage van brongetallen).
+
+## v0.12b: grote context, Luna kiest zelf (dev-set)
+
+v0.12b is v0.12a3 met `maxContextChars: 32000` en `dedupeParents: true` (commit 890690e). Gemeten op 2026-10-06: dev-set 40×2, `--no-judge`, bot-kosten $0,09. Claude-judge ($0), zelfde rubric, per-rij-scores in `eval-out/dev/luna-v012b.claude-judge.json`. Kalibratie: 10 herscoorde v0.11b-rijen geven 28/30 identieke cijfers.
+
+| versie | C | P | G | C≤2 | bronnen/antw. | TTFT p50 / p90 | bot-$ per antw. |
+|---|---|---|---|---|---|---|---|
+| v0.11b | 4,36 | 3,52 | 4,96 | 6 | 3,05 | 5177 / 7194 ms | $0,0008 |
+| v0.12a3 | 4,45 | 3,64 | 4,99 | 5 | 3,11 | 3634 / 4523 ms | $0,0007 |
+| v0.12b | 4,64 | 3,96 | 4,99 | 1 | 6,84 | 3089 / 4580 ms | $0,0011 |
+
+- Gepaard op C+P+G (beter/slechter/gelijk): v0.12b tegen v0.11b 13/4/23 (p≈0,05), tegen a3 10/2/28 (p≈0,04). multiPart en multiTurn zijn niet slechter.
+- De 5 a3-regressies die in de dev-set zitten, zijn alle 5 hersteld: 21-vergoed, tarief-eerste-consult, spoedlijn, pricing-tiers, embedding-vector. De bijbehorende pagina's zitten nu in de context.
+- Nieuw klein foutje: `v063-hardfact-aantal-pricing-tiers` opent met "**vijf** pricing-tiers". De opsomming klopt, maar de kop is misleidend.
+- Caveats:
+  - De dev-set is geselecteerd op zwakke v0.11b-rijen; daarom is de vergelijking met a3 eerlijker.
+  - Er was één judge, niet blind voor de versie.
+  - TTFT is op een ander tijdstip gemeten dan de referentie.
+  - De Globex-org heeft 7 TTFT-uitschieters van 7-10 s door ~20-25k tekens input. Latency p90 is 7,7 s tegen 6,75 s bij a3.
+- Sophie, Frank, kinderfysio en bedrijfsovername zitten niet in de dev-set; die test pas de volledige Sol-set.
+- Telemetrie-bijvangst: `adaptiveDecision.shouldRerank=true` wordt gelogd terwijl er geen rerank draait.
+
+**Finalist (dev-set): v0.12b.** Volgende stap: een Sol-ronde op v0.12b (~$2, met v0.11b-Sol als referentie) plus de hard-eval (~$0,05).
