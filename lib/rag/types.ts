@@ -308,6 +308,8 @@ export type RagConfig = {
   complaintModeV2?: boolean;
   /** v0.13: premisse-check alleen op namen en telefoonnummers (bedragen/percentages in de vraag zijn vaak een hypothese). */
   premiseCheckNamesOnly?: boolean;
+  /** v0.13: premisse-directive V2 — personen niet stellig ontkennen tenzij volledig overzicht; wel bekende namen noemen. */
+  premiseCheckV2?: boolean;
   /**
    * v0.8.1: anti-adoptie. Na generatie detecteert de pipeline of een
    * entiteit (persoonsnaam) die de user in de chat-history introduceerde —

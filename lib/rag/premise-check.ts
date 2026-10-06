@@ -100,6 +100,31 @@ export function premiseCheckDirective(missing: string[]): string {
   return `\n\nCONTROLE (automatisch): ${list} uit het bericht van de klant ${missing.length === 1 ? 'komt' : 'komen'} niet voor in de CONTEXT. Behandel dit als onbevestigd: neem het niet over, ook niet in je vervolgstap. Bevat de CONTEXT een overzicht waarin het had moeten staan (team, tarieven, contactgegevens), zeg dan stellig dat het niet klopt en geef het juiste gegeven; anders zeg je kort dat je het niet kunt bevestigen en verwijs je naar contact.`;
 }
 
+/** V2 (stress-ronde 2/3): V1 zei "zeg stellig dat het niet klopt" ook bij
+ *  personen — met een onvolledig teamoverzicht gaf dat valse ontkenningen
+ *  ("er werkt geen Sophie"), terwijl "kan niet bevestigen" zonder bekende namen
+ *  als zwakke correctie telt. Personen: niet-kennen + wie wél + contact. */
+export function premiseCheckDirectiveV2(missing: string[]): string {
+  if (missing.length === 0) return '';
+  const isFact = (m: string) => m.startsWith('€ ') || m.endsWith('%') || /^\+?\d+$/.test(m);
+  const persons = missing.filter((m) => !isFact(m)).slice(0, 3);
+  const facts = missing.filter(isFact).slice(0, 3);
+  const parts: string[] = [];
+  if (persons.length > 0) {
+    const l = persons.map((m) => `"${m}"`).join(', ');
+    parts.push(
+      `${l} ${persons.length === 1 ? 'komt' : 'komen'} niet voor in de CONTEXT. Behandel dit als onbevestigd en neem het niet over, ook niet in je vervolgstap. Zeg dat je ${persons.length === 1 ? 'deze persoon' : 'deze personen'} niet kent als medewerker, noem de medewerkers uit de CONTEXT die bij de vraag passen bij naam, en verwijs naar contact. Zeg niet stellig dat iemand hier niet werkt, tenzij de CONTEXT een volledig overzicht van álle medewerkers geeft.`,
+    );
+  }
+  if (facts.length > 0) {
+    const l = facts.map((m) => `"${m}"`).join(', ');
+    parts.push(
+      `${l} ${facts.length === 1 ? 'komt' : 'komen'} niet voor in de CONTEXT. Neem dit niet over; geeft de CONTEXT het juiste nummer of bedrag, zeg dan stellig dat het niet klopt en noem het juiste.`,
+    );
+  }
+  return `\n\nCONTROLE (automatisch): ${parts.join(' ')}`;
+}
+
 const RAW_PHONE_RE = /(?<![\d+])(\+31\s?(?:\(0\))?\s?\d(?:[\s-]?\d){7,9}|0\d(?:[\s-]?\d){7,9})\b/;
 const RAW_EMAIL_RE = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
 

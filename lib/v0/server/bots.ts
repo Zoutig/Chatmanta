@@ -1525,6 +1525,14 @@ const V0_13X5V: BotConfig = {
   description: 'v0.13x5 met hybridSearch:false, zoals V1 draait.',
   hybridSearch: false,
 };
+const V0_13X6V: BotConfig = {
+  ...V0_13X5V,
+  version: 'v0.13x6v',
+  label: 'v0.13x6v — x5v + premisse-directive v2 (experiment)',
+  description: 'Na stress-ronde 3: de CONTROLE-regel zei nog "zeg stellig dat het niet klopt", ook bij personen — botste met de x5-promptregel. V2: personen = niet kennen + bekende namen + contact; nummers/bedragen = stellig rechtzetten. Zonder hybrid (V1-gedrag).',
+  premiseCheckV2: true,
+};
+const V0_13X6: BotConfig = { ...V0_13X6V, version: 'v0.13x6', label: 'v0.13x6 — x6v mét hybrid (V0) (experiment)', hybridSearch: true };
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1604,6 +1612,8 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_13X4V.version]: V0_13X4V,
   [V0_13X5.version]: V0_13X5,
   [V0_13X5V.version]: V0_13X5V,
+  [V0_13X6V.version]: V0_13X6V,
+  [V0_13X6.version]: V0_13X6,
 };
 
 /**

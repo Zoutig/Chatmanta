@@ -48,6 +48,7 @@ import {
   findUnsupportedPremises,
   historyEntityRefusal,
   premiseCheckDirective,
+  premiseCheckDirectiveV2,
 } from '@/lib/rag/premise-check';
 import { COMPLAINT_DIRECTIVE, COMPLAINT_DIRECTIVE_V2, isComplaint } from '@/lib/rag/complaint-mode';
 
@@ -2259,7 +2260,7 @@ KRITISCHE FORMAT-REGELS:
   // v0.13 premisse-check: namen/bedragen/nummers uit de vraag die niet in de
   // CONTEXT staan → korte CONTROLE-regel ná de vraag (recency wint).
   const premiseDirective = bot.premiseCheckHint
-    ? premiseCheckDirective(
+    ? (bot.premiseCheckV2 ? premiseCheckDirectiveV2 : premiseCheckDirective)(
         findUnsupportedPremises(
           [original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)],
           context,
