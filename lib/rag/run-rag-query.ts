@@ -44,6 +44,11 @@ import {
 import { detectLanguage } from '@/lib/rag/hard-eval-checks';
 import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from '@/lib/rag/source-links';
 import { findMatchingManualQA } from '@/lib/rag/manual-qa';
+import {
+  findUnsupportedPremises,
+  historyEntityRefusal,
+  premiseCheckDirective,
+} from '@/lib/rag/premise-check';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -2134,14 +2139,35 @@ KRITISCHE FORMAT-REGELS:
   const providedUrls: string[] = [];
   const maxContextChars = bot.maxContextChars ?? RAG_DEFAULTS.MAX_CONTEXT_CHARS;
   const seenParents = new Set<string>();
+  // v0.13 contentDedupe: sla een bron over als ≥70% van zijn 5-woord-shingles
+  // al in de context staat (site-brede boilerplate, parent-overlap, dubbele
+  // regiopagina's) → plek voor een échte andere bron binnen dezelfde 32k.
+  const seenShingles = new Set<string>();
+  const shinglesOf = (t: string): string[] => {
+    const w = t.toLowerCase().split(/[^a-z0-9à-ÿ€]+/).filter(Boolean);
+    const out: string[] = [];
+    for (let i = 0; i + 5 <= w.length; i++) out.push(w.slice(i, i + 5).join(' '));
+    return out;
+  };
   for (const c of final) {
     const hasParent = typeof c.parent_content === 'string' && c.parent_content.length > 0;
     if (bot.dedupeParents && hasParent && c.parent_chunk_id) {
       if (seenParents.has(c.parent_chunk_id)) continue;
       seenParents.add(c.parent_chunk_id);
     }
+    let candidateShingles: string[] = [];
+    if (bot.contentDedupe) {
+      candidateShingles = shinglesOf(c.parent_content ?? c.content);
+      if (candidateShingles.length >= 10) {
+        const dup = candidateShingles.filter((s) => seenShingles.has(s)).length / candidateShingles.length;
+        if (dup >= 0.7) continue;
+      }
+    }
     if (hasParent) anyParentSwap = true;
-    const header = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
+    const titledName = bot.contentDedupe ? (c.source_title ?? c.filename ?? null) : null;
+    const header = titledName
+      ? `[bron ${used + 1}: ${titledName.replace(/\.md$/i, '').replace(/^\d+[-_]/, '')}]`
+      : `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
     const urlLine = linkEnabled && c.source_url ? `\nBron-URL: ${c.source_url}` : '';
     let block: string;
     if (bot.matchedSpanContext && hasParent) {
@@ -2153,6 +2179,7 @@ KRITISCHE FORMAT-REGELS:
     }
     if (context.length + block.length > maxContextChars) break;
     context += block;
+    for (const s of candidateShingles) seenShingles.add(s);
     if (linkEnabled && c.source_url) providedUrls.push(c.source_url);
     usedChunks.push(c);
     used++;
@@ -2219,7 +2246,18 @@ KRITISCHE FORMAT-REGELS:
     input.manualQAItems && input.manualQAItems.length > 0
       ? 'Let op: een bron in de vorm "Vraag: … Antwoord: …" is een handmatig door de klant toegevoegde Q&A en is gezaghebbend. Spreekt zo\'n Q&A een andere bron tegen (bijvoorbeeld andere openingstijden, prijzen of voorwaarden), volg dan de Q&A — die is bewust bijgewerkt.\n\n'
       : '';
-  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
+  // v0.13 premisse-check: namen/bedragen/nummers uit de vraag die niet in de
+  // CONTEXT staan → korte CONTROLE-regel ná de vraag (recency wint).
+  const premiseDirective = bot.premiseCheckHint
+    ? premiseCheckDirective(
+        findUnsupportedPremises(
+          [original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)],
+          context,
+          [input.persona.company],
+        ),
+      )
+    : '';
+  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${languageDirective}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
@@ -2395,6 +2433,11 @@ KRITISCHE FORMAT-REGELS:
       : (withinBudget() || markSkipped('claimVerification'));
   const verifyDecisionGate =
     !bot.adaptiveRag || decision.shouldVerifyClaims;
+  // v0.13: vraag + gebruikersbeurten als 'gegeven' voor de rekenbewuste verifier.
+  const givenTextsForVerify = [
+    input.question,
+    ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content),
+  ];
   if (bot.claimVerification && verifyBudgetGate && verifyDecisionGate) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
@@ -2419,6 +2462,7 @@ KRITISCHE FORMAT-REGELS:
         threshold: bot.claimVerificationThreshold,
         hardFactCheck: bot.adaptiveHardFactVerification === true,
         hardFactNumericFallback: bot.hardFactNumericFallback,
+        ...(bot.hardFactDerivedNumbers ? { hardFactGivenTexts: givenTextsForVerify } : {}),
       });
       claimVerifyEmbedTokens = result.embedTokens;
       claimVerifyEmbedCost = result.costUsd;
@@ -2632,10 +2676,16 @@ KRITISCHE FORMAT-REGELS:
   // de Option-A "deterministisch template"-aanpak, geen parallelle gate.
   if (bot.claimRegenerateEnabled && unsupportedHistoryEntity) {
     const entityList = adoptedHistoryEntities.slice(0, 3).join(', ');
-    activeAnswerText =
-      `Ik kan ${entityList} niet in onze gegevens terugvinden, dus dat kan ik niet bevestigen. ` +
-      `Iets dat in een eerder bericht is genoemd, neem ik niet zomaar over als juist. ` +
-      `Voor de juiste persoon of een afspraak kunt u het beste rechtstreeks contact met ons opnemen.`;
+    activeAnswerText = bot.historyEntityTemplateV2
+      ? historyEntityRefusal({
+          entities: adoptedHistoryEntities,
+          company: input.persona.company,
+          contextText: context,
+          formal: tone === 'formal',
+        })
+      : `Ik kan ${entityList} niet in onze gegevens terugvinden, dus dat kan ik niet bevestigen. ` +
+        `Iets dat in een eerder bericht is genoemd, neem ik niet zomaar over als juist. ` +
+        `Voor de juiste persoon of een afspraak kunt u het beste rechtstreeks contact met ons opnemen.`;
     activeResponse = {
       ...activeResponse,
       answer: activeAnswerText,
@@ -2768,6 +2818,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           threshold: bot.claimVerificationThreshold,
           hardFactCheck: bot.adaptiveHardFactVerification === true,
           hardFactNumericFallback: bot.hardFactNumericFallback,
+          ...(bot.hardFactDerivedNumbers ? { hardFactGivenTexts: givenTextsForVerify } : {}),
         });
         regenerateRatio = Number.isFinite(verifyResult2.confidence)
           ? verifyResult2.confidence

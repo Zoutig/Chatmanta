@@ -18,7 +18,7 @@ import {
   type Tone,
 } from './style-types';
 
-export type OutputStyleVersion = 'v1' | 'v2' | 'v3' | 'v4';
+export type OutputStyleVersion = 'v1' | 'v2' | 'v3' | 'v4' | 'v5';
 
 const TONE_INSTRUCTION: Record<Tone, string> = {
   formal:
@@ -70,7 +70,19 @@ const LENGTH_INSTRUCTION_V4: Record<Length, string> = {
   detailed: LENGTH_INSTRUCTION_V3.detailed,
 };
 
+// V5 (v0.13, launch-onderzoek): V4-medium ("een tweede relevant bedrag of optie
+// uit de bronnen") sprak de v0.12e-promptregel ("tweede bedrag alleen bij dezelfde
+// vraag") tegen; de te_kort-fouten waren vrijwel steeds een aanvulling uit
+// DEZELFDE bron (btw, voorrijkosten, garantie, termijn). V5 maakt dat de regel.
+const LENGTH_INSTRUCTION_V5: Record<Length, string> = {
+  short: LENGTH_INSTRUCTION_V3.short,
+  medium:
+    'Geef een volledig en bruikbaar antwoord zonder vulling: eerst het directe antwoord, dan uit dezelfde bron wat de klant nodig heeft om ermee verder te kunnen — de voorwaarde of uitzondering, bijkomende kosten (btw, voorrijkosten, toeslag), termijn of garantie — en de concrete vervolgstap. Geen bedragen of diensten uit andere bronnen tenzij ernaar gevraagd wordt. Meestal 2-4 zinnen; meer alleen als de vraag meerdere onderdelen heeft.',
+  detailed: LENGTH_INSTRUCTION_V3.detailed,
+};
+
 function pickLengthMap(version: OutputStyleVersion): Record<Length, string> {
+  if (version === 'v5') return LENGTH_INSTRUCTION_V5;
   if (version === 'v4') return LENGTH_INSTRUCTION_V4;
   if (version === 'v3') return LENGTH_INSTRUCTION_V3;
   if (version === 'v2') return LENGTH_INSTRUCTION_V2;

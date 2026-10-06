@@ -197,6 +197,24 @@ const PERSONAS: Record<OrgSlug, OrgPersona> = {
   },
 };
 
+// Eval-only orgs die bewust NIET in KNOWN_ORGS/OrgSlug staan (geen UI, geen
+// widget) — launch-ready-onderzoek 2026-10-07: een gecrawlde "onbekende klant"
+// als holdout. Zonder entry viel die terug op de ChatManta-persona.
+const EVAL_EXTRA_PERSONAS_BY_ID: Record<string, OrgPersona> = {
+  '00000000-0000-0000-0000-0000000000a5': {
+    company: 'Autorijschool Veenstra',
+    companySuffix: ' in Zoetermeer',
+    audience: 'meestal (aankomende) leerlingen en hun ouders met vragen over rijlessen, pakketten, examens en prijzen',
+    citationExample1: 'Je bereikt ons telefonisch of per e-mail',
+    citationExample2: 'Een proefles kun je online aanvragen',
+    smalltalkGreeting: 'Hoi! Leuk dat je er bent. Waar kan ik je mee helpen?',
+    smalltalkHelpScope: 'rijlessen, lespakketten, examens, tarieven en contact',
+    domainKeywords: ['rijles', 'rijschool', 'pakket', 'examen', 'cbr', 'theorie', 'instructeur', 'automaat', 'proefles', 'tarieven'],
+    generalKnowledgeClosing: ' Wil je weten hoe wij dit aanpakken? Vraag gerust.',
+    offTopicScope: 'rijlessen en alles rond je rijbewijs — denk aan pakketten, examens, prijzen en contact',
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Lookup helpers
 // ---------------------------------------------------------------------------
@@ -217,6 +235,8 @@ export function getPersonaBySlug(slug: string): OrgPersona {
  * om de juiste persona te vinden. Onbekende ID → DEV_ORG persona.
  */
 export function getPersonaById(orgId: string): OrgPersona {
+  const extra = EVAL_EXTRA_PERSONAS_BY_ID[orgId];
+  if (extra) return extra;
   for (const slug of Object.keys(ORG_SLUG_TO_ID) as OrgSlug[]) {
     if (ORG_SLUG_TO_ID[slug] === orgId) return PERSONAS[slug];
   }
