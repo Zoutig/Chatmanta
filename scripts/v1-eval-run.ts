@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { runRagQuery, type ChatResponse } from '../lib/rag/run-rag-query';
 import { V1_RAG_DEFAULTS, getOrgChatbot } from '../app/v1/app/rag-config';
+import { resolveBot } from '../lib/v0/server/bots';
 import { getChatbotSettings, buildV1ChatbotInputs } from '../app/v1/app/instellingen/settings-config';
 
 type Case = {
@@ -37,7 +38,25 @@ async function main() {
   const chatbot = await getOrgChatbot(svc, ORG as string);
   if (!chatbot) throw new Error('geen actieve chatbot voor de seed-org — draai v1:seed:chunks');
 
-  const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
+  // V1_EVAL_BOT=<v0-versie>: meet een kandidaat-botconfig op het V1-pad (V1-
+  // overrides blijven gelden: hybrid uit, chatbot-scoped, cache uit via disableCache).
+  const candidate = process.env.V1_EVAL_BOT ? resolveBot(process.env.V1_EVAL_BOT) : null;
+  const config = candidate
+    ? {
+        ...candidate,
+        version: chatbot.bot_version,
+        chatModel: V1_RAG_DEFAULTS.chatModel,
+        auxModel: V1_RAG_DEFAULTS.auxModel,
+        similarityThreshold: V1_RAG_DEFAULTS.similarityThreshold,
+        chatbotScoped: true,
+        hybridSearch: false,
+        parentDocumentRetrieval: true,
+        cacheEnabled: V1_RAG_DEFAULTS.cacheEnabled,
+        sourceLinksEnabled: false,
+        generalKnowledgeEnabled: false,
+      }
+    : { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
+  if (candidate) console.log(`kandidaat-config: ${process.env.V1_EVAL_BOT}`);
   const settings = await getChatbotSettings(svc, chatbot.id);
   const { overrides, persona } = buildV1ChatbotInputs(settings, chatbot.name);
 
