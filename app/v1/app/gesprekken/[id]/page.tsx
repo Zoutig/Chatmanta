@@ -14,6 +14,7 @@ import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1Conversation } from '@/lib/v1/dashboard/conversations';
+import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
 import { Icon } from '@/app/klantendashboard/components/ui/icons';
@@ -65,10 +66,14 @@ export default async function V1GesprekDetailPage({
   const lastAssistant = [...detail.messages].reverse().find((m) => m.role === 'assistant');
   const isUnanswered = lastAssistant?.kind === 'fallback';
 
-  // Eerste user-vraag + laatste bot-antwoord voor "Maak Q&A".
-  const firstUserMsg = detail.messages.find((m) => m.role === 'user');
-  const suggestedAnswer =
-    !isUnanswered && lastAssistant ? lastAssistant.content : '';
+  // "Maak Q&A": de bezoekersvraag die bij het láátste bot-antwoord hoort — bij een
+  // onbeantwoord gesprek is dat precies de vraag waar de bot op afhaakte.
+  const lastAssistantIdx = lastAssistant ? detail.messages.indexOf(lastAssistant) : -1;
+  const questionForQA =
+    detail.messages
+      .slice(0, lastAssistantIdx >= 0 ? lastAssistantIdx : undefined)
+      .reverse()
+      .find((m) => m.role === 'user') ?? detail.messages.find((m) => m.role === 'user');
 
   return (
     <>
@@ -193,10 +198,12 @@ export default async function V1GesprekDetailPage({
                       color: 'var(--klant-ink)',
                       fontSize: 13.5,
                       lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
+                      whiteSpace: isUser ? 'pre-wrap' : 'normal',
                     }}
                   >
-                    {m.content}
+                    {/* Bot-antwoorden: zelfde XSS-veilige lite-renderer als de widget
+                        (**vet**, bullets) i.p.v. rauwe markdown-tekens. */}
+                    {isUser ? m.content : renderMarkdownLite(m.content, undefined, false)}
                   </div>
                   {!isUser && m.sources && <SourcesPanel sources={m.sources} />}
                 </div>
@@ -209,8 +216,7 @@ export default async function V1GesprekDetailPage({
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ConversationActions
             threadId={id}
-            suggestedQuestion={firstUserMsg?.content ?? ''}
-            suggestedAnswer={suggestedAnswer}
+            suggestedQuestion={questionForQA?.content ?? ''}
             isUnanswered={isUnanswered}
           />
         </aside>

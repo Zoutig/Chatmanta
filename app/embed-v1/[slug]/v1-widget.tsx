@@ -35,11 +35,10 @@ type Msg = {
   content: string;
   streaming?: boolean;
   error?: boolean;
-  // Feedback-koppeling: queryLogId komt binnen via het 'meta'-event (eerste regel
-  // van de stream) vóór de eerste delta; de duim-knoppen koppelen daarop.
+  // queryLogId komt binnen via het 'meta'-event (eerste regel van de stream).
+  // De 👍/👎-knoppen zijn bewust verwijderd (soft-launch 2026-10-06); de koppeling
+  // blijft staan zodat ze zonder stream-wijziging terug kunnen.
   queryLogId?: string;
-  feedbackRating?: 'up' | 'down';
-  feedbackState?: 'sending' | 'sent' | 'error';
 };
 
 // We posten naar de loader met targetOrigin '*': de signalen (ready/resize) zijn
@@ -95,7 +94,7 @@ export function V1Widget(props: V1WidgetProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Patch één message op id — gedeeld door de stream-handler en de feedback-flow.
+  // Patch één message op id — gebruikt door de stream-handler.
   const patchMsg = useCallback((id: string, patch: Partial<Msg>) => {
     setMessages((prev) => {
       const idx = prev.findIndex((m) => m.id === id);
@@ -165,31 +164,6 @@ export function V1Widget(props: V1WidgetProps) {
       return null;
     }
   }, [slug]);
-
-  // Feedback 👍/👎 → /api/v1/feedback. Zelfde token + 401→refresh→1×-retry als chat.
-  // queryLogId komt uit de meta-event-koppeling op de message; rating in up/down.
-  const submitFeedback = useCallback(
-    async (messageId: string, queryLogId: string, rating: 'up' | 'down') => {
-      patchMsg(messageId, { feedbackRating: rating, feedbackState: 'sending' });
-      const post = (token: string) =>
-        fetch(`/api/v1/feedback?org=${encodeURIComponent(slug)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-chatmanta-embed': token },
-          body: JSON.stringify({ queryLogId, rating }),
-        });
-      try {
-        let res = await post(embedTokenRef.current);
-        if (res.status === 401 || res.status === 403) {
-          const fresh = await refreshEmbedToken();
-          if (fresh) res = await post(fresh);
-        }
-        patchMsg(messageId, { feedbackState: res.ok ? 'sent' : 'error', feedbackRating: rating });
-      } catch {
-        patchMsg(messageId, { feedbackState: 'error', feedbackRating: rating });
-      }
-    },
-    [slug, refreshEmbedToken, patchMsg],
-  );
 
   // Contactformulier → /api/v1/contact-request. Spiegelt de chat-fetch: zelfde org-slug,
   // x-chatmanta-embed-token, en 401→token-refresh→1×-retry zodat een traag ingevuld
@@ -287,8 +261,7 @@ export function V1Widget(props: V1WidgetProps) {
               continue;
             }
             if (ev.kind === 'meta') {
-              // Eerste regel van de stream — koppel de query_log-id aan deze bubble
-              // zodat de duim-knoppen er feedback aan kunnen hangen.
+              // Eerste regel van de stream — koppel de query_log-id aan deze bubble.
               if (typeof ev.queryLogId === 'string') patchMsg(assistantId, { queryLogId: ev.queryLogId });
             } else if (ev.kind === 'answer-start') {
               setAssistant({ content: '', streaming: true });
@@ -457,16 +430,6 @@ export function V1Widget(props: V1WidgetProps) {
                   : ''
                 : m.content}
             </Bubble>
-            {/* Feedback-knoppen: alleen op een afgerond, niet-fout antwoord met een
-                queryLogId (= meta-event al binnen). */}
-            {m.role === 'assistant' && !m.streaming && !m.error && m.queryLogId && (
-              <FeedbackRow
-                accentColor={accentColor}
-                rating={m.feedbackRating}
-                state={m.feedbackState}
-                onRate={(rating) => void submitFeedback(m.id, m.queryLogId as string, rating)}
-              />
-            )}
           </div>
         ))}
 
@@ -593,55 +556,6 @@ function Bubble({
       }}
     >
       {children}
-    </div>
-  );
-}
-
-function FeedbackRow({
-  accentColor,
-  rating,
-  state,
-  onRate,
-}: {
-  accentColor: string;
-  rating?: 'up' | 'down';
-  state?: 'sending' | 'sent' | 'error';
-  onRate: (rating: 'up' | 'down') => void;
-}) {
-  if (state === 'sent') {
-    return (
-      <div style={{ alignSelf: 'flex-start', fontSize: 12, color: '#6b7280', padding: '2px' }}>
-        Bedankt voor je feedback{rating === 'up' ? ' 👍' : rating === 'down' ? ' 👎' : ''}
-      </div>
-    );
-  }
-  const disabled = state === 'sending';
-  const btn = (r: 'up' | 'down', label: string, glyph: string) => (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onRate(r)}
-      style={{
-        background: rating === r ? accentColor : '#fff',
-        color: rating === r ? bestForegroundOn(accentColor) : '#374151',
-        border: '1px solid #d1d5db',
-        borderRadius: 8,
-        padding: '2px 8px',
-        fontSize: 14,
-        lineHeight: 1.4,
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      {glyph}
-    </button>
-  );
-  return (
-    <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6 }}>
-      {btn('up', 'Nuttig antwoord', '👍')}
-      {btn('down', 'Niet nuttig', '👎')}
-      {state === 'error' && <span style={{ fontSize: 11, color: '#b91c1c' }}>Niet gelukt — probeer opnieuw</span>}
     </div>
   );
 }

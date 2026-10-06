@@ -14,6 +14,7 @@ import { writeAuditLog } from '@/lib/v1/audit';
 import { isAppError } from '@/lib/errors/app-error';
 import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/errors/action';
 import { getOrgChatbot } from '@/app/v1/app/rag-config';
+import { parseAllowedOrigins } from '@/lib/widget/origin-allowlist';
 import {
   getChatbotSettings,
   sanitizeChatbotPatch,
@@ -481,6 +482,59 @@ export async function setOrgSuspendedAction(
 
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
+  });
+}
+
+// ─────────────────────────── Soft-launch — widget-domeinen ───────────────────────────
+//
+// chatbots.allowed_domains is Jorion-beheerd (de klant ziet 'm read-only). Leeg = de
+// widget mag op élke site (fail-open) — dus bij elke klant vóór livegang invullen.
+// Normalisatie via dezelfde parseAllowedOrigins als de embed-check (lib/widget/
+// origin-allowlist): schema/pad/poort/`www.` eraf, zodat de opgeslagen lijst exact
+// matcht met wat de embed-pagina vergelijkt.
+
+const MAX_ALLOWED_DOMAINS = 20;
+
+/** Zet chatbots.allowed_domains voor de (enige) chatbot van deze org. */
+export async function setAllowedDomainsAction(
+  orgId: string,
+  rawInput: string,
+): Promise<ActionResult<{ domains: string[] }>> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    const domains = parseAllowedOrigins(String(rawInput ?? '').slice(0, 4000));
+    if (domains.length > MAX_ALLOWED_DOMAINS) {
+      fail('INPUT_INVALID', `Maximaal ${MAX_ALLOWED_DOMAINS} domeinen.`);
+    }
+    if (domains.some((d) => !/^[a-z0-9.-]+$/.test(d) || (!d.includes('.') && d !== 'localhost'))) {
+      fail('INPUT_INVALID', 'Ongeldig domein — gebruik bv. bakkerij.nl (één per regel).');
+    }
+    const svc = getV1ServiceRoleClient();
+    const chatbot = await getOrgChatbot(svc, orgId);
+    if (!chatbot) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
+
+    const { error } = await svc
+      .from('chatbots')
+      .update({ allowed_domains: domains.length > 0 ? domains : null })
+      .eq('id', chatbot.id)
+      .eq('organization_id', orgId);
+    if (error) throw new Error(`allowed_domains opslaan faalde: ${error.message}`);
+
+    await writeAuditLog(svc, {
+      organizationId: orgId,
+      userId: actorId,
+      action: 'chatbot.allowed_domains.update',
+      targetType: 'chatbot',
+      targetId: chatbot.id,
+      metadata: { domains },
+    });
+
+    revalidatePath(`/v1/admin/organizations/${orgId}`);
+    return { domains };
   });
 }
 
