@@ -97,25 +97,23 @@ Doe dit met de tabel in §4 ernaast. Per dienst: **inloggen → account actief �
 - [x] **C1. 🔴 Security-lek dichten: PR #254 (plan 011)** *(5 okt: migr 0026 op V1-prod, live getest — zelf-promotie geblokkeerd (42501), naam wijzigen + admin-onboarding werken nog; PR gemerged als `cbf24ab`)* · 🤖 doet het, 🧑 geeft "go"
   - Wat: zonder deze fix kan elke klant-gebruiker zichzelf tot admin promoveren en dan **alle klanten + bezoekers-PII** zien. Nu nog niet misbruikbaar (er zijn geen echte klant-accounts), maar **moet dicht vóór de eerste invite**.
   - Hoe: PR rebasen op main → `npm run migrate:v1` (zet migratie 0026 op V1-prod) → post-migratie-check → merge. Worktree `../chatmanta-v1-lockdown` bestaat al.
-- [ ] **C2. 🔴 Invite-mail-template** in Supabase V1-prod · 🧑 (🤖 levert de HTML)
+- [x] **C2. 🔴 Invite-mail-template** in Supabase V1-prod · 🧑 (🤖 levert de HTML) *(5 okt: Invite + Reset password linken naar `/v1/auth/confirm`; end-to-end getest met C3)*
   - Supabase → V1-prod → Authentication → Emails → **"Invite user"** → link naar `…/v1/auth/confirm?token_hash={{ .TokenHash }}&type=invite`. Zelfde voor **"Reset password"** (`type=recovery`).
-  - **Status onbekend** — in juli was de tekst geleverd maar nog niet geplakt. Eerst kijken.
-- [ ] **C3. 🔴 Supabase-mail via Resend (custom SMTP)** · 🧑 + 🤖
+- [x] **C3. 🔴 Supabase-mail via Resend (custom SMTP)** · 🧑 + 🤖 *(5 okt: SMTP `smtp.resend.com:465`, afzender `noreply@chatmanta.com`, eigen sending-only API-key. Testinvite via Resend afgeleverd → wachtwoord instellen → klantdashboard: werkt)*
   - Supabase's ingebouwde mailer stuurt maar een paar mails per uur. Bij 3 klanten tegelijk inviten loop je daar tegenaan. Supabase → Auth → SMTP Settings → Resend-gegevens.
-- [ ] **C4. 🟡 Leaked-password-protection aan + MFA op je admin-account** · 🧑 (5 min)
+- [ ] **C4. 🟡 Leaked-password-protection aan + MFA op je admin-account** · 🧑 (5 min) *(5 okt: leaked-password-protection kan alleen op Supabase **Pro** → aanzetten samen met E7. Admin-MFA: bewust later, niet launch-kritisch)*
   - Supabase → Auth → "Leaked password protection" aan. Daarna 2FA enrollen op je Jorion-admin-account (het admin-dashboard eist daarna automatisch 2FA).
-- [ ] **C5. 🟡 MX-records op chatmanta.com** · 🧑 (TransIP)
+- [x] **C5. 🟡 MX-records op chatmanta.com** · 🧑 (TransIP) *(5 okt: MX → `mx.transip.email` + SPF TransIP, geverifieerd via DNS)*
   - Anders kunnen klanten niet terugmailen naar je afzenderadres. Simpelste: TransIP-mailbox of doorsturen naar je Gmail.
-- [ ] **C6. 🟡 Monitoring: Sentry + uptime** · 🧑 account, 🤖 zet de DSN — uptime-deel ✅ via Better Stack (5 okt), Sentry staat nog open
+- [x] **C6. 🟡 Monitoring: Sentry + uptime** · 🧑 account, 🤖 zet de DSN — uptime ✅ via Better Stack; Sentry ✅ *(5 okt: org `chatmanta` in EU/Frankfurt, project alleen Error monitoring, IP-opslag uit; `SENTRY_DSN` op Vercel prod + redeploy; testmelding ontvangen en resolved. Sentry is ook als MCP aan Claude Code gekoppeld → "check Sentry" werkt)*
   - Bij 3 klanten tegelijk wil je fouten zien vóórdat een klant belt. Beide gratis.
-- [ ] **C7. 🟢 (optioneel) Plan 015 sectie G — injectie-regexfix** · 🤖
-  - Klein, geen prod-gate: dicht een gat waarbij "negeer alle vorige instructies" door het filter glipt. Plannen 012–014 kunnen ná launch.
+- [x] ~~**C7. 🟢 (optioneel) Plan 015 sectie G — injectie-regexfix**~~ *(5 okt: vervallen — keuze Sebastiaan: geen extra filter-hulpstappen. Prompt-injectie wordt later afgedekt in de bot-instructies via **plan 013** (context-als-data-grens), bij voorkeur samen met de Luna-overstap. Zie §6.)*
 
 ### Fase D — Juridisch & bedrijf (parallel aan C) · 🤝 Niels + 🧑
 
 - [ ] **D1. 🔴 KVK-inschrijving Jorion Solutions** · 🧑/🤝
   - Nodig zodra je gaat factureren (na de gratis eerste maand). Ook handig voor DPA's en zakelijke accounts op bedrijfsnaam. **Advies:** nu regelen — de gratis maand geeft je ±4 weken speling, maar de inschrijving zelf kost ook tijd.
-- [ ] **D2. 🔴 DPA's accepteren** bij elke sub-verwerker (DPA = verwerkersovereenkomst: contract dat de leverancier jouw data netjes volgens de AVG behandelt): **OpenAI, Supabase, Vercel, Firecrawl, Upstash, Resend** (+ Sentry als je die aanzet). Meestal een akkoord-knop in het dashboard.
+- [ ] **D2. 🔴 DPA's accepteren** bij elke sub-verwerker (DPA = verwerkersovereenkomst: contract dat de leverancier jouw data netjes volgens de AVG behandelt): **OpenAI, Supabase, Vercel, Firecrawl, Upstash, Resend** + **Sentry** (EU-org, sinds 5 okt actief) + **Better Stack** (alleen uptime-pings, geen persoonsgegevens). Meestal een akkoord-knop in het dashboard.
 - [ ] **D3. 🔴 Verwerkersovereenkomst mét elke klant** · 🤝
   - Jij verwerkt namens de klant persoonsgegevens van hún websitebezoekers → je hebt er ook één met de klant zelf nodig. 🤖 kan een concept opstellen.
 - [ ] **D4. 🔴 Privacyverklaring afmaken** · 👥
@@ -150,6 +148,7 @@ Doe dit met de tabel in §4 ernaast. Per dienst: **inloggen → account actief �
 
 ## 6. Wat bewust kan wachten (niet nu doen)
 
+- **Plan 013 (prompt-injectie via bot-instructies)** — gekozen route i.p.v. regex-fixes; meenemen in het Luna-traject zodat model + prompt in één betaalde eval gemeten worden.
 - **Plannen 012–014** (schema-hardening, prompt-injectie-grens v0.11, migratie-tooling) — goed werk, maar geen launch-blocker.
 - **Retentie-cron V1** (90 dagen PII-verwijdering) — route bestaat, wordt pas gepingd zodra AVG serieus wordt (rond V2). *Let op:* met echte bezoekers-PII via contactverzoeken is dit wél verstandig om binnen ~2 maanden na launch aan te zetten.
 - **V2-lijst:** Claude Haiku als backup, automatische fallback, hybrid search, meerdere chatbots per klant, EUR-billing, PITR, maandrecap voor V1-klanten.
