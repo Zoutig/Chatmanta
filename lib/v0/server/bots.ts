@@ -1190,6 +1190,13 @@ const V0_13R2: BotConfig = {
   finalContextMaxChunks: 16,
   maxContextChars: 48000,
 };
+const V0_13R3: BotConfig = {
+  ...V0_13R2,
+  version: 'v0.13r3',
+  label: 'v0.13r3 — v0.13r2 zonder hybrid (alleen vector, 16 kandidaten, 48k) (experiment)',
+  description: 'Combinatie van r1 (geen FTS-fusie) en r2 (meer kandidaten + ruimere context).',
+  hybridSearch: false,
+};
 const V0_12C2: BotConfig = {
   ...V0_12C,
   version: 'v0.12c2',
@@ -1229,6 +1236,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_12E.version]: V0_12E,
   [V0_13R1.version]: V0_13R1,
   [V0_13R2.version]: V0_13R2,
+  [V0_13R3.version]: V0_13R3,
 };
 
 /**
