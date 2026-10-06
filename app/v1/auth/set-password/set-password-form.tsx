@@ -43,7 +43,7 @@ export function SetPasswordForm() {
 
   return (
     <AuthCard title="Kies je wachtwoord" subtitle="Minstens 8 tekens. Hiermee log je voortaan in.">
-      <form onSubmit={onSubmit} className="v1-form" noValidate>
+      <form onSubmit={onSubmit} className="v1-form">
         <div className="v1-field">
           <label htmlFor="v1-new-password" className="v1-label">Nieuw wachtwoord</label>
           <div className="v1-input-wrap">

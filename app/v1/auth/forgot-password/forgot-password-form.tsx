@@ -8,7 +8,8 @@ import { Button } from '@/app/v1/_ui/button';
 import { authErrorMessage } from '@/app/v1/_ui/auth-messages';
 
 // "Wachtwoord vergeten" in de Diepzee-stijl. Flow ongewijzigd:
-// resetPasswordForEmail(email); bij succes altijd dezelfde bevestiging (verraadt
+// resetPasswordForEmail(email); bij succes altijd dezelfde bevestiging (anti-
+// enumeratie: verraadt
 // niet of het adres bestaat).
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
@@ -50,7 +51,7 @@ export function ForgotPasswordForm() {
       subtitle="Vul je e-mailadres in. We sturen je een link om een nieuw wachtwoord te kiezen."
       footer={backToLogin}
     >
-      <form onSubmit={onSubmit} className="v1-form" noValidate>
+      <form onSubmit={onSubmit} className="v1-form">
         <div className="v1-field">
           <label htmlFor="v1-forgot-email" className="v1-label">E-mailadres</label>
           <input

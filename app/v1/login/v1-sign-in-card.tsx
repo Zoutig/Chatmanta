@@ -36,7 +36,7 @@ export function V1SignInCard({ initialError }: { initialError?: string }) {
 
   return (
     <AuthCard title="Welkom terug" subtitle="Log in om je chatbot te beheren.">
-      <form onSubmit={onSubmit} className="v1-form" noValidate>
+      <form onSubmit={onSubmit} className="v1-form">
         <div className="v1-field">
           <label htmlFor="v1-login-email" className="v1-label">E-mailadres</label>
           <input

@@ -86,14 +86,18 @@ export function V1Sidebar({
 }) {
   const pathname = usePathname();
   // Optimistisch: de markering verspringt direct bij de klik, nog vóór de
-  // navigatie klaar is. `from` onthoudt op welk pad er geklikt is; zodra
-  // pathname verandert (navigatie klaar, of weg via een andere link) is de
-  // pending-waarde ongeldig en wint pathname weer.
-  const [pending, setPending] = useState<{ href: string; from: string } | null>(null);
-  const activeHref = pending && pending.from === pathname ? pending.href : pathname;
+  // navigatie klaar is. Zodra pathname verandert (navigatie klaar, of weg via
+  // terugknop/palette) wissen we pending, zodat pathname weer de waarheid is.
+  const [pending, setPending] = useState<string | null>(null);
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    setSeenPath(pathname);
+    setPending(null);
+  }
+  const activeHref = pending ?? pathname;
 
   const handleNavigate = (href: string) => {
-    setPending({ href, from: pathname });
+    if (href !== pathname) setPending(href);
     onNavigate?.();
   };
 

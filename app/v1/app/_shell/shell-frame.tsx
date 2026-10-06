@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { BrandMark } from '@/app/v1/_ui/brand-mark';
@@ -25,18 +26,45 @@ export function ShellFrame({
   contactRequestsCount: number;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Sluit het menu bij elke navigatie, ook die niet via de zijbalk loopt
+  // (zoek-palette, terugknop). Aanpassen-tijdens-render i.p.v. een effect.
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    setSeenPath(pathname);
+    setNavOpen(false);
+  }
+
+  const openNav = () => {
+    setNavOpen(true);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('#v1-sidebar a')?.focus());
+  };
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setNavOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   return (
     <div className="v1-shell" data-klant-scope data-nav-open={navOpen ? 'true' : 'false'}>
       <header className="v1-mobilebar">
         <button
+          ref={menuButtonRef}
           type="button"
           className="v1-iconbtn"
           aria-label="Menu openen"
           aria-controls="v1-sidebar"
           aria-expanded={navOpen}
-          onClick={() => setNavOpen(true)}
+          onClick={openNav}
         >
           <Menu size={20} strokeWidth={1.8} aria-hidden="true" />
         </button>
