@@ -584,6 +584,10 @@ export function parseV03Output(raw: string): ParsedV03Output {
     }
   }
 
+  // Losse <answer>/</answer>-tags (Luna sluit soms af zonder te openen) mogen
+  // nooit in de zichtbare tekst belanden.
+  answer = answer.replace(/<\/?answer>/gi, '').trim();
+
   const confidence = confMatch ? Number.parseFloat(confMatch[1]) : null;
   return {
     thinking: thinkingMatch?.[1]?.trim() ?? null,

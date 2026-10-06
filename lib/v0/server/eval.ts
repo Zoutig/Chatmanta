@@ -24,7 +24,7 @@ import {
   type PhaseTimings,
 } from './rag';
 import { resolveBot, type BotConfig } from './bots';
-import { getPersonaForOrgId, formatPersonaSection } from './eval-personas';
+import { getPersonaForOrgId, formatPersonaSection, getEvalToneForOrgId } from './eval-personas';
 import { containsHardFacts } from '@/lib/rag/hard-facts';
 import { costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
 import { JUDGE_MODEL } from './eval-judge-model';
@@ -881,6 +881,7 @@ export async function runEvalRow(args: {
       // de antwoord-LLM kreeg, niet de ≤800-char preview: anders tellen gegronde
       // feiten voorbij teken ~800 als verzonnen. Zelfde fix als de hard-eval.
       includeFullParentContent: true,
+      tone: getEvalToneForOrgId(organizationId),
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {
         markFirstToken();

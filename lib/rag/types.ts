@@ -365,7 +365,7 @@ export type RagConfig = {
    * CTA teruggeeft (too_curt-fix). Per-versie zodat oudere eval-runs
    * reproduceerbaar blijven.
    */
-  outputStyleVersion?: 'v1' | 'v2' | 'v3';
+  outputStyleVersion?: 'v1' | 'v2' | 'v3' | 'v4';
   /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie
