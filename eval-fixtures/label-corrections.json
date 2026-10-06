@@ -32,9 +32,31 @@
         "gebruiken Hetzner",
         "gekozen voor Hetzner"
       ],
-      "v063-hardfact-max-doc-size": ["5 MB", "20 MB", "25 MB", "50 MB", "100 MB", "5MB", "20MB", "25MB", "50MB"],
-      "v063-hardfact-aantal-pricing-tiers": ["drie tiers", "vijf tiers", "Enterprise tier", "Premium tier"],
-      "v063-hardfact-api-rate-limit": ["60 per minuut", "10 per minuut", "50 per minuut", "200 per minuut", "500 per minuut", "1000 per minuut"]
+      "v063-hardfact-max-doc-size": [
+        "5 MB",
+        "20 MB",
+        "25 MB",
+        "50 MB",
+        "100 MB",
+        "5MB",
+        "20MB",
+        "25MB",
+        "50MB"
+      ],
+      "v063-hardfact-aantal-pricing-tiers": [
+        "drie tiers",
+        "vijf tiers",
+        "Enterprise tier",
+        "Premium tier"
+      ],
+      "v063-hardfact-api-rate-limit": [
+        "60 per minuut",
+        "10 per minuut",
+        "50 per minuut",
+        "200 per minuut",
+        "500 per minuut",
+        "1000 per minuut"
+      ]
     }
   },
   "_gold": {
@@ -42,39 +64,116 @@
     "00000000-0000-0000-0000-0000000000d0": {
       "v063-hardfact-max-doc-size": {
         "gold_answer": "Maximaal 10 MB per document-upload, gecontroleerd op de client én op de server.",
-        "gold_facts": ["max 10 MB per document-upload"],
+        "gold_facts": [
+          "max 10 MB per document-upload"
+        ],
         "question_type": "factual"
       },
       "v063-hardfact-aantal-pricing-tiers": {
         "gold_answer": "In v1 is alleen de tier 'standard' actief. Trial, Starter, Pro en Business zijn voorbereid voor v2, maar nog niet publiek.",
-        "gold_facts": ["v1: alleen standard actief", "trial/starter/pro/business voorbereid voor v2"],
+        "gold_facts": [
+          "v1: alleen standard actief",
+          "trial/starter/pro/business voorbereid voor v2"
+        ],
         "question_type": "factual"
       },
       "v063-hardfact-api-rate-limit": {
         "gold_answer": "Er is geen algemene limiet per minuut; die verschilt per scope. Per chatbot_public_id geldt 100 config-calls per minuut, per IP-hash op /api/widget/config 30 calls per minuut. Daarnaast geldt per chatbot 300 chatberichten per uur en per organisatie 1000 per dag.",
-        "gold_facts": ["100 config-calls per minuut per chatbot_public_id", "30 calls per minuut per IP-hash op /api/widget/config"],
+        "gold_facts": [
+          "100 config-calls per minuut per chatbot_public_id",
+          "30 calls per minuut per IP-hash op /api/widget/config"
+        ],
+        "question_type": "factual"
+      },
+      "doelgroep-jorion": {
+        "gold_answer": "Jorion Solutions bouwt met ChatManta een SaaS-product voor het MKB in Nederland (generiek MKB); de eerste 2-3 testklanten komen bij voorkeur uit catering/events.",
+        "gold_facts": [
+          "MKB",
+          "SaaS"
+        ],
+        "question_type": "factual"
+      },
+      "kernprincipes": {
+        "gold_answer": "De documentatie noemt geen vaste set van 'drie kernprincipes'. De blueprint heeft 12 bindende technische uitgangspunten, waaronder multi-tenant by design (organization_id NOT NULL), Row-Level Security overal, anti-hallucinatie boven volledigheid (bij twijfel fallback-tekst), usage tracking vanaf dag 1 en cost guardrails vóór features.",
+        "gold_facts": [
+          "geen vaste 'drie' principes: 12 technische uitgangspunten",
+          "multi-tenant by design",
+          "anti-hallucinatie boven volledigheid",
+          "usage tracking / cost guardrails"
+        ],
+        "question_type": "false_premise"
+      },
+      "oprichter-jorion": {
+        "gold_answer": "Sebastiaan Olyslag. De documentatie noemt hem als (hoofd)bouwer namens Jorion Solutions; het woord 'oprichter' staat er niet letterlijk bij. Een antwoord dat Sebastiaan Olyslag noemt als de persoon achter/bouwer bij Jorion Solutions is correct (een korte nuance mag); weigeren of een andere naam noemen is fout.",
+        "gold_facts": [
+          "Sebastiaan Olyslag"
+        ],
+        "question_type": "factual"
+      },
+      "v063-hardfact-basis-licentie-eur": {
+        "gold_answer": "Een 'basis-licentie' staat niet als zodanig in de documentatie. In v1 is alleen het Standard-pakket actief, gratis voor de v1-testklanten; voor v2 is indicatief Starter € 29-39 per maand voorgesteld (nog niet actief). Het bedrag € 25-50/maand in de documentatie is het eigen v0-kostenbudget van ChatManta, geen klantprijs. De bot mag geen vaste licentieprijs verzinnen.",
+        "gold_facts": [
+          "geen vaste basis-licentie-prijs",
+          "v1 Standard gratis voor testklanten"
+        ],
         "question_type": "factual"
       }
     }
   },
   "00000000-0000-0000-0000-0000000000d0": {
-    "kernprincipes": ["Concept_Blueprint_ChatManta.md"],
-    "doelgroep-jorion": ["Concept_Blueprint_ChatManta.md"],
-    "oprichter-jorion": ["Concept_Blueprint_ChatManta.md"],
-    "stack-overzicht": ["Concept_Blueprint_ChatManta.md"],
-    "rls-uitleg": ["Concept_Blueprint_ChatManta.md"],
-    "supabase-region": ["Concept_Blueprint_ChatManta.md"],
-    "fallback-gedrag": ["Concept_Blueprint_ChatManta.md"],
-    "hosting-platform": ["Concept_Blueprint_ChatManta.md"],
-    "embedding-model": ["Concept_Blueprint_ChatManta.md"],
-    "firecrawl-limit": ["Concept_Blueprint_ChatManta.md"],
-    "multi-hop-llm-in-eu": ["Concept_Blueprint_ChatManta.md"],
-    "multi-hop-anti-hallucinatie-mechanisme": ["Concept_Blueprint_ChatManta.md"],
-    "multi-hop-embedding-vector": ["Concept_Blueprint_ChatManta.md"],
-    "typo-llm-informeel": ["Concept_Blueprint_ChatManta.md"],
-    "typo-vector-db-informeel": ["Concept_Blueprint_ChatManta.md"],
-    "typo-wat-doet-informeel": ["Concept_Blueprint_ChatManta.md"],
-    "planted-fact-hetzner": ["Concept_Blueprint_ChatManta.md"],
-    "false-premise-geen-rls": ["Concept_Blueprint_ChatManta.md"]
+    "kernprincipes": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "doelgroep-jorion": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "oprichter-jorion": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "stack-overzicht": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "rls-uitleg": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "supabase-region": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "fallback-gedrag": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "hosting-platform": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "embedding-model": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "firecrawl-limit": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "multi-hop-llm-in-eu": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "multi-hop-anti-hallucinatie-mechanisme": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "multi-hop-embedding-vector": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "typo-llm-informeel": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "typo-vector-db-informeel": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "typo-wat-doet-informeel": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "planted-fact-hetzner": [
+      "Concept_Blueprint_ChatManta.md"
+    ],
+    "false-premise-geen-rls": [
+      "Concept_Blueprint_ChatManta.md"
+    ]
   }
 }
