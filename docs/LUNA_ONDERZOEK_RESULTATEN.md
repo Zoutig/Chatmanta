@@ -86,7 +86,24 @@ Conclusie: de v0.11b-instelling op V1 is veilig en gegrond op deze set. Spoor 1 
   - Ontkennings-false-positive (1 hit). `acme-planted-korting-20procent@v0.12a2` luidt "Ik kan niet bevestigen dat die 20% korting geldt".
 - De latency-budgetwaarschuwing (v0.11b 6,4 s, v0.12a2 5,9 s tegen een budget van 5,5 s) is informatief, geen gate.
 
-Vervolg: judge-werk (C/G/routing/informatieverlies) op deze run. Eerst de `parentExcerpt`-vraag hieronder oplossen.
+**Judge-fix vooraf (commit 95e32ea).** `eval:run` gaf de judge alleen de ≤800-char `parentExcerpt` en de `--no-judge`-JSON alleen de ~250-char `contentExcerpt`. De judge ziet nu `parentContentFull`. Voor deze run is de volledige parent offline uit de DB gekoppeld (`luna-ablatie-1.enriched.json`, 991/991 bronnen gevonden). Ook zijn de 4 verouderde v063-hardfact-labels omgelabeld naar `factual` met corpus-gold. Daarna gaf een herhaalde must-not-check op deze run 0 hits.
+
+**Claude-judge ($0, bron-gegrond tegen de volledige parent).** Per-rij-scores staan in `eval-out/dev/luna-ablatie-1.claude-judge.json`.
+
+| versie | C | P | G | G≤1 | C≤2 | routing-fouten | info-verlies-rijen |
+|---|---|---|---|---|---|---|---|
+| v0.11b | 4,36 | 3,52 | 4,96 | 0 | 6 | 0 | 18 |
+| v0.12a1 | 4,31 | 3,52 | 4,97 | 0 | 7 | 0 | 20 |
+| v0.12a2 | 4,38 | 3,52 | 4,96 | 0 | 7 | 0 | 17 |
+| v0.12a3 | 4,45 | 3,64 | 4,99 | 0 | 5 | 0 | 21 |
+
+- Gepaard tegen v0.11b op C+P+G (beter/slechter/gelijk): a1 12/7/21, a2 6/9/25, a3 11/7/22. Dat is niet significant (sign-test p≈0,48); kwaliteit is gelijk binnen de ruis. multiPart a3: 3/1/4, dus geen vervolg-spec "fused pre-process" nodig. multiTurn a3: 3/2/3.
+- Alle 5 fallback-vragen krijgen bij elke versie een eerlijke "weet ik niet" als `kind=answer`. Nergens zijn feiten verzonnen.
+- G≤1 is in alle versies 0. De 17 G≤1-gevallen die gpt-4o eerder bij v0.11b zag, waren een artefact van de afgekapte excerpt.
+- **Finalist: v0.12a3** (rerank, decompose en HyDE uit). Op kwaliteit gelijk, en het snelst: TTFT p50 −1,5 s en p90 −2,7 s ten opzichte van v0.11b. Dit is nog geen productie-GO: de hard-eval-veto en de Sol-vergelijking (Task 9) ontbreken nog.
+- Verliezen én winsten van a3 komen bijna allemaal door retrieval: zonder rerank landen er andere pagina's in de top-k. Verliezen zijn onder meer `v063-hardfact-aantal-pricing-tiers` (tier-sectie niet opgehaald), `globex-tarief-eerste-consult`, `globex-planted-21-vergoed` en `initech-planted-spoedlijn-0900` (nummer stond wél in de parent: echt informatieverlies). Winsten zijn onder meer `vector-database`, `acme-planted-prijs-49` en `acme-tarief-bitumen-plat-dak`. Mogelijke vervolgstap: a3 met grotere top-k in plaats van de LLM-rerank terug.
+- Bijvangst: een `</answer>`-tag lekt soms in de output (acme-ambiguous-kost-dat). Gold mogelijk verouderd bij `out-of-corpus-prijs` en `v063-hardfact-basis-licentie-eur`.
+- Beperkingen: één judge, niet blind voor versielabels, n = 40×2.
 
 **Werkelijke spend (OpenAI, schatting uit run-logs):** Sol-smoke 2x (1x mislukte DB-insert) ≈ $0,014 · droogtest $0,0014 · V1-eval $0,0043 · dev-set (ongeldig) $0,057 · dev-set herhaling $0,249 · **totaal ≈ $0,33** (budget $0,50). De eerdere raming van ~$0,06 voor de herhaling was te laag: de ongeldige run kostte weinig omdat 74% van de rijen vóór de LLM-call faalde.
 
