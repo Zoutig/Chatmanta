@@ -593,6 +593,10 @@ export function parseV03Output(raw: string): ParsedV03Output {
   // Losse <answer>/</answer>-tags (Luna sluit soms af zonder te openen) mogen
   // nooit in de zichtbare tekst belanden.
   answer = answer.replace(/<\/?answer>/gi, '').trim();
+  // <answer> zonder </answer> gevolgd door <confidence>: de lazy-match met `$`
+  // nam de confidence-tag mee in het antwoord (gezien in de launch-screening,
+  // "…<confidence>0.99</confidence>" zichtbaar voor de bezoeker).
+  answer = answer.replace(/<confidence>[\s\S]*$/i, '').trim();
 
   const confidence = confMatch ? Number.parseFloat(confMatch[1]) : null;
   return {
