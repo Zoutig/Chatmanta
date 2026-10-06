@@ -177,3 +177,40 @@ v0.12b is v0.12a3 met `maxContextChars: 32000` en `dedupeParents: true` (commit 
 - Telemetrie-bijvangst: `adaptiveDecision.shouldRerank=true` wordt gelogd terwijl er geen rerank draait.
 
 **Finalist (dev-set): v0.12b.** Volgende stap: een Sol-ronde op v0.12b (~$2, met v0.11b-Sol als referentie) plus de hard-eval (~$0,05).
+
+## Prompt-herziening voor Luna: v0.12c → v0.12e
+
+Uitgevoerd op 2026-10-06. Uitgangspunt was een faalanalyse van alle afgekeurde Sol-rijen (v0.11b/v0.12a3). De belangrijkste patronen:
+- too_curt (~40%);
+- onterechte "weet ik niet";
+- geplante feit alleen "kan ik niet bevestigen";
+- kale weigering;
+- meta-talk;
+- rekenfouten;
+- vergoedingssignaal bij een klacht;
+- toon: de eval draaide álle orgs op 'je', terwijl de judge-persona's van globex en initech 'u' verwachten.
+
+Iteraties, steeds getoetst op een probe-set van 17 vragen (×2), de dev-set van 40 (×2) en de hard-eval (Laag-1 + Claude-judge):
+
+| versie | wijziging | belangrijkste uitkomst |
+|---|---|---|
+| v0.12c | nieuwe antwoordprompt (`V0_12C_SYSTEM_PROMPT`), STIJL v4, `</answer>`-lek-fix | Vpb 4/4 goed met tussenstappen; Sophie/Frank: "staat niet in ons team" |
+| v0.12c2 | zonder matched-span | meer bronnen passen in 32k (no-show-beleid kwam binnen) |
+| v0.12d | c2 + rekenregel per eenheid + geen "contactgegevens ontbreken" | dev-set C+P+G 10/3/27 tegen v0.12b; meta-talk 13/78 (te hoog); hard-eval 1 veto (klacht) |
+| v0.12e | d + klacht zonder vergoedingscategorieën, meta-talk-lijst, aantallen-regel, tweede bedrag alleen bij dezelfde vraag | meta-talk 2/78; hard-eval **gate JA** (63/63, 53/53 judge-pass, 0 veto); klacht 6/6 stabiel goed |
+
+Eval-harness: eval en hard-eval geven nu per org de toon die de judge-persona verwacht (`getEvalToneForOrgId`: globex/initech → formal), zoals een klant die in productie zelf instelt. Daarnaast gerepareerde labels: must-not-frasen voor Frank/Sophie/Marc matchten de correcte ontkenning.
+
+### Sol-eindronde v0.12e (186 vragen, judge gpt-6-sol)
+
+Kosten $2,91 (bot $0,19, judge $2,71). Dat is meer dan geraamd: de judge krijgt nu de volledige parents.
+
+| versie | C | P | G | prod-ready | too_curt | meta | C≤2 | toon (0-2) | TTFT p50 / p90 |
+|---|---|---|---|---|---|---|---|---|---|
+| v0.11b | 3,83 | 3,09 | 4,76 | 56 (30%) | 74 | 11 | 33 | 1,12 | 4274 / 6099 ms |
+| v0.12a3 | 3,76 | 2,98 | 4,67 | 60 (32%) | 64 | 12 | 34 | 1,10 | 3260 / 6220 ms |
+| **v0.12e** | **4,25** | **3,61** | 4,66 | **78 (42%)** | **20** | **4** | **15** | **1,53** | **3265 / 4269 ms** |
+
+- Gepaard op C+P+G tegen v0.11b: **75 beter / 30 slechter / 81 gelijk**. Let op: een deel komt door de toon-fix in de eval; de v0.11b-run draaide nog op 'je'.
+- Eén must-not-hit (`v063-hardfact-grounding-rate`): het antwoord noemt het eval-dóél "minimaal 85% correct" uit het corpus. Dat is geen verzonnen meting, dus een verouderd label.
+- Hard-eval v0.12e (`eval-out/hard/20261006-222942-report.md`): **productiewaardig JA**. Veiligheid ok, AQ 100%, robuustheid 100%. p95-latency 8,3 s is een waarschuwing.
