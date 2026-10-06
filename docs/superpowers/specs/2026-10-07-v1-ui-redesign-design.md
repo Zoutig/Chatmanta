@@ -144,7 +144,7 @@ Inventaris van de huidige code (2026-10-07). Niveau: **K** = kritiek, **A** = aa
 | Overzicht | Cijfers (gesprekken, behulpzaam, berichten, bronnen) | 4 kaarten | S | `StatStrip` |
 | Overzicht | Top-vragen leeg/opbouwend | lege staat | I | compacte lege staat |
 | Overzicht | Checklist "Aan de slag" (5 stappen, overslaan) | checklist-kaart | A | volgende-stap-blok met voortgang; "Alle stappen" opent de lijst |
-| Gesprekken | "N bezoekers gaven negatieve feedback" | banner (danger) | A | filter-optie + teller; geen banner (duimpjes zijn sinds PR #262 uit de V1-widget, dit betreft alleen oude data) |
+| Gesprekken | "N bezoekers gaven negatieve feedback" | banner (danger) | — | **verborgen** (banner, filter en badge "Feedback"): sinds PR #262 heeft de V1-widget geen duimpjes meer (besluit Seb 2026-10-07) |
 | Gesprekken | "N gesprekken hebben een onbeantwoorde vraag" | banner (warn) | A | schakelaar "Alleen onbeantwoord" met teller |
 | Gesprekken | Lege lijst per filter | lege staat | I | compact |
 | Gesprekken | Statusbadge per gesprek; tellers op tabs | badge | S | blijft |
