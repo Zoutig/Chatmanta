@@ -107,3 +107,25 @@ export function dedupeSiteBoilerplate<T extends { url: string; title?: string | 
     return { ...p, markdown: kept.join('\n\n').trim() };
   });
 }
+
+/** Opschonen + site-brede dedup over een hele crawl. Pagina's met een fout of
+ *  zonder inhoud gaan ongewijzigd door (de status-logica van de caller blijft
+ *  leidend); alleen pagina's met markdown worden opgeschoond en gededupliceerd. */
+export function cleanCrawlPages<T extends { url: string; title?: string | null; markdown: string; error?: string | null }>(
+  pages: T[],
+): T[] {
+  const idx: number[] = [];
+  const cleaned: T[] = [];
+  pages.forEach((p, i) => {
+    if (!p.error && p.markdown && p.markdown.trim().length > 0) {
+      idx.push(i);
+      cleaned.push({ ...p, markdown: cleanCrawledMarkdown(p.markdown) });
+    }
+  });
+  const deduped = dedupeSiteBoilerplate(cleaned);
+  const out = [...pages];
+  idx.forEach((pi, k) => {
+    out[pi] = deduped[k];
+  });
+  return out;
+}
