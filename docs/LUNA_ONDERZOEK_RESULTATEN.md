@@ -277,3 +277,18 @@ Eval-bijvangst: de hard-eval-judge kapt de bronnen op 24.000 tekens (`scripts/v0
 Labels: 39 verouderde of strijdige gold-labels zijn tegen de corpus gecorrigeerd (commit 17d966a). Er volgt bewust geen nieuwe Sol-ronde.
 
 **Totale spend onderzoek ≈ $8,95.**
+
+## Launch-ready-onderzoek (nacht 6 → 7 okt 2026): v0.13x6
+
+Volledig rapport: `docs/LAUNCH_READY_RAPPORT.md` · logboek `docs/NACHT_LOG_2026-10-07.md`.
+
+- Meetlat nieuw: gewogen foutscore (kritiek = veto, ernstig ×3, licht ×1, toon ×0,25) door een geblindeerde Claude-jury per vraag. Les: ernst-labels variëren per jurylid → alleen gepaard vergelijken binnen één jury-run.
+- De kritieke fouten van v0.12e kwamen grotendeels uit de prompt zelf: het "geen vaste prijs"-template, het "Flevoland → Lelystad ja"-voorbeeld en de regel "zeg stellig dat het niet klopt" (ook bij personen met een onvolledig teamoverzicht).
+- Finalist **v0.13x6 / x6v** = prompt-hygiëne (a2) + thinking-checklist + vergelijkingsregel + voorzichtige persoons-premisse + premisse-check (namen/nummers, directive v2) + rekenbewuste verifier + inhouds-dedup + klacht-modus v2.
+  - Screening: 8 → 1 kritiek, gewogen 39 → 24 per 100, gepaard 22/8 (p=0,016).
+  - Stress-sets: −50 tot −66%.
+  - Hard-eval: JA.
+  - V1-eval: 15/15.
+- Crawl-cleaner (ingest): op een echte gecrawlde site 58 → 25 per 100.
+- Productie-fixes: de answer-cache negeerde de gespreksgeschiedenis, en er was een `<confidence>`-lek. Daarnaast: Luna schreef `<PRIVATE_PERSON>` onder het thinking-schema; opgelost in de prompt.
+- Niet gedaan: de holdout-run (143 vragen) is gestopt door geheugendruk en niet herstart. De Sol-ronde is niet gestart.
