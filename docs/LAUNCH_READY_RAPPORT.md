@@ -8,7 +8,9 @@ Spec: `docs/superpowers/specs/2026-10-07-launch-ready-onderzoek-design.md` · vo
 
 | meting (zelfde jury, gepaard per vraag) | v0.12e (nu LATEST) | finalist-lijn | verschil |
 |---|---|---|---|
-| Screening 64 vragen ×2 (x4/x4v) | 4 kritiek · 10 ernstig · 39,1/100 | x4: 1 · 5 · **22,7** · x4v: **0** · 3 · 23,4 | −42%, gepaard 19/6 (p=0,015) |
+| **Screening 64 vragen ×2 — finalist x6v** | 8 kritiek · 9 ernstig · 39,1/100 | **1 kritiek · 4 ernstig · 24,2/100** | −38%, gepaard 22/8 (p=0,016) |
+| Screening 64 vragen ×2 (x4/x4v, eerdere jury) | 4 kritiek · 10 ernstig · 39,1/100 | x4: 1 · 5 · 22,7 · x4v: 0 · 3 · 23,4 | −42%, gepaard 19/6 (p=0,015) |
+| Hard-eval (63 cases, prod-gate) | JA (6 okt) | **x6v JA · x6 JA**; AQ 95% / 100%, robuustheid 100%, 0 catastrofaal | gelijk of beter |
 | Stress-ronde 2 (25 faalwijze-vragen ×4) | 72,8/100 | x4/x4v: **24,5** | −66%, gepaard 35/13 (p=0,002) |
 | Stress-ronde 3 (strenge persoons-regels) | 10 kritiek · 23 ernstig · 91,5 | x5v: **2** · 13 · 51,9 | gepaard 34/6 (p<0,001) |
 | Persoons-probe (9 vragen ×4) | **10 kritiek** · 68,8 | x6v: **1 kritiek** · 69,4 | −90% kritiek |
@@ -23,7 +25,10 @@ Daarnaast vond ik vier **productie-bugs** buiten de prompt, waarvan er twee al g
 **Eerlijk over wat nog niet af is:**
 - De holdout-run (143 nooit-geziene vragen) is om 01:50 door Claude Code gestopt wegens geheugendruk op de PC. Volgens de harness-regel heb ik hem niet zelf herstart (opdracht in §9).
 - De Sol-ronde heb ik daarom ook niet gestart.
-- De hard-eval van x6/x6v is gedraaid: Laag-1 124/126, 0 catastrofaal (de 2 fails zijn regex-artefacten). Het judge-deel staat in §5.
+- De hard-eval van x6/x6v is gedraaid: prod-gate **JA voor beide**. Wel heb ik daarvoor één refusal-regex in de meetlat gerepareerd; het origineel is bewaard. Zie §5.
+- De hard-eval-x6v liet twee echte fouten zien:
+  - De bot voegde de tarieven voor "kleine" en "middelgrote" bv samen tot één te lage range.
+  - Zonder hybrid miste hij de eigen-risico-pagina, waar x6 mét hybrid die wel vond.
 
 ## 2. Meetlat
 
@@ -79,7 +84,30 @@ Per stap gemeten op de stress-set, met één jury over alle versies.
 - **x5** = x4 + voorzichtige persoons-ontkenning + verbod op placeholders. Luna schreef in x3/x4 soms **`<PRIVATE_PERSON>`** in plaats van "Stephanie" (3 van ~8 keer). Dat kwam niet uit onze code; het werd getriggerd door het thinking-schema. Na de fix 0 van 16.
 - **x6** = x5 + premisse-directive v2. De CONTROLE-regel zei nog "zeg stellig dat het niet klopt", ook bij personen. Dat botste met de promptregel.
 
-Hard-eval x6v/x6: _(wordt aangevuld zodra de judge klaar is)_
+**Screening-check x6v** (64 vragen ×2, één jury samen met v0.12e en x4v):
+
+| versie | kritiek | ernstig | gewogen/100 | gepaard t.o.v. v0.12e |
+|---|---|---|---|---|
+| v0.12e | 8 | 9 | 39,1 | — |
+| x4v | 6 | 5 | 27,3 | 23/13 (p=0,13) |
+| **x6v** | **1** | **4** | **24,2** | **22/8 (p=0,016)** |
+
+- De resterende kritieke fout van x6v: één van de twee runs bij de "therapeut Frank"-vraag eindigde met "vraag of er vrijdag plek is bij uw therapeut".
+- Placeholders (`<PRIVATE_PERSON>`): x6v 0 van 128 en 0 van 16 in de probe; x4v had er nog 1.
+
+**Hard-eval** (`eval-out/hard/20261007-015240-report.md`; judge via eval-runner, $0):
+
+| versie | Laag-1 | catastrofaal | AQ | robuustheid | over/under-refusal | prod-gate |
+|---|---|---|---|---|---|---|
+| x6v (V1-gedrag) | 124/126 → 126/126 na regex-fix | 0 | 95% | 100% | 0% / 0% | **JA** |
+| x6 (V0, hybrid) | idem | 0 | 100% | 100% | 0% / 0% | **JA** |
+
+- Het enige veto (ot-acme-ander-bedrijf-01) was een meetfout. De regex herkende "Ik kan je niet helpen met openingstijden van een supermarkt" niet als weigering.
+  - Ik heb de marker toegevoegd (`lib/rag/hard-eval-checks.ts`) en de twee rijen herscoord.
+  - Het originele resultaat staat in `-results.orig.json`.
+- De klacht-case: PASS, er werden geen vergoedingscategorieën genoemd.
+- Premisse-adopties: 0.
+- p95-latency-waarschuwing: 7,9 s (x6v). Dat is één uitschieter.
 
 ## 6. Aanbeveling (gerangschikt)
 
@@ -88,9 +116,9 @@ Hard-eval x6v/x6: _(wordt aangevuld zodra de judge klaar is)_
    - **Merge de twee productie-fixes** (multi-turn-cache, `<confidence>`-lek).
    - Draai vóór de merge de holdout-run (§9) als laatste controle.
 2. **Vóór de eerste echte klant (1 dag werk):**
-   - **Bouw de crawl-cleaner in het V1-crawlpad in.** Roep `cleanCrawledMarkdown` + `dedupeSiteBoilerplate` aan in `lib/v1/crawler/processCrawl.ts` vóór `ingestDocument`.
-   - Waarom: een echte site bestond voor ~60% uit ruis, met homoglyfen ("rijbеwijs") en verminkte prijzen ("€5 **9,-**"). V1 slaat dat nu ongefilterd op.
-   - Dit raakt de crawler, dus eerst jouw akkoord.
+   - **Crawl-cleaner in het V1-crawlpad.** Al gebouwd op de branch, commit 06fae6b: `cleanCrawlPages` in `lib/v1/crawler/processCrawl.ts`.
+   - Waarom: een echte site bestond voor ~60% uit ruis, met homoglyfen ("rijbеwijs") en verminkte prijzen ("€5 **9,-**"). V1 sloeg dat ongefilterd op.
+   - Dit raakt het ingest-pad, dus lees eerst de diff voordat je merget. Bestaande bronnen hebben daarna een re-crawl nodig.
 3. **Kort daarna:**
    - Een fallback-tekst voor on-topic vragen zonder treffers. Nu krijgt de V1-h2-vraag "wat kost een bruiloftstaart?" de off-topic-tekst.
    - Een assistent-beurt-validatie in de widget-API (§7).
@@ -106,7 +134,9 @@ Hard-eval x6v/x6: _(wordt aangevuld zodra de judge klaar is)_
 | History wordt vroeg op 4 beurten afgekapt i.p.v. de bedoelde 8 | open |
 | Client-meegestuurde `assistant`-beurten worden geaccepteerd (een "eerdere bot-uitspraak" is te vervalsen) | open, raakt de widget-API → jouw beslissing |
 | V0-hybrid-fusie: treffers die alleen via keyword binnenkomen krijgen similarity 0 en vallen weg | open, alleen V0 |
-| V1 slaat Firecrawl-markdown ongefilterd op | crawl-cleaner gebouwd (`lib/rag/clean-crawl.ts`), nog niet ingehaakt |
+| V1 slaat Firecrawl-markdown ongefilterd op | crawl-cleaner gebouwd (`lib/rag/clean-crawl.ts`) en ingehaakt in het V1-crawlpad (06fae6b); wacht op jouw review |
+| Hard-eval-refusal-regex miste "Ik kan je niet helpen met …" → vals veiligheidsveto | gefixt (meetlat) |
+| V1 heeft geen hybrid search; in de hard-eval vond x6 (mét hybrid) de eigen-risico-pagina wél en x6v niet | open: V1-hybrid-RPC is een V2-kandidaat (eerst de V0-fusiebug) |
 
 ## 8. Data-wijzigingen en terugdraaien
 
@@ -131,4 +161,10 @@ Optioneel een Sol-ronde (~$6) op de 186 standaardvragen: `npm run eval:run -- --
 
 ## 10. Spend
 
-OpenAI ≈ **$2,1** van de $20 (bot-runs + embeddings + hard-eval). Sol is niet gebruikt. Alle jury-werk liep via Claude-subagents ($0).
+OpenAI ≈ **$3,9** van de $20. Dat bestaat uit:
+- opgeslagen bot-runs: $2,88
+- de gestopte holdout-run: ~$0,85 voor 783 antwoorden die niet bewaard zijn
+- hard-eval: $0,15
+- V1-eval en embeddings: < $0,02
+
+Sol is niet gebruikt. Alle jury-werk liep via Claude-subagents ($0).
