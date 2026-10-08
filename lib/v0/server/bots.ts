@@ -1587,7 +1587,7 @@ const V0_13X7V: BotConfig = {
   systemPrompt: V0_13X7_SYSTEM_PROMPT,
   smalltalkToneAware: true,
 };
-const V0_13X7: BotConfig = { ...V0_13X7V, version: 'v0.13x7', label: 'v0.13x7 — x7v mét hybrid (V0) (experiment)', hybridSearch: true };
+const V0_13X7: BotConfig = { ...V0_13X7V, version: 'v0.13x7', label: 'v0.13x7 — x6 + precisie: synoniemen, dienst-premisse, titels vs tekst, afstand, smalltalk-u (hybrid, V0)', hybridSearch: true };
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1739,7 +1739,11 @@ export const BOTS: Record<string, BotConfig> = {
 // (V1-pad r1 9); screening 8 → 1 kritiek; hard-eval gate JA (x6 én x6v); V1-eval 15/15.
 // Prijs: iets vaker "weet ik niet", generation-staart ~+0,5 s. V1 draait hem als x6v
 // (rag-config zet hybridSearch uit). v0.12e blijft append-only behouden.
-export const LATEST_BOT_VERSION = V0_13X6.version;
+// 2026-10-08 (avond): v0.13x7 gepromoveerd (x7-precisieronde, rapport §12). Stress-set
+// (40 faalwijze-vragen ×4, jury): x7v 43,4 vs x6v 60,5 /100, gepaard 35/11 (p=0,001);
+// verse holdout2 (120 vragen ×2): gelijk (geen regressie); hard-eval gate JA (AQ 100%).
+// v0.13x6 blijft append-only behouden.
+export const LATEST_BOT_VERSION = V0_13X7.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1769,6 +1773,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_12D.version,
   V0_12E.version,
   V0_13X6.version,
+  V0_13X7.version,
 ];
 
 /**
