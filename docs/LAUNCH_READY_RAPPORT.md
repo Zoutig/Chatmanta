@@ -23,8 +23,8 @@ Spec: `docs/superpowers/specs/2026-10-07-launch-ready-onderzoek-design.md` · vo
 Daarnaast vond ik vier **productie-bugs** buiten de prompt, waarvan er twee al gefixt zijn op de branch (§7). En de **crawl-cleaner** (ingest-opschoning) halveerde de fouten op een echte gecrawlde klantsite: 58 → 25 per 100 antwoorden.
 
 **Eerlijk over wat nog niet af is:**
-- De holdout-run (143 nooit-geziene vragen) is om 01:50 door Claude Code gestopt wegens geheugendruk op de PC. Volgens de harness-regel heb ik hem niet zelf herstart (opdracht in §9).
-- De Sol-ronde heb ik daarom ook niet gestart.
+- ~~De holdout-run is gestopt~~ → **holdout alsnog gedraaid op 8 okt, zie §11.** Uitkomst: x6/x6v houden stand op 143 nooit-geziene vragen (kritiek 8-9 → 2-3).
+- De Sol-ronde is niet gedraaid. Na de holdout-jury voegt die weinig toe.
 - De hard-eval van x6/x6v is gedraaid: prod-gate **JA voor beide**. Wel heb ik daarvoor één refusal-regex in de meetlat gerepareerd; het origineel is bewaard. Zie §5.
 - De hard-eval-x6v liet twee echte fouten zien:
   - De bot voegde de tarieven voor "kleine" en "middelgrote" bv samen tot één te lage range.
@@ -168,3 +168,33 @@ OpenAI ≈ **$3,9** van de $20. Dat bestaat uit:
 - V1-eval en embeddings: < $0,02
 
 Sol is niet gebruikt. Alle jury-werk liep via Claude-subagents ($0).
+
+## 11. Holdout-validatie (8 okt 2026)
+
+De nachtelijke holdout-run bleek tóch afgerond (het node-proces liep als wees door; `holdout1.json`, 1144 antwoorden), maar zonder de finalist: x6/x6v bestonden nog niet toen hij startte. Daarom op 8 okt:
+
+1. **x6 + x6v op dezelfde 143 holdout-vragen ×2** (`eval-out/launch/holdout2.json`, $0,61).
+2. **Eén geblindeerde jury over vier versies**: v0.12e (= V0 nu) en r1 (= V1 nu) uit `holdout1`, x6 en x6v uit `holdout2`. 1144 antwoorden, 48 batches, 12 Claude-jury-agents, één jurylid per vraag over alle varianten (`eval-out/launch/jury/holdout/`).
+3. **Gepaarde latency-probe**: alle 4 versies door elkaar op 40 holdout-vragen, op hetzelfde moment (`latency-probe.json`, $0,17).
+
+| versie | kritiek | ernstig | licht | gewogen/100 | gepaard vs v0.12e b/s/g (p) | gepaard vs r1 (p) |
+|---|---|---|---|---|---|---|
+| v0.12e (V0 nu) | 8 | 9 | 45 | 26,2 | — | 30/32 (0,90) |
+| v0.13r1 (V1 nu) | 9 | 11 | 33 | 24,1 | 32/30 (0,90) | — |
+| **v0.13x6** (V0-kandidaat) | **2** | 12 | 33 | 25,3 | 38/25 (0,13) | 35/26 (0,31) |
+| **v0.13x6v** (V1-kandidaat) | **3** | 10 | 28 | **21,5** | 40/26 (0,11) | 33/23 (0,23) |
+
+**Lezing:**
+- **Kritieke fouten −70%** op nooit-geziene vragen. Dat is precies wat de stress-sets voorspelden. Verdwenen zijn verzonnen beleid ("geen vaste prijs", "geen vooruitbetaalkorting", "shockwave bieden wij niet aan"), procedure-verzinsels en fout overgenomen tarieven.
+- De ruil is dezelfde als in de stress-rondes: x6 zegt iets vaker "weet ik niet" waar het antwoord wél in de bron stond (onterechte weigering 0 → 5). Dat is de veilige kant van de afweging, en de licht-fouten dalen ook.
+- Het gewogen totaal verschilt niet significant: de meeste holdout-vragen zijn "gewone" vragen waar alle versies goed scoren. De winst zit in de staart, en daar zitten de reputatierisico's.
+- Restant kritiek bij x6/x6v (ook bij v0.12e/r1):
+  - "vanaf 16 jaar" i.p.v. 16,5: de bot neemt de paginatitel "Rijles vanaf 16 jaar" over.
+  - Venlo-reiskosten: de bot gebruikt aardrijkskunde (wereldkennis) om te bepalen of iets binnen 30 minuten ligt.
+  - Kandidaten voor een volgende ronde, niet blokkerend.
+- 0 placeholder-lekken (`<PRIVATE_PERSON>`) in 572 x6/x6v-antwoorden.
+- Must-not-meetlat: 5 van de 6 x6v-treffers bleken substring-vals-alarm in een ontkenning ("…of contant betalen kan", "kan niet bevestigen dat 15% seniorenkorting geldt"). Label `ho-veen-regio-leidschenveen-automaat` gerepareerd (DB + seed).
+
+**Latency** (gepaard, zelfde moment): de TTFT-mediaan is gelijk (~4,0 s voor alle vier; overdag is OpenAI ~1 s trager dan 's nachts). Het gepaarde verschil per vraag is x6v−r1 +0,5 s en x6−v0.12e +0,06 s. De staart is dikker: TTFT p90 5,1 → 5,8 s, totaal p95 7,0 → 8,1 s. De oorzaak zit volledig in `generation` (het thinking-schema schrijft meer tokens vóór het antwoord). Retrieval, preprocess en verify zijn gelijk. Kosten per antwoord zijn gelijk.
+
+**Conclusie: promoveer v0.13x6 naar LATEST.** De holdout bevestigt de stress-sets en de hard-eval. Prijs: ~0,5 s extra in de staart.
