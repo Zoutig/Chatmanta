@@ -160,7 +160,9 @@
 .v1-page-enter { animation: v1-enter var(--v1-slow) var(--v1-ease) both; }
 
 .v1-sidebar {
-  width: 248px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 0; height: 100dvh;
+  /* z-index: sticky maakt een stacking context; zonder z-index valt de
+     zoek-palette (fixed, binnen de zijbalk) achter de pagina-inhoud. */
+  width: 248px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 0; z-index: 30; height: 100dvh;
   overflow-y: auto; background: var(--v1-navy); color: var(--v1-on-navy);
   padding: 20px 14px 16px; display: flex; flex-direction: column; gap: 20px;
 }
