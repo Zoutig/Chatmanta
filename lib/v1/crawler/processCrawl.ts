@@ -12,6 +12,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import type { CrawledPage } from './firecrawl';
+import { cleanCrawledMarkdown, cleanCrawlPages } from '@/lib/rag/clean-crawl';
 
 type Sb = SupabaseClient;
 
@@ -132,7 +133,10 @@ export async function ingestCrawlResults(
     ingestErrors: [],
   };
 
-  for (const page of pages) {
+  // Launch-onderzoek 2026-10-07: gecrawlde markdown is voor ~60% ruis (site-brede
+  // boilerplate, data-URI's, homoglyfen, verminkte prijzen) → eerst opschonen.
+  const cleanPages = cleanCrawlPages(pages);
+  for (const page of cleanPages) {
     const status = pageStatus(page);
     try {
       if (status !== 'crawled') {
@@ -176,6 +180,7 @@ export async function ingestSinglePage(
   chatbotId: string,
   page: CrawledPage,
 ): Promise<{ status: 'crawled' | 'failed' | 'excluded'; error: string | null }> {
+  page = { ...page, markdown: page.markdown ? cleanCrawledMarkdown(page.markdown) : page.markdown };
   // Oude rij(en) met deze URL binnen de bron weg (CASCADE → chunks). Een gefaalde
   // delete NIET negeren: daarna inserten zou een duplicaat opleveren.
   const { error: delErr } = await sb

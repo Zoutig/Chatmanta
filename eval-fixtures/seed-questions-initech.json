@@ -46,19 +46,26 @@
     {
       "slug": "initech-kor-vs-mkb-winstvrijstelling",
       "question": "Als ik onder de KOR val, kan ik dan ook nog de MKB-winstvrijstelling toepassen?",
-      "gold_answer": "Dat zijn twee verschillende regelingen die los van elkaar staan. De KOR (Kleine Ondernemersregeling) geldt voor de btw-positie: bij een omzet onder € 20.000 hoeft u geen btw-aangifte te doen en mag u ook geen btw aftrekken. De MKB-winstvrijstelling is een aftrek in de inkomstenbelasting (12,7% van de winst, 2026) voor IB-ondernemers die aan het urencriterium voldoen. Beide kunnen tegelijk gelden — KOR sluit MKB-winstvrijstelling niet uit.",
+      "gold_answer": "Dat zijn twee verschillende regelingen die los van elkaar staan. De KOR geldt voor de btw: bij een omzet onder € 20.000 kunt u ervoor kiezen, dan brengt u geen btw in rekening en trekt u geen btw af. De MKB-winstvrijstelling is een regeling in de inkomstenbelasting: 12,7% van de winst is vrijgesteld (2026), automatisch toegepast als u zelfstandigenaftrek krijgt. Beide kunnen tegelijk gelden — de KOR sluit de MKB-winstvrijstelling niet uit.",
       "gold_facts": [
         "KOR = btw-regeling onder €20.000 omzet",
-        "MKB-winstvrijstelling = 12,7% IB-aftrek 2026",
-        "twee verschillende regelingen, beide tegelijk mogelijk",
-        "MKB-winstvrijstelling vereist urencriterium"
+        "MKB-winstvrijstelling = 12,7% IB-vrijstelling 2026",
+        "twee verschillende regelingen, beide tegelijk mogelijk"
       ],
-      "tags": ["kor", "mkb-winstvrijstelling", "false-premise-correction"],
+      "tags": [
+        "kor",
+        "mkb-winstvrijstelling",
+        "false-premise-correction"
+      ],
       "difficulty": "hard",
       "question_type": "false_premise",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["11-btw-aangifte.md", "07-belastingaangifte-ondernemers.md", "22-faq-zzp.md"]
+      "ideal_source_filenames": [
+        "11-btw-aangifte.md",
+        "07-belastingaangifte-ondernemers.md",
+        "22-faq-zzp.md"
+      ]
     },
     {
       "slug": "initech-vpb-tarief-200k",
@@ -79,19 +86,26 @@
     {
       "slug": "initech-dga-loon-minimum",
       "question": "Mijn bv draait goed maar ik wil zelf weinig loon nemen. Hoeveel moet ik minimaal als DGA opnemen in 2026?",
-      "gold_answer": "Het gebruikelijk loon voor een DGA in 2026 is minimaal € 56.000 per jaar. Neemt u significant lager, dan corrigeert de Belastingdienst en stelt dit bedrag vast — met loonheffing en werkgeversbijdrage over het verschil. Lager nemen mag alleen in uitzonderingsgevallen (bv. structureel verlies of seizoensbedrijf). Voor uw specifieke situatie kan Anouk Hendrikse u verder helpen — een quick-advies kost € 195.",
+      "gold_answer": "Het gebruikelijk loon voor een DGA is in 2026 minimaal € 56.000. Lager mag alleen als u kunt aantonen dat lager passend is — bijvoorbeeld als het bedrijf niet meer kan betalen (doelmatigheid), bij vergelijkbare functies in een kleinere bv (70-80% kan redelijk zijn) of als u parttime voor de bv werkt. De Belastingdienst is hier streng; de bewijslast ligt bij u. We bespreken dit per situatie; voor dga-zaken kunt u terecht bij Mr. Anouk Hendrikse (quick-advies € 195).",
       "gold_facts": [
         "DGA-gebruikelijk loon 2026 minimaal €56.000",
-        "Belastingdienst corrigeert bij lager",
-        "uitzondering bij structureel verlies/seizoensbedrijf",
-        "Anouk Hendrikse fiscaal adviseur, €195 quick-advies"
+        "lager alleen als u aantoont dat lager passend is (bewijslast bij u)",
+        "Anouk Hendrikse (dga-zaken), quick-advies €195"
       ],
-      "tags": ["dga", "loon", "hard-fact"],
+      "tags": [
+        "dga",
+        "loon",
+        "hard-fact"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "23-faq-bv.md", "19-tarieven-en-pakketten.md"]
+      "ideal_source_filenames": [
+        "07-belastingaangifte-ondernemers.md",
+        "23-faq-bv.md",
+        "19-tarieven-en-pakketten.md"
+      ]
     },
     {
       "slug": "initech-overstap-andere-accountant",
@@ -115,18 +129,24 @@
     {
       "slug": "initech-mkb-pakket-omzet",
       "question": "Wat kost een MKB-pakket voor een bv met € 800.000 omzet en 10 medewerkers?",
-      "gold_answer": "Met € 800.000 omzet en 10 medewerkers valt u in onze categorie 'MKB bv' (€ 500k-5M omzet, 5-25 medewerkers). Het pakket kost typisch € 8.500-11.500 per jaar en omvat maandboekhouding, loonadministratie tot 25 medewerkers, half-jaarlijks overleg en een beoordelings-jaarrekening. Voor een precieze offerte plannen we een verkennend gesprek; bel ons hoofdkantoor Eindhoven of vraag een afspraak aan.",
+      "gold_answer": "Met € 800.000 omzet en 10 medewerkers valt u in de categorie 'MKB bv' (5-25 medewerkers, omzet € 500.000 - € 5 mln). Dat pakket kost vanaf € 8.500 per jaar (€ 710 per maand) en omvat o.a. maandelijkse boekhouding, loonadministratie tot 25 werknemers, btw-aangifte, jaarrekening (samenstelling of beoordeling), Vpb-aangifte, DGA-loonadministratie + IB-aangifte, een half-jaarlijks evaluatiegesprek en onbeperkt telefoon-/e-mailadvies. MKB-pakketten zijn maatwerk; voor een precieze offerte plannen we een kosteloos verkennend gesprek.",
       "gold_facts": [
-        "categorie MKB bv: €500k-5M omzet, 5-25 medewerkers",
-        "€8.500-11.500 per jaar",
-        "maandboekhouding + loon tot 25 + half-jaarlijks overleg + jaarrekening beoordeling"
+        "categorie MKB bv: €500k-5 mln omzet, 5-25 medewerkers",
+        "vanaf €8.500 per jaar",
+        "maandboekhouding + loon tot 25 + half-jaarlijks evaluatiegesprek + jaarrekening (samenstelling of beoordeling)"
       ],
-      "tags": ["pakketten", "mkb", "pricing"],
+      "tags": [
+        "pakketten",
+        "mkb",
+        "pricing"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["16-mkb-pakketten.md"]
+      "ideal_source_filenames": [
+        "16-mkb-pakketten.md"
+      ]
     },
     {
       "slug": "initech-urencriterium-administratie",
@@ -148,21 +168,29 @@
     {
       "slug": "initech-zzp-naar-bv-omslag",
       "question": "Wanneer is het fiscaal interessant om vanuit zzp naar een bv-structuur over te stappen?",
-      "gold_answer": "Vuistregel: bij een stabiele winst rond € 200.000-300.000 wordt een bv vaak voordeliger dan de IB-route. Onder die grens werkt de MKB-winstvrijstelling (12,7% in 2026) en de zelfstandigenaftrek (€ 3.750) gunstig in box 1. Bij een bv heeft u te maken met DGA-gebruikelijk loon (€ 56.000 minimaal in 2026), Vpb (19% tot € 200k, 25,8% daarboven) en dividend-belasting. Een bv-omzetting kost € 350-650 notariskosten plus onze begeleiding. Voor een persoonlijke afweging plannen we een gesprek met Joris Vermeer.",
+      "gold_answer": "Volgens onze vuistregel is omzetten naar een bv vrijwel altijd zinvol bij een winst structureel boven € 100.000-125.000, en verder bij vermogensgroei in het bedrijf, aansprakelijkheidsrisico's of plannen voor bedrijfsoverdracht. Als eenmanszaak profiteert u van zelfstandigenaftrek (€ 3.750 in 2026), startersaftrek en MKB-winstvrijstelling (12,7%); in een bv betaalt u Vpb (19% tot € 200.000, 25,8% daarboven) en moet u een gebruikelijk loon van minimaal € 56.000 (2026) toekennen. Oprichten kost circa € 300-500 aan notaris- en KvK-kosten. Voor een persoonlijke afweging plannen we een gesprek, bijvoorbeeld met Joris Vermeer.",
       "gold_facts": [
-        "vuistregel bv-omslag rond €200.000-300.000 winst",
+        "vuistregel: winst structureel boven €100.000-125.000",
         "DGA-gebruikelijk loon €56.000 2026",
         "Vpb 19% tot €200k, 25,8% daarboven",
         "MKB-winstvrijstelling 12,7%",
         "zelfstandigenaftrek €3.750",
         "Joris Vermeer voor advies"
       ],
-      "tags": ["multi-hop", "bv-omzetting", "advies"],
+      "tags": [
+        "multi-hop",
+        "bv-omzetting",
+        "advies"
+      ],
       "difficulty": "hard",
       "question_type": "multi_hop",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "12-fiscale-adviezen.md", "23-faq-bv.md"]
+      "ideal_source_filenames": [
+        "07-belastingaangifte-ondernemers.md",
+        "12-fiscale-adviezen.md",
+        "23-faq-bv.md"
+      ]
     },
     {
       "slug": "initech-vestiging-den-bosch",
@@ -234,35 +262,44 @@
     {
       "slug": "initech-out-of-corpus-hypotheek",
       "question": "Kunnen jullie mij helpen met de aanvraag van een woninghypotheek?",
-      "gold_answer": "Hypotheekadvies bieden we niet aan — daarvoor verwijzen we u door naar een onafhankelijk hypotheekadviseur of uw bank. Wel kunnen we u helpen met de fiscale kant: berekening van uw maximale leencapaciteit op basis van uw IB-aangifte, eigenwoningforfait, en advies over hypotheekrenteaftrek bij ondernemers. Voor een fiscaal-administratieve check kunt u contact opnemen.",
+      "gold_answer": "Hypotheekaanvragen en hypotheekadvies verzorgen wij niet; daarvoor kunt u terecht bij een hypotheekadviseur of uw bank. Wel helpen we met de fiscale kant van uw eigen woning: eigenwoningforfait en hypotheekrenteaftrek in uw IB-aangifte, en fiscaal advies over hypotheekstructuur of oversluiten.",
       "gold_facts": [
-        "geen hypotheekadvies",
-        "wel fiscale berekening van leencapaciteit",
-        "eigenwoningforfait en renteaftrek-advies wel mogelijk",
+        "geen hypotheekaanvraag/-advies",
+        "wel fiscale kant eigen woning (eigenwoningforfait, renteaftrek, hypotheekstructuur)",
         "doorverwijzing naar hypotheekadviseur of bank"
       ],
-      "tags": ["scope-refusal", "doorverwijzing"],
+      "tags": [
+        "scope-refusal",
+        "doorverwijzing"
+      ],
       "difficulty": "medium",
       "question_type": "out_of_corpus",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["08-belastingaangifte-particulier.md"]
+      "ideal_source_filenames": [
+        "08-belastingaangifte-particulier.md"
+      ]
     },
     {
       "slug": "initech-out-of-corpus-notaris",
       "question": "Kunnen jullie de oprichtingsakte voor mijn nieuwe bv opstellen?",
-      "gold_answer": "Nee, een oprichtingsakte voor een bv moet wettelijk door een notaris worden opgesteld — daar mogen wij niet in treden. Wel begeleiden we het traject eromheen: keuze tussen eenmans-bv of holding-structuur, statuten-input, opstart-fiscaal-advies en de KvK-registratie na oprichting. We werken samen met diverse notarissen in de regio Eindhoven en Den Bosch.",
+      "gold_answer": "Nee, de oprichtingsakte stellen wij niet op — notariswerk (oprichting bv, statutenwijziging) gaat extern via een notariskantoor; we werken vaak samen met Notariskantoor De Vries-Smit in Eindhoven. Wij begeleiden wel de start eromheen: advies over bv- of holdingstructuur, fiscaal startadvies en zaken als KvK-inschrijving, btw-nummer en zakelijke rekening.",
       "gold_facts": [
-        "oprichtingsakte alleen via notaris (wettelijk)",
-        "wij wel: keuze structuur, statuten-input, fiscaal advies, KvK-registratie",
-        "samenwerking met notarissen Eindhoven en Den Bosch"
+        "oprichtingsakte via notaris, niet door ons",
+        "wij wel: structuuradvies, fiscaal advies, KvK-inschrijving/btw-nummer",
+        "samenwerking met Notariskantoor De Vries-Smit (Eindhoven)"
       ],
-      "tags": ["scope-refusal", "notaris"],
+      "tags": [
+        "scope-refusal",
+        "notaris"
+      ],
       "difficulty": "medium",
       "question_type": "out_of_corpus",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["14-startende-ondernemers.md"]
+      "ideal_source_filenames": [
+        "14-startende-ondernemers.md"
+      ]
     },
     {
       "slug": "initech-planted-fact-roel-rb",
@@ -476,14 +513,26 @@
     {
       "slug": "initech-mh-zzp-aftrek-jaar1",
       "question": "Ik ben in mijn eerste jaar als zzp'er — hoeveel aftrek (zelfstandigen plus starters) kan ik samen toepassen in 2026 en welke voorwaarde geldt?",
-      "gold_answer": "In 2026 is de zelfstandigenaftrek € 3.750. In de eerste drie jaar van uw onderneming komt daar de startersaftrek bovenop: nogmaals € 2.123. Samen is dat dus € 5.873 aftrek in jaar 1. Beide gelden alleen wanneer u aan het urencriterium van 1.225 uur per jaar voldoet — houd daarvoor een urenadministratie bij.",
-      "gold_facts": ["zelfstandigenaftrek 2026 €3.750", "startersaftrek €2.123 in eerste 3 jaar", "samen €5.873", "urencriterium 1.225 uur"],
-      "tags": ["multi-hop", "zzp", "aftrek"],
+      "gold_answer": "In 2026 is de zelfstandigenaftrek € 3.750. In de eerste 3 jaar komt de startersaftrek van € 2.123 erbij: samen € 5.873 in jaar 1. Voorwaarde is het urencriterium: normaal minimaal 1.225 uur per jaar; voor startende zzp'ers geldt in het eerste jaar volgens onze informatie een 800-uren-criterium voor de startersaftrek. Houd een urenadministratie bij.",
+      "gold_facts": [
+        "zelfstandigenaftrek 2026 €3.750",
+        "startersaftrek €2.123 in eerste 3 jaar",
+        "samen €5.873",
+        "urencriterium (1.225 uur; in startersjaar 800 uur voor startersaftrek)"
+      ],
+      "tags": [
+        "multi-hop",
+        "zzp",
+        "aftrek"
+      ],
       "difficulty": "medium",
       "question_type": "multi_hop",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["07-belastingaangifte-ondernemers.md", "22-faq-zzp.md"]
+      "ideal_source_filenames": [
+        "07-belastingaangifte-ondernemers.md",
+        "22-faq-zzp.md"
+      ]
     },
     {
       "slug": "initech-mh-bv-vpb-dga-250k",

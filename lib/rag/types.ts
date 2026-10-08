@@ -284,6 +284,33 @@ export type RagConfig = {
    */
   hardFactNumericFallback?: boolean;
   /**
+   * v0.13 (launch-onderzoek): rekenbewuste hard-fact-verifier. Getallen uit de
+   * vraag/gebruikersbeurten tellen als gegeven, en een getoonde rekenstap
+   * (a+b, a−b, a×b, a×b/100, a/b over al-gegronde getallen in het antwoord)
+   * telt als gegrond. Voorkomt dat élk rekenantwoord 'unsupported' wordt en
+   * een regenerate triggert die opnieuw (fout) rekent. Default uit.
+   */
+  hardFactDerivedNumbers?: boolean;
+  /** v0.13: deterministische premisse-check — namen/bedragen/nummers uit de
+   *  vraag die niet in de CONTEXT staan als CONTROLE-regel na de vraag. */
+  premiseCheckHint?: boolean;
+  /** v0.13: history-entiteit-weigertemplate zonder meta-zin, toon-bewust en
+   *  met contactgegevens uit de context (lib/rag/premise-check.ts). */
+  historyEntityTemplateV2?: boolean;
+  /** v0.13: bij context-opbouw bronnen overslaan die voor ≥70% (5-woord-
+   *  shingles) al in de context staan, en bron-headers met documenttitel
+   *  i.p.v. "[chunk N, similarity=…]". */
+  contentDedupe?: boolean;
+  /** v0.13: klacht-modus — bij een gedetecteerde klacht een no-toezegging-
+   *  directive ná de vraag (lib/rag/complaint-mode.ts). */
+  complaintModeDirective?: boolean;
+  /** v0.13: klacht-directive V2 (contactroute centraal, geen andere dienst als oplossing, vergoeding alleen als erom gevraagd). */
+  complaintModeV2?: boolean;
+  /** v0.13: premisse-check alleen op namen en telefoonnummers (bedragen/percentages in de vraag zijn vaak een hypothese). */
+  premiseCheckNamesOnly?: boolean;
+  /** v0.13: premisse-directive V2 — personen niet stellig ontkennen tenzij volledig overzicht; wel bekende namen noemen. */
+  premiseCheckV2?: boolean;
+  /**
    * v0.8.1: anti-adoptie. Na generatie detecteert de pipeline of een
    * entiteit (persoonsnaam) die de user in de chat-history introduceerde —
    * en die NIET in de retrieval-sources voorkomt — tóch in het antwoord
@@ -365,7 +392,7 @@ export type RagConfig = {
    * CTA teruggeeft (too_curt-fix). Per-versie zodat oudere eval-runs
    * reproduceerbaar blijven.
    */
-  outputStyleVersion?: 'v1' | 'v2' | 'v3' | 'v4';
+  outputStyleVersion?: 'v1' | 'v2' | 'v3' | 'v4' | 'v5';
   /**
    * Eval budget (uit #15) — max gemiddelde bot-latency in ms voor de eval-runner.
    * Bij overschrijding zet de runner exit-code 1 (regressie-signaal). Per versie

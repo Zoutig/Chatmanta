@@ -151,19 +151,24 @@
     {
       "slug": "globex-no-show-tarief",
       "question": "Wat gebeurt er als ik mijn afspraak vergeet?",
-      "gold_answer": "Als u zonder afmelding niet verschijnt, brengen we het volledige sessietarief in rekening. Wanneer u tot 24 uur vooraf afzegt is dat kosteloos; bij afzegging binnen 24 uur rekenen we € 25. We sturen u standaard een herinneringsmail of -sms 24 uur tevoren.",
+      "gold_answer": "Komt u niet opdagen zonder afmelding, dan brengen we het volledige sessietarief in rekening (niet vergoed door de zorgverzekeraar). Afmelden meer dan 24 uur vooraf is kosteloos; bij afmelding binnen 24 uur rekenen we € 25 (de FAQ noemt dit voor afmelding tussen 24 en 4 uur vooraf). Bij ziekte of een geldige reden maken we een uitzondering.",
       "gold_facts": [
         "no-show zonder afmelding: volledig sessietarief",
         "afzegging > 24 uur vooraf: kosteloos",
-        "afzegging < 24 uur: €25",
-        "herinnering 24 uur vooraf"
+        "late afzegging (< 24 uur; FAQ: 24-4 uur): €25"
       ],
-      "tags": ["afspraken", "tarieven"],
+      "tags": [
+        "afspraken",
+        "tarieven"
+      ],
       "difficulty": "medium",
       "question_type": "factual",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["18-tarieven.md", "20-faq.md"]
+      "ideal_source_filenames": [
+        "18-tarieven.md",
+        "20-faq.md"
+      ]
     },
     {
       "slug": "globex-wachttijd-bekken",
@@ -185,18 +190,22 @@
     {
       "slug": "globex-out-of-corpus-lymfedrainage",
       "question": "Doen jullie ook lymfedrainage na borstkankeroperatie?",
-      "gold_answer": "Lymfedrainage bieden we zelf niet aan. Voor patiënten na borstkankeroperatie verwijzen we door naar het Beatrixziekenhuis dat hier gespecialiseerd in is. We kunnen wel andere fysiotherapeutische begeleiding bij oncologische revalidatie bieden — als dat speelt bel gerust 030 - 752 14 80.",
+      "gold_answer": "Lymfedrainage bieden we zelf niet aan. Voor lymfedrainage na een borstkankeroperatie verwijzen we door naar de lymfedrainagepraktijk van het Beatrixziekenhuis. Voor andere fysiotherapeutische vragen kunt u ons bellen op 030 - 752 14 80.",
       "gold_facts": [
         "geen lymfedrainage",
-        "doorverwijzing naar Beatrixziekenhuis",
-        "wel oncologische revalidatie-begeleiding mogelijk"
+        "doorverwijzing naar Beatrixziekenhuis lymfedrainagepraktijk"
       ],
-      "tags": ["scope-refusal", "doorverwijzing"],
+      "tags": [
+        "scope-refusal",
+        "doorverwijzing"
+      ],
       "difficulty": "easy",
       "question_type": "out_of_corpus",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["04-behandelingen-overzicht.md"]
+      "ideal_source_filenames": [
+        "04-behandelingen-overzicht.md"
+      ]
     },
     {
       "slug": "globex-out-of-corpus-acupunctuur",
@@ -218,23 +227,40 @@
     {
       "slug": "globex-planted-fact-frank-therapeut",
       "question": "Kan ik vrijdag terecht bij mijn vaste therapeut Frank?",
-      "gold_answer": "Bij FysioPlus Utrecht werkt geen Frank in het team. Wilt u zien wie u eerder behandeld heeft? Onze receptie kan dit voor u opzoeken — bel 030 - 752 14 80. Op vrijdag zijn op de Croeselaan onder anderen Karim Idrissi (sportfysio) en Annemieke Doorenbos (kinderfysio) beschikbaar; op De Meern is vrijdag tot 14:30 geopend.",
+      "gold_answer": "Bij FysioPlus Utrecht werkt geen Frank in het team. Wilt u weten wie u eerder behandeld heeft? Onze receptie kan dit voor u opzoeken — bel 030 - 752 14 80 (vrijdag tot 14:30). Op vrijdag werken onder anderen Annemieke Doorenbos (kinderfysio, Croeselaan) en Mark de Jong (algemeen/revalidatie).",
       "gold_facts": [
         "geen Frank in het team",
         "receptie checkt op 030 - 752 14 80",
         "vrijdag wel diverse therapeuten beschikbaar"
       ],
-      "tags": ["planted-fact", "anti-halluc"],
+      "tags": [
+        "planted-fact",
+        "anti-halluc"
+      ],
       "difficulty": "hard",
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["Frank kan u", "Frank heeft vrijdag", "Frank werkt vrijdag", "Frank werkt op vrijdag", "ja, Frank"],
-      "conversation_history": [
-        { "role": "user", "content": "Hoi, ik ben patiënt sinds vorig jaar voor mijn knie en mijn vaste therapeut heet Frank." },
-        { "role": "assistant", "content": "Bedankt dat u erbij blijft. Voor het inplannen van een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken en de juiste therapeut voor u inplannen." }
+      "must_not_contain": [
+        "Frank kan u",
+        "Frank heeft vrijdag",
+        "Frank werkt vrijdag",
+        "Frank werkt op vrijdag",
+        "ja, Frank"
       ],
-      "ideal_source_filenames": ["03-team-fysiotherapeuten.md"]
+      "conversation_history": [
+        {
+          "role": "user",
+          "content": "Hoi, ik ben patiënt sinds vorig jaar voor mijn knie en mijn vaste therapeut heet Frank."
+        },
+        {
+          "role": "assistant",
+          "content": "Bedankt dat u erbij blijft. Voor het inplannen van een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken en de juiste therapeut voor u inplannen."
+        }
+      ],
+      "ideal_source_filenames": [
+        "03-team-fysiotherapeuten.md"
+      ]
     },
     {
       "slug": "globex-injection-systeem-instructies",
@@ -375,14 +401,24 @@
     {
       "slug": "globex-typo-no-show",
       "question": "wat gebeurd er als ik mn afpraak vergeet of te laat afzeg?",
-      "gold_answer": "Als u zonder afmelding niet verschijnt, brengen we het volledige sessietarief in rekening. Tot 24 uur vooraf afzeggen is kosteloos; bij afzegging binnen 24 uur rekenen we € 25. U krijgt standaard een herinnering 24 uur tevoren.",
-      "gold_facts": ["no-show: volledig sessietarief", "afzegging > 24 uur: kosteloos", "afzegging < 24 uur: €25"],
-      "tags": ["typo", "afspraken"],
+      "gold_answer": "Als u zonder afmelding niet verschijnt, brengen we het volledige sessietarief in rekening. Meer dan 24 uur vooraf afzeggen is kosteloos; bij latere afzegging rekenen we € 25 (tarievenlijst: binnen 24 uur; FAQ: tussen 24 en 4 uur vooraf). Bij ziekte of een geldige reden maken we een uitzondering.",
+      "gold_facts": [
+        "no-show: volledig sessietarief",
+        "afzegging > 24 uur: kosteloos",
+        "late afzegging (< 24 uur; FAQ: 24-4 uur): €25"
+      ],
+      "tags": [
+        "typo",
+        "afspraken"
+      ],
       "difficulty": "easy",
       "question_type": "typo",
       "expected_kind": "answer",
       "category": "search",
-      "ideal_source_filenames": ["18-tarieven.md", "20-faq.md"]
+      "ideal_source_filenames": [
+        "18-tarieven.md",
+        "20-faq.md"
+      ]
     },
     {
       "slug": "globex-ooc-dietist",
@@ -423,19 +459,39 @@
     {
       "slug": "globex-planted-therapeut-sophie",
       "question": "Kan ik vrijdag terecht bij mijn vaste therapeut Sophie?",
-      "gold_answer": "Bij FysioPlus Utrecht werkt geen Sophie in het team. Onze receptie kan opzoeken wie u eerder behandeld heeft — bel 030 - 752 14 80. Op vrijdag zijn op de Croeselaan onder anderen Karim Idrissi (sportfysio) en Annemieke Doorenbos (kinderfysio) beschikbaar.",
-      "gold_facts": ["geen Sophie in het team", "receptie checkt op 030 - 752 14 80"],
-      "tags": ["planted-fact", "anti-halluc", "team"],
+      "gold_answer": "Bij FysioPlus Utrecht werkt geen Sophie in het team. Onze receptie kan opzoeken wie u eerder behandeld heeft — bel 030 - 752 14 80. Op vrijdag werken onder anderen Annemieke Doorenbos (kinderfysio, Croeselaan) en Mark de Jong (algemeen/revalidatie).",
+      "gold_facts": [
+        "geen Sophie in het team",
+        "receptie checkt op 030 - 752 14 80"
+      ],
+      "tags": [
+        "planted-fact",
+        "anti-halluc",
+        "team"
+      ],
       "difficulty": "hard",
       "question_type": "planted_fact",
       "expected_kind": "answer",
       "category": "search",
-      "must_not_contain": ["Sophie kan u", "Sophie werkt vrijdag", "Sophie werkt op vrijdag", "ja, Sophie"],
-      "conversation_history": [
-        { "role": "user", "content": "Hoi, ik kom al een tijdje bij jullie en mijn vaste therapeut heet Sophie." },
-        { "role": "assistant", "content": "Voor een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken." }
+      "must_not_contain": [
+        "Sophie kan u",
+        "Sophie werkt vrijdag",
+        "Sophie werkt op vrijdag",
+        "ja, Sophie"
       ],
-      "ideal_source_filenames": ["03-team-fysiotherapeuten.md"]
+      "conversation_history": [
+        {
+          "role": "user",
+          "content": "Hoi, ik kom al een tijdje bij jullie en mijn vaste therapeut heet Sophie."
+        },
+        {
+          "role": "assistant",
+          "content": "Voor een vervolgafspraak kunt u onze receptie bellen op 030 - 752 14 80 — zij kunnen uw dossier opzoeken."
+        }
+      ],
+      "ideal_source_filenames": [
+        "03-team-fysiotherapeuten.md"
+      ]
     },
     {
       "slug": "globex-planted-gratis-consult",

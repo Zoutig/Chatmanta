@@ -14,6 +14,7 @@ import { embedTexts } from './embeddings';
 import {
   extractHardFacts,
   hardFactsSupportedBySources,
+  groundedDerivedValues,
   type ExtractedHardFacts,
 } from './hard-facts';
 
@@ -139,6 +140,9 @@ export async function verifyClaims(args: {
   threshold: number;
   hardFactCheck?: boolean;
   hardFactNumericFallback?: boolean;
+  /** v0.13 — teksten die als gegeven gelden (vraag + gebruikersbeurten). Als
+   *  gezet, tellen getallen daaruit en getoonde rekenstappen als gegrond. */
+  hardFactGivenTexts?: string[];
 }): Promise<ClaimVerificationResult> {
   const claims = splitIntoClaims(args.answerText);
   const hardFactCheck = args.hardFactCheck === true;
@@ -157,6 +161,10 @@ export async function verifyClaims(args: {
   // Helper: voeg hard-fact data toe aan een claim-object indien check actief
   // is en de claim minstens één hard fact bevat.
   const sourceTexts = args.chunks.map((c) => c.text);
+  const extraGrounded =
+    hardFactCheck && args.hardFactGivenTexts
+      ? groundedDerivedValues(args.answerText, sourceTexts, args.hardFactGivenTexts)
+      : undefined;
   const enrichWithHardFacts = (
     claim: ClaimVerification,
   ): ClaimVerification => {
@@ -174,6 +182,7 @@ export async function verifyClaims(args: {
     if (!hasAnyFact) return claim;
     const support = hardFactsSupportedBySources(facts, sourceTexts, {
       numericFallback: hardFactNumericFallback,
+      extraGrounded,
     });
     return {
       ...claim,

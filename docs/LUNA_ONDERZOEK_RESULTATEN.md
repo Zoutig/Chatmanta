@@ -235,3 +235,60 @@ Schatting: ~73% van de antwoorden kan in de praktijk prima naar een klant. Haalb
 Bijvangst (commit 58c5c99): de judge viel bij chunks zónder parent nog terug op de ~250-char excerpt. Daardoor kreeg `supabase-region` G=0 voor "Ireland", terwijl de bot het wél zag. Gefixt; dit geldt pas voor nieuwe runs.
 
 **Totale spend onderzoek ≈ $7,90.**
+
+## Retrieval-spoor: overzichtspagina's (v0.13r1-r3)
+
+Gemeten op 2026-10-06/07, branch `feat/seb/luna-retrieval`. Doel was minder gemiste feiten (team-, tarieven-, werkgebied-pagina's) zonder kwaliteitsverlies.
+
+**Stap 1: dekking van gold-feiten in de context** (52 vragen met eerder gemiste feiten, 2 samples, ≈ $0,47; deterministische token-match):
+
+| variant | wijziging t.o.v. v0.12e | feiten in context | TTFT p90 | $/antwoord |
+|---|---|---|---|---|
+| v0.12e | — (hybrid aan, topK 8, 32k) | 46% | 3,7-3,9 s | $0,0011 |
+| r1 | hybrid uit | 54% | 3,4-3,7 s | $0,0010 |
+| r2 | topK 16, 48k | 60% | 4,0-4,2 s | $0,0016 |
+| r3 | r1 + r2 | 62% | 3,5 s | $0,0015 |
+
+Van de feiten die bij r3 nog misten, zat maar een klein deel in een al opgehaald document (4 feiten: optie "meer parents per document" loont niet). De rest (11) zat verspreid over verschillende documenten (optie "overzichtspagina's vastpinnen" is te ongericht).
+
+**Stap 2: antwoordkwaliteit** (dev-set 40×2, Claude-judge geblindeerd per vraag, $0) en hard-eval:
+
+| | v0.12e | r2 | r3 |
+|---|---|---|---|
+| C / P / G | 4,61 / 4,05 / 4,90 | 4,69 / 4,24 / 4,83 | 4,64 / 4,05 / 4,79 |
+| gepaard C+P+G t.o.v. v0.12e | — | 9/10/21 (p=1,0) | 9/13/18 (p=0,52) |
+| onterechte weigering | 4 | 2 | 0 |
+| verkeerde-bron-link (catering-demo in dev-org) | 4 | 6 | 8 |
+| hard-eval | **JA** | (niet gedraaid) | **NEE**: klacht-veto (schadeprocedure kwam via extra context weer binnen), AQ 95% |
+
+**Conclusie: v0.12e blijft de standaard.**
+- Meer context vindt meer feiten, maar netto worden de antwoorden niet beter.
+- Luna raakt vaker afgeleid. "Hybrid uit" gaf de inhoudelijke uitweidingen (catering-prijzen); méér chunks gaf meer verkeerde-bron-links.
+- Bij r3 kwam het klacht-veto terug.
+- Keyword-zoeken aanzetten (oorspronkelijke optie 1) hielp niet: hybrid staat in V0 al aan en scoorde op dekking juist lager.
+
+De winst zit eerder in gerichter zoeken (precisie) dan in méér context. Mogelijke vervolgrichtingen, apart te plannen:
+- corpus-opschoning: de catering-demosite in de ChatManta-dev-org;
+- een relevantie-drempel per extra chunk;
+- een betere chunking van tabellen en teamlijsten.
+
+Eval-bijvangst: de hard-eval-judge kapt de bronnen op 24.000 tekens (`scripts/v0-hard-eval-run.ts`). Bij ~12 bronnen ziet de judge niet alles. Verhogen vóór een volgende context-vergelijking.
+
+Labels: 39 verouderde of strijdige gold-labels zijn tegen de corpus gecorrigeerd (commit 17d966a). Er volgt bewust geen nieuwe Sol-ronde.
+
+**Totale spend onderzoek ≈ $8,95.**
+
+## Launch-ready-onderzoek (nacht 6 → 7 okt 2026): v0.13x6
+
+Volledig rapport: `docs/LAUNCH_READY_RAPPORT.md` · logboek `docs/NACHT_LOG_2026-10-07.md`.
+
+- Meetlat nieuw: gewogen foutscore (kritiek = veto, ernstig ×3, licht ×1, toon ×0,25) door een geblindeerde Claude-jury per vraag. Les: ernst-labels variëren per jurylid → alleen gepaard vergelijken binnen één jury-run.
+- De kritieke fouten van v0.12e kwamen grotendeels uit de prompt zelf: het "geen vaste prijs"-template, het "Flevoland → Lelystad ja"-voorbeeld en de regel "zeg stellig dat het niet klopt" (ook bij personen met een onvolledig teamoverzicht).
+- Finalist **v0.13x6 / x6v** = prompt-hygiëne (a2) + thinking-checklist + vergelijkingsregel + voorzichtige persoons-premisse + premisse-check (namen/nummers, directive v2) + rekenbewuste verifier + inhouds-dedup + klacht-modus v2.
+  - Screening: 8 → 1 kritiek, gewogen 39 → 24 per 100, gepaard 22/8 (p=0,016).
+  - Stress-sets: −50 tot −66%.
+  - Hard-eval: JA.
+  - V1-eval: 15/15.
+- Crawl-cleaner (ingest): op een echte gecrawlde site 58 → 25 per 100.
+- Productie-fixes: de answer-cache negeerde de gespreksgeschiedenis, en er was een `<confidence>`-lek. Daarnaast: Luna schreef `<PRIVATE_PERSON>` onder het thinking-schema; opgelost in de prompt.
+- Niet gedaan: de holdout-run (143 vragen) is gestopt door geheugendruk en niet herstart. De Sol-ronde is niet gestart.

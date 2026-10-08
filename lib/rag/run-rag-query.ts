@@ -44,6 +44,19 @@ import {
 import { detectLanguage } from '@/lib/rag/hard-eval-checks';
 import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from '@/lib/rag/source-links';
 import { findMatchingManualQA } from '@/lib/rag/manual-qa';
+import {
+  findUnsupportedPremises,
+  historyEntityRefusal,
+  premiseCheckDirective,
+  premiseCheckDirectiveV2,
+} from '@/lib/rag/premise-check';
+import { COMPLAINT_DIRECTIVE, COMPLAINT_DIRECTIVE_V2, isComplaint } from '@/lib/rag/complaint-mode';
+import {
+  containsPlaceholder,
+  offDomainCodeRefusal,
+  offTopicRefusal,
+  resolveFallbackMessage,
+} from '@/lib/rag/fixed-texts';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -75,8 +88,8 @@ export const RAG_DEFAULTS = {
   MAX_RERANK_INPUT: 10,
 } as const;
 
-export const FALLBACK_MESSAGE =
-  'Daar heb ik geen informatie over. Stel je vraag anders, of neem contact op met de organisatie.';
+// Toon-bewuste varianten + resolutie staan in fixed-texts.ts (puur, testbaar).
+export { FALLBACK_MESSAGE } from '@/lib/rag/fixed-texts';
 
 // ---------------------------------------------------------------------------
 // Lazy clients
@@ -587,6 +600,10 @@ export function parseV03Output(raw: string): ParsedV03Output {
   // Losse <answer>/</answer>-tags (Luna sluit soms af zonder te openen) mogen
   // nooit in de zichtbare tekst belanden.
   answer = answer.replace(/<\/?answer>/gi, '').trim();
+  // <answer> zonder </answer> gevolgd door <confidence>: de lazy-match met `$`
+  // nam de confidence-tag mee in het antwoord (gezien in de launch-screening,
+  // "…<confidence>0.99</confidence>" zichtbaar voor de bezoeker).
+  answer = answer.replace(/<confidence>[\s\S]*$/i, '').trim();
 
   const confidence = confMatch ? Number.parseFloat(confMatch[1]) : null;
   return {
@@ -1192,7 +1209,7 @@ export type StreamEvent =
       // gedetecteerde adoptie van een history-entiteit (geen LLM-poging).
       // v0.9.1: 'off-domain-code-refusal' = deterministische scope-guard die een
       // off-domein code-antwoord vervangt door de off-topic-refusal.
-      reason: 'claim-regenerate' | 'history-entity-adoption' | 'off-domain-code-refusal';
+      reason: 'claim-regenerate' | 'history-entity-adoption' | 'off-domain-code-refusal' | 'placeholder-guard';
       regeneratedVerifiedRatio: number | null;
     }
   | { kind: 'error'; code: AppErrorCode; retryAfterSec?: number };
@@ -1285,13 +1302,11 @@ export async function* runRagQuery(
   const tone: Tone = input.tone ?? input.chatbotOverrides?.tone ?? DEFAULT_TONE;
   const length: Length =
     input.length ?? input.chatbotOverrides?.length ?? DEFAULT_LENGTH;
-  // Fallback-tekst: klant-override > vaste default. Wordt gebruikt op alle
-  // 'kind: fallback' paden in deze functie. Lege string van de override
-  // telt als "klant heeft niets ingevuld" → terug naar default.
-  const fallbackMessage =
-    input.chatbotOverrides?.fallbackMessage && input.chatbotOverrides.fallbackMessage.length > 0
-      ? input.chatbotOverrides.fallbackMessage
-      : FALLBACK_MESSAGE;
+  // Fallback-tekst: klant-override > toon-bewuste default (u-vorm bij 'formal').
+  // Wordt gebruikt op alle 'kind: fallback' paden in deze functie. Een lege
+  // override of de letterlijke engine-default (V1-settings-default) telt als
+  // "klant heeft niets ingevuld".
+  const fallbackMessage = resolveFallbackMessage(input.chatbotOverrides?.fallbackMessage, tone);
   const orgId = input.organizationId; // verplicht, geen stille DEV_ORG-fallback meer
   // V0.6 persona-laag: door de caller geresolved en één keer doorgegeven aan de
   // hele pipeline (preProcess, main answer, general-knowledge prompt, off-topic
@@ -1468,7 +1483,12 @@ export async function* runRagQuery(
   // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
   // ge-await/gecatcht wordt (alleen het smalltalk-pad catcht 'm) → unhandled
   // rejection. Lookup/write zijn al disableCache-gated; dit sluit de embed mee.
-  const cacheActive = bot.cacheEnabled && input.disableCache !== true;
+  // Multi-turn: de cache keyt alleen op de losse vraag-embedding. Een
+  // vervolgvraag ("en wat kost dat?") betekent per gesprek iets anders, dus
+  // lookup/write zou een antwoord uit een ánder gesprek kunnen serveren
+  // (launch-onderzoek 2026-10-07). Met gebruikers-history: cache overslaan.
+  const hasUserHistory = (input.history ?? []).some((t) => t.role === 'user');
+  const cacheActive = bot.cacheEnabled && input.disableCache !== true && !hasUserHistory;
   const cacheEmbedPromise = cacheActive ? embedTexts([original]) : null;
   // Epoch-snapshot bij pipeline-start (plan 006): parallel met de embed, geen
   // wall-clock-impact. readCacheEpoch kan niet rejecten (vangt alles → null),
@@ -1968,7 +1988,7 @@ KRITISCHE FORMAT-REGELS:
       }
 
       if (rc.category === 'off_topic') {
-        const OFF_TOPIC_REFUSAL = `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`;
+        const OFF_TOPIC_REFUSAL = offTopicRefusal(persona.offTopicScope, tone);
         yield {
           kind: 'fallback',
           response: {
@@ -2048,7 +2068,7 @@ KRITISCHE FORMAT-REGELS:
             : {}),
         kind: 'fallback',
         answer: offTopicSuspected
-          ? `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`
+          ? offTopicRefusal(persona.offTopicScope, tone)
           : fallbackMessage,
         reason: offTopicSuspected
           ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
@@ -2134,14 +2154,35 @@ KRITISCHE FORMAT-REGELS:
   const providedUrls: string[] = [];
   const maxContextChars = bot.maxContextChars ?? RAG_DEFAULTS.MAX_CONTEXT_CHARS;
   const seenParents = new Set<string>();
+  // v0.13 contentDedupe: sla een bron over als ≥70% van zijn 5-woord-shingles
+  // al in de context staat (site-brede boilerplate, parent-overlap, dubbele
+  // regiopagina's) → plek voor een échte andere bron binnen dezelfde 32k.
+  const seenShingles = new Set<string>();
+  const shinglesOf = (t: string): string[] => {
+    const w = t.toLowerCase().split(/[^a-z0-9à-ÿ€]+/).filter(Boolean);
+    const out: string[] = [];
+    for (let i = 0; i + 5 <= w.length; i++) out.push(w.slice(i, i + 5).join(' '));
+    return out;
+  };
   for (const c of final) {
     const hasParent = typeof c.parent_content === 'string' && c.parent_content.length > 0;
     if (bot.dedupeParents && hasParent && c.parent_chunk_id) {
       if (seenParents.has(c.parent_chunk_id)) continue;
       seenParents.add(c.parent_chunk_id);
     }
+    let candidateShingles: string[] = [];
+    if (bot.contentDedupe) {
+      candidateShingles = shinglesOf(c.parent_content ?? c.content);
+      if (candidateShingles.length >= 10) {
+        const dup = candidateShingles.filter((s) => seenShingles.has(s)).length / candidateShingles.length;
+        if (dup >= 0.7) continue;
+      }
+    }
     if (hasParent) anyParentSwap = true;
-    const header = `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
+    const titledName = bot.contentDedupe ? (c.source_title ?? c.filename ?? null) : null;
+    const header = titledName
+      ? `[bron ${used + 1}: ${titledName.replace(/\.md$/i, '').replace(/^\d+[-_]/, '')}]`
+      : `[chunk ${used + 1}, similarity=${c.similarity.toFixed(3)}]`;
     const urlLine = linkEnabled && c.source_url ? `\nBron-URL: ${c.source_url}` : '';
     let block: string;
     if (bot.matchedSpanContext && hasParent) {
@@ -2153,6 +2194,7 @@ KRITISCHE FORMAT-REGELS:
     }
     if (context.length + block.length > maxContextChars) break;
     context += block;
+    for (const s of candidateShingles) seenShingles.add(s);
     if (linkEnabled && c.source_url) providedUrls.push(c.source_url);
     usedChunks.push(c);
     used++;
@@ -2219,7 +2261,26 @@ KRITISCHE FORMAT-REGELS:
     input.manualQAItems && input.manualQAItems.length > 0
       ? 'Let op: een bron in de vorm "Vraag: … Antwoord: …" is een handmatig door de klant toegevoegde Q&A en is gezaghebbend. Spreekt zo\'n Q&A een andere bron tegen (bijvoorbeeld andere openingstijden, prijzen of voorwaarden), volg dan de Q&A — die is bewust bijgewerkt.\n\n'
       : '';
-  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${languageDirective}`;
+  // v0.13 premisse-check: namen/bedragen/nummers uit de vraag die niet in de
+  // CONTEXT staan → korte CONTROLE-regel ná de vraag (recency wint).
+  const premiseDirective = bot.premiseCheckHint
+    ? (bot.premiseCheckV2 ? premiseCheckDirectiveV2 : premiseCheckDirective)(
+        findUnsupportedPremises(
+          [original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)],
+          context,
+          [input.persona.company],
+          { amounts: !bot.premiseCheckNamesOnly },
+        ),
+      )
+    : '';
+  const complaintDirective =
+    bot.complaintModeDirective &&
+    isComplaint([original, ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content)])
+      ? bot.complaintModeV2
+        ? COMPLAINT_DIRECTIVE_V2
+        : COMPLAINT_DIRECTIVE
+      : '';
+  const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${complaintDirective}${languageDirective}`;
 
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
@@ -2395,6 +2456,11 @@ KRITISCHE FORMAT-REGELS:
       : (withinBudget() || markSkipped('claimVerification'));
   const verifyDecisionGate =
     !bot.adaptiveRag || decision.shouldVerifyClaims;
+  // v0.13: vraag + gebruikersbeurten als 'gegeven' voor de rekenbewuste verifier.
+  const givenTextsForVerify = [
+    input.question,
+    ...(input.history ?? []).filter((t) => t.role === 'user').map((t) => t.content),
+  ];
   if (bot.claimVerification && verifyBudgetGate && verifyDecisionGate) {
     yield { kind: 'status', phase: 'verify' };
     const stopVerify = tMark('verify_ms');
@@ -2419,6 +2485,7 @@ KRITISCHE FORMAT-REGELS:
         threshold: bot.claimVerificationThreshold,
         hardFactCheck: bot.adaptiveHardFactVerification === true,
         hardFactNumericFallback: bot.hardFactNumericFallback,
+        ...(bot.hardFactDerivedNumbers ? { hardFactGivenTexts: givenTextsForVerify } : {}),
       });
       claimVerifyEmbedTokens = result.embedTokens;
       claimVerifyEmbedCost = result.costUsd;
@@ -2632,10 +2699,16 @@ KRITISCHE FORMAT-REGELS:
   // de Option-A "deterministisch template"-aanpak, geen parallelle gate.
   if (bot.claimRegenerateEnabled && unsupportedHistoryEntity) {
     const entityList = adoptedHistoryEntities.slice(0, 3).join(', ');
-    activeAnswerText =
-      `Ik kan ${entityList} niet in onze gegevens terugvinden, dus dat kan ik niet bevestigen. ` +
-      `Iets dat in een eerder bericht is genoemd, neem ik niet zomaar over als juist. ` +
-      `Voor de juiste persoon of een afspraak kunt u het beste rechtstreeks contact met ons opnemen.`;
+    activeAnswerText = bot.historyEntityTemplateV2
+      ? historyEntityRefusal({
+          entities: adoptedHistoryEntities,
+          company: input.persona.company,
+          contextText: context,
+          formal: tone === 'formal',
+        })
+      : `Ik kan ${entityList} niet in onze gegevens terugvinden, dus dat kan ik niet bevestigen. ` +
+        `Iets dat in een eerder bericht is genoemd, neem ik niet zomaar over als juist. ` +
+        `Voor de juiste persoon of een afspraak kunt u het beste rechtstreeks contact met ons opnemen.`;
     activeResponse = {
       ...activeResponse,
       answer: activeAnswerText,
@@ -2768,6 +2841,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           threshold: bot.claimVerificationThreshold,
           hardFactCheck: bot.adaptiveHardFactVerification === true,
           hardFactNumericFallback: bot.hardFactNumericFallback,
+          ...(bot.hardFactDerivedNumbers ? { hardFactGivenTexts: givenTextsForVerify } : {}),
         });
         regenerateRatio = Number.isFinite(verifyResult2.confidence)
           ? verifyResult2.confidence
@@ -2842,7 +2916,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   // refusal. Laatste answer-mutatie (na regenerate) zodat niets het overschrijft.
   // Flag-guarded → alleen v0.9.1; geen false-positives voor proza-antwoorden.
   if (bot.offDomainCodeRefusal === true && containsCodeOutput(activeAnswerText)) {
-    activeAnswerText = `Daar kan ik je helaas niet mee helpen — ik help met vragen rondom ${persona.offTopicScope}. Waar kan ik je mee van dienst zijn?`;
+    activeAnswerText = offDomainCodeRefusal(persona.offTopicScope, tone);
     activeResponse = {
       ...activeResponse,
       answer: activeAnswerText,
@@ -2852,6 +2926,23 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       kind: 'replacement',
       response: activeResponse,
       reason: 'off-domain-code-refusal',
+      regeneratedVerifiedRatio: null,
+    };
+  }
+
+  // Vangnet: het model schrijft soms een anonimiserings-placeholder
+  // (<PRIVATE_PERSON>) i.p.v. een naam (gezien in v0.13x3/x4; x5+-prompt verbiedt
+  // het, 0/572 in de holdout). Een half antwoord met een placeholder is erger dan
+  // een eerlijke fallback, dus vervangen — niet strippen. Altijd aan: het patroon
+  // komt in een legitiem antwoord niet voor.
+  if (containsPlaceholder(activeAnswerText)) {
+    console.warn('[placeholder-guard] placeholder in antwoord, vervangen door fallback');
+    activeAnswerText = fallbackMessage;
+    activeResponse = { ...activeResponse, answer: activeAnswerText };
+    yield {
+      kind: 'replacement',
+      response: activeResponse,
+      reason: 'placeholder-guard',
       regeneratedVerifiedRatio: null,
     };
   }

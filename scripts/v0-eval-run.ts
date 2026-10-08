@@ -47,7 +47,7 @@ const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
 
 // V0.5 — verlaagd van 5 naar 2 omdat de uitgebreidere judge-prompt langere
 // calls geeft, en 5 parallel vloog vroeger over gpt-4o TPM-limit van 30k/min.
-const CONCURRENCY = 2;
+const CONCURRENCY = Number(process.env.EVAL_CONCURRENCY ?? 2);
 
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);

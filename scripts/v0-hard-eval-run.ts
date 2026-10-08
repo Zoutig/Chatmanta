@@ -196,7 +196,9 @@ function sourceTexts(resp: ChatResponse | null): string[] {
 // bron, ruime caps zodat we niet alsnog afkappen; totaal-cap puur als
 // runaway-rem bij veel/grote bronnen.
 const JUDGE_SOURCE_PER = 8000;
-const JUDGE_SOURCE_TOTAL = 24000;
+// Totaal ≥ grootste bot-context (v0.12e: 32k, r2/r3: 48k) — 24k liet de
+// judge bij ~12 bronnen niet alles zien (launch-ready-onderzoek 2026-10-07).
+const JUDGE_SOURCE_TOTAL = 64000;
 function judgeSources(resp: ChatResponse | null): string[] {
   const out: string[] = [];
   let budget = JUDGE_SOURCE_TOTAL;

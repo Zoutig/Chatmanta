@@ -255,8 +255,23 @@ export type HardFactSupport = {
 export function hardFactsSupportedBySources(
   facts: ExtractedHardFacts,
   sourceTexts: string[],
-  options?: { numericFallback?: boolean },
+  options?: {
+    numericFallback?: boolean;
+    /** v0.13 — genormaliseerde getallen die als gegrond gelden (vraag-getallen
+     *  en eenvoudige afleidingen, zie `groundedDerivedValues`). Alleen voor
+     *  money/percentage/number. */
+    extraGrounded?: Set<string>;
+  },
 ): HardFactSupport {
+  const extra = options?.extraGrounded;
+  if (extra && extra.size > 0) {
+    facts = {
+      ...facts,
+      money: facts.money.filter((v) => !extra.has(v)),
+      percentages: facts.percentages.filter((v) => !extra.has(v)),
+      numbers: facts.numbers.filter((v) => !extra.has(v)),
+    };
+  }
   const numericFallback = options?.numericFallback !== false;
   if (!sourceTexts || sourceTexts.length === 0) {
     // Geen sources om tegen te checken — alleen 'supported' als ook geen
@@ -509,4 +524,80 @@ export function shouldDeterministicallyRefuseHardFact(args: {
     if (!hasDangerousFabrication) return false;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// v0.13 — afgeleide getallen (rekenbewuste verifier)
+// ---------------------------------------------------------------------------
+
+const DERIVED_POOL_CAP = 300;
+
+function numericValues(f: ExtractedHardFacts): number[] {
+  return [...f.money, ...f.percentages, ...f.numbers]
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n));
+}
+
+function fmt(n: number): string[] {
+  const two = Math.round(n * 100) / 100;
+  return [...new Set([String(two), String(Math.round(n))])];
+}
+
+/** Welke getallen uit `answerText` zijn gegrond in vraag+bronnen, direct of als
+ *  eenvoudige afleiding? Getallen uit de vraag/gebruikersbeurten tellen als
+ *  gegeven (de bot mag de klant citeren). Een afgeleid getal (a+b, |a−b|, a×b,
+ *  a×b/100, a/b) telt alleen als gegrond wanneer BEIDE operanden zelf al
+ *  gegronde getallen in het antwoord zijn — "laat je werk zien": een kaal
+ *  verzonnen bedrag dat toevallig een som van twee brongetallen is, blijft
+ *  ongegrond. Iteratief tot fixpunt, zodat tussenstappen ("250.000 − 200.000 =
+ *  50.000; 25,8% × 50.000 = 12.900") een volgende stap gronden. Retourneert
+ *  genormaliseerde strings in hetzelfde formaat als `extractHardFacts`. */
+export function groundedDerivedValues(
+  answerText: string,
+  sourceTexts: string[],
+  givenTexts: string[],
+): Set<string> {
+  const answerFacts = extractHardFacts(answerText);
+  const answerVals = [...new Set([...answerFacts.money, ...answerFacts.percentages, ...answerFacts.numbers])];
+  const grounded = new Set<string>();
+  if (answerVals.length === 0) return grounded;
+
+  const sourcePool = sourceTexts.flatMap((t) => numericValues(extractHardFacts(t)));
+  const givenPool = givenTexts.flatMap((t) => numericValues(extractHardFacts(t)));
+  const givenStr = new Set(givenTexts.flatMap((t) => {
+    const f = extractHardFacts(t);
+    return [...f.money, ...f.percentages, ...f.numbers];
+  }));
+  for (const v of answerVals) if (givenStr.has(v)) grounded.add(v);
+
+  const directSource = new Set([...sourcePool, ...givenPool].flatMap(fmt));
+  for (const v of answerVals) if (directSource.has(v)) grounded.add(v);
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const open = answerVals.filter((v) => !grounded.has(v));
+    if (open.length === 0) break;
+    const p = [...grounded].map(Number).filter(Number.isFinite).slice(0, DERIVED_POOL_CAP);
+    const targets = new Set(open);
+    outer: for (let i = 0; i < p.length; i++) {
+      for (let j = 0; j < p.length; j++) {
+        const a = p[i];
+        const b = p[j];
+        const cands = [a + b, Math.abs(a - b), a * b, (a * b) / 100];
+        if (b !== 0) cands.push(a / b);
+        for (const c of cands) {
+          for (const s of fmt(c)) {
+            if (targets.has(s)) {
+              grounded.add(s);
+              targets.delete(s);
+              changed = true;
+              if (targets.size === 0) break outer;
+            }
+          }
+        }
+      }
+    }
+  }
+  return grounded;
 }
