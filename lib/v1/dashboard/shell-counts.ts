@@ -24,7 +24,9 @@ export type ShellCounts = {
  * negativeFeedback   = feedback rijen rating='down' (laatste 30 dagen)
  * contactRequestsNew = contact_requests status='new' (alle, niet soft-deleted)
  * contactRequestsEnabled = chatbots.settings.contactRequestsEnabled
- * chatbotStatus      = 'testing' als er included documents zijn, anders 'concept'
+ * chatbotStatus      = 'live' bij ooit verkeer (query_log), anders 'testing' als er
+ *                      included documents zijn, anders 'concept' (zelfde regel als
+ *                      getV1OverviewMetrics, zodat zijbalk en Overzicht gelijk lopen)
  */
 export async function getShellCounts(
   client: SupabaseClient,
@@ -36,7 +38,7 @@ export async function getShellCounts(
   since.setHours(0, 0, 0, 0);
   const sinceIso = since.toISOString();
 
-  const [unansweredRes, negFeedbackRes, contactNewRes, docRes, chatbotRes] = await Promise.all([
+  const [unansweredRes, negFeedbackRes, contactNewRes, docRes, chatbotRes, trafficRes] = await Promise.all([
     // Onbeantwoorde vragen: query_log-rijen met kind='fallback' deze maand.
     client
       .from('query_log')
@@ -78,6 +80,14 @@ export async function getShellCounts(
       .select('settings')
       .eq('id', chatbotId)
       .maybeSingle(),
+
+    // Ooit verkeer gehad? → 'live' (spiegelt hasTraffic in metrics.ts).
+    client
+      .from('query_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .limit(1),
   ]);
 
   const settings =
@@ -86,12 +96,13 @@ export async function getShellCounts(
       : {};
 
   const hasContent = (docRes.count ?? 0) > 0;
+  const hasTraffic = (trafficRes.count ?? 0) > 0;
 
   return {
     unansweredCount: unansweredRes.count ?? 0,
     negativeFeedbackCount: negFeedbackRes.count ?? 0,
     contactRequestsNewCount: contactNewRes.count ?? 0,
     contactRequestsEnabled: settings.contactRequestsEnabled === true,
-    chatbotStatus: hasContent ? 'testing' : 'concept',
+    chatbotStatus: hasTraffic ? 'live' : hasContent ? 'testing' : 'concept',
   };
 }

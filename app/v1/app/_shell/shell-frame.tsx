@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { BrandMark } from '@/app/v1/_ui/brand-mark';
+import { ToastProvider } from '@/app/v1/_ui/toast';
+import type { AttentionSignals } from '@/lib/v1/dashboard/attention';
 import { V1Sidebar } from './sidebar';
 
 // Client-schil: houdt alleen de open/dicht-state van het mobiele menu bij.
@@ -17,6 +19,7 @@ export function ShellFrame({
   unansweredCount,
   showContactRequests,
   contactRequestsCount,
+  signals,
   children,
 }: {
   orgName: string;
@@ -24,6 +27,7 @@ export function ShellFrame({
   unansweredCount: number;
   showContactRequests: boolean;
   contactRequestsCount: number;
+  signals: AttentionSignals;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -88,11 +92,14 @@ export function ShellFrame({
         unansweredCount={unansweredCount}
         showContactRequests={showContactRequests}
         contactRequestsCount={contactRequestsCount}
+        signals={signals}
         onNavigate={() => setNavOpen(false)}
       />
 
       <main className="v1-main">
-        <div className="v1-main-inner">{children}</div>
+        <ToastProvider>
+          <div className="v1-main-inner">{children}</div>
+        </ToastProvider>
       </main>
     </div>
   );
