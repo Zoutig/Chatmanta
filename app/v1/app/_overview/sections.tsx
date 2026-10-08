@@ -16,8 +16,7 @@ export function TopQuestions({ items }: { items: TopQuestion[] }) {
       <p className="klant-section-help">Wat bezoekers het vaakst aan je chatbot vragen.</p>
       {items.length === 0 ? (
         <div style={{ padding: '12px 4px', fontSize: 13, color: 'var(--klant-dim)', lineHeight: 1.5 }}>
-          Nog geen vragen. Zodra bezoekers met je chatbot praten, zie je hier wat het vaakst gevraagd
-          wordt.
+          Nog geen vragen. Zodra bezoekers met je chatbot praten, zie je hier wat ze het vaakst vragen.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -72,7 +71,7 @@ export function UnansweredQuestions({ items }: { items: UnansweredItem[] }) {
       <Card style={{ padding: '16px 20px' }}>
         <h3 className="klant-section-title">Onbeantwoorde vragen</h3>
         <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0, lineHeight: 1.5 }}>
-          Alles is afgehandeld — er zijn geen vragen waar je chatbot geen antwoord op had.
+          Alles is afgehandeld. Je chatbot had overal een antwoord op.
         </p>
       </Card>
     );
@@ -81,8 +80,7 @@ export function UnansweredQuestions({ items }: { items: UnansweredItem[] }) {
     <Card style={{ padding: '16px 20px' }}>
       <h3 className="klant-section-title">Onbeantwoorde vragen</h3>
       <p className="klant-section-help">
-        Vragen waar je chatbot geen antwoord op had. Voeg kennis toe zodat hij ze vanaf het volgende
-        gesprek wél beantwoordt.
+        Vragen waar je chatbot geen antwoord op had. Voeg kennis toe, dan beantwoordt hij ze voortaan zelf.
       </p>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column' }}>
         {items.map((u, i) => (
@@ -147,7 +145,7 @@ export function SetupChecklist({
         <div>
           <h3 className="klant-section-title">Aan de slag</h3>
           <p style={{ fontSize: 12, color: 'var(--klant-muted)', margin: 0 }}>
-            {doneCount} van {steps.length} stappen voltooid — klik door om de rest te doen.
+            {doneCount} van {steps.length} stappen klaar.
           </p>
         </div>
         <span style={{ fontFamily: 'var(--klant-font-mono)', fontSize: 12, color: 'var(--klant-muted)' }}>

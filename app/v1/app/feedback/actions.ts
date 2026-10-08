@@ -109,7 +109,7 @@ export async function submitFeedbackV1Action(
         await addTicketEvent(item.id, {
           kind: 'internal_note',
           author: 'systeem',
-          body: 'Bijlage-upload mislukt — de klant voegde een bestand toe dat niet kon worden opgeslagen.',
+          body: 'Bijlage-upload mislukt. De klant voegde een bestand toe dat niet kon worden opgeslagen.',
         }).catch(() => {});
       }
     }

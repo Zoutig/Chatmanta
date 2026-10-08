@@ -12,10 +12,10 @@ import { Sparkles, RefreshCw } from 'lucide-react';
 import { askV1 } from '@/app/v1/app/actions';
 
 const ERROR_MESSAGES: Record<string, string> = {
-  NO_CHATBOT: 'Geen chatbot geconfigureerd voor deze org.',
+  NO_CHATBOT: 'Er is nog geen chatbot ingesteld.',
   FORBIDDEN: 'Geen toegang.',
-  RATE_LIMITED: 'Te veel verzoeken — probeer het zo opnieuw.',
-  BUDGET_EXHAUSTED: 'Dagbudget bereikt — probeer het morgen opnieuw.',
+  RATE_LIMITED: 'Te veel verzoeken. Probeer het zo opnieuw.',
+  BUDGET_EXHAUSTED: 'Dagbudget bereikt. Probeer het morgen opnieuw.',
   MONTHLY_LIMIT: 'Maandlimiet bereikt.',
   FAILED: 'De bot kon geen antwoord geven.',
 };
@@ -43,7 +43,7 @@ export function CurrentBotAnswer({ question }: { question: string }) {
         }
       } catch {
         setAnswer(null);
-        setError('Er ging iets mis bij het ophalen van het antwoord.');
+        setError('Het antwoord kon niet worden opgehaald.');
       }
     });
   }
@@ -62,7 +62,7 @@ export function CurrentBotAnswer({ question }: { question: string }) {
           style={{ fontSize: 12 }}
           title={
             trimmed
-              ? 'Voer een echte test-vraag uit op je chatbot'
+              ? 'Stel deze vraag aan je chatbot'
               : 'Vul eerst een vraag in'
           }
         >

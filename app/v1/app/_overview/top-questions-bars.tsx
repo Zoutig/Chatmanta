@@ -28,10 +28,10 @@ export function TopQuestionsBars({ result }: { result: KlantFaqResult }) {
       {items.length === 0 ? (
         <div style={{ padding: '20px 4px', fontSize: 13, color: 'var(--klant-dim)', lineHeight: 1.5 }}>
           {pending
-            ? 'De ranglijst wordt periodiek automatisch bijgewerkt — kom binnenkort terug.'
+            ? 'De ranglijst wordt regelmatig bijgewerkt. Kijk later nog eens.'
             : totalUnique === 0
-              ? 'Nog geen vragen. Zodra bezoekers met je chatbot praten, zie je hier wat het vaakst gevraagd wordt.'
-              : 'Nog geen vraag die de drempel haalt. Pas de drempel aan in Gesprekken → Meest gesteld.'}
+              ? 'Nog geen vragen. Zodra bezoekers met je chatbot praten, zie je hier wat ze het vaakst vragen.'
+              : 'Nog geen vraag haalt de drempel. Je past die aan in Gesprekken → Meest gesteld.'}
         </div>
       ) : (
         <ul

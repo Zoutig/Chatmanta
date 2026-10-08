@@ -148,7 +148,7 @@ export default async function V1GesprekDetailPage({
                   Je chatbot kon deze vraag niet beantwoorden
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--klant-muted)', marginTop: 2 }}>
-                  Voeg een Q&amp;A of pagina toe — vergelijkbare vragen worden meteen meegenomen.
+                  Voeg een Q&amp;A of pagina toe. Vergelijkbare vragen gaan dan meteen goed.
                 </div>
               </div>
             </div>
@@ -177,7 +177,7 @@ export default async function V1GesprekDetailPage({
                       letterSpacing: '0.04em',
                     }}
                   >
-                    {isUser ? 'BEZOEKER' : 'CHATMANTA'}
+                    {isUser ? 'Bezoeker' : 'ChatManta'}
                   </span>
                   <div
                     style={{

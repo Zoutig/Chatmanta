@@ -67,14 +67,13 @@ export function TopQuestionsConfigCard({ initial }: { initial: TopQuestionsConfi
           Ranglijst-instellingen
         </h3>
         <p className="klant-section-help" style={{ margin: '4px 0 0' }}>
-          Bepaal vanaf hoe vaak een vraag in de lijst verschijnt en hoeveel
-          vragen je maximaal wilt zien.
+          Wanneer een vraag in de lijst komt, en hoeveel vragen je ziet.
         </p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div>
-          <label className="klant-label">Toon vragen vanaf X keer gesteld</label>
+          <label className="klant-label">Minimaal aantal keer gesteld</label>
           <input
             className="klant-input"
             type="number"
@@ -96,7 +95,7 @@ export function TopQuestionsConfigCard({ initial }: { initial: TopQuestionsConfi
         </div>
 
         <div>
-          <label className="klant-label">Maximum aantal in lijst</label>
+          <label className="klant-label">Maximaal aantal vragen</label>
           <input
             className="klant-input"
             type="number"

@@ -39,7 +39,7 @@ export default async function V1PreviewPage() {
       <PageHead
         eyebrow="Preview"
         title="Test je chatbot"
-        subtitle="Stel een vraag en zie het antwoord dat je bezoekers krijgen, gegrond op je kennisbank — precies zoals op je eigen site, vóór je live gaat."
+        subtitle="Stel een vraag en zie precies wat je bezoekers te zien krijgen."
       />
       {chatbot && settings ? (
         <PreviewFrame>
@@ -59,7 +59,7 @@ export default async function V1PreviewPage() {
       ) : (
         <div className="klant-card" style={{ width: 'min(560px, 100%)' }}>
           <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: 0 }}>
-            Deze organisatie heeft nog geen chatbot geconfigureerd.
+            Er is nog geen chatbot ingesteld.
           </p>
         </div>
       )}

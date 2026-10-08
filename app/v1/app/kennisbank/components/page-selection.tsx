@@ -84,7 +84,7 @@ export function PageSelection({
           <h3 className="klant-section-title">Kies welke pagina&apos;s je chatbot mag gebruiken</h3>
           <p className="klant-section-help">
             We vonden {urls.length} pagina&apos;s op {host}. Vink uit wat je niet wilt.
-            {urls.length > MAX_CRAWL_PAGES && <> Je chatbot crawlt er maximaal {MAX_CRAWL_PAGES} per keer — kies de belangrijkste.</>}
+            {urls.length > MAX_CRAWL_PAGES && <> Per keer gaan er maximaal {MAX_CRAWL_PAGES} mee, dus kies de belangrijkste.</>}
           </p>
         </div>
         <label style={{ fontSize: 12, display: 'inline-flex', gap: 6, alignItems: 'center', whiteSpace: 'nowrap' }}>

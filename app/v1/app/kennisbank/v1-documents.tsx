@@ -143,7 +143,7 @@ export function V1Documents({ initialDocs }: { initialDocs: UploadedDoc[] }) {
           Sleep documenten hierheen of klik om te uploaden
         </div>
         <div style={{ fontSize: 13, color: 'var(--klant-fg-muted)' }}>
-          Upload PDF, DOCX of TXT — denk aan prijslijsten, FAQ&apos;s, handleidingen of voorwaarden.
+          PDF, DOCX of TXT. Bijvoorbeeld prijslijsten, handleidingen of voorwaarden.
         </div>
         <input
           ref={fileRef}
@@ -166,8 +166,7 @@ export function V1Documents({ initialDocs }: { initialDocs: UploadedDoc[] }) {
           </div>
           <h3 className="klant-empty-title">Nog geen documenten</h3>
           <p className="klant-empty-sub">
-            Upload je eerste document via het paneel hierboven. Je chatbot leest de content en
-            kan vragen erover beantwoorden.
+            Upload je eerste document hierboven. Je chatbot kan er daarna vragen over beantwoorden.
           </p>
         </div>
       ) : (

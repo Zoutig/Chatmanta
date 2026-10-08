@@ -50,7 +50,7 @@ function buildSteps(
   return [
     {
       id: 'add_website',
-      title: 'Koppel een website of voeg een bron toe',
+      title: 'Voeg je website of een andere bron toe',
       href: '/v1/app/kennisbank',
       status: status(setup.hasKnowledgeSource, 'add_website'),
     },
@@ -143,8 +143,8 @@ export function SetupChecklist({
           </h3>
           <p style={{ fontSize: 12, color: 'var(--klant-muted)', margin: 0 }}>
             {doneCount === total
-              ? 'Alle stappen voltooid! Je chatbot staat klaar.'
-              : `${doneCount} van ${total} stappen voltooid — klik door om de rest te doen.`}
+              ? 'Alles staat klaar.'
+              : `${doneCount} van ${total} stappen klaar.`}
           </p>
         </div>
         <div style={{ fontFamily: 'var(--klant-font-mono)', fontSize: 12, color: 'var(--klant-muted)' }}>
@@ -240,8 +240,8 @@ function StepRow({ step, onSkip }: { step: V1Step; onSkip: (id: string) => void 
       <button
         type="button"
         className="klant-setup-skip"
-        aria-label="Deze stap overslaan en als gedaan markeren"
-        title="Overslaan — markeer als gedaan"
+        aria-label="Stap overslaan"
+        title="Markeer als gedaan"
         onClick={() => onSkip(step.id)}
       >
         Overslaan

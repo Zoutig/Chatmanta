@@ -51,7 +51,7 @@ export default async function V1ContactverzoekenPage() {
         <PageHead
           eyebrow="Contactverzoeken"
           title="Contactverzoeken staat uit"
-          subtitle="Zet contactverzoeken aan bij Instellingen om bezoekers via de chatbot een terugbel- of mailverzoek te laten achterlaten."
+          subtitle="Zet ze aan bij Instellingen, dan kunnen bezoekers via je chatbot om contact vragen."
         />
         <div className="klant-empty">
           <div className="klant-empty-icon">
@@ -59,8 +59,7 @@ export default async function V1ContactverzoekenPage() {
           </div>
           <h3 className="klant-empty-title">Nog niet ingeschakeld</h3>
           <p className="klant-empty-sub">
-            Ga naar Instellingen en zet &ldquo;Contactverzoeken&rdquo; aan. Daarna kan je chatbot
-            bezoekers met een contactvraag een kort formulier aanbieden.
+            Zet &ldquo;Contactverzoeken&rdquo; aan bij Instellingen. Je chatbot biedt bezoekers dan een kort formulier aan.
           </p>
         </div>
       </>
@@ -81,7 +80,7 @@ export default async function V1ContactverzoekenPage() {
       <PageHead
         eyebrow="Contactverzoeken"
         title="Bezoekers die contact willen"
-        subtitle="Verzoeken die je chatbot heeft opgehaald. Werk ze weg via Nieuw → Opgepakt → Afgehandeld, voeg een notitie toe en verwijder ze wanneer je klaar bent."
+        subtitle="Verzoeken die via je chatbot binnenkwamen. Zet ze op opgepakt en daarna op afgehandeld."
         actions={
           <a
             href="/v1/app/contactverzoeken/export"
@@ -102,7 +101,7 @@ export default async function V1ContactverzoekenPage() {
           </div>
           <h3 className="klant-empty-title">Nog geen contactverzoeken</h3>
           <p className="klant-empty-sub">
-            Zodra een bezoeker via de chatbot om contact vraagt, verschijnt het verzoek hier.
+            Vraagt een bezoeker via je chatbot om contact, dan zie je dat hier.
           </p>
         </div>
       ) : (

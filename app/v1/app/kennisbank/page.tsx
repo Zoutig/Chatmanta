@@ -49,7 +49,7 @@ export default async function V1KennisbankPage({
       <PageHead
         eyebrow="Kennisbank"
         title="De bronnen waaruit je chatbot put"
-        subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
+        subtitle="Er is nog geen chatbot ingesteld."
       />
     );
   }
@@ -116,7 +116,7 @@ export default async function V1KennisbankPage({
       <PageHead
         eyebrow="Kennisbank"
         title="De bronnen waaruit je chatbot put"
-        subtitle="Documenten, website en Q&A worden geïndexeerd en hergebruikt in elk antwoord. Een goede kennisbank is het verschil tussen 60% en 95% behulpzaamheid."
+        subtitle="Je chatbot antwoordt op basis van wat hier staat."
       />
 
       <TabsNav

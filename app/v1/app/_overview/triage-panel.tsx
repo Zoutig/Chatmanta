@@ -65,8 +65,7 @@ export function TriagePanel({
               Alle vragen zijn beantwoord
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--klant-muted)', marginTop: 2 }}>
-              Zodra een bezoeker iets vraagt waar je chatbot geen antwoord op heeft, verschijnt het
-              hier om snel op te lossen.
+              Vragen waar je chatbot geen antwoord op heeft, verschijnen hier.
             </div>
           </div>
         </div>
@@ -118,7 +117,7 @@ export function TriagePanel({
               : `${total} vragen wachten op een antwoord`}
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--klant-muted)', marginTop: 2 }}>
-            Voeg kennis toe — je chatbot beantwoordt vergelijkbare vragen vanaf het volgende gesprek.
+            Voeg kennis toe, dan beantwoordt je chatbot ze voortaan zelf.
           </div>
         </div>
         <Btn

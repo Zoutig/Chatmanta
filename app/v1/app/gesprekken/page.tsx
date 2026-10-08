@@ -77,7 +77,7 @@ export default async function V1GesprekkenPage({
       <PageHead
         eyebrow="Gesprekken"
         title="Alle conversaties op één plek"
-        subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
+        subtitle="Er is nog geen chatbot ingesteld."
       />
     );
   }
@@ -116,7 +116,7 @@ export default async function V1GesprekkenPage({
       <PageHead
         eyebrow="Gesprekken"
         title="Alle conversaties op één plek"
-        subtitle="Filter op onbeantwoord om snel te zien waar je chatbot vastloopt — en los het direct op door kennis toe te voegen."
+        subtitle="Zie waar je chatbot vastloopt en los het op met nieuwe kennis."
         actions={
           <>
             <a
@@ -168,8 +168,8 @@ export default async function V1GesprekkenPage({
           </h3>
           <p className="klant-empty-sub">
             {filter === 'unanswered'
-              ? 'Mooi! Op dit moment heeft je chatbot alle vragen beantwoord.'
-              : 'Zodra je widget live staat, verschijnen hier de gesprekken van je bezoekers.'}
+              ? 'Je chatbot heeft alle vragen beantwoord.'
+              : 'Zodra je widget live staat, zie je hier de gesprekken.'}
           </p>
         </div>
       ) : view === 'gesprekken' ? (

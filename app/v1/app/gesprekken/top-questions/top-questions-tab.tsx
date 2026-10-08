@@ -111,7 +111,7 @@ export function TopQuestionsTab({
           </div>
           <h3 className="klant-empty-title">De ranglijst wordt nog opgebouwd</h3>
           <p className="klant-empty-sub">
-            De ranglijst wordt periodiek automatisch bijgewerkt — kom binnenkort terug.
+            De ranglijst wordt regelmatig bijgewerkt. Kijk later nog eens.
           </p>
         </div>
       </section>
@@ -134,8 +134,8 @@ export function TopQuestionsTab({
           </h3>
           <p className="klant-empty-sub">
             {hasRawQuestions
-              ? `Er zijn ${totalUnique} unieke vragen gesteld, maar nog geen die de drempel haalt. Verlaag de drempel hierboven of wacht tot bezoekers vaker dezelfde vraag stellen.`
-              : "Zodra bezoekers vragen stellen aan je chatbot, verschijnt hier een ranglijst van de vragen die het vaakst terugkomen — handig om je FAQ uit te breiden."}
+              ? `${totalUnique} unieke vragen, maar nog geen die de drempel haalt. Verlaag de drempel hierboven of wacht nog even.`
+              : "Zodra bezoekers vragen stellen, zie je hier welke het vaakst terugkomen."}
           </p>
         </div>
       </section>
@@ -148,10 +148,8 @@ export function TopQuestionsTab({
 
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <p className="klant-section-help" style={{ margin: 0, maxWidth: 640 }}>
-          Vragen die &ge;{config.minCount}&times; zijn gesteld &mdash; slim gegroepeerd op
-          betekenis, zodat verschillende formuleringen van dezelfde vraag
-          samentellen. Klik op &quot;Maak Q&amp;A&quot; om een goed antwoord vast te leggen,
-          dan beantwoordt je chatbot deze vraag voortaan direct uit je kennisbank.
+          Vragen die minstens {config.minCount}&times; zijn gesteld, gegroepeerd op betekenis.
+          Met &quot;Maak Q&amp;A&quot; bepaal je zelf het antwoord.
         </p>
         <div style={{ fontSize: 12, color: 'var(--klant-fg-dim)' }}>
           Top {items.length} van max {config.topN}
@@ -234,7 +232,7 @@ export function TopQuestionsTab({
                           className="klant-btn"
                           data-variant="ghost"
                           style={{ fontSize: 12 }}
-                          title="Bekijk de gesprekken waarin deze vraag is gesteld"
+                          title="Gesprekken met deze vraag"
                         >
                           <MessageSquare size={12} strokeWidth={2} /> Bekijk gesprekken
                         </button>
@@ -478,9 +476,7 @@ export function TopQuestionsTab({
                 Voeg deze vraag toe aan je Q&amp;A
               </h3>
               <p className="klant-section-help" style={{ margin: '4px 0 0' }}>
-                Hier herschrijf je het antwoord dat de AI geeft. Bekijk eerst wat je chatbot
-                nu zegt en pas het aan waar nodig &mdash; vanaf dat moment beantwoordt hij
-                vergelijkbare vragen meteen met jouw tekst, geen retrieval nodig.
+                Bekijk wat je chatbot nu zegt en pas het aan. Daarna gebruikt hij jouw tekst.
               </p>
             </div>
             <div>
@@ -498,7 +494,7 @@ export function TopQuestionsTab({
                 className="klant-textarea"
                 value={drafting.answer}
                 onChange={(e) => setDrafting({ ...drafting, answer: e.target.value })}
-                placeholder="Schrijf hier het antwoord dat je chatbot voortaan moet geven."
+                placeholder="Het antwoord dat je chatbot voortaan geeft"
                 rows={4}
                 autoFocus
               />

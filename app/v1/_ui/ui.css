@@ -132,32 +132,54 @@
 .v1-link:focus-visible { outline: none; box-shadow: var(--v1-focus); border-radius: 4px; }
 
 /* ── Merk ────────────────────────────────────────────────── */
+/* Alleen de rog, in de tekstkleur van de omgeving: wit op de zijbalk, navy op de
+   lichte auth-kaart. Verhouding volgt mono-mark.png (270×148). */
 .v1-mark {
-  width: 30px; height: 30px; border-radius: 9px; background: var(--v1-accent); flex-shrink: 0;
-  display: inline-grid; place-items: center;
-}
-.v1-mark > span {
-  width: 18px; height: 12px; background-color: #fff;
+  width: 34px; height: 19px; flex-shrink: 0; background-color: currentColor;
   -webkit-mask: url('/logo/mono-mark.png') center / contain no-repeat;
   mask: url('/logo/mono-mark.png') center / contain no-repeat;
 }
 
 /* ── Laadskelet ──────────────────────────────────────────── */
+/* Zachte, trage glans; het skelet komt pas na 150 ms in beeld zodat snelle
+   navigaties niet flitsen. */
 .v1-skel {
-  border-radius: 8px;
-  background: linear-gradient(90deg, #e6ebf0 0%, #f3f6f9 50%, #e6ebf0 100%);
-  background-size: 200% 100%; animation: v1-shimmer 1.2s linear infinite;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #e9eef3 0%, #f2f5f8 45%, #e9eef3 90%);
+  background-size: 220% 100%; animation: v1-shimmer 1.8s ease-in-out infinite;
 }
-.v1-skel-page { display: flex; flex-direction: column; gap: 24px; animation: v1-fade var(--v1-base) ease both; }
+.v1-skel-page { display: flex; flex-direction: column; gap: 24px; animation: v1-fade var(--v1-slow) ease 150ms both; }
 .v1-skel-card { background: var(--v1-surface); border-radius: var(--v1-r-lg); box-shadow: var(--v1-shadow-1); padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.v1-skel-card .v1-skel { background-image: linear-gradient(90deg, #eef2f6 0%, #f6f8fa 45%, #eef2f6 90%); }
 .v1-skel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.v1-skel-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.v1-skel-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
+.v1-skel-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 16px 0; border-top: 1px solid var(--v1-line); }
+.v1-skel-row > :first-child { flex: 0 0 200px; }
+.v1-skel-listrow { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid var(--v1-line); }
+.v1-skel-listrow:first-child { border-top: 0; }
+.v1-skel-drop { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 24px; border-radius: var(--v1-r-lg); border: 1.5px dashed var(--v1-line-strong); background: var(--v1-surface); }
+.v1-skel-drop > .v1-skel { max-width: 90%; }
+.v1-skel-subnav { display: flex; flex-direction: column; gap: 14px; padding-top: 2px; }
+@media (max-width: 900px) {
+  .v1-skel-split { grid-template-columns: minmax(0, 1fr); }
+  .v1-skel-row > :first-child { flex-basis: 100%; }
+  .v1-skel-subnav { flex-direction: row; }
+}
 
 /* ── Schil ───────────────────────────────────────────────── */
 .v1-shell[data-klant-scope] { overflow-x: clip; } /* klant.css zet overflow-x:hidden op de scope (≤900px); dat breekt sticky */
+/* Cijfers in het gewone V1-font i.p.v. JetBrains Mono (gestipte nul). Echte code
+   (embed-snippet) gebruikt --font-mono en blijft mono. */
+.v1-shell[data-klant-scope] { --klant-font-mono: var(--v1-font); }
+.v1-main { font-variant-numeric: tabular-nums; }
 .v1-shell { display: flex; min-height: 100dvh; background: var(--v1-bg); color: var(--v1-ink); font-family: var(--v1-font); }
 .v1-main { flex: 1; min-width: 0; padding: 32px clamp(16px, 4vw, 48px) 56px; }
 .v1-main-inner { max-width: 1200px; margin: 0 auto; }
-.v1-page-enter { animation: v1-enter var(--v1-slow) var(--v1-ease) both; }
+/* backwards, niet both: een blijvende transform na afloop maakt van de pagina een
+   stacking context onder de zijbalk, waardoor fixed overlays (dialogen, rondleiding)
+   de zijbalk niet meer bedekken. */
+.v1-page-enter { animation: v1-enter var(--v1-slow) var(--v1-ease) backwards; }
 
 .v1-sidebar {
   /* z-index: sticky maakt een stacking context; zonder z-index valt de
@@ -235,6 +257,133 @@
     background: rgba(12, 30, 46, 0.4); animation: v1-fade var(--v1-base) ease both;
   }
   .v1-main { padding: 20px 16px 48px; }
+}
+
+/* ── Pagina ──────────────────────────────────────────────── */
+.v1-page { display: flex; flex-direction: column; gap: 24px; }
+.v1-page--narrow { max-width: 880px; }
+.v1-page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.v1-page-title { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; color: var(--v1-ink); }
+.v1-page-desc { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--v1-muted); }
+.v1-page-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ── Paneel met lees-rijen ───────────────────────────────── */
+.v1-panel {
+  background: var(--v1-surface); border-radius: var(--v1-r-lg); box-shadow: var(--v1-shadow-1);
+  padding: 4px 24px 8px; scroll-margin-top: 24px;
+}
+.v1-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; padding: 14px 0 12px; }
+.v1-panel-title { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--v1-ink); }
+.v1-panel-meta { display: flex; align-items: center; gap: 12px; }
+.v1-saved { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--v1-ok); animation: v1-fade var(--v1-base) ease both; }
+.v1-rows { margin: 0; }
+.v1-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 14px 0; border-top: 1px solid var(--v1-line); }
+.v1-row-label { flex: 0 0 200px; margin: 0; font-size: 14px; color: var(--v1-muted); }
+.v1-row-value { flex: 1 1 260px; min-width: 0; margin: 0; font-size: 14px; font-weight: 500; line-height: 1.5; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-row-sub { font-weight: 400; color: var(--v1-muted); }
+.v1-row-empty { font-weight: 400; color: var(--v1-muted); }
+.v1-row-action { margin-left: auto; align-self: center; }
+.v1-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v1-chip { font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 999px; background: var(--v1-surface-2); color: var(--v1-ink); }
+
+/* Bewerkmodus van een paneel */
+.v1-edit { display: flex; flex-direction: column; gap: 18px; padding: 16px 0 14px; border-top: 1px solid var(--v1-line); animation: v1-enter var(--v1-base) var(--v1-ease) both; }
+.v1-row-value--edit { flex: 1 1 320px; font-weight: 400; }
+.v1-row-value--edit .v1-edit { padding: 0; border-top: 0; gap: 14px; }
+.v1-edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.v1-edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.v1-input--narrow { max-width: 360px; }
+.v1-input--medium { max-width: 480px; }
+textarea.v1-input { height: auto; min-height: 88px; padding: 10px 14px; line-height: 1.5; resize: vertical; }
+select.v1-input { cursor: pointer; }
+
+/* Schakelaar */
+.v1-switch-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.v1-switch-text { display: flex; flex-direction: column; gap: 2px; font-size: 14px; font-weight: 500; color: var(--v1-ink); }
+.v1-switch {
+  flex-shrink: 0; position: relative; width: 40px; height: 24px; border: 0; border-radius: 999px;
+  background: #cbd5df; cursor: pointer; transition: background-color var(--v1-fast) ease;
+}
+.v1-switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(12, 30, 46, 0.25); transition: transform var(--v1-base) var(--v1-spring);
+}
+.v1-switch[aria-checked='true'] { background: var(--v1-accent); }
+.v1-switch[aria-checked='true']::after { transform: translateX(16px); }
+.v1-switch:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+
+/* Segmentkeuze */
+.v1-seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: var(--v1-r-md); background: var(--v1-surface-2); }
+.v1-seg-opt {
+  height: 32px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--v1-ink-2);
+  font: 500 13px var(--v1-font); cursor: pointer; transition: background-color var(--v1-fast) ease, box-shadow var(--v1-fast) ease;
+}
+.v1-seg-opt:hover { color: var(--v1-ink); }
+.v1-seg-opt[aria-checked='true'] { background: var(--v1-surface); color: var(--v1-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(12, 30, 46, 0.1); }
+.v1-seg-opt:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+
+/* Keuzetegels */
+.v1-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.v1-choice {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 0; border-radius: var(--v1-r-md);
+  background: var(--v1-bg); color: var(--v1-ink); font-family: var(--v1-font); text-align: left; cursor: pointer;
+  transition: background-color var(--v1-fast) ease, box-shadow var(--v1-fast) ease;
+}
+.v1-choice:hover { background: var(--v1-surface-2); }
+.v1-choice[aria-checked='true'] { background: var(--v1-surface); box-shadow: 0 0 0 2px var(--v1-accent); }
+.v1-choice:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-choice-title { font-size: 14px; font-weight: 600; }
+.v1-choice-help { font-size: 12px; line-height: 1.4; color: var(--v1-muted); }
+
+/* Geavanceerd (ingeklapt) */
+.v1-details > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--v1-ink-2); list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+.v1-details > summary::-webkit-details-marker { display: none; }
+.v1-details > summary::before { content: '›'; display: inline-block; transition: transform var(--v1-fast) ease; }
+.v1-details[open] > summary::before { transform: rotate(90deg); }
+.v1-details-body { display: flex; flex-direction: column; gap: 16px; padding-top: 14px; }
+
+/* Sectienavigatie (links naast de panelen) */
+.v1-subnav-layout { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 28px; align-items: start; }
+.v1-subnav { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 2px; }
+.v1-subnav-link { padding: 8px 12px; border-radius: var(--v1-r-sm); color: var(--v1-ink-2); font-size: 14px; font-weight: 500; text-decoration: none; white-space: nowrap; transition: background-color var(--v1-fast) ease, color var(--v1-fast) ease; }
+.v1-subnav-link:hover { color: var(--v1-ink); }
+.v1-subnav-link[aria-current='true'] { background: var(--v1-surface); color: var(--v1-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(12, 30, 46, 0.06); }
+.v1-subnav-link:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+/* Verbruik */
+.v1-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); border-top: 1px solid var(--v1-line); }
+.v1-metric { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 6px 0; }
+.v1-metric-label { font-size: 13px; font-weight: 500; color: var(--v1-muted); }
+.v1-metric-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.v1-metric-num { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--v1-ink); }
+.v1-metric-of { font-size: 13px; color: var(--v1-muted); }
+.v1-bar { height: 6px; border-radius: 3px; background: var(--v1-surface-2); overflow: hidden; }
+.v1-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--v1-accent); transition: width var(--v1-slow) var(--v1-ease); }
+.v1-bar[data-level='warn'] > span { background: #d97706; }
+.v1-bar[data-level='over'] > span { background: var(--v1-danger); }
+.v1-note { margin: 12px 0 10px; font-size: 13px; line-height: 1.5; color: var(--v1-muted); }
+
+/* Dialoog */
+.v1-dialog-backdrop { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgba(12, 30, 46, 0.45); animation: v1-fade var(--v1-base) ease both; }
+.v1-dialog { width: 100%; max-width: 480px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: var(--v1-r-xl); background: var(--v1-surface); box-shadow: var(--v1-shadow-pop); animation: v1-enter var(--v1-base) var(--v1-ease) both; }
+.v1-dialog-title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--v1-ink); }
+.v1-dialog-body { margin: 0; font-size: 14px; line-height: 1.6; color: var(--v1-ink-2); }
+.v1-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+@media (max-width: 900px) {
+  .v1-page-title { font-size: 24px; }
+  .v1-panel { padding: 4px 18px 8px; }
+  /* Label + knop op de eerste regel, waarde eronder over de volle breedte. */
+  .v1-row { align-items: center; }
+  .v1-row-label { flex: 1 1 0; }
+  .v1-row-action { order: 1; }
+  .v1-row-value { order: 2; flex-basis: 100%; }
+  .v1-subnav-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .v1-subnav {
+    top: calc(56px + var(--safe-top, 0px)); z-index: 5; flex-direction: row; overflow-x: auto;
+    margin: 0 -16px; padding: 8px 16px; background: var(--v1-bg);
+  }
 }
 
 /* ── Auth-pagina's ───────────────────────────────────────── */

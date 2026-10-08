@@ -29,8 +29,7 @@ export default async function V1FeedbackPage() {
         <div>
           <h1 className="klant-page-title">Feedback &amp; meldingen</h1>
           <p className="klant-page-sub">
-            Iets niet goed gegaan, een idee, of een fout in een bot-antwoord? Laat het ons
-            weten. Hoe duidelijker je het omschrijft, hoe sneller we het kunnen oppakken.
+            Een fout, een idee of een verkeerd antwoord van je chatbot? Laat het ons weten.
           </p>
         </div>
       </header>

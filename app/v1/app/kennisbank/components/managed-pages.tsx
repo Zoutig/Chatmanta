@@ -24,8 +24,8 @@ function humanizePageError(msg: string): string {
   if (/HTTP\s*404/i.test(msg)) return 'Pagina niet gevonden (404)';
   if (/HTTP\s*403/i.test(msg)) return 'Geen toegang tot deze pagina (403)';
   if (/HTTP\s*5\d\d/i.test(msg)) return 'De pagina gaf een serverfout';
-  if (/^Embedding mislukt/i.test(msg)) return 'Verwerken mislukt — probeer opnieuw';
-  if (/^Chunk-opslag mislukt/i.test(msg)) return 'Opslaan mislukt — probeer opnieuw';
+  if (/^Embedding mislukt/i.test(msg)) return 'Verwerken mislukt. Probeer het opnieuw.';
+  if (/^Chunk-opslag mislukt/i.test(msg)) return 'Opslaan mislukt. Probeer het opnieuw.';
   return msg;
 }
 
