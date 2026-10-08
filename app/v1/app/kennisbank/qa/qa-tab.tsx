@@ -1,18 +1,19 @@
 'use client';
 
-// V1 Kennisbank Q&A-tab — faithful port van V0's qa-tab.tsx.
-//
-// Seam-wijzigingen t.o.v. V0:
-//   • Type: ManualQA → QAItem (geen updatedAt; category: string | null).
-//   • Props: + orgId + chatbotId (contract; actions leiden org uit de sessie af).
-//   • save(): geeft { id?, question, answer, category, active } door (geen temp-ID
-//     generatie; DB genereert het id op insert).
-//   • CurrentBotAnswer: import uit ./current-bot-answer (V1-fork met askV1).
-//   • Actions: geïmporteerd uit ./qa-actions (V1-service-role, session-auth).
-// JSX/classNames/Dutch copy: verbatim V0.
+// V1 Kennisbank Q&A-tab: lijst met eigen vraag-antwoordparen; aan/uit,
+// bewerken (zijpaneel met het "huidig bot-antwoord"-venster) en verwijderen.
+// Server actions ongewijzigd (./qa-actions, org uit de sessie). De lijst-state
+// woont in de Kennisbank-view (voor de teller op de tab).
 
-import { useState, useTransition } from 'react';
-import { MessageSquareText, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useState, useTransition, type Dispatch, type SetStateAction } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
+import { Badge, EmptyState } from '@/app/v1/_ui/feedback';
+import { Button } from '@/app/v1/_ui/button';
+import { Field, Switch } from '@/app/v1/_ui/controls';
+import { Drawer } from '@/app/v1/_ui/drawer';
+import { List } from '@/app/v1/_ui/list';
+import { useToast } from '@/app/v1/_ui/toast';
+import { ConfirmDialog } from '../components/confirm-dialog';
 import {
   deleteQAItemAction,
   setQAActiveAction,
@@ -29,31 +30,55 @@ export type QAItem = {
   ingestedDocumentId: string | null;
 };
 
-// contract props — orgId/chatbotId worden door de page doorgegeven (voor eventuele
-// toekomstige client-side gebruik); de server actions leiden org+chatbot uit de sessie af.
-// prefillQuestion: gezet via ?prefillQuestion= (correctieloop, WP4) → opent de
-// "Nieuwe Q&A"-modal meteen met de vraag ingevuld.
-type Props = { initialQA: QAItem[]; orgId: string; chatbotId: string; prefillQuestion?: string };
-
 type DraftQA = { id?: string; question: string; answer: string; category: string; active: boolean };
 
 function emptyDraft(): DraftQA {
   return { question: '', answer: '', category: '', active: true };
 }
 
-export function QATab({ initialQA, prefillQuestion }: Props) {
-  const [items, setItems] = useState<QAItem[]>(initialQA);
+export function QATab({
+  items,
+  setItems,
+  prefillQuestion,
+  newRequest,
+}: {
+  items: QAItem[];
+  setItems: Dispatch<SetStateAction<QAItem[]>>;
+  /** Gezet via ?prefillQuestion= (correctieloop): opent meteen een nieuw Q&A met de vraag ingevuld. */
+  prefillQuestion?: string;
+  /** Telt op als "Q&A schrijven" in het Toevoegen-menu gekozen wordt. */
+  newRequest: number;
+}) {
+  const toast = useToast();
   const [editing, setEditing] = useState<DraftQA | null>(
     prefillQuestion ? { ...emptyDraft(), question: prefillQuestion } : null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  function openNew() {
+  const openNew = useCallback(() => {
+    setError(null);
+    setEditing(emptyDraft());
+  }, []);
+
+  // Toevoegen-menu → "Q&A schrijven": open een leeg formulier (state bijwerken tijdens render).
+  const [seenNewRequest, setSeenNewRequest] = useState(newRequest);
+  if (newRequest !== seenNewRequest) {
+    setSeenNewRequest(newRequest);
+    setError(null);
     setEditing(emptyDraft());
   }
 
+  const close = useCallback(() => {
+    setEditing(null);
+    setError(null);
+  }, []);
+  const cancelDelete = useCallback(() => setConfirmId(null), []);
+
   function openEdit(qa: QAItem) {
+    setError(null);
     setEditing({
       id: qa.id,
       question: qa.question,
@@ -78,6 +103,7 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
       if (res.ok) {
         setItems(res.qa);
         setEditing(null);
+        toast.success('Q&A opgeslagen');
       } else {
         setError(res.error);
       }
@@ -87,313 +113,165 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
   function toggleActive(id: string) {
     const target = items.find((x) => x.id === id);
     if (!target) return;
+    setBusyId(id);
     startTransition(async () => {
       const res = await setQAActiveAction(id, !target.active);
+      setBusyId(null);
       if (res.ok) setItems(res.qa);
-      else setError(res.error);
+      else toast.error(res.error);
     });
   }
 
-  function remove(id: string) {
-    if (!confirm('Q&A verwijderen?')) return;
+  function remove() {
+    const id = confirmId;
+    setConfirmId(null);
+    if (!id) return;
     startTransition(async () => {
       const res = await deleteQAItemAction(id);
-      if (res.ok) setItems(res.qa);
-      else setError(res.error);
+      if (res.ok) {
+        setItems(res.qa);
+        toast.success('Q&A verwijderd');
+      } else toast.error(res.error);
     });
   }
 
+  const canSave = !!editing && editing.question.trim() !== '' && editing.answer.trim() !== '';
+
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <h3 className="klant-section-title">Handmatige Q&amp;A</h3>
-          <p className="klant-section-help">
-            Bepaal zelf wat je chatbot op een vraag antwoordt.
-          </p>
-        </div>
-        <button type="button" onClick={openNew} className="klant-btn" data-variant="primary">
-          <Plus size={14} strokeWidth={2} /> Nieuwe Q&amp;A
-        </button>
-      </div>
-
-      {error && (
-        <div
-          style={{
-            padding: '8px 12px',
-            borderRadius: 'var(--klant-r-sm)',
-            background: 'var(--klant-danger-soft)',
-            color: 'var(--klant-danger)',
-            fontSize: 13,
-          }}
-        >
-          {error}
-        </div>
-      )}
-
+    <>
       {items.length === 0 ? (
-        <div className="klant-empty">
-          <div className="klant-empty-icon">
-            <MessageSquareText size={26} strokeWidth={1.6} />
-          </div>
-          <h3 className="klant-empty-title">Nog geen Q&amp;A</h3>
-          <p className="klant-empty-sub">
-            Leg vast wat je chatbot zegt over veelgestelde onderwerpen, zoals openingstijden.
-          </p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="klant-btn"
-            data-variant="primary"
-            style={{ marginTop: 8 }}
-          >
-            <Plus size={14} strokeWidth={2} /> Eerste Q&amp;A toevoegen
-          </button>
+        <div className="v1-card v1-kb-card-flush">
+          <EmptyState action={<Button variant="secondary" size="sm" onClick={openNew}>Toevoegen</Button>}>
+            Nog geen Q&amp;A. Leg vast wat je chatbot zegt over vaste onderwerpen, zoals openingstijden.
+          </EmptyState>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map((qa) => (
-            <article
-              key={qa.id}
-              className="klant-card"
-              style={{
-                opacity: qa.active ? 1 : 0.6,
-                display: 'flex',
-                gap: 14,
-                alignItems: 'flex-start',
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    marginBottom: 6,
-                  }}
-                >
-                  {qa.category && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                        background: 'var(--klant-surface)',
-                        color: 'var(--klant-fg-muted)',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      {qa.category}
-                    </span>
-                  )}
-                  {!qa.active && (
-                    <span
-                      className="klant-status"
-                      data-tone="neutral"
-                      style={{ fontSize: 11 }}
-                    >
-                      Inactief
-                    </span>
-                  )}
-                </div>
-                <h4
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: 'var(--klant-fg)',
-                    margin: '0 0 6px',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {qa.question}
-                </h4>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: 'var(--klant-fg-muted)',
-                    lineHeight: 1.6,
-                    margin: 0,
-                  }}
-                >
-                  {qa.answer}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => toggleActive(qa.id)}
-                  className="klant-btn"
-                  data-variant="ghost"
-                  title={qa.active ? 'Inactief maken' : 'Activeren'}
-                  style={{ padding: 6 }}
-                >
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 28,
-                      height: 16,
-                      borderRadius: 999,
-                      background: qa.active ? 'var(--klant-accent)' : 'var(--klant-border-strong)',
-                      position: 'relative',
-                      transition: 'background 120ms ease',
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: 2,
-                        left: qa.active ? 14 : 2,
-                        width: 12,
-                        height: 12,
-                        borderRadius: 999,
-                        background: '#fff',
-                        transition: 'left 120ms ease',
-                      }}
-                    />
+        <div className="v1-card v1-kb-card-flush">
+          <List label="Q&A">
+            {items.map((qa) => (
+              <li key={qa.id} className="v1-kb-qa-row" data-inactive={!qa.active}>
+                <div className="v1-list-row">
+                  <span className="v1-list-main">
+                    {qa.category || !qa.active ? (
+                      <span className="v1-kb-qa-tags">
+                        {qa.category ? <span className="v1-chip">{qa.category}</span> : null}
+                        {!qa.active ? <Badge>Inactief</Badge> : null}
+                      </span>
+                    ) : null}
+                    <span className="v1-list-title v1-list-title--wrap">{qa.question}</span>
+                    <span className="v1-kb-qa-answer">{qa.answer}</span>
                   </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openEdit(qa)}
-                  className="klant-btn"
-                  data-variant="ghost"
-                  title="Bewerken"
-                  style={{ padding: 6 }}
-                >
-                  <Pencil size={14} strokeWidth={1.7} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove(qa.id)}
-                  className="klant-btn"
-                  data-variant="danger"
-                  title="Verwijderen"
-                  style={{ padding: 6 }}
-                >
-                  <Trash2 size={14} strokeWidth={1.7} />
-                </button>
-              </div>
-            </article>
-          ))}
+                  <span className="v1-list-end">
+                    <button
+                      type="button"
+                      role="switch"
+                      className="v1-switch"
+                      aria-checked={qa.active}
+                      aria-label={`Actief: ${qa.question}`}
+                      title={qa.active ? 'Inactief maken' : 'Activeren'}
+                      disabled={pending && busyId === qa.id}
+                      onClick={() => toggleActive(qa.id)}
+                    />
+                    <button type="button" className="v1-menu-btn" onClick={() => openEdit(qa)}
+                      aria-label={`Bewerken: ${qa.question}`} title="Bewerken">
+                      <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />
+                    </button>
+                    <button type="button" className="v1-menu-btn v1-kb-iconbtn--danger" onClick={() => setConfirmId(qa.id)}
+                      aria-label={`Verwijderen: ${qa.question}`} title="Verwijderen">
+                      <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                    </button>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </List>
         </div>
       )}
 
-      {/* Edit modal */}
       {editing && (
-        <div
-          onClick={() => setEditing(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.65)',
-            zIndex: 100,
-            display: 'grid',
-            placeItems: 'center',
-            padding: 20,
-          }}
-          role="dialog"
-          aria-modal="true"
+        <Drawer
+          title={editing.id ? 'Q&A bewerken' : 'Nieuwe Q&A'}
+          onClose={close}
+          footer={
+            <>
+              <Button variant="ghost" onClick={close} disabled={pending}>
+                Annuleren
+              </Button>
+              <Button onClick={save} loading={pending} disabled={!canSave}>
+                Opslaan
+              </Button>
+            </>
+          }
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="klant-card"
-            style={{
-              width: '100%',
-              maxWidth: 560,
-              background: 'var(--klant-bg-elev)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
+          <form
+            className="v1-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save();
             }}
           >
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 18,
-                fontWeight: 600,
-                fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-                color: 'var(--klant-fg)',
-              }}
-            >
-              {editing.id ? 'Q&A bewerken' : 'Nieuwe Q&A'}
-            </h3>
-            <div>
-              <label className="klant-label">Vraag</label>
-              <input
-                className="klant-input"
-                value={editing.question}
-                onChange={(e) => setEditing({ ...editing, question: e.target.value })}
-                placeholder="Bijv. Wat zijn jullie openingstijden?"
-                autoFocus
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div>
-                <label className="klant-label">Antwoord dat je chatbot moet geven</label>
-                <p className="klant-section-help" style={{ margin: '2px 0 0' }}>
-                  Bekijk wat je chatbot nu zegt en pas het aan.
-                </p>
-              </div>
-              <CurrentBotAnswer question={editing.question} />
-              <textarea
-                className="klant-textarea"
-                value={editing.answer}
-                onChange={(e) => setEditing({ ...editing, answer: e.target.value })}
-                placeholder="Het antwoord dat je chatbot voortaan geeft"
-                rows={4}
-              />
-            </div>
-            <div>
-              <label className="klant-label">Categorie (optioneel)</label>
-              <input
-                className="klant-input"
-                value={editing.category ?? ''}
-                onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                placeholder="Bijv. Openingstijden, Prijzen, Contact"
-              />
-            </div>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 13,
-                color: 'var(--klant-fg)',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={editing.active}
-                onChange={(e) => setEditing({ ...editing, active: e.target.checked })}
-              />
-              Actief: je chatbot gebruikt dit antwoord
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
-              <button type="button" onClick={() => setEditing(null)} className="klant-btn">
-                Annuleren
-              </button>
-              <button
-                type="button"
-                onClick={save}
-                className="klant-btn"
-                data-variant="primary"
-                disabled={pending || !editing.question.trim() || !editing.answer.trim()}
-              >
-                {pending ? 'Bezig…' : 'Opslaan'}
-              </button>
-            </div>
-          </div>
-        </div>
+            <Field label="Vraag">
+              {(id) => (
+                <input
+                  id={id}
+                  className="v1-input"
+                  value={editing.question}
+                  onChange={(e) => setEditing({ ...editing, question: e.target.value })}
+                  placeholder="Bijv. Wat zijn jullie openingstijden?"
+                  autoFocus
+                />
+              )}
+            </Field>
+            <Field label="Antwoord dat je chatbot moet geven" hint="Bekijk wat je chatbot nu zegt en pas het aan.">
+              {(id) => (
+                <>
+                  <CurrentBotAnswer question={editing.question} />
+                  <textarea
+                    id={id}
+                    className="v1-input"
+                    value={editing.answer}
+                    onChange={(e) => setEditing({ ...editing, answer: e.target.value })}
+                    placeholder="Het antwoord dat je chatbot voortaan geeft"
+                    rows={5}
+                  />
+                </>
+              )}
+            </Field>
+            <Field label="Categorie (optioneel)">
+              {(id) => (
+                <input
+                  id={id}
+                  className="v1-input"
+                  value={editing.category}
+                  onChange={(e) => setEditing({ ...editing, category: e.target.value })}
+                  placeholder="Bijv. Openingstijden, Prijzen, Contact"
+                />
+              )}
+            </Field>
+            <Switch
+              label="Actief"
+              description="Je chatbot gebruikt dit antwoord."
+              checked={editing.active}
+              onChange={(active) => setEditing({ ...editing, active })}
+            />
+            {error && (
+              <p className="v1-alert v1-alert--error" role="alert">
+                {error}
+              </p>
+            )}
+          </form>
+        </Drawer>
       )}
-    </section>
+
+      {confirmId ? (
+        <ConfirmDialog
+          title="Q&A verwijderen?"
+          body="Je chatbot gebruikt dit antwoord daarna niet meer."
+          confirmLabel="Verwijderen"
+          onCancel={cancelDelete}
+          onConfirm={remove}
+        />
+      ) : null}
+    </>
   );
 }

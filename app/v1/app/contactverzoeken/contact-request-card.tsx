@@ -1,16 +1,23 @@
 'use client';
 
-// Eén contactverzoek-kaart met de werkstroom-acties (status / notitie / wissen).
+// Eén contactverzoek als kaart met de werkstroom-acties (status / notitie / wissen).
 // De server-actions revalideren /v1/app/contactverzoeken; router.refresh() trekt
-// de tab meteen bij. PII (naam/contact/bericht) komt al org-gescoped + onder RLS
-// uit de read-laag — hier alleen weergeven + bijwerken. Styling = de bestaande
-// V0 .contactverzoek-* classes uit klant.css (de /v1/app-shell laadt die).
+// de lijst meteen bij. PII (naam/contact/bericht) komt al org-gescoped + onder RLS
+// uit de read-laag; hier alleen weergeven + bijwerken.
+//
+// Rustige vorm: één secundaire hoofdactie (volgende stap in de werkstroom), de
+// overige statussen en Verwijderen in het ⋯-menu. Notitie volgt "eerst lezen,
+// dan Wijzigen". Bevestigingen en actiefouten via Toast.
 
-import { useState, useTransition } from 'react';
+import { useEffect, useId, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Phone, Trash2 } from 'lucide-react';
 
-import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
+import { Button } from '@/app/v1/_ui/button';
+import { Badge, type Tone } from '@/app/v1/_ui/feedback';
+import { Menu, type MenuItem } from '@/app/v1/_ui/menu';
+import { useEditable } from '@/app/v1/_ui/editable';
+import { useToast } from '@/app/v1/_ui/toast';
 import {
   STATUS_FLOW,
   STATUS_LABEL,
@@ -25,8 +32,20 @@ import {
   deleteContactRequestAction,
 } from './actions';
 
+const BADGE_TONE: Record<(typeof STATUS_TONE)[V1ContactRequestStatus], Tone> = {
+  warning: 'warn',
+  info: 'accent',
+  success: 'ok',
+};
+
+/** Hoofdactie per status: de volgende stap in de werkstroom. */
+const NEXT_STEP: Partial<Record<V1ContactRequestStatus, { status: V1ContactRequestStatus; label: string }>> = {
+  new: { status: 'picked_up', label: 'Oppakken' },
+  picked_up: { status: 'handled', label: 'Afhandelen' },
+};
+
 function formatDateTime(iso: string): string {
-  if (!iso) return '—';
+  if (!iso) return '';
   return new Date(iso).toLocaleString('nl-NL', {
     day: 'numeric',
     month: 'short',
@@ -38,176 +57,247 @@ function formatDateTime(iso: string): string {
 
 export function ContactRequestCard({ request }: { request: V1ContactRequest }) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
-  const [notes, setNotes] = useState(request.notes ?? '');
-  const [notesSaved, setNotesSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const notesDirty = notes.trim() !== (request.notes ?? '').trim();
 
   const setStatus = (next: V1ContactRequestStatus) =>
     startTransition(async () => {
-      setError(null);
       const res = await setContactRequestStatusAction(request.id, next);
       if (!res.ok) {
-        setError(res.error);
+        toast.error(res.error);
         return;
       }
-      router.refresh();
-    });
-
-  const saveNotes = () =>
-    startTransition(async () => {
-      setError(null);
-      setNotesSaved(false);
-      const res = await setContactRequestNotesAction(request.id, notes);
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setNotesSaved(true);
-      setTimeout(() => setNotesSaved(false), 2500);
+      toast.success(`Status gewijzigd naar ${STATUS_LABEL[next].toLowerCase()}`);
       router.refresh();
     });
 
   const doDelete = () =>
     startTransition(async () => {
-      setError(null);
       const res = await deleteContactRequestAction(request.id);
       if (!res.ok) {
-        setError(res.error);
+        toast.error(res.error);
         return;
       }
+      setConfirmDelete(false);
+      toast.success('Contactverzoek verwijderd');
       router.refresh();
     });
 
+  const next = NEXT_STEP[request.status];
+  const menuItems: MenuItem[] = [
+    ...STATUS_FLOW.filter((s) => s !== request.status && s !== next?.status).map((s) => ({
+      label: `Zet op ${STATUS_LABEL[s].toLowerCase()}`,
+      onSelect: () => setStatus(s),
+      disabled: pending,
+    })),
+    {
+      label: 'Verwijderen',
+      icon: <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+      onSelect: () => setConfirmDelete(true),
+      disabled: pending,
+    },
+  ];
+
+  const meta = [
+    request.preferredContact === 'call' ? 'Liever bellen' : 'Liever mailen',
+    formatDateTime(request.createdAt),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <div className="contactverzoek-card">
-      <div className="contactverzoek-card-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="contactverzoek-name">{request.name}</div>
-          <div className="contactverzoek-meta">
-            <span className="contactverzoek-pref">
-              {request.preferredContact === 'call' ? (
-                <>
-                  <Phone size={12} strokeWidth={1.8} /> Liever bellen
-                </>
-              ) : (
-                <>
-                  <Mail size={12} strokeWidth={1.8} /> Liever mailen
-                </>
-              )}
-            </span>
-            <span className="contactverzoek-date">{formatDateTime(request.createdAt)}</span>
-          </div>
+    <article className="v1-card v1-cv-card" aria-label={`Contactverzoek van ${request.name}`}>
+      <div className="v1-cv-head">
+        <div className="v1-cv-who">
+          <h2 className="v1-cv-name">{request.name}</h2>
+          <p className="v1-cv-meta">{meta}</p>
         </div>
-        <StatusBadge kind="custom" label={STATUS_LABEL[request.status]} tone={STATUS_TONE[request.status]} />
+        <div className="v1-cv-actions">
+          <Badge tone={BADGE_TONE[STATUS_TONE[request.status]]} dot>
+            {STATUS_LABEL[request.status]}
+          </Badge>
+          {next ? (
+            <Button variant="secondary" size="sm" loading={pending} onClick={() => setStatus(next.status)}>
+              {next.label}
+            </Button>
+          ) : null}
+          <Menu label="Meer acties" items={menuItems} />
+        </div>
       </div>
 
-      <div className="contactverzoek-contact">
-        {request.email && (
-          <a href={`mailto:${request.email}`} className="contactverzoek-contact-link">
-            <Mail size={13} strokeWidth={1.8} /> {request.email}
-          </a>
-        )}
-        {request.phone && (
-          <a href={`tel:${request.phone}`} className="contactverzoek-contact-link">
-            <Phone size={13} strokeWidth={1.8} /> {request.phone}
-          </a>
-        )}
-      </div>
+      {request.email || request.phone ? (
+        <div className="v1-cv-contact">
+          {request.email ? (
+            <a href={`mailto:${request.email}`}>
+              <Mail size={16} strokeWidth={1.8} aria-hidden="true" />
+              {request.email}
+            </a>
+          ) : null}
+          {request.phone ? (
+            <a href={`tel:${request.phone}`}>
+              <Phone size={16} strokeWidth={1.8} aria-hidden="true" />
+              {request.phone}
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
-      {request.subject && <div className="contactverzoek-subject">{request.subject}</div>}
-      {request.message && <p className="contactverzoek-toelichting">{request.message}</p>}
+      {request.subject ? <p className="v1-cv-subject">{request.subject}</p> : null}
+      {request.message ? <p className="v1-cv-message">{request.message}</p> : null}
 
-      <div className="contactverzoek-actions">
-        <span className="contactverzoek-actions-label">Status:</span>
-        {STATUS_FLOW.filter((s) => s !== request.status).map((s) => (
-          <button
-            key={s}
-            type="button"
-            className="klant-btn"
-            data-variant={s === 'handled' ? 'primary' : undefined}
-            disabled={pending}
-            onClick={() => setStatus(s)}
-          >
-            {STATUS_LABEL[s]}
-          </button>
-        ))}
-      </div>
+      <NoteBlock request={request} />
 
-      <div className="contactverzoek-notes">
-        <label className="klant-label" htmlFor={`cr-notes-${request.id}`}>
-          Notitie
-        </label>
-        <textarea
-          id={`cr-notes-${request.id}`}
-          className="klant-textarea"
-          rows={2}
-          maxLength={NOTES_MAX}
-          value={notes}
-          onChange={(e) => {
-            setNotes(e.target.value);
-            setNotesSaved(false);
-          }}
-          placeholder="Notitie voor jezelf…"
-          style={{ resize: 'vertical' }}
+      {confirmDelete ? (
+        <ConfirmDelete
+          name={request.name}
+          pending={pending}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={doDelete}
         />
-        <div className="contactverzoek-notes-bar">
-          <button
-            type="button"
-            className="klant-btn"
-            disabled={pending || !notesDirty}
-            onClick={saveNotes}
-          >
-            {pending ? 'Bezig…' : 'Notitie opslaan'}
-          </button>
-          {notesSaved && <span className="contactverzoek-saved">Opgeslagen</span>}
-          <span className="contactverzoek-notes-count">
-            {notes.length}/{NOTES_MAX}
-          </span>
-          <span style={{ marginLeft: 'auto' }}>
-            {confirmDelete ? (
-              <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                <span className="contactverzoek-confirm">Verwijderen?</span>
-                <button
-                  type="button"
-                  className="klant-btn"
-                  data-variant="danger"
-                  disabled={pending}
-                  onClick={doDelete}
-                >
-                  Ja, wissen
-                </button>
-                <button
-                  type="button"
-                  className="klant-btn"
-                  disabled={pending}
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  Annuleren
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="klant-btn contactverzoek-delete"
-                disabled={pending}
-                onClick={() => setConfirmDelete(true)}
-              >
-                <Trash2 size={13} strokeWidth={1.8} /> Verwijderen
-              </button>
-            )}
-          </span>
+      ) : null}
+    </article>
+  );
+}
+
+/** Notitie: eerst lezen, dan Wijzigen. */
+function NoteBlock({ request }: { request: V1ContactRequest }) {
+  const router = useRouter();
+  const toast = useToast();
+  const saved = request.notes ?? '';
+  const edit = useEditable({
+    current: () => ({ notes: saved }),
+    save: async ({ notes }) => {
+      const res = await setContactRequestNotesAction(request.id, notes);
+      if (!res.ok) return { ok: false, error: res.error };
+      toast.success('Notitie opgeslagen');
+      router.refresh();
+      return { ok: true };
+    },
+  });
+  const dirty = edit.draft.notes.trim() !== saved.trim();
+
+  return (
+    <section className="v1-cv-note" aria-label="Notitie">
+      <div className="v1-cv-note-head">
+        <p className="v1-cv-note-label">Notitie</p>
+        {edit.editing ? null : (
+          <Button ref={edit.triggerRef} variant="ghost" size="sm" onClick={edit.start}>
+            {saved ? 'Wijzigen' : 'Toevoegen'}
+          </Button>
+        )}
+      </div>
+      {edit.editing ? (
+        <form
+          className="v1-cv-note-form"
+          onSubmit={edit.submit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && !edit.pending) {
+              e.stopPropagation();
+              edit.cancel();
+            }
+          }}
+        >
+          <AutoFocusTextarea
+            label="Notitie voor jezelf"
+            value={edit.draft.notes}
+            onChange={(v) => edit.set('notes', v)}
+          />
+          {edit.error ? (
+            <p className="v1-alert v1-alert--error" role="alert">
+              {edit.error}
+            </p>
+          ) : null}
+          <div className="v1-cv-note-bar">
+            <Button type="submit" size="sm" loading={edit.pending} disabled={!dirty}>
+              Opslaan
+            </Button>
+            <Button variant="ghost" size="sm" onClick={edit.cancel} disabled={edit.pending}>
+              Annuleren
+            </Button>
+            <span className="v1-cv-note-count">
+              {edit.draft.notes.length}/{NOTES_MAX}
+            </span>
+          </div>
+        </form>
+      ) : saved ? (
+        <p className="v1-cv-note-text">{saved}</p>
+      ) : (
+        <p className="v1-cv-note-empty">Nog geen notitie.</p>
+      )}
+    </section>
+  );
+}
+
+function AutoFocusTextarea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [el, setEl] = useState<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    el?.focus();
+  }, [el]);
+  return (
+    <textarea
+      ref={setEl}
+      aria-label={label}
+      className="v1-input"
+      rows={3}
+      maxLength={NOTES_MAX}
+      value={value}
+      placeholder="Bijvoorbeeld wat je hebt afgesproken"
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+function ConfirmDelete({
+  name,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !pending) onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, pending]);
+
+  return (
+    <div className="v1-dialog-backdrop" onClick={pending ? undefined : onCancel}>
+      <div
+        className="v1-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id={titleId} className="v1-dialog-title">
+          Contactverzoek verwijderen?
+        </h2>
+        <p className="v1-dialog-body">Het verzoek van {name} verdwijnt uit je lijst.</p>
+        <div className="v1-dialog-actions">
+          <Button variant="ghost" onClick={onCancel} disabled={pending} autoFocus>
+            Annuleren
+          </Button>
+          <Button onClick={onConfirm} loading={pending}>
+            Verwijderen
+          </Button>
         </div>
       </div>
-
-      {error && (
-        <div className="contactverzoek-error" role="alert">
-          {error}
-        </div>
-      )}
     </div>
   );
 }

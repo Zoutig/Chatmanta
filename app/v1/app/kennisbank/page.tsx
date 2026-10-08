@@ -1,21 +1,21 @@
-// V1 Kennisbank — 3 tabs: Documenten / Website / Q&A.
-// Tab-state via ?tab= in de URL (server-side, geen client-flicker).
+// V1 Kennisbank: Documenten / Website / Q&A (spec §7.4).
+// Leest alle tab-data parallel (session-client, RLS); de actieve tab komt uit
+// ?tab= en wordt client-side gewisseld (kennisbank-view.tsx).
 // Auth-keten = /v1/app: geen sessie → redirect /v1/login; geen lid → "Geen toegang".
 
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
-import { TabsNav } from '@/app/klantendashboard/components/tabs';
+import { getActiveQuizForOrg } from '@/lib/v1/quiz/data';
+import { PageHeader } from '@/app/v1/_ui/page-header';
 import { getOrgChatbot } from '../rag-config';
 import { getWebsiteSources } from './crawl-data';
-import { WebsiteTab } from './components/website-tab';
-import { V1Documents, type UploadedDoc } from './v1-documents';
-import { QATab } from './qa/qa-tab';
+import { KennisbankView } from './kennisbank-view';
+import { parseKbTab } from './kb-tab';
+import type { UploadedDoc } from './v1-documents';
+import './kennisbank.css';
 
 export const dynamic = 'force-dynamic';
-
-const BASE = '/v1/app/kennisbank';
 
 export default async function V1KennisbankPage({
   searchParams,
@@ -23,21 +23,15 @@ export default async function V1KennisbankPage({
   searchParams: Promise<{ tab?: string; prefillQuestion?: string }>;
 }) {
   const { tab, prefillQuestion } = await searchParams;
-  // Een prefill-link (correctieloop, WP4) impliceert de Q&A-tab, zodat de modal mount.
-  const activeTab = prefillQuestion
-    ? 'qa'
-    : tab === 'website' || tab === 'qa'
-      ? tab
-      : 'documenten';
+  // Een prefill-link (correctieloop) impliceert de Q&A-tab, zodat het formulier opent.
+  const activeTab = prefillQuestion ? 'qa' : parseKbTab(tab) ?? 'documenten';
 
   let orgId: string;
   try {
     ({ orgId } = await getSessionOrg());
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <PageHead eyebrow="Kennisbank" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
-      );
+      return <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />;
     }
     throw e; // NEXT_REDIRECT → /v1/login
   }
@@ -45,17 +39,11 @@ export default async function V1KennisbankPage({
   const supabase = await createClient();
   const chatbot = await getOrgChatbot(supabase, orgId);
   if (!chatbot) {
-    return (
-      <PageHead
-        eyebrow="Kennisbank"
-        title="De bronnen waaruit je chatbot put"
-        subtitle="Er is nog geen chatbot ingesteld."
-      />
-    );
+    return <PageHeader title="Kennisbank" description="Er is nog geen chatbot ingesteld." />;
   }
 
   // Lees alle tab-data parallel (session-client, RLS).
-  const [sourcesRes, docRows, chunkCounts, qaRows] = await Promise.all([
+  const [sourcesRes, docRows, chunkCounts, qaRows, activeQuiz] = await Promise.all([
     getWebsiteSources(supabase, orgId, chatbot.id).catch(() => []),
 
     supabase
@@ -90,7 +78,14 @@ export default async function V1KennisbankPage({
       .eq('chatbot_id', chatbot.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => data ?? []),
+
+    // Actieve kennisquiz (best-effort, nooit blokkeren); zelfde berekening als Overzicht.
+    getActiveQuizForOrg(supabase, orgId).catch(() => null),
   ]);
+
+  const quizOpen =
+    activeQuiz?.status === 'actief' &&
+    activeQuiz.questionCount - activeQuiz.answeredCount - activeQuiz.skippedCount > 0;
 
   const docs: UploadedDoc[] = docRows.map((d) => ({
     id: d.id as string,
@@ -109,36 +104,14 @@ export default async function V1KennisbankPage({
     ingestedDocumentId: (r.ingested_document_id as string | null) ?? null,
   }));
 
-  const pageCount = sourcesRes.reduce((n, w) => n + w.pages.length, 0);
-
   return (
-    <>
-      <PageHead
-        eyebrow="Kennisbank"
-        title="De bronnen waaruit je chatbot put"
-        subtitle="Je chatbot antwoordt op basis van wat hier staat."
-      />
-
-      <TabsNav
-        basePath={BASE}
-        active={activeTab}
-        tabs={[
-          { key: 'documenten', label: 'Documenten', count: docs.length },
-          { key: 'website', label: 'Website', count: pageCount },
-          { key: 'qa', label: 'Handmatige Q&A', count: initialQA.length },
-        ]}
-      />
-
-      {activeTab === 'documenten' && <V1Documents initialDocs={docs} />}
-      {activeTab === 'website' && <WebsiteTab initialSources={sourcesRes} />}
-      {activeTab === 'qa' && (
-        <QATab
-          initialQA={initialQA}
-          orgId={orgId}
-          chatbotId={chatbot.id}
-          prefillQuestion={prefillQuestion}
-        />
-      )}
-    </>
+    <KennisbankView
+      initialTab={activeTab}
+      initialDocs={docs}
+      initialSources={sourcesRes}
+      initialQA={initialQA}
+      prefillQuestion={prefillQuestion}
+      quizOpen={quizOpen}
+    />
   );
 }

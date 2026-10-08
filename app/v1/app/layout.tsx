@@ -1,6 +1,6 @@
 // V1 /app shell-layout — data-fetchende wrapper om alle /v1/app-pagina's.
 //
-// Haalt orgName + shell-counts op voor de sidebar/topbar. Auth-keten:
+// Haalt orgName + shell-counts + aandacht-signalen (stippen) op voor de zijbalk. Auth-keten:
 //  1. getSessionOrg gooit NEXT_REDIRECT (geen sessie) of AppError('AUTH_FORBIDDEN')
 //  2. De layout vangt ALLE fouten stil op en degradeert naar lege-props-shell
 //  3. De page-level guard (getSessionOrg in de page) handelt de redirect af
@@ -13,6 +13,7 @@ import { getSessionOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getOrgChatbot } from './rag-config';
 import { getShellCounts } from '@/lib/v1/dashboard/shell-counts';
+import { getAttentionSignals, NO_SIGNALS, type AttentionSignals } from '@/lib/v1/dashboard/attention';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { ShellFrame } from './_shell/shell-frame';
 
@@ -23,13 +24,21 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default async function V1AppLayout({ children }: { children: React.ReactNode }) {
+export default async function V1AppLayout({
+  children,
+  drawer,
+}: {
+  children: React.ReactNode;
+  /** Parallel slot: gesprek als zijpaneel (zie @drawer/(.)gesprekken/[id]). */
+  drawer: React.ReactNode;
+}) {
   // Defaults voor de lege-shell bij geen sessie / geen org / DB-fout.
   let orgName = '';
   let chatbotStatus: ChatbotStatus = 'concept';
   let unansweredCount = 0;
   let contactRequestsNewCount = 0;
   let contactRequestsEnabled = false;
+  let signals: AttentionSignals = NO_SIGNALS;
 
   try {
     const { orgId } = await getSessionOrg();
@@ -44,7 +53,11 @@ export default async function V1AppLayout({ children }: { children: React.ReactN
     orgName = (orgRow.data?.name as string | null) ?? '';
 
     if (chatbot) {
-      const counts = await getShellCounts(supabase, orgId, chatbot.id);
+      const [counts, sig] = await Promise.all([
+        getShellCounts(supabase, orgId, chatbot.id),
+        getAttentionSignals(supabase, orgId, chatbot.id),
+      ]);
+      signals = sig;
       chatbotStatus = counts.chatbotStatus;
       unansweredCount = counts.unansweredCount;
       contactRequestsNewCount = counts.contactRequestsNewCount;
@@ -64,8 +77,10 @@ export default async function V1AppLayout({ children }: { children: React.ReactN
       unansweredCount={unansweredCount}
       showContactRequests={contactRequestsEnabled}
       contactRequestsCount={contactRequestsNewCount}
+      signals={signals}
     >
       {children}
+      {drawer}
     </ShellFrame>
   );
 }

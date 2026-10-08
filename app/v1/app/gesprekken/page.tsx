@@ -1,58 +1,44 @@
-// V1 Klantendashboard — Gesprekken (lijst). Faithful port van V0's structuur:
-// 5 filterpillen (incl. negative_feedback), DANGER-banner voor recente negatieve
-// feedback, WARN-banner voor onbeantwoorde vragen, ReloadButton in PageHead.
+// V1 Klantendashboard: Gesprekken (spec 7.3 + bijlage A).
+//
+// Twee tabs via ?view=: "Alle gesprekken" (lijst) en "Meest gestelde vragen".
+// Eén filterregel: periode (?filter=today|last_7_days|last_30_days) plus de
+// schakelaar "Alleen onbeantwoord" (?unanswered=1, met teller; vervangt de
+// vroegere warn-banner). Een gesprek opent rechts in een Drawer via de
+// onderschepte route @drawer/(.)[id]; de rij-links gebruiken scroll={false},
+// zodat de lijst na sluiten niet naar boven springt.
+//
+// Negatieve feedback (banner, filter, badge) is bewust weg: de V1-widget heeft
+// sinds PR #262 geen duimpjes meer. ?filter=negative_feedback valt terug op 30 dagen.
 //
 // Read-only. Auth-keten: getSessionOrg → AUTH_FORBIDDEN / NEXT_REDIRECT.
-// Alle reads onder de session-client (RLS). Geen TabsNav: "Meest gestelde vragen"
-// is een latere fase — voeg een <TabsNav> toe met view='gesprekken'|'top-questions'
-// en een <view === 'top-questions'> block wanneer die fase landt.
+// Alle reads onder de session-client (RLS).
 
 import Link from 'next/link';
-import { MessagesSquare } from 'lucide-react';
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import {
-  listV1Conversations,
-  listV1NegativeFeedback,
-  countRecentNegativeFeedback,
-  type V1ConversationFilter,
-} from '@/lib/v1/dashboard/conversations';
+import { listV1Conversations, type V1ConversationListItem } from '@/lib/v1/dashboard/conversations';
 import { getV1KlantFaqForDashboard, getV1FaqConfig } from '@/lib/v1/dashboard/faq';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
-import { StatusBadge } from '@/app/klantendashboard/components/status-badge';
-import { Icon } from '@/app/klantendashboard/components/ui/icons';
-import { TabsNav } from '@/app/klantendashboard/components/tabs';
-import { NegativeFeedbackTable } from '@/app/klantendashboard/gesprekken/components/negative-feedback-table';
-import { ReloadButton } from '@/app/klantendashboard/gesprekken/components/reload-button';
-import { TopQuestionsTab } from './top-questions/top-questions-tab';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { LinkTabs } from '@/app/v1/_ui/tabs';
+import { List } from '@/app/v1/_ui/list';
+import { Badge, EmptyState } from '@/app/v1/_ui/feedback';
+import { buttonClass } from '@/app/v1/_ui/button';
 import { getOrgChatbot } from '../rag-config';
-import { FilterBar } from './filter-bar';
+import { FilterBar, type Period } from './filter-bar';
+import { TopQuestionsTab } from './top-questions/top-questions-tab';
+import { formatShort } from './_conversation/format';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_FILTERS: V1ConversationFilter[] = [
-  'today',
-  'last_7_days',
-  'last_30_days',
-  'unanswered',
-  'negative_feedback',
-];
-
-function formatDateTime(iso: string): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('nl-NL', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const BASE = '/v1/app/gesprekken';
+const PERIODS: Period[] = ['today', 'last_7_days', 'last_30_days'];
+const DESCRIPTION = 'Lees mee met je bezoekers en zie waar je chatbot vastloopt.';
 
 export default async function V1GesprekkenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; view?: string }>;
+  searchParams: Promise<{ filter?: string; view?: string; unanswered?: string }>;
 }) {
   let orgId: string;
   try {
@@ -60,11 +46,9 @@ export default async function V1GesprekkenPage({
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
-        <PageHead
-          eyebrow="Gesprekken"
-          title="Geen toegang"
-          subtitle="Je bent geen lid van deze organisatie."
-        />
+        <div className="v1-page">
+          <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />
+        </div>
       );
     }
     throw e; // NEXT_REDIRECT → /v1/login
@@ -74,76 +58,60 @@ export default async function V1GesprekkenPage({
   const chatbot = await getOrgChatbot(supabase, orgId);
   if (!chatbot) {
     return (
-      <PageHead
-        eyebrow="Gesprekken"
-        title="Alle conversaties op één plek"
-        subtitle="Er is nog geen chatbot ingesteld."
-      />
+      <div className="v1-page">
+        <PageHeader title="Gesprekken" description="Er is nog geen chatbot voor je organisatie ingesteld." />
+      </div>
     );
   }
 
-  const { filter: rawFilter, view: rawView } = await searchParams;
-  const filter: V1ConversationFilter = VALID_FILTERS.includes(rawFilter as V1ConversationFilter)
-    ? (rawFilter as V1ConversationFilter)
-    : 'last_30_days';
-  const view: 'gesprekken' | 'top-questions' =
-    rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
+  const { filter: rawFilter, view: rawView, unanswered: rawUnanswered } = await searchParams;
+  // Oude deelbare link ?filter=unanswered = 30 dagen + alleen onbeantwoord.
+  const legacyUnanswered = rawFilter === 'unanswered';
+  const period: Period = PERIODS.includes(rawFilter as Period) ? (rawFilter as Period) : 'last_30_days';
+  const onlyUnanswered = legacyUnanswered || rawUnanswered === '1';
+  const view: 'gesprekken' | 'top-questions' = rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
 
-  const [items, faqResult, faqConfig, negativeFeedback, recentNegativeCount, qaData] =
-    await Promise.all([
-      filter === 'negative_feedback'
-        ? Promise.resolve([])
-        : listV1Conversations(supabase, orgId, chatbot.id, filter),
-      getV1KlantFaqForDashboard(supabase, orgId, chatbot.id),
-      getV1FaqConfig(supabase, orgId, chatbot.id),
-      listV1NegativeFeedback(supabase, orgId, chatbot.id),
-      countRecentNegativeFeedback(supabase, orgId, chatbot.id, 7),
-      supabase
-        .from('org_qa_items')
-        .select('question')
-        .eq('organization_id', orgId)
-        .eq('chatbot_id', chatbot.id)
-        .eq('active', true),
-    ]);
+  const [all, faqResult, faqConfig, qaData] = await Promise.all([
+    listV1Conversations(supabase, orgId, chatbot.id, period),
+    getV1KlantFaqForDashboard(supabase, orgId, chatbot.id),
+    getV1FaqConfig(supabase, orgId, chatbot.id),
+    supabase
+      .from('org_qa_items')
+      .select('question')
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbot.id)
+      .eq('active', true),
+  ]);
 
-  const existingQAQuestions = (qaData.data ?? []).map(
-    (r: { question: string }) => r.question as string,
-  );
-  const unansweredCount = items.filter((x) => x.unanswered).length;
+  const existingQAQuestions = (qaData.data ?? []).map((r: { question: string }) => r.question as string);
+  const unansweredCount = all.filter((x) => x.unanswered).length;
+  const items = onlyUnanswered ? all.filter((x) => x.unanswered) : all;
+
+  // Tabs houden de filters vast, zodat terugschakelen dezelfde lijst geeft.
+  const filterQs = new URLSearchParams({ filter: period });
+  if (onlyUnanswered) filterQs.set('unanswered', '1');
+  const topQs = new URLSearchParams(filterQs);
+  topQs.set('view', 'top-questions');
 
   return (
-    <>
-      <PageHead
-        eyebrow="Gesprekken"
-        title="Alle conversaties op één plek"
-        subtitle="Zie waar je chatbot vastloopt en los het op met nieuwe kennis."
-        actions={
-          <>
-            <a
-              href="/v1/app/gesprekken/export"
-              className="klant-btn"
-              data-variant="ghost"
-              style={{ textDecoration: 'none' }}
-              title="Exporteert max. 5.000 berichten als CSV"
-            >
-              Exporteer CSV
-            </a>
-            <ReloadButton />
-          </>
-        }
-      />
+    <div className="v1-page">
+      <PageHeader title="Gesprekken" description={DESCRIPTION} />
 
-      <TabsNav
-        basePath="/v1/app/gesprekken"
-        paramName="view"
+      <LinkTabs
+        label="Gesprekken"
         active={view}
-        tabs={[
-          { key: 'gesprekken', label: 'Alle gesprekken', count: items.length },
-          { key: 'top-questions', label: 'Meest gestelde vragen', count: faqResult.items.length },
+        items={[
+          { id: 'gesprekken', label: 'Alle gesprekken', count: items.length, href: `${BASE}?${filterQs}` },
+          {
+            id: 'top-questions',
+            label: 'Meest gestelde vragen',
+            count: faqResult.items.length,
+            href: `${BASE}?${topQs}`,
+          },
         ]}
       />
 
-      {view === 'top-questions' && (
+      {view === 'top-questions' ? (
         <TopQuestionsTab
           initial={faqResult.items}
           totalUnique={faqResult.totalUnique}
@@ -152,166 +120,63 @@ export default async function V1GesprekkenPage({
           config={faqConfig}
           existingQAQuestions={existingQAQuestions}
         />
-      )}
-
-      {view === 'gesprekken' && <FilterBar active={filter} />}
-
-      {view === 'gesprekken' && filter === 'negative_feedback' ? (
-        <NegativeFeedbackTable items={negativeFeedback} qaBasePath="/v1/app/kennisbank" />
-      ) : view === 'gesprekken' && items.length === 0 ? (
-        <div className="klant-empty">
-          <div className="klant-empty-icon">
-            <MessagesSquare size={26} strokeWidth={1.6} />
-          </div>
-          <h3 className="klant-empty-title">
-            {filter === 'unanswered' ? 'Geen onbeantwoorde vragen' : 'Nog geen gesprekken'}
-          </h3>
-          <p className="klant-empty-sub">
-            {filter === 'unanswered'
-              ? 'Je chatbot heeft alle vragen beantwoord.'
-              : 'Zodra je widget live staat, zie je hier de gesprekken.'}
-          </p>
+      ) : (
+        <div className="v1-stack">
+          <FilterBar period={period} onlyUnanswered={onlyUnanswered} unansweredCount={unansweredCount} />
+          <section className="v1-card v1-gs-listcard" aria-label="Gesprekken">
+            {items.length === 0 ? (
+              <EmptyLine period={period} onlyUnanswered={onlyUnanswered} />
+            ) : (
+              <List label="Gesprekken">
+                {items.map((c) => (
+                  <ConversationRow key={c.id} item={c} />
+                ))}
+              </List>
+            )}
+          </section>
         </div>
-      ) : view === 'gesprekken' ? (
-        <>
-          {recentNegativeCount > 0 && (
-            <div
-              style={{
-                marginBottom: 12,
-                padding: '10px 14px',
-                background: 'var(--klant-danger-soft)',
-                border: '1px solid var(--klant-danger-border)',
-                borderRadius: 'var(--klant-r-md)',
-                fontSize: 13,
-                color: 'var(--klant-ink)',
-              }}
-            >
-              <strong>{recentNegativeCount}</strong>{' '}
-              {recentNegativeCount === 1 ? 'bezoeker gaf' : 'bezoekers gaven'} negatieve feedback
-              in de laatste 7 dagen.{' '}
-              <Link
-                href="/v1/app/gesprekken?filter=negative_feedback"
-                style={{ color: 'var(--klant-accent)' }}
-              >
-                Bekijk
-              </Link>
-            </div>
-          )}
-          {unansweredCount > 0 && filter !== 'unanswered' && (
-            <div
-              style={{
-                marginBottom: 16,
-                padding: '10px 14px',
-                background: 'var(--klant-warn-soft)',
-                border: '1px solid var(--klant-warn-border)',
-                borderRadius: 'var(--klant-r-md)',
-                fontSize: 13,
-                color: 'var(--klant-ink)',
-              }}
-            >
-              <strong>{unansweredCount}</strong>{' '}
-              {unansweredCount === 1 ? 'gesprek heeft' : 'gesprekken hebben'} een onbeantwoorde
-              vraag.{' '}
-              <Link
-                href="/v1/app/gesprekken?filter=unanswered"
-                style={{ color: 'var(--klant-accent)' }}
-              >
-                Bekijk
-              </Link>
-            </div>
-          )}
-          <div
-            style={{
-              background: 'var(--klant-surface)',
-              border: '1px solid var(--klant-border)',
-              borderRadius: 'var(--klant-r-lg)',
-              boxShadow: 'var(--klant-shadow)',
-              overflow: 'hidden',
-            }}
-          >
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {items.map((c, i) => (
-                <li
-                  key={c.id}
-                  style={{ borderTop: i ? '1px solid var(--klant-border)' : 'none' }}
-                >
-                  <Link
-                    href={`/v1/app/gesprekken/${c.id}`}
-                    className="klant-convo-row"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      padding: '13px 18px',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: 6,
-                          background: 'var(--klant-surface-muted)',
-                          color: 'var(--klant-muted)',
-                          border: '1px solid var(--klant-border)',
-                          display: 'inline-grid',
-                          placeItems: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Icon name="globe" size={11} />
-                      </span>
-                      <span style={{ fontSize: 12.5, color: 'var(--klant-ink)', fontWeight: 500 }}>
-                        Bezoeker
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: 'auto',
-                          fontSize: 11,
-                          color: 'var(--klant-dim)',
-                          fontFamily: 'var(--klant-font-mono)',
-                        }}
-                      >
-                        {formatDateTime(c.lastMessageAt)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13.5,
-                        color: 'var(--klant-ink)',
-                        lineHeight: 1.35,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {c.firstQuestion}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <StatusBadge
-                        status={c.unanswered ? 'unanswered' : 'answered'}
-                        kind="conversation"
-                      />
-                      <span
-                        style={{
-                          marginLeft: 'auto',
-                          fontSize: 11,
-                          color: 'var(--klant-dim)',
-                          fontFamily: 'var(--klant-font-mono)',
-                        }}
-                      >
-                        {c.messageCount} berichten
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
-      ) : null}
-    </>
+      )}
+    </div>
+  );
+}
+
+/** Rij met Link scroll={false}: het zijpaneel opent zonder dat de lijst verspringt. */
+function ConversationRow({ item }: { item: V1ConversationListItem }) {
+  const n = item.messageCount;
+  return (
+    <li>
+      <Link href={`${BASE}/${item.id}`} scroll={false} className="v1-list-row v1-list-row--link">
+        <span className="v1-list-main">
+          <span className="v1-list-title">{item.firstQuestion}</span>
+          <span className="v1-list-meta">
+            {n} {n === 1 ? 'bericht' : 'berichten'} · {formatShort(item.lastMessageAt)}
+          </span>
+        </span>
+        {item.unanswered ? (
+          <span className="v1-list-end">
+            <Badge tone="warn">Onbeantwoord</Badge>
+          </span>
+        ) : null}
+      </Link>
+    </li>
+  );
+}
+
+function EmptyLine({ period, onlyUnanswered }: { period: Period; onlyUnanswered: boolean }) {
+  if (onlyUnanswered) {
+    return <EmptyState>Geen onbeantwoorde vragen in deze periode.</EmptyState>;
+  }
+  if (period === 'today') return <EmptyState>Vandaag nog geen gesprekken.</EmptyState>;
+  if (period === 'last_7_days') return <EmptyState>De afgelopen 7 dagen nog geen gesprekken.</EmptyState>;
+  return (
+    <EmptyState
+      action={
+        <Link href="/v1/app/widget" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+          Naar widget
+        </Link>
+      }
+    >
+      Nog geen gesprekken. Zodra je widget live staat, zie je ze hier.
+    </EmptyState>
   );
 }

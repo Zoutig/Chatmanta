@@ -1,11 +1,12 @@
-// V1 klant-feedback pagina — port van app/klantendashboard/feedback/page.tsx.
+// V1 klant-feedback pagina.
 // Auth: getSessionOrg (redirect naar /v1/login bij geen sessie).
 // Voorvullen: e-mail uit sessie; naam leeg (V1 heeft geen contactPerson-override).
 
 import { isAppError } from '@/lib/errors/app-error';
 import { getSessionOrg } from '@/lib/auth';
-import { Card } from '@/app/klantendashboard/components/ui/card';
+import { PageHeader } from '@/app/v1/_ui/page-header';
 import { FeedbackForm } from './feedback-form';
+import './feedback.css';
 
 export const metadata = { title: 'Feedback · ChatManta' };
 export const dynamic = 'force-dynamic';
@@ -17,26 +18,21 @@ export default async function V1FeedbackPage() {
     initialEmail = user.email ?? '';
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      // Lid van geen org — laat het formulier leeg renderen (auth check in action).
+      // Lid van geen org: laat het formulier leeg renderen (auth check in action).
     } else {
       throw e; // NEXT_REDIRECT → /v1/login
     }
   }
 
   return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">Feedback &amp; meldingen</h1>
-          <p className="klant-page-sub">
-            Een fout, een idee of een verkeerd antwoord van je chatbot? Laat het ons weten.
-          </p>
-        </div>
-      </header>
-
-      <Card style={{ maxWidth: 720 }}>
+    <div className="v1-page v1-fb-page">
+      <PageHeader
+        title="Feedback geven"
+        description="Een fout, een idee of een verkeerd antwoord van je chatbot? Laat het ons weten."
+      />
+      <div className="v1-card">
         <FeedbackForm initialEmail={initialEmail} />
-      </Card>
-    </>
+      </div>
+    </div>
   );
 }

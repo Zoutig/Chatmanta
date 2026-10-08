@@ -1,39 +1,59 @@
-// V1 Klantendashboard — Contactverzoeken (inbox + werkstroom).
+// V1 Klantendashboard: Contactverzoeken (inbox + werkstroom).
 //
 // Auth-keten = die van /v1/app (getSessionOrg). Org uit de sessie. De lijst leest
-// onder de session-client (RLS, org-leden-SELECT) — ECHTE bezoekers-PII, dus
+// onder de session-client (RLS, org-leden-SELECT): ECHTE bezoekers-PII, dus
 // nooit service-role hier. Status/notitie/wissen lopen via de gegate server-actions.
 //
-// De tab toont alléén data als de contactverzoeken-toggle aan staat; staat 'ie uit
-// dan tonen we een uitleg-state (een directe URL mag geen rauwe data tonen).
+// De pagina toont alléén data als de contactverzoeken-toggle aan staat; staat 'ie uit
+// dan tonen we een lege staat (een directe URL mag geen rauwe data tonen).
+// Het statusfilter (?status=) filtert alleen de weergave; de query blijft gelijk.
 
-import { PhoneCall } from 'lucide-react';
+import Link from 'next/link';
 
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { buttonClass } from '@/app/v1/_ui/button';
+import { EmptyState } from '@/app/v1/_ui/feedback';
+import { LinkTabs } from '@/app/v1/_ui/tabs';
 import { getOrgChatbot } from '../rag-config';
 import { getChatbotSettings } from '../instellingen/settings-config';
 import {
   listContactRequests,
   STATUS_FLOW,
   STATUS_LABEL,
-  type V1ContactRequest,
+  type V1ContactRequestStatus,
 } from '@/lib/v1/dashboard/contact-requests';
 import { ContactRequestCard } from './contact-request-card';
+import './contactverzoeken.css';
 
 export const metadata = { title: 'Contactverzoeken · ChatManta' };
 export const dynamic = 'force-dynamic';
 
-export default async function V1ContactverzoekenPage() {
+const BASE = '/v1/app/contactverzoeken';
+const SETTINGS_HREF = '/v1/app/instellingen#contact';
+
+type Filter = 'all' | V1ContactRequestStatus;
+
+function parseFilter(raw: string | undefined): Filter {
+  return STATUS_FLOW.includes(raw as V1ContactRequestStatus) ? (raw as V1ContactRequestStatus) : 'all';
+}
+
+export default async function V1ContactverzoekenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   let orgId: string;
   try {
     ({ orgId } = await getSessionOrg());
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
-        <PageHead eyebrow="Contactverzoeken" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
+        <div className="v1-page">
+          <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />
+        </div>
       );
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
@@ -45,79 +65,92 @@ export default async function V1ContactverzoekenPage() {
     ? (await getChatbotSettings(supabase, chatbot.id)).contactRequestsEnabled
     : false;
 
+  const settingsLink = (
+    <Link href={SETTINGS_HREF} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+      Naar Chatbot › Contact
+    </Link>
+  );
+
   if (!enabled) {
     return (
-      <>
-        <PageHead
-          eyebrow="Contactverzoeken"
-          title="Contactverzoeken staat uit"
-          subtitle="Zet ze aan bij Instellingen, dan kunnen bezoekers via je chatbot om contact vragen."
+      <div className="v1-page">
+        <PageHeader
+          title="Contactverzoeken"
+          description="Bezoekers die via je chatbot om contact vragen."
         />
-        <div className="klant-empty">
-          <div className="klant-empty-icon">
-            <PhoneCall size={26} strokeWidth={1.6} />
-          </div>
-          <h3 className="klant-empty-title">Nog niet ingeschakeld</h3>
-          <p className="klant-empty-sub">
-            Zet &ldquo;Contactverzoeken&rdquo; aan bij Instellingen. Je chatbot biedt bezoekers dan een kort formulier aan.
-          </p>
+        <div className="v1-card">
+          <EmptyState action={settingsLink}>
+            Contactverzoeken staat uit. Zet ze aan bij Chatbot › Contact.
+          </EmptyState>
         </div>
-      </>
+      </div>
     );
   }
 
   const items = await listContactRequests(supabase, orgId);
+  const filter = parseFilter((await searchParams).status);
 
-  // Groepeer op status in de werkstroom-volgorde (Nieuw → Opgepakt → Afgehandeld);
-  // binnen elke groep blijft de recent-eerst-volgorde uit de query behouden.
-  const groups = STATUS_FLOW.map((status) => ({
-    status,
-    items: items.filter((r) => r.status === status),
-  })).filter((g) => g.items.length > 0);
+  // Op "Alle" in werkstroom-volgorde (Nieuw → Opgepakt → Afgehandeld); binnen
+  // elke status blijft de recent-eerst-volgorde uit de query behouden.
+  const shown =
+    filter === 'all'
+      ? STATUS_FLOW.flatMap((s) => items.filter((r) => r.status === s))
+      : items.filter((r) => r.status === filter);
+
+  const tabs = [
+    { id: 'all', label: 'Alle', count: items.length, href: BASE },
+    ...STATUS_FLOW.map((s) => ({
+      id: s,
+      label: STATUS_LABEL[s],
+      count: items.filter((r) => r.status === s).length,
+      href: `${BASE}?status=${s}`,
+    })),
+  ];
 
   return (
-    <>
-      <PageHead
-        eyebrow="Contactverzoeken"
-        title="Bezoekers die contact willen"
-        subtitle="Verzoeken die via je chatbot binnenkwamen. Zet ze op opgepakt en daarna op afgehandeld."
+    <div className="v1-page">
+      <PageHeader
+        title="Contactverzoeken"
+        description="Bezoekers die via je chatbot om contact vragen, van nieuw tot afgehandeld."
         actions={
-          <a
-            href="/v1/app/contactverzoeken/export"
-            className="klant-btn"
-            data-variant="ghost"
-            style={{ textDecoration: 'none' }}
-            title="Exporteert max. 5.000 rijen als CSV"
-          >
-            Exporteer CSV
-          </a>
+          items.length > 0 ? (
+            <a
+              href={`${BASE}/export`}
+              className={buttonClass({ variant: 'secondary' })}
+              title="Exporteert maximaal 5.000 verzoeken als CSV"
+            >
+              Exporteer CSV
+            </a>
+          ) : null
         }
       />
 
       {items.length === 0 ? (
-        <div className="klant-empty">
-          <div className="klant-empty-icon">
-            <PhoneCall size={26} strokeWidth={1.6} />
-          </div>
-          <h3 className="klant-empty-title">Nog geen contactverzoeken</h3>
-          <p className="klant-empty-sub">
-            Vraagt een bezoeker via je chatbot om contact, dan zie je dat hier.
-          </p>
+        <div className="v1-card">
+          <EmptyState action={settingsLink}>
+            Nog geen contactverzoeken. Vraagt een bezoeker via je chatbot om contact, dan zie je dat hier.
+          </EmptyState>
         </div>
       ) : (
-        groups.map((g) => (
-          <section key={g.status} style={{ marginBottom: 22 }}>
-            <h3 className="klant-section-title" style={{ marginBottom: 12 }}>
-              {STATUS_LABEL[g.status]} ({g.items.length})
-            </h3>
-            <div className="contactverzoeken-list">
-              {g.items.map((r: V1ContactRequest) => (
-                <ContactRequestCard key={r.id} request={r} />
-              ))}
+        <>
+          <LinkTabs items={tabs} active={filter} label="Filter op status" />
+          {shown.length === 0 ? (
+            <div className="v1-card">
+              <EmptyState>
+                Geen verzoeken met status {STATUS_LABEL[filter as V1ContactRequestStatus].toLowerCase()}.
+              </EmptyState>
             </div>
-          </section>
-        ))
+          ) : (
+            <ul className="v1-cv-list" aria-label="Contactverzoeken">
+              {shown.map((r) => (
+                <li key={r.id}>
+                  <ContactRequestCard request={r} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
-    </>
+    </div>
   );
 }

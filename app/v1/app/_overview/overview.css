@@ -1,0 +1,61 @@
+/* Overzicht (spec §7.2). Lokale stijl, alles onder .v1-ui met prefix v1-ov-. */
+
+/* Kopacties: status-pill verticaal gecentreerd naast de knoppen. */
+.v1-ui .v1-page-actions:has(#v1-ov-preview) { align-items: center; }
+
+/* ── Volgende-stap-blok ──────────────────────────────────── */
+.v1-ui .v1-ov-next {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px 32px;
+  padding: 26px 28px; border-radius: var(--v1-r-xl); background: var(--v1-navy); color: var(--v1-on-navy);
+  box-shadow: var(--v1-shadow-2);
+}
+.v1-ui .v1-ov-next-main { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.v1-ui .v1-ov-next-eyebrow { margin: 0; font-size: 13px; font-weight: 500; color: var(--v1-on-navy-2); }
+.v1-ui .v1-ov-next-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
+.v1-ui .v1-ov-next-progress { display: flex; gap: 6px; max-width: 360px; margin-top: 8px; }
+.v1-ui .v1-ov-next-seg { flex: 1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); transition: background-color var(--v1-slow) var(--v1-ease); }
+.v1-ui .v1-ov-next-seg[data-done] { background: #2dd4bf; }
+.v1-ui .v1-ov-next-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.v1-ui .v1-ov-next-cta.v1-btn--secondary { background: #fff; color: var(--v1-navy); box-shadow: none; }
+.v1-ui .v1-ov-next-cta.v1-btn--secondary:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25); }
+.v1-ui .v1-ov-next-ghost.v1-btn--ghost { color: var(--v1-on-navy-2); }
+.v1-ui .v1-ov-next-ghost.v1-btn--ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: var(--v1-on-navy); }
+
+.v1-ui .v1-ov-next-list {
+  flex-basis: 100%; list-style: none; margin: 0; padding: 6px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.1);
+  animation: v1-enter var(--v1-base) var(--v1-ease) both;
+}
+.v1-ui .v1-ov-next-item { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.v1-ui .v1-ov-next-check {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.3);
+}
+.v1-ui .v1-ov-next-item[data-done] .v1-ov-next-check { background: #2dd4bf; color: var(--v1-navy); box-shadow: none; }
+.v1-ui .v1-ov-next-item-title { flex: 1; min-width: 0; font-size: 14px; color: var(--v1-on-navy); }
+.v1-ui .v1-ov-next-item[data-done] .v1-ov-next-item-title { color: var(--v1-on-navy-3); text-decoration: line-through; }
+.v1-ui .v1-ov-next-item-link { text-decoration: none; border-radius: 6px; }
+.v1-ui .v1-ov-next-item-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.v1-ui .v1-ov-next-item-link:focus-visible,
+.v1-ui .v1-ov-next-skip:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-ui .v1-ov-next-skip {
+  flex-shrink: 0; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--v1-on-navy-2); font: 500 13px var(--v1-font); cursor: pointer;
+}
+.v1-ui .v1-ov-next-skip:hover { background: rgba(255, 255, 255, 0.08); color: var(--v1-on-navy); }
+
+/* ── Twee kolommen ───────────────────────────────────────── */
+.v1-ui .v1-ov-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+
+/* Meest gestelde vragen: dunne balk + aantal */
+.v1-ui .v1-ov-top { list-style: none; margin: 8px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.v1-ui .v1-ov-top-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.v1-ui .v1-ov-top-q { font-size: 14px; line-height: 1.35; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-ui .v1-ov-top-n { flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--v1-muted); }
+.v1-ui .v1-ov-top .v1-bar { height: 4px; }
+
+@media (max-width: 900px) {
+  .v1-ui .v1-ov-next { padding: 22px 20px; }
+  .v1-ui .v1-ov-next-title { font-size: 18px; }
+  .v1-ui .v1-ov-cols { grid-template-columns: minmax(0, 1fr); }
+  .v1-ui .v1-ov-card-list .v1-list-row { flex-wrap: wrap; }
+}

@@ -1,0 +1,33 @@
+/* Kennisquiz (V1-ontwerplaag). Alleen onder .v1-ui, prefix v1-qz-. */
+
+.v1-ui .v1-qz-page { max-width: 720px; }
+.v1-ui .v1-qz-card { display: flex; flex-direction: column; gap: 18px; }
+
+.v1-ui .v1-qz-progress { display: flex; flex-direction: column; gap: 8px; }
+.v1-ui .v1-qz-progress-text { margin: 0; font-size: 13px; font-weight: 500; color: var(--v1-muted); }
+
+.v1-ui .v1-qz-q { display: flex; flex-direction: column; gap: 6px; }
+.v1-ui .v1-qz-cat { margin: 0; font-size: 12px; font-weight: 600; color: var(--v1-accent-ink); }
+.v1-ui .v1-qz-title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.4; letter-spacing: -0.01em; color: var(--v1-ink); }
+.v1-ui .v1-qz-context { margin: 0; font-size: 14px; line-height: 1.5; color: var(--v1-muted); }
+
+.v1-ui .v1-qz-options { display: flex; flex-direction: column; gap: 8px; }
+.v1-ui .v1-qz-option {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; box-sizing: border-box; padding: 12px 14px;
+  border: 0; border-radius: var(--v1-r-md); background: var(--v1-bg); color: var(--v1-ink);
+  font: 500 14px/1.4 var(--v1-font); text-align: left; cursor: pointer;
+  transition: background-color var(--v1-fast) ease, box-shadow var(--v1-fast) ease;
+}
+.v1-ui .v1-qz-option:hover:not(:disabled) { background: var(--v1-surface-2); }
+.v1-ui .v1-qz-option[aria-checked='true'] { background: var(--v1-surface); box-shadow: 0 0 0 2px var(--v1-accent); font-weight: 600; }
+.v1-ui .v1-qz-option:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-ui .v1-qz-option:disabled { cursor: default; opacity: 0.6; }
+.v1-ui .v1-qz-radio {
+  flex-shrink: 0; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--v1-line-strong); background: var(--v1-surface);
+  transition: box-shadow var(--v1-fast) var(--v1-ease);
+}
+.v1-ui .v1-qz-option[aria-checked='true'] .v1-qz-radio { box-shadow: inset 0 0 0 5px var(--v1-accent); }
+
+.v1-ui .v1-qz-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+

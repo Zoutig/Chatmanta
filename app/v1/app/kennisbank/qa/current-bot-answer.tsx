@@ -1,15 +1,16 @@
 'use client';
 
-// V1 Kennisbank — "Wat antwoordt de bot nu?"-paneel (port van V0's current-bot-answer.tsx).
+// "Wat antwoordt de bot nu?"-venster (Kennisbank › Q&A, ook op Gesprekken).
 //
 // Bewust ON-DEMAND (knop), niet automatisch: dit is een volwaardige, billable
-// RAG-call (~8-15s). We hergebruiken askV1 (org uit de getrouwde sessie) in
-// plaats van /api/v0/chat. Structureel identiek aan V0; enige seam-wijziging:
-// askV1 geeft res.answer direct terug (geen res.response.answer-wrapper).
+// RAG-call (~8-15s). askV1 leidt de org af uit de sessie. Meldingen (dagbudget,
+// maandlimiet, te veel verzoeken, geen antwoord) blijven inline (bijlage A, B).
 
 import { useState, useTransition } from 'react';
-import { Sparkles, RefreshCw } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
 import { askV1 } from '@/app/v1/app/actions';
+import { Button } from '@/app/v1/_ui/button';
+import '../kennisbank.css';
 
 const ERROR_MESSAGES: Record<string, string> = {
   NO_CHATBOT: 'Er is nog geen chatbot ingesteld.',
@@ -21,7 +22,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export function CurrentBotAnswer({ question }: { question: string }) {
-  // null = nog niet opgehaald; string = opgehaald antwoord; '' wordt nooit getoond.
+  // null = nog niet opgehaald; string = opgehaald antwoord.
   const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -51,102 +52,40 @@ export function CurrentBotAnswer({ question }: { question: string }) {
   const hasResult = answer !== null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button
-          type="button"
+    <div className="v1-kb-bot">
+      <div className="v1-kb-bot-bar">
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={fetchAnswer}
-          className="klant-btn"
-          data-variant="ghost"
           disabled={disabled}
-          style={{ fontSize: 12 }}
-          title={
-            trimmed
-              ? 'Stel deze vraag aan je chatbot'
-              : 'Vul eerst een vraag in'
-          }
+          title={trimmed ? 'Stel deze vraag aan je chatbot' : 'Vul eerst een vraag in'}
         >
           {hasResult ? (
-            <RefreshCw size={13} strokeWidth={2} />
+            <RefreshCw size={14} strokeWidth={1.8} aria-hidden="true" />
           ) : (
-            <Sparkles size={13} strokeWidth={2} />
+            <Sparkles size={14} strokeWidth={1.8} aria-hidden="true" />
           )}
           {hasResult ? 'Opnieuw ophalen' : 'Toon wat de bot nu antwoordt'}
-        </button>
+        </Button>
         {pending && (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 12,
-              color: 'var(--klant-fg-muted)',
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: 999,
-                border: '2px solid var(--klant-border)',
-                borderTopColor: 'var(--klant-accent)',
-                display: 'inline-block',
-                animation: 'klant-cba-spin 0.7s linear infinite',
-              }}
-            />
-            De bot denkt na…
+          <span className="v1-kb-thinking" role="status">
+            <span className="v1-spinner" aria-hidden="true" />
+            De bot denkt na
           </span>
         )}
       </div>
 
-      <style>{`@keyframes klant-cba-spin { to { transform: rotate(360deg); } }`}</style>
-
       {error && !pending && (
-        <div
-          style={{
-            padding: '8px 10px',
-            borderRadius: 'var(--klant-r-sm)',
-            background: 'var(--klant-danger-soft)',
-            color: 'var(--klant-danger)',
-            fontSize: 12.5,
-            lineHeight: 1.5,
-          }}
-        >
+        <p className="v1-alert v1-alert--error" role="alert">
           {error}
-        </div>
+        </p>
       )}
 
       {hasResult && !pending && (
-        <div
-          style={{
-            border: '1px solid var(--klant-border)',
-            borderRadius: 'var(--klant-r-sm)',
-            background: 'var(--klant-surface-muted)',
-            padding: '10px 12px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: '0.03em',
-              textTransform: 'uppercase',
-              color: 'var(--klant-fg-dim)',
-              marginBottom: 6,
-            }}
-          >
-            Wat je chatbot nu antwoordt
-          </div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: 'var(--klant-fg-muted)',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
+        <div className="v1-kb-bot-answer">
+          <p className="v1-kb-bot-label">Wat je chatbot nu antwoordt</p>
+          <p className="v1-kb-bot-text">
             {answer && answer.trim() ? answer : 'De bot gaf geen tekstantwoord.'}
           </p>
         </div>

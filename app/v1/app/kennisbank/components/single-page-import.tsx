@@ -1,10 +1,20 @@
 'use client';
-// V1 fork van V0's single-page-import.tsx — enige wijziging: action-imports uit
-// ../actions (V1) i.p.v. @/app/actions/crawl (V0). JSX/copy verbatim.
+// Losse pagina importeren: wordt direct opgehaald, zonder volledige crawl.
+// Actie ongewijzigd (scrapeSinglePageAction); vormgeving V1.
 import { useState, useTransition } from 'react';
 import { scrapeSinglePageAction, refreshWebsiteSources } from '../actions';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import { useToast } from '@/app/v1/_ui/toast';
 
-export function SinglePageImport({ onAdded }: { onAdded: (s: Awaited<ReturnType<typeof refreshWebsiteSources>>) => void }) {
+export function SinglePageImport({
+  onAdded,
+  onCancel,
+}: {
+  onAdded: (s: Awaited<ReturnType<typeof refreshWebsiteSources>>) => void;
+  onCancel: () => void;
+}) {
+  const toast = useToast();
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -14,21 +24,24 @@ export function SinglePageImport({ onAdded }: { onAdded: (s: Awaited<ReturnType<
     start(async () => {
       const res = await scrapeSinglePageAction(url);
       if (!res.ok) { setError(res.error); return; }
-      setUrl(''); try { onAdded(await refreshWebsiteSources()); } catch {}
+      setUrl('');
+      toast.success('Pagina toegevoegd');
+      try { onAdded(await refreshWebsiteSources()); } catch {}
     });
   }
   return (
-    <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 13, fontWeight: 600 }}>Losse pagina importeren</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input type="url" className="klant-input" placeholder="https://jouwsite.nl/nieuwe-pagina"
-          value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} disabled={pending} />
-        <button type="button" className="klant-btn" data-variant="primary" onClick={add} disabled={pending || !url.trim()}>
-          {pending ? 'Toevoegen…' : 'Toevoegen'}
-        </button>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--klant-fg-dim)' }}>Wordt direct opgehaald, zonder volledige crawl.</div>
-      {error && <div style={{ fontSize: 12, color: 'var(--klant-danger, #dc2626)' }}>{error}</div>}
-    </div>
+    <form noValidate className="v1-card v1-kb-card-stack" onSubmit={(e) => { e.preventDefault(); add(); }}>
+      <Field label="Losse pagina toevoegen" hint="Wordt direct opgehaald, zonder de hele website.">
+        {(id) => (
+          <div className="v1-kb-form-row">
+            <input id={id} type="url" className="v1-input" placeholder="https://jouwsite.nl/nieuwe-pagina"
+              value={url} onChange={(e) => setUrl(e.target.value)} disabled={pending} autoFocus />
+            <Button type="submit" loading={pending} disabled={!url.trim()}>Toevoegen</Button>
+            <Button variant="ghost" onClick={onCancel} disabled={pending}>Annuleren</Button>
+          </div>
+        )}
+      </Field>
+      {error && <p className="v1-alert v1-alert--error" role="alert">{error}</p>}
+    </form>
   );
 }
