@@ -12,7 +12,7 @@
 // GK-toggle (answerGeneralKnowledge) wordt bewust niet getoond: de V1-engine
 // vergrendelt 'm op false.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { saveChatbotSettingsAction } from './actions';
 import {
@@ -74,12 +74,20 @@ type Persist = (patch: Partial<V1ChatbotSettings>) => Promise<SaveResult>;
 
 export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
   const [s, setS] = useState<V1ChatbotSettings>(initial);
+  // De server leest-merget-schrijft het hele settings-object. Twee panelen die
+  // tegelijk opslaan zouden elkaars patch kunnen overschrijven; daarom gaan alle
+  // saves van deze pagina na elkaar door één wachtrij.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
 
-  const persist: Persist = async (patch) => {
-    const res = await saveChatbotSettingsAction(patch);
-    if (!res.ok) return { ok: false, error: res.error };
-    setS(res.settings);
-    return { ok: true };
+  const persist: Persist = (patch) => {
+    const run = queue.current.then(async (): Promise<SaveResult> => {
+      const res = await saveChatbotSettingsAction(patch);
+      if (!res.ok) return { ok: false, error: res.error };
+      setS(res.settings);
+      return { ok: true };
+    });
+    queue.current = run.catch(() => undefined);
+    return run;
   };
 
   return (
