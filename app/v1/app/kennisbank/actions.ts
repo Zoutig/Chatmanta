@@ -60,7 +60,7 @@ function crawlRateLimitFail(retryAfterSec: number): ActionFail {
   return {
     ok: false,
     code: 'RATE_LIMIT',
-    error: `Te veel crawl-verzoeken — probeer over ${retryAfterSec} ${retryAfterSec === 1 ? 'seconde' : 'seconden'} opnieuw.`,
+    error: `Te veel crawl-verzoeken. Probeer het over ${retryAfterSec} ${retryAfterSec === 1 ? 'seconde' : 'seconden'} opnieuw.`,
     retryAfterSec,
   };
 }

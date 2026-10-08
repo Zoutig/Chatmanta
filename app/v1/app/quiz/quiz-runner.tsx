@@ -121,7 +121,7 @@ export function QuizRunner({
 
       {/* Consent-notice */}
       <div style={{ fontSize: 11.5, color: 'var(--klant-faint)' }}>
-        Je antwoord wordt aan je kennisbank toegevoegd en kan door je chatbot aan bezoekers worden getoond.
+        Je antwoord komt in je kennisbank. Je chatbot kan het aan bezoekers laten zien.
       </div>
 
       {error && <div style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</div>}

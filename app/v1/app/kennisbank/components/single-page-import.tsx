@@ -27,7 +27,7 @@ export function SinglePageImport({ onAdded }: { onAdded: (s: Awaited<ReturnType<
           {pending ? 'Toevoegen…' : 'Toevoegen'}
         </button>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--klant-fg-dim)' }}>⚡ Direct opgehaald — geen wachten, geen volledige crawl.</div>
+      <div style={{ fontSize: 11, color: 'var(--klant-fg-dim)' }}>Wordt direct opgehaald, zonder volledige crawl.</div>
       {error && <div style={{ fontSize: 12, color: 'var(--klant-danger, #dc2626)' }}>{error}</div>}
     </div>
   );

@@ -68,7 +68,7 @@ export function WebsiteTab({ initialSources }: { initialSources: WebsiteSource[]
 
       {mode === 'crawl' && (
         <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p className="klant-section-help">Geef je website-URL op. We zoeken eerst de pagina&apos;s, daarna kies je welke meegaan.</p>
+          <p className="klant-section-help">Vul je website in. Daarna kies je welke pagina&apos;s meegaan.</p>
           <div style={{ display: 'flex', gap: 8 }}>
             <input type="url" placeholder="https://jouwwebsite.nl" value={url} disabled={pending}
               onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onDiscover()} className="klant-input" />
@@ -87,7 +87,7 @@ export function WebsiteTab({ initialSources }: { initialSources: WebsiteSource[]
 
       {sources.length === 0 && mode === 'list' && (
         <div className="klant-card" style={{ fontSize: 13, color: 'var(--klant-fg-dim)' }}>
-          Nog geen websites. Klik &ldquo;+ Website crawlen&rdquo; om er een toe te voegen.
+          Nog geen websites toegevoegd.
         </div>
       )}
 

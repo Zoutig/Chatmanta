@@ -104,7 +104,7 @@ export async function submitQuizAnswerV1Action(
     }
 
     const chatbot = await getOrgChatbot(sb, orgId);
-    if (!chatbot) return { ok: false, error: 'Geen chatbot geconfigureerd voor deze organisatie.' };
+    if (!chatbot) return { ok: false, error: 'Er is nog geen chatbot ingesteld.' };
 
     // Atomic claim: UNIQUE(question_id) is de echte idempotentie-grens.
     let answer;

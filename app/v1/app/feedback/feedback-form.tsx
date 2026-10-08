@@ -115,14 +115,13 @@ export function FeedbackForm({
     return (
       <div className="klant-empty" style={{ textAlign: 'center' }}>
         <div className="klant-empty-icon"><Check size={22} strokeWidth={2} /></div>
-        <h3 className="klant-empty-title">Bedankt voor je melding.</h3>
+        <h3 className="klant-empty-title">Bedankt voor je melding</h3>
         <p className="klant-empty-sub" style={{ maxWidth: 440 }}>
-          We hebben je feedback ontvangen. Niels bekijkt hem zo snel mogelijk en neemt
-          contact met je op zodra hij je melding heeft bekeken.
+          Niels bekijkt hem zo snel mogelijk en neemt daarna contact met je op.
         </p>
         <div style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'center' }}>
           <Link href="/v1/app" className="klant-btn" data-variant="primary">
-            ← Terug naar het portaal
+            ← Terug naar het overzicht
           </Link>
           <button
             type="button"
@@ -211,7 +210,7 @@ export function FeedbackForm({
         <input type="hidden" name="urgency" value={urgency} />
         <span className="klant-hint" style={{ marginTop: 2 }}>
           {URGENCY_OPTIONS.find((o) => o.value === urgency)?.help ??
-            'Kies hoe snel dit opgepakt moet worden.'}
+            'Hoe snel moet dit worden opgepakt?'}
         </span>
       </Field>
 
@@ -227,7 +226,7 @@ export function FeedbackForm({
           rows={6}
           value={description}
           onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
-          placeholder="Beschrijf zo duidelijk mogelijk wat er is gebeurd."
+          placeholder="Wat is er gebeurd?"
           required
         />
       </Field>
@@ -263,7 +262,7 @@ export function FeedbackForm({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         <Field
           label="Chat-ID (optioneel)"
-          hint="Te vinden onder Gesprekken → open het gesprek → ID bovenaan."
+          hint="Staat bij het gesprek onder Gesprekken."
           htmlFor="fb-chat"
         >
           <input id="fb-chat" name="chatId" className="klant-input" placeholder="Bijv. chat_abc123" />
@@ -277,7 +276,7 @@ export function FeedbackForm({
         </Field>
       </div>
 
-      <Field label="Screenshot of bijlage (optioneel)" hint={`JPG, PNG, GIF, WEBP of PDF — max ${ATTACHMENT_MAX_MB} MB.`}>
+      <Field label="Screenshot of bijlage (optioneel)" hint={`JPG, PNG, GIF, WEBP of PDF, tot ${ATTACHMENT_MAX_MB} MB.`}>
         <label
           className="klant-btn"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', width: 'fit-content' }}

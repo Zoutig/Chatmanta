@@ -199,7 +199,7 @@ export function V1WidgetForm({
       {/* Installatie */}
       <Collapsible
         title="Installatie"
-        subtitle="Plaats deze code op je website om de chatbot zichtbaar te maken."
+        subtitle="Plaats deze code op je website."
         open={openSection === 'install'}
         onToggle={() => toggle('install')}
       >
@@ -226,7 +226,7 @@ export function V1WidgetForm({
               lineHeight: 1.6,
             }}
           >
-            {slug ? embedCode : '(slug ontbreekt — organisatie nog niet geconfigureerd)'}
+            {slug ? embedCode : '(code nog niet beschikbaar, je organisatie is nog niet ingesteld)'}
           </pre>
           {slug && (
             <button
@@ -257,12 +257,11 @@ export function V1WidgetForm({
         <div style={{ marginTop: 18, borderTop: '1px solid var(--klant-border)', paddingTop: 14 }}>
           <label className="klant-label">Toegestane domeinen</label>
           <div className="klant-hint" style={{ marginBottom: 6 }}>
-            Beheerd door ChatManta. Leeg = de widget werkt op elk domein; met een lijst verschijnt
-            hij alléén op deze domeinen.
+            Beheerd door ChatManta. Staan er domeinen, dan werkt de widget alleen daar.
           </div>
           {allowedDomains.length === 0 ? (
             <span style={{ fontSize: 13, color: 'var(--klant-fg-muted)' }}>
-              Geen beperking — werkt overal.
+              Geen beperking, werkt overal.
             </span>
           ) : (
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'var(--klant-fg)' }}>
@@ -277,7 +276,7 @@ export function V1WidgetForm({
       {/* Uiterlijk */}
       <Collapsible
         title="Uiterlijk"
-        subtitle="Pas de kleuren, het icoon, positie en teksten van je widget aan."
+        subtitle="Kleuren, icoon, positie en teksten."
         open={openSection === 'design'}
         onToggle={() => toggle('design')}
       >
@@ -316,14 +315,14 @@ export function V1WidgetForm({
               active={a.logoStyle === 'brand-mark'}
               onClick={() => update('logoStyle', 'brand-mark')}
               label="ChatManta-mark"
-              hint="Subtiel merkteken — kleurt mee met de accentkleur."
+              hint="Kleurt mee met de accentkleur."
               preview={<MarkPreview color={a.accentColor} />}
             />
             <LogoChoice
               active={a.logoStyle === 'chat-bubble'}
               onClick={() => update('logoStyle', 'chat-bubble')}
               label="Chat-bubbel"
-              hint="Universeel pictogram, herkenbaar voor elke bezoeker."
+              hint="Herkenbaar voor elke bezoeker."
               preview={<BubblePreview color={a.accentColor} />}
             />
             <LogoChoice
@@ -440,7 +439,7 @@ export function V1WidgetForm({
               <option value="dark">Donker</option>
             </select>
           </Field>
-          <Field label="Widget-titel" hint="Leeg laten → de chatbotnaam wordt gebruikt.">
+          <Field label="Widget-titel" hint="Leeg laten voor de naam van je chatbot.">
             <input
               className="klant-input"
               value={a.headerTitle}
@@ -463,7 +462,7 @@ export function V1WidgetForm({
             />
           </Field>
           <div style={{ gridColumn: '1 / -1' }}>
-            <Field label="Tekst bij de knop" hint="Optioneel tooltip-bubbeltje naast de chat-knop. Leeg = geen tooltip.">
+            <Field label="Tekst bij de knop" hint="Optioneel. Verschijnt naast de chat-knop.">
               <input
                 className="klant-input"
                 value={a.launcherText}
@@ -526,7 +525,7 @@ export function V1WidgetForm({
       {/* Live-status (WP2): echte heartbeat-data + pauzeer-toggle. */}
       <Collapsible
         title="Live-status"
-        subtitle="Controleer of je widget op je website draait, en zet hem aan of uit."
+        subtitle="Draait je widget op je site? Hier zet je hem ook aan of uit."
         open={openSection === 'status'}
         onToggle={() => toggle('status')}
       >
@@ -546,7 +545,7 @@ export function V1WidgetForm({
             label="Gevonden op website"
             value={
               live.lastSeenAt
-                ? `Ja${live.lastSeenOrigin ? ` — op ${live.lastSeenOrigin}` : ''}`
+                ? `Ja${live.lastSeenOrigin ? `, op ${live.lastSeenOrigin}` : ''}`
                 : 'Nog niet gezien'
             }
             tone={live.lastSeenAt ? 'success' : 'warning'}
@@ -580,7 +579,7 @@ export function V1WidgetForm({
             onClick={toggleActive}
             title={
               live.isActive
-                ? 'Verbergt de widget direct voor bezoekers; je kunt hem altijd weer activeren.'
+                ? 'Verbergt de widget direct. Je kunt hem altijd weer aanzetten.'
                 : 'Maakt de widget weer zichtbaar voor bezoekers.'
             }
           >
@@ -833,22 +832,22 @@ function PlatformAccordion({ platform }: { platform: string }) {
     WordPress: [
       'Ga naar Uiterlijk → Thema-editor (of installeer een "Header & Footer Scripts" plugin).',
       'Plak de code in het "Footer scripts"-veld.',
-      'Sla op en bekijk je website — de widget verschijnt rechtsonder.',
+      'Sla op en bekijk je website. De widget staat rechtsonder.',
     ],
     Webflow: [
       'Open je Webflow-project en ga naar Site Settings → Custom Code.',
       'Plak de code in het "Footer Code"-veld.',
-      'Publiceer je site — de widget is direct actief.',
+      'Publiceer je site. De widget is direct actief.',
     ],
     Shopify: [
       'Ga naar Online Store → Themes → Edit Code.',
       'Open theme.liquid en plak de code vlak vóór </body>.',
-      'Sla op en open je winkel — de chatbot is zichtbaar.',
+      'Sla op en open je winkel. De chatbot is zichtbaar.',
     ],
     'Custom website': [
       'Plak de code in je HTML, vlak vóór de sluitende </body>-tag.',
       'Upload de gewijzigde pagina.',
-      'Ververs je website — de widget verschijnt.',
+      'Ververs je website. De widget verschijnt.',
     ],
   };
   return (

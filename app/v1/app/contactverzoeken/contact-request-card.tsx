@@ -151,7 +151,7 @@ export function ContactRequestCard({ request }: { request: V1ContactRequest }) {
             setNotes(e.target.value);
             setNotesSaved(false);
           }}
-          placeholder="Interne notitie over de opvolging…"
+          placeholder="Notitie voor jezelf…"
           style={{ resize: 'vertical' }}
         />
         <div className="contactverzoek-notes-bar">

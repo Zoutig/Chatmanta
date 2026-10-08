@@ -8,7 +8,14 @@ import { Sparkline } from '../ui/sparkline';
 import { InfoTip } from '../ui/info-tip';
 import type { OverviewMetrics } from '@/lib/v0/klantendashboard/types';
 
-export function MetricStrip({ metrics }: { metrics: OverviewMetrics }) {
+export function MetricStrip({
+  metrics,
+  helpedInfo,
+}: {
+  metrics: OverviewMetrics;
+  /** Optionele override van de uitleg bij "Behulpzaam" (V1 geeft een eigen tekst mee). */
+  helpedInfo?: string;
+}) {
   const sources =
     metrics.sources.websitePages + metrics.sources.documents + metrics.sources.qaItems;
   const delta = metrics.conversationsWeekDelta.deltaPct;
@@ -33,7 +40,7 @@ export function MetricStrip({ metrics }: { metrics: OverviewMetrics }) {
       />
       <MetricCard
         label="Behulpzaam"
-        info="Een gesprek telt als geholpen, behalve als het laatste antwoord een doorverwijzing was (de bot wist het niet) of een duim-omlaag kreeg. Het percentage gaat over deze kalendermaand."
+        info={helpedInfo ?? "Een gesprek telt als geholpen, behalve als het laatste antwoord een doorverwijzing was (de bot wist het niet) of een duim-omlaag kreeg. Het percentage gaat over deze kalendermaand."}
         value={metrics.helpfulness.rate === null ? '—' : `${metrics.helpfulness.rate}%`}
         sub={
           metrics.helpfulness.total > 0

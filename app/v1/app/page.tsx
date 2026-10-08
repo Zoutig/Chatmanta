@@ -66,7 +66,7 @@ const STATUS_CLAUSE: Record<ChatbotStatus, string> = {
 function buildSubtitle(answered: number, waiting: number, unansweredCount: number): string {
   const totalWeek = answered + waiting;
   if (totalWeek === 0) {
-    return 'Nog geen vragen deze week — je chatbot staat klaar voor bezoekers.';
+    return 'Nog geen vragen deze week. Je chatbot staat klaar.';
   }
   const base = `Deze week kreeg je chatbot ${totalWeek} vra${totalWeek === 1 ? 'ag' : 'gen'} en beantwoordde er ${answered} zelf.`;
   if (unansweredCount === 0) return `${base} Alles is afgehandeld.`;
@@ -79,32 +79,32 @@ const V1_TOUR_STEPS: TourStep[] = [
   {
     selector: null,
     placement: 'center',
-    title: 'Welkom bij ChatManta 👋',
-    body: 'In een paar stappen laten we zien waar alles staat. Je kunt de rondleiding altijd overslaan.',
+    title: 'Welkom bij ChatManta',
+    body: 'In een paar stappen zie je waar alles staat.',
   },
   {
     selector: 'a[href="/v1/app/kennisbank"]',
     placement: 'right',
     title: 'Kennisbank',
-    body: 'Hier voeg je je website en documenten toe. Dit is de kennis waaruit je chatbot put — zonder bronnen kan hij nog niets beantwoorden.',
+    body: 'Voeg je website en documenten toe. Hieruit haalt je chatbot zijn antwoorden.',
   },
   {
     selector: 'a[href="/v1/app/preview"]',
     placement: 'right',
     title: 'Preview Chatbot',
-    body: 'Zie je chatbot zoals een bezoeker hem op je eigen site ziet, en stel zelf testvragen vóór je live gaat.',
+    body: 'Bekijk je chatbot zoals bezoekers hem zien en stel zelf een paar testvragen.',
   },
   {
     selector: 'a[href="/v1/app/widget"]',
     placement: 'right',
     title: 'Widget',
-    body: 'Pas de kleuren aan en kopieer de code om de chatbot op je eigen website te zetten.',
+    body: 'Kies je kleuren en kopieer de code voor je website.',
   },
   {
     selector: '#setup-checklist',
     placement: 'bottom',
     title: 'Aan de slag',
-    body: 'Volg deze checklist. Staat alles op groen, dan is je chatbot live!',
+    body: 'Staat alles op groen, dan is je chatbot live.',
   },
 ];
 
@@ -137,7 +137,7 @@ export default async function V1OverviewPage() {
         <PageHead
           eyebrow="Overzicht"
           title="Je chatbot"
-          subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
+          subtitle="Er is nog geen chatbot ingesteld."
         />
       </>
     );
@@ -210,7 +210,7 @@ export default async function V1OverviewPage() {
     <>
       <PageHead
         eyebrow={`Vandaag · ${today}`}
-        title={`${timeGreeting()} — ${STATUS_CLAUSE[m.chatbotStatus]}.`}
+        title={`${timeGreeting()}, ${STATUS_CLAUSE[m.chatbotStatus]}.`}
         subtitle={buildSubtitle(
           m.weeklyAnswerSplit.answered,
           m.weeklyAnswerSplit.waiting,
@@ -245,8 +245,8 @@ export default async function V1OverviewPage() {
               dismissId="v1-no-sources"
               signature="active"
               variant="warning"
-              title="Je hebt nog geen bronnen toegevoegd"
-              message="Voeg websitepagina's, documenten of Q&A toe zodat je chatbot vragen kan beantwoorden."
+              title="Nog geen bronnen"
+              message="Voeg pagina's, documenten of Q&A toe, dan kan je chatbot vragen beantwoorden."
               cta={{ label: 'Bronnen toevoegen', href: '/v1/app/kennisbank' }}
             />
           )}
@@ -255,8 +255,8 @@ export default async function V1OverviewPage() {
               dismissId="v1-widget-not-installed"
               signature="active"
               variant="info"
-              title="Je widget is nog niet geplaatst"
-              message="Plaats de embed-code op je website om je chatbot zichtbaar te maken voor bezoekers."
+              title="Je widget staat nog niet op je site"
+              message="Plaats de code op je website, dan zien bezoekers je chatbot."
               cta={{ label: 'Widget installeren', href: '/v1/app/widget' }}
             />
           )}
@@ -270,8 +270,8 @@ export default async function V1OverviewPage() {
             dismissId="v1-quiz-active"
             signature="active"
             variant="info"
-            title="Er staat een kennisquiz voor je klaar"
-            message="Beantwoord een paar korte vragen zodat je chatbot je bedrijf beter leert kennen."
+            title="Er staat een kennisquiz klaar"
+            message="Een paar korte vragen, zodat je chatbot je bedrijf beter leert kennen."
             cta={{ label: 'Quiz starten', href: '/v1/app/quiz' }}
           />
         </div>
@@ -282,7 +282,10 @@ export default async function V1OverviewPage() {
 
       {/* Metric-strip */}
       <div style={{ marginTop: 16 }}>
-        <MetricStrip metrics={metricsAdapter} />
+        <MetricStrip
+          metrics={metricsAdapter}
+          helpedInfo="Gesprekken waarin je chatbot een antwoord gaf zonder door te verwijzen. Over deze maand."
+        />
       </div>
 
       {/* Twee-koloms zolang de setup-checklist relevant is. Zodra alle stappen

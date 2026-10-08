@@ -39,7 +39,7 @@ export default async function V1WidgetPage() {
       <PageHead
         eyebrow="Widget"
         title="Plaats je chatbot op je website"
-        subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
+        subtitle="Er is nog geen chatbot ingesteld."
       />
     );
   }
@@ -69,7 +69,7 @@ export default async function V1WidgetPage() {
       <PageHead
         eyebrow="Widget"
         title="Plaats je chatbot op je website"
-        subtitle="Een paar regels code, jouw kleuren, jouw positie — bezoekers zien meteen dat het bij je site hoort."
+        subtitle="Een paar regels code, in jouw kleuren."
       />
       <V1WidgetForm
         initial={settings}

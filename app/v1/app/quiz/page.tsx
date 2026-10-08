@@ -26,9 +26,9 @@ export default async function V1QuizPage() {
   if (!quiz || quiz.status !== 'actief') {
     return (
       <div className="klant-card" style={{ maxWidth: 540 }}>
-        <div className="klant-section-title">Kennisbank-Quiz</div>
+        <div className="klant-section-title">Kennisquiz</div>
         <p className="klant-hint" style={{ marginTop: 6 }}>
-          Er staat op dit moment geen quiz klaar. Je beheerder activeert er een zodra de analyse van je kennisbank klaar is.
+          Er staat nu geen quiz klaar. Zodra er een is, zie je die hier.
         </p>
       </div>
     );
@@ -48,9 +48,9 @@ export default async function V1QuizPage() {
     const skippedCount = answers.filter((a) => a.antwoord === null).length;
     return (
       <div className="klant-card" style={{ maxWidth: 540 }}>
-        <div className="klant-section-title">Quiz voltooid!</div>
+        <div className="klant-section-title">Quiz afgerond</div>
         <p className="klant-hint" style={{ marginTop: 6 }}>
-          Bedankt voor je antwoorden. We hebben {answeredCount} {answeredCount === 1 ? 'antwoord' : 'antwoorden'} opgeslagen
+          Bedankt. We hebben {answeredCount} {answeredCount === 1 ? 'antwoord' : 'antwoorden'} opgeslagen
           {skippedCount > 0 ? ` (${skippedCount} overgeslagen)` : ''}.
           Je kennisbank wordt de komende minuten bijgewerkt.
         </p>
@@ -65,10 +65,9 @@ export default async function V1QuizPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h1 className="klant-page-title">Kennisbank-Quiz</h1>
+        <h1 className="klant-page-title">Kennisquiz</h1>
         <p className="klant-page-sub">
-          Help je chatbot beter worden door een paar korte vragen te beantwoorden.
-          Je antwoorden worden direct aan je kennisbank toegevoegd.
+          Een paar korte vragen. Je antwoorden gaan direct naar je kennisbank.
         </p>
       </div>
       <QuizRunner question={current} index={index} total={total} />

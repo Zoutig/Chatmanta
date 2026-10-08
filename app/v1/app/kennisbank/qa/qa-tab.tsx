@@ -117,9 +117,7 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
         <div>
           <h3 className="klant-section-title">Handmatige Q&amp;A</h3>
           <p className="klant-section-help">
-            Hiermee herschrijf je het antwoord dat de AI op een vraag geeft. Je voegt geen
-            losse feiten toe — je bepaalt precies wat je chatbot voortaan zegt. Handig voor
-            onderwerpen waar je chatbot anders niet het juiste antwoord zou geven.
+            Bepaal zelf wat je chatbot op een vraag antwoordt.
           </p>
         </div>
         <button type="button" onClick={openNew} className="klant-btn" data-variant="primary">
@@ -148,8 +146,7 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
           </div>
           <h3 className="klant-empty-title">Nog geen Q&amp;A</h3>
           <p className="klant-empty-sub">
-            Maak je eerste vraag-en-antwoord aan voor onderwerpen die je chatbot vaak gaat krijgen
-            — bijvoorbeeld openingstijden of contactopties.
+            Leg vast wat je chatbot zegt over veelgestelde onderwerpen, zoals openingstijden.
           </p>
           <button
             type="button"
@@ -343,8 +340,7 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
               <div>
                 <label className="klant-label">Antwoord dat je chatbot moet geven</label>
                 <p className="klant-section-help" style={{ margin: '2px 0 0' }}>
-                  Hier herschrijf je het antwoord dat de AI geeft. Bekijk eerst wat je chatbot
-                  nu zegt en pas het aan waar nodig.
+                  Bekijk wat je chatbot nu zegt en pas het aan.
                 </p>
               </div>
               <CurrentBotAnswer question={editing.question} />
@@ -352,7 +348,7 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
                 className="klant-textarea"
                 value={editing.answer}
                 onChange={(e) => setEditing({ ...editing, answer: e.target.value })}
-                placeholder="Schrijf hier het antwoord dat je chatbot voortaan moet geven."
+                placeholder="Het antwoord dat je chatbot voortaan geeft"
                 rows={4}
               />
             </div>
@@ -379,7 +375,7 @@ export function QATab({ initialQA, prefillQuestion }: Props) {
                 checked={editing.active}
                 onChange={(e) => setEditing({ ...editing, active: e.target.checked })}
               />
-              Actief — je chatbot gebruikt dit antwoord
+              Actief: je chatbot gebruikt dit antwoord
             </label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
               <button type="button" onClick={() => setEditing(null)} className="klant-btn">
