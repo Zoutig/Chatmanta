@@ -8,15 +8,15 @@ import { Search } from 'lucide-react';
 // ⌘K / Ctrl-K opent ook. Verbatim kopie van V0's SearchTrigger met
 // /v1/app/...-routes i.p.v. /klantendashboard/...-routes.
 const ROUTES: { href: string; label: string; hint: string }[] = [
-  { href: '/v1/app', label: 'Overzicht', hint: 'Dashboard & triage' },
-  { href: '/v1/app/kennisbank', label: 'Kennisbank', hint: "Pagina's, documenten, Q&A" },
-  { href: '/v1/app/preview', label: 'Preview Chatbot', hint: 'Zie je chatbot op je eigen site' },
-  { href: '/v1/app/instellingen', label: 'Instellingen', hint: 'Toon, gedrag, fallback' },
-  { href: '/v1/app/widget', label: 'Widget', hint: 'Uiterlijk & embed-code' },
+  { href: '/v1/app', label: 'Overzicht', hint: 'Hoe je chatbot het doet' },
   { href: '/v1/app/gesprekken', label: 'Gesprekken', hint: 'Alle conversaties' },
+  { href: '/v1/app/kennisbank', label: 'Kennisbank', hint: "Pagina's, documenten, Q&A" },
   { href: '/v1/app/contactverzoeken', label: 'Contactverzoeken', hint: 'Verzoeken van websitebezoekers' },
-  { href: '/v1/app/account', label: 'Account', hint: 'Profiel, team, abonnement' },
-  { href: '/v1/app/feedback', label: 'Feedback', hint: 'Meld een probleem of doe een voorstel' },
+  { href: '/v1/app/widget', label: 'Widget', hint: 'Uiterlijk, installatie en status' },
+  { href: '/v1/app/preview', label: 'Bekijk chatbot', hint: 'Test je chatbot zoals bezoekers hem zien' },
+  { href: '/v1/app/instellingen', label: 'Chatbot-instellingen', hint: 'Toon, antwoorden, contact' },
+  { href: '/v1/app/account', label: 'Account', hint: 'Inloggegevens en verbruik' },
+  { href: '/v1/app/feedback', label: 'Feedback geven', hint: 'Meld een probleem of doe een voorstel' },
 ];
 
 export function V1SearchTrigger() {
@@ -66,40 +66,10 @@ export function V1SearchTrigger() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openPalette}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '7px 10px',
-          marginBottom: 4,
-          borderRadius: 'var(--klant-r-md)',
-          border: '1px solid var(--klant-border)',
-          background: 'var(--klant-surface-muted)',
-          color: 'var(--klant-muted)',
-          fontFamily: 'var(--klant-font-body)',
-          fontSize: 12.5,
-          cursor: 'pointer',
-          width: '100%',
-        }}
-      >
-        <Search size={13} strokeWidth={1.8} />
-        <span style={{ flex: 1, textAlign: 'left' }}>Zoeken…</span>
-        <kbd
-          style={{
-            fontFamily: 'var(--klant-font-mono)',
-            fontSize: 10.5,
-            color: 'var(--klant-dim)',
-            padding: '0 5px',
-            border: '1px solid var(--klant-border)',
-            borderRadius: 4,
-            background: 'var(--klant-bg)',
-          }}
-        >
-          ⌘K
-        </kbd>
+      <button type="button" onClick={openPalette} className="v1-search">
+        <Search size={15} strokeWidth={1.8} aria-hidden="true" />
+        <span>Zoeken</span>
+        <kbd>⌘K</kbd>
       </button>
 
       {open && (

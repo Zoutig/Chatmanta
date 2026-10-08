@@ -14,9 +14,7 @@ import { createClient } from '@/lib/supabase/v1/server';
 import { getOrgChatbot } from './rag-config';
 import { getShellCounts } from '@/lib/v1/dashboard/shell-counts';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
-import { V1Sidebar } from './_shell/sidebar';
-import { V1Topbar } from './_shell/topbar';
-import { TweaksPanel } from '@/app/klantendashboard/components/tweaks/tweaks-panel';
+import { ShellFrame } from './_shell/shell-frame';
 
 export const metadata: Metadata = {
   title: 'ChatManta · Klantendashboard',
@@ -30,7 +28,6 @@ export default async function V1AppLayout({ children }: { children: React.ReactN
   let orgName = '';
   let chatbotStatus: ChatbotStatus = 'concept';
   let unansweredCount = 0;
-  let negativeFeedbackCount = 0;
   let contactRequestsNewCount = 0;
   let contactRequestsEnabled = false;
 
@@ -50,7 +47,6 @@ export default async function V1AppLayout({ children }: { children: React.ReactN
       const counts = await getShellCounts(supabase, orgId, chatbot.id);
       chatbotStatus = counts.chatbotStatus;
       unansweredCount = counts.unansweredCount;
-      negativeFeedbackCount = counts.negativeFeedbackCount;
       contactRequestsNewCount = counts.contactRequestsNewCount;
       contactRequestsEnabled = counts.contactRequestsEnabled;
     }
@@ -62,20 +58,14 @@ export default async function V1AppLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div data-klant-scope className="klant-shell">
-      <V1Sidebar
-        unansweredCount={unansweredCount}
-        showContactRequests={contactRequestsEnabled}
-        contactRequestsCount={contactRequestsNewCount}
-      />
-      <V1Topbar
-        orgName={orgName}
-        chatbotStatus={chatbotStatus}
-        unansweredCount={unansweredCount}
-        negativeFeedbackCount={negativeFeedbackCount}
-      />
-      <main className="klant-main">{children}</main>
-      <TweaksPanel />
-    </div>
+    <ShellFrame
+      orgName={orgName}
+      chatbotStatus={chatbotStatus}
+      unansweredCount={unansweredCount}
+      showContactRequests={contactRequestsEnabled}
+      contactRequestsCount={contactRequestsNewCount}
+    >
+      {children}
+    </ShellFrame>
   );
 }
