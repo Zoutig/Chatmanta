@@ -1532,7 +1532,7 @@ const V0_13X6V: BotConfig = {
   description: 'Na stress-ronde 3: de CONTROLE-regel zei nog "zeg stellig dat het niet klopt", ook bij personen — botste met de x5-promptregel. V2: personen = niet kennen + bekende namen + contact; nummers/bedragen = stellig rechtzetten. Zonder hybrid (V1-gedrag).',
   premiseCheckV2: true,
 };
-const V0_13X6: BotConfig = { ...V0_13X6V, version: 'v0.13x6', label: 'v0.13x6 — x6v mét hybrid (V0) (experiment)', hybridSearch: true };
+const V0_13X6: BotConfig = { ...V0_13X6V, version: 'v0.13x6', label: 'v0.13x6 — Luna + premisse-check v2, rekenverifier, klacht-modus, thinking-checklist (hybrid, V0)', hybridSearch: true };
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1677,7 +1677,12 @@ export const BOTS: Record<string, BotConfig> = {
 // 2026-10-06: v0.12e gepromoveerd (Luna-pipeline-onderzoek, docs/LUNA_ONDERZOEK_RESULTATEN.md):
 // hard-eval gate JA (63/63, 0 veto), Sol prod-ready 42% vs 30% (v0.10-lijn op Luna),
 // TTFT p90 4,3s vs 6,1s. V1 erft dit via app/v1/app/rag-config.ts.
-export const LATEST_BOT_VERSION = V0_12E.version;
+// 2026-10-08: v0.13x6 gepromoveerd (launch-ready-onderzoek, docs/LAUNCH_READY_RAPPORT.md).
+// Holdout (143 ongeziene vragen ×2, geblindeerde jury): kritiek v0.12e 8 → x6 2 / x6v 3
+// (V1-pad r1 9); screening 8 → 1 kritiek; hard-eval gate JA (x6 én x6v); V1-eval 15/15.
+// Prijs: iets vaker "weet ik niet", generation-staart ~+0,5 s. V1 draait hem als x6v
+// (rag-config zet hybridSearch uit). v0.12e blijft append-only behouden.
+export const LATEST_BOT_VERSION = V0_13X6.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -1706,6 +1711,7 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_12C2.version,
   V0_12D.version,
   V0_12E.version,
+  V0_13X6.version,
 ];
 
 /**

@@ -51,6 +51,12 @@ import {
   premiseCheckDirectiveV2,
 } from '@/lib/rag/premise-check';
 import { COMPLAINT_DIRECTIVE, COMPLAINT_DIRECTIVE_V2, isComplaint } from '@/lib/rag/complaint-mode';
+import {
+  containsPlaceholder,
+  offDomainCodeRefusal,
+  offTopicRefusal,
+  resolveFallbackMessage,
+} from '@/lib/rag/fixed-texts';
 
 // OpenAI-fouten classificeren naar code: een timeout heeft een specifieke
 // title/body in user-messages, de generieke variant is LLM_UNAVAILABLE.
@@ -82,8 +88,8 @@ export const RAG_DEFAULTS = {
   MAX_RERANK_INPUT: 10,
 } as const;
 
-export const FALLBACK_MESSAGE =
-  'Daar heb ik geen informatie over. Stel je vraag anders, of neem contact op met de organisatie.';
+// Toon-bewuste varianten + resolutie staan in fixed-texts.ts (puur, testbaar).
+export { FALLBACK_MESSAGE } from '@/lib/rag/fixed-texts';
 
 // ---------------------------------------------------------------------------
 // Lazy clients
@@ -1203,7 +1209,7 @@ export type StreamEvent =
       // gedetecteerde adoptie van een history-entiteit (geen LLM-poging).
       // v0.9.1: 'off-domain-code-refusal' = deterministische scope-guard die een
       // off-domein code-antwoord vervangt door de off-topic-refusal.
-      reason: 'claim-regenerate' | 'history-entity-adoption' | 'off-domain-code-refusal';
+      reason: 'claim-regenerate' | 'history-entity-adoption' | 'off-domain-code-refusal' | 'placeholder-guard';
       regeneratedVerifiedRatio: number | null;
     }
   | { kind: 'error'; code: AppErrorCode; retryAfterSec?: number };
@@ -1296,13 +1302,11 @@ export async function* runRagQuery(
   const tone: Tone = input.tone ?? input.chatbotOverrides?.tone ?? DEFAULT_TONE;
   const length: Length =
     input.length ?? input.chatbotOverrides?.length ?? DEFAULT_LENGTH;
-  // Fallback-tekst: klant-override > vaste default. Wordt gebruikt op alle
-  // 'kind: fallback' paden in deze functie. Lege string van de override
-  // telt als "klant heeft niets ingevuld" → terug naar default.
-  const fallbackMessage =
-    input.chatbotOverrides?.fallbackMessage && input.chatbotOverrides.fallbackMessage.length > 0
-      ? input.chatbotOverrides.fallbackMessage
-      : FALLBACK_MESSAGE;
+  // Fallback-tekst: klant-override > toon-bewuste default (u-vorm bij 'formal').
+  // Wordt gebruikt op alle 'kind: fallback' paden in deze functie. Een lege
+  // override of de letterlijke engine-default (V1-settings-default) telt als
+  // "klant heeft niets ingevuld".
+  const fallbackMessage = resolveFallbackMessage(input.chatbotOverrides?.fallbackMessage, tone);
   const orgId = input.organizationId; // verplicht, geen stille DEV_ORG-fallback meer
   // V0.6 persona-laag: door de caller geresolved en één keer doorgegeven aan de
   // hele pipeline (preProcess, main answer, general-knowledge prompt, off-topic
@@ -1984,7 +1988,7 @@ KRITISCHE FORMAT-REGELS:
       }
 
       if (rc.category === 'off_topic') {
-        const OFF_TOPIC_REFUSAL = `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`;
+        const OFF_TOPIC_REFUSAL = offTopicRefusal(persona.offTopicScope, tone);
         yield {
           kind: 'fallback',
           response: {
@@ -2064,7 +2068,7 @@ KRITISCHE FORMAT-REGELS:
             : {}),
         kind: 'fallback',
         answer: offTopicSuspected
-          ? `Ik help met vragen rondom ${persona.offTopicScope}. Wat wil je weten?`
+          ? offTopicRefusal(persona.offTopicScope, tone)
           : fallbackMessage,
         reason: offTopicSuspected
           ? `OFF_TOPIC (pre-processor); geen chunk haalde de drempel ${threshold.toFixed(2)} (top: ${topSim?.toFixed(3) ?? 'n.v.t.'}).`
@@ -2912,7 +2916,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   // refusal. Laatste answer-mutatie (na regenerate) zodat niets het overschrijft.
   // Flag-guarded → alleen v0.9.1; geen false-positives voor proza-antwoorden.
   if (bot.offDomainCodeRefusal === true && containsCodeOutput(activeAnswerText)) {
-    activeAnswerText = `Daar kan ik je helaas niet mee helpen — ik help met vragen rondom ${persona.offTopicScope}. Waar kan ik je mee van dienst zijn?`;
+    activeAnswerText = offDomainCodeRefusal(persona.offTopicScope, tone);
     activeResponse = {
       ...activeResponse,
       answer: activeAnswerText,
@@ -2922,6 +2926,23 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       kind: 'replacement',
       response: activeResponse,
       reason: 'off-domain-code-refusal',
+      regeneratedVerifiedRatio: null,
+    };
+  }
+
+  // Vangnet: het model schrijft soms een anonimiserings-placeholder
+  // (<PRIVATE_PERSON>) i.p.v. een naam (gezien in v0.13x3/x4; x5+-prompt verbiedt
+  // het, 0/572 in de holdout). Een half antwoord met een placeholder is erger dan
+  // een eerlijke fallback, dus vervangen — niet strippen. Altijd aan: het patroon
+  // komt in een legitiem antwoord niet voor.
+  if (containsPlaceholder(activeAnswerText)) {
+    console.warn('[placeholder-guard] placeholder in antwoord, vervangen door fallback');
+    activeAnswerText = fallbackMessage;
+    activeResponse = { ...activeResponse, answer: activeAnswerText };
+    yield {
+      kind: 'replacement',
+      response: activeResponse,
+      reason: 'placeholder-guard',
       regeneratedVerifiedRatio: null,
     };
   }
