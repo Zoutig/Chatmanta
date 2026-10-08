@@ -152,6 +152,9 @@
 .v1-skel-card { background: var(--v1-surface); border-radius: var(--v1-r-lg); box-shadow: var(--v1-shadow-1); padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
 .v1-skel-card .v1-skel { background-image: linear-gradient(90deg, #eef2f6 0%, #f6f8fa 45%, #eef2f6 90%); }
 .v1-skel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.v1-skel-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); background: var(--v1-surface); border-radius: var(--v1-r-lg); box-shadow: var(--v1-shadow-1); }
+.v1-skel-stat { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; }
+.v1-skel-strip .v1-skel { background-image: linear-gradient(90deg, #eef2f6 0%, #f6f8fa 45%, #eef2f6 90%); }
 .v1-skel-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .v1-skel-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
 .v1-skel-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 16px 0; border-top: 1px solid var(--v1-line); }
@@ -456,6 +459,7 @@ a.v1-stat:focus-visible { outline: none; box-shadow: inset var(--v1-focus); }
   .v1-stat + .v1-stat::before { display: none; }
   .v1-stat:nth-child(n + 3) { border-top: 1px solid var(--v1-line); }
   .v1-stat:nth-child(even) { border-left: 1px solid var(--v1-line); }
+  .v1-stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .v1-stat-num { font-size: 24px; }
 }
 

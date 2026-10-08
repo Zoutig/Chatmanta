@@ -91,16 +91,6 @@ function ListRows({ count, meta = true }: { count: number; meta?: boolean }) {
   );
 }
 
-function Pills({ widths }: { widths: number[] }) {
-  return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      {widths.map((w, i) => (
-        <Skeleton key={i} width={w} height={32} radius={999} />
-      ))}
-    </div>
-  );
-}
-
 function Tabs({ count }: { count: number }) {
   return (
     <div style={{ display: 'flex', gap: 28, paddingBottom: 12, borderBottom: '1px solid var(--v1-line)' }}>
@@ -125,32 +115,30 @@ function Body({ variant }: { variant: PageSkeletonVariant }) {
     case 'overview':
       return (
         <>
-          <Head eyebrow actions={3} />
-          <Skeleton height={76} radius={16} />
-          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            <Skeleton width={40} height={40} radius={12} />
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Skeleton width="34%" height={15} />
-              <Skeleton width="62%" height={12} />
-            </div>
-          </Card>
-          <div className="v1-skel-stats">
+          <Head actions={3} />
+          <Skeleton height={150} radius={22} />
+          <div className="v1-skel-strip">
             {[0, 1, 2, 3].map((i) => (
-              <Card key={i}>
-                <Skeleton width="45%" height={11} />
-                <Skeleton width={56} height={28} radius={8} />
-                <Skeleton width="60%" height={11} />
-              </Card>
+              <div key={i} className="v1-skel-stat">
+                <Skeleton width="45%" height={12} />
+                <Skeleton width={64} height={28} radius={8} />
+                <Skeleton width="70%" height={11} />
+              </div>
             ))}
           </div>
           <div className="v1-skel-grid">
             <Card>
-              <Skeleton width="40%" height={16} />
-              <ListRows count={4} meta={false} />
+              <Skeleton width="45%" height={16} />
+              <ListRows count={4} />
             </Card>
             <Card>
-              <Skeleton width="30%" height={16} />
-              <ListRows count={4} meta={false} />
+              <Skeleton width="40%" height={16} />
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <Skeleton width={['60%', '52%', '48%', '40%', '35%'][i]} height={13} />
+                  <Skeleton width={80} height={6} radius={3} style={{ marginLeft: 'auto' }} />
+                </div>
+              ))}
             </Card>
           </div>
         </>
@@ -159,9 +147,13 @@ function Body({ variant }: { variant: PageSkeletonVariant }) {
     case 'conversations':
       return (
         <>
-          <Head eyebrow actions={2} />
+          <Head />
           <Tabs count={2} />
-          <Pills widths={[78, 112, 124, 112]} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <Skeleton width={250} height={38} radius={12} />
+            <Skeleton width={40} height={24} radius={999} />
+            <Skeleton width={150} height={13} />
+          </div>
           <Card style={{ gap: 0 }}>
             <ListRows count={6} />
           </Card>
@@ -170,39 +162,27 @@ function Body({ variant }: { variant: PageSkeletonVariant }) {
 
     case 'conversation':
       return (
-        <>
+        <div className="v1-page" style={{ maxWidth: 760 }}>
           <Skeleton width={140} height={13} />
           <Head />
-          <div className="v1-skel-split">
-            <Card style={{ gap: 18 }}>
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: i % 2 ? 'flex-start' : 'flex-end' }}>
-                  <Skeleton width={i % 2 ? '68%' : '44%'} height={i % 2 ? 72 : 40} radius={16} />
-                </div>
-              ))}
-            </Card>
-            <Card>
-              <Skeleton width="50%" height={15} />
-              <Skeleton height={12} />
-              <Skeleton width="80%" height={12} />
-              <Skeleton width="65%" height={12} />
-            </Card>
-          </div>
-        </>
+          <Skeleton width={220} height={12} />
+          <Card style={{ gap: 18 }}>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: i % 2 ? 'flex-start' : 'flex-end' }}>
+                <Skeleton width={i % 2 ? '68%' : '44%'} height={i % 2 ? 72 : 40} radius={16} />
+              </div>
+            ))}
+          </Card>
+        </div>
       );
 
     case 'knowledge':
       return (
         <>
-          <Head eyebrow />
+          <Head actions={1} />
           <Tabs count={3} />
-          <div className="v1-skel-drop">
-            <Skeleton width={48} height={48} radius={999} />
-            <Skeleton width={280} height={15} />
-            <Skeleton width={360} height={12} />
-          </div>
           <Card style={{ gap: 0 }}>
-            <ListRows count={4} />
+            <ListRows count={5} />
           </Card>
         </>
       );
@@ -210,8 +190,8 @@ function Body({ variant }: { variant: PageSkeletonVariant }) {
     case 'contacts':
       return (
         <>
-          <Head eyebrow />
-          <Pills widths={[70, 70, 96, 90]} />
+          <Head actions={1} />
+          <Tabs count={4} />
           {[0, 1, 2].map((i) => (
             <Card key={i}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
