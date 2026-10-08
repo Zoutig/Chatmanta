@@ -50,7 +50,11 @@ export function Drawer({
       if (f.length === 0) return;
       const first = f[0];
       const last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
+      // Focus staat na openen op het paneel zelf: ook dan binnen de lus blijven.
+      if (document.activeElement === panelRef.current) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
