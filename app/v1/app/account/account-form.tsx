@@ -1,17 +1,18 @@
 'use client';
-
-// V1 Account — e-mail/wachtwoord via Supabase Auth (V1 browser-client), org-naam via
-// owner-gated server-action, + verbruik/workspace-info in een rechterkolom.
-// Spiegelt de V0 Account-pagina-layout: 2-koloms grid (links auth, rechts info/metrics).
-// Styling via het V0-klantendashboard-designsysteem (klant.css-classes).
-
-import { useState, useTransition } from 'react';
-import { Database, ShieldCheck } from 'lucide-react';
+// V1 Account: alles eerst als leesweergave; per regel "Wijzigen" (spec golf 3).
+// E-mail/wachtwoord via Supabase Auth (V1 browser-client), org-naam via de
+// owner-gated server-action. Verbruik komt uit de bestaande limiet-checks.
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase/v1/client';
 import type { MonthlyVerdict, BudgetVerdict } from '@/lib/v1/limits/usage-limits';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import { EditableRow, useEditable } from '@/app/v1/_ui/editable';
+import { Panel, Row, Rows } from '@/app/v1/_ui/panel';
+import { authErrorMessage } from '@/app/v1/_ui/auth-messages';
 import { updateOrgNameAction } from './actions';
 
-const inputStyle: React.CSSProperties = { maxWidth: 360 };
+const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
 
 export function AccountForm({
   email,
@@ -31,331 +32,226 @@ export function AccountForm({
   documentsCount: number;
 }) {
   return (
-    <div
-      className="klant-stack-narrow"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
-        gap: 20,
-        alignItems: 'start',
-      }}
-    >
-      {/* Linker kolom: auth-secties (e-mail, wachtwoord, org-naam) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <EmailSection currentEmail={email} />
-        <PasswordSection />
-        <OrgNameSection initialName={orgName} isOwner={isOwner} />
-      </div>
+    <>
+      <Panel title="Inloggegevens">
+        <Rows>
+          <EmailRow currentEmail={email} />
+          <PasswordRow />
+        </Rows>
+      </Panel>
 
-      {/* Rechter kolom: workspace-ID + verbruiksmetrics */}
-      <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <h3 className="klant-section-title">Workspace</h3>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 'var(--klant-r-md)',
-                background: 'var(--klant-surface)',
-                color: 'var(--klant-fg-muted)',
-                display: 'grid',
-                placeItems: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <ShieldCheck size={15} strokeWidth={1.7} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: 'var(--klant-fg-muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.02em',
-                  marginBottom: 2,
-                }}
-              >
-                Workspace-ID
-              </div>
-              <code
-                style={{
-                  fontSize: 12,
-                  background: 'var(--klant-surface)',
-                  padding: '2px 8px',
-                  borderRadius: 'var(--klant-r-sm)',
-                  fontFamily: 'var(--font-mono), monospace',
-                  color: 'var(--klant-fg-muted)',
-                  wordBreak: 'break-all',
-                }}
-              >
-                {orgId}
-              </code>
-            </div>
-          </div>
-        </section>
+      <Panel title="Organisatie">
+        <Rows>
+          <OrgNameRow initialName={orgName} isOwner={isOwner} />
+          <Row label="Jouw rol">{isOwner ? 'Eigenaar' : 'Lid'}</Row>
+          <WorkspaceIdRow orgId={orgId} />
+        </Rows>
+      </Panel>
 
-        <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h3 className="klant-section-title">Verbruik</h3>
-          <MonthlyUsageBar monthly={monthly} />
-          <UsageCell
-            icon={Database}
-            label="Documenten in kennisbank"
-            value={documentsCount}
+      <Panel title="Verbruik">
+        <div className="v1-metrics">
+          <Metric
+            label="Gesprekken deze maand"
+            value={String(monthly.count)}
+            of={`van ${monthly.limit}`}
+            ratio={monthly.count / monthly.limit}
+            over={monthly.over}
           />
-          <p style={{ fontSize: 12, color: 'var(--klant-muted)', margin: 0, lineHeight: 1.5 }}>
-            {monthly.over || dailyBudget.over
-              ? 'Je hebt de maandlimiet of het dagbudget bereikt — je chatbot pauzeert tot de volgende dag (dagbudget) of tot de 1e van volgende maand (gesprekken). Neem contact op om je limiet te verhogen.'
-              : `Bij het bereiken van de maandlimiet of het dagbudget pauzeert je chatbot tijdelijk. Dagbudget vandaag: €${dailyBudget.spentEur.toFixed(2)} van €${dailyBudget.capEur.toFixed(2)}.`}
-          </p>
-        </section>
-      </aside>
-    </div>
+          <Metric
+            label="Dagbudget vandaag"
+            value={eur.format(dailyBudget.spentEur)}
+            of={`van ${eur.format(dailyBudget.capEur)}`}
+            ratio={dailyBudget.capEur > 0 ? dailyBudget.spentEur / dailyBudget.capEur : 0}
+            over={dailyBudget.over}
+          />
+          <Metric label="Documenten" value={String(documentsCount)} of="in je kennisbank" />
+        </div>
+        <p className="v1-note">
+          {monthly.over || dailyBudget.over
+            ? 'Een limiet is bereikt, dus je chatbot pauzeert tot morgen (dagbudget) of tot de 1e van de maand (gesprekken). Neem contact op als je meer nodig hebt.'
+            : 'Is een limiet bereikt, dan pauzeert je chatbot tot morgen of tot de 1e van de maand.'}
+        </p>
+      </Panel>
+    </>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Gedeelde hulpcomponenten
-// ---------------------------------------------------------------------------
-
-function Status({ msg, error }: { msg: string | null; error: string | null }) {
-  if (error) return <span role="alert" style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>;
-  if (msg) return <span style={{ fontSize: 13, color: 'var(--klant-success)' }}>{msg}</span>;
-  return null;
-}
-
-// "X van 300 gesprekken deze maand" + percentage-bar. Zelfde bar-visual als
-// app/v1/app/_overview/top-questions-bars.tsx (track/fill, geen nieuwe stijl).
-function MonthlyUsageBar({ monthly }: { monthly: MonthlyVerdict }) {
-  const pct = Math.min(100, Math.round((monthly.count / monthly.limit) * 100));
-  const fillColor = monthly.over
-    ? 'var(--klant-danger)'
-    : pct > 80
-      ? 'var(--klant-warn)'
-      : 'var(--klant-accent)';
-  return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          gap: 12,
-          marginBottom: 6,
-        }}
-      >
-        <span style={{ fontSize: 13, color: 'var(--klant-ink)' }}>Gesprekken deze maand</span>
-        <span
-          style={{
-            fontFamily: 'var(--klant-font-mono)',
-            fontSize: 12,
-            color: monthly.over ? 'var(--klant-danger)' : 'var(--klant-muted)',
-          }}
-        >
-          {monthly.count} van {monthly.limit}
-        </span>
-      </div>
-      <div
-        style={{
-          height: 6,
-          background: 'var(--klant-surface-muted)',
-          borderRadius: 999,
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ width: `${pct}%`, height: '100%', background: fillColor }} />
-      </div>
-    </div>
-  );
-}
-
-function UsageCell({
-  icon: Icon,
+function Metric({
   label,
   value,
+  of,
+  ratio,
+  over = false,
 }: {
-  icon: typeof Database;
   label: string;
-  value: number;
+  value: string;
+  of: string;
+  /** 0..1; zonder ratio geen balk. */
+  ratio?: number;
+  over?: boolean;
 }) {
+  const pct = ratio === undefined ? null : Math.max(0, Math.min(100, Math.round(ratio * 100)));
+  const level = over ? 'over' : pct !== null && pct > 80 ? 'warn' : undefined;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 'var(--klant-r-md)',
-          background: 'var(--klant-accent-soft)',
-          color: 'var(--klant-accent)',
-          display: 'grid',
-          placeItems: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={16} strokeWidth={1.7} />
+    <div className="v1-metric">
+      <div className="v1-metric-label">{label}</div>
+      <div className="v1-metric-value">
+        <span className="v1-metric-num">{value}</span>
+        <span className="v1-metric-of">{of}</span>
       </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: 'var(--klant-fg-muted)' }}>{label}</div>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: 'var(--klant-fg)',
-            fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-          }}
-        >
-          {value}
+      {pct !== null ? (
+        <div className="v1-bar" data-level={level} role="presentation">
+          <span style={{ width: `${pct}%` }} />
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Auth-secties (ongewijzigd — Supabase Auth + server-action)
-// ---------------------------------------------------------------------------
-
-function EmailSection({ currentEmail }: { currentEmail: string }) {
-  const [email, setEmail] = useState(currentEmail);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    setError(null);
-    if (!email.trim() || email.trim() === currentEmail) {
-      setError('Vul een nieuw e-mailadres in.');
-      return;
-    }
-    setBusy(true);
-    const { error: updErr } = await createClient().auth.updateUser({ email: email.trim() });
-    setBusy(false);
-    if (updErr) setError(updErr.message);
-    else setMsg('Bevestigingsmail verstuurd — bevestig via de link om de wijziging af te ronden.');
-  }
-
+function EmailRow({ currentEmail }: { currentEmail: string }) {
+  const [awaiting, setAwaiting] = useState<string | null>(null);
+  const edit = useEditable({
+    current: () => ({ email: currentEmail }),
+    save: async ({ email }) => {
+      const next = email.trim();
+      if (!next || next === currentEmail) return { ok: false, error: 'Vul een nieuw e-mailadres in.' };
+      const { error } = await createClient().auth.updateUser({ email: next });
+      if (error) return { ok: false, error: authErrorMessage(error.message) };
+      setAwaiting(next);
+      return { ok: true };
+    },
+  });
   return (
-    <form onSubmit={submit} className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <h3 className="klant-section-title" style={{ margin: 0 }}>E-mailadres</h3>
-      <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0 }}>
-        Je huidige adres is <strong>{currentEmail}</strong>. Een wijziging vereist bevestiging via e-mail.
-      </p>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="klant-input"
-        style={inputStyle}
-      />
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button type="submit" className="klant-btn" data-variant="primary" disabled={busy}>
-          {busy ? 'Bezig…' : 'E-mail wijzigen'}
-        </button>
-        <Status msg={msg} error={error} />
-      </div>
-    </form>
-  );
-}
-
-function PasswordSection() {
-  const [pw, setPw] = useState('');
-  const [msg, setMsg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    setError(null);
-    if (pw.length < 8) {
-      setError('Kies een wachtwoord van minstens 8 tekens.');
-      return;
-    }
-    setBusy(true);
-    const { error: updErr } = await createClient().auth.updateUser({ password: pw });
-    setBusy(false);
-    if (updErr) setError(updErr.message);
-    else {
-      setMsg('Wachtwoord gewijzigd.');
-      setPw('');
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <h3 className="klant-section-title" style={{ margin: 0 }}>Wachtwoord</h3>
-      <input
-        type="password"
-        autoComplete="new-password"
-        placeholder="Nieuw wachtwoord"
-        value={pw}
-        onChange={(e) => setPw(e.target.value)}
-        className="klant-input"
-        style={inputStyle}
-      />
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button type="submit" className="klant-btn" data-variant="primary" disabled={busy}>
-          {busy ? 'Bezig…' : 'Wachtwoord wijzigen'}
-        </button>
-        <Status msg={msg} error={error} />
-      </div>
-    </form>
-  );
-}
-
-function OrgNameSection({ initialName, isOwner }: { initialName: string; isOwner: boolean }) {
-  const [name, setName] = useState(initialName);
-  const [baseline, setBaseline] = useState(initialName);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    setError(null);
-    startTransition(async () => {
-      const res = await updateOrgNameAction(name);
-      if (res.ok) {
-        setName(res.name);
-        setBaseline(res.name);
-        setMsg('Opgeslagen.');
-      } else {
-        setError(res.error);
-      }
-    });
-  }
-
-  return (
-    <form onSubmit={submit} className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <h3 className="klant-section-title" style={{ margin: 0 }}>Organisatienaam</h3>
-      {isOwner ? (
+    <EditableRow
+      label="E-mailadres"
+      edit={edit}
+      view={
         <>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="klant-input"
-            style={inputStyle}
-          />
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <button
-              type="submit"
-              className="klant-btn"
-              data-variant="primary"
-              disabled={pending || name.trim() === baseline.trim()}
-            >
-              {pending ? 'Bezig…' : 'Naam opslaan'}
-            </button>
-            <Status msg={msg} error={error} />
-          </div>
+          {currentEmail}
+          {awaiting ? (
+            <div className="v1-row-sub">Bevestig {awaiting} via de link in je mail.</div>
+          ) : null}
         </>
-      ) : (
-        <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: 0 }}>
-          <strong>{initialName}</strong> — alleen de eigenaar van de organisatie kan de naam wijzigen.
-        </p>
-      )}
-    </form>
+      }
+    >
+      <Field label="Nieuw e-mailadres" hint="Je krijgt een bevestigingsmail op het nieuwe adres.">
+        {(id) => (
+          <input
+            id={id}
+            type="email"
+            autoComplete="email"
+            className="v1-input v1-input--narrow"
+            value={edit.draft.email}
+            onChange={(e) => edit.set('email', e.target.value)}
+          />
+        )}
+      </Field>
+    </EditableRow>
+  );
+}
+
+function PasswordRow() {
+  const edit = useEditable({
+    current: () => ({ password: '', repeat: '' }),
+    save: async ({ password, repeat }) => {
+      if (password.length < 8) return { ok: false, error: 'Kies een wachtwoord van minstens 8 tekens.' };
+      if (password !== repeat) return { ok: false, error: 'De wachtwoorden zijn niet gelijk.' };
+      const { error } = await createClient().auth.updateUser({ password });
+      if (error) return { ok: false, error: authErrorMessage(error.message) };
+      return { ok: true };
+    },
+  });
+  return (
+    <EditableRow label="Wachtwoord" edit={edit} view={<span aria-label="Verborgen">••••••••••</span>}>
+      <Field label="Nieuw wachtwoord" hint="Minstens 8 tekens.">
+        {(id) => (
+          <input
+            id={id}
+            type="password"
+            autoComplete="new-password"
+            className="v1-input v1-input--narrow"
+            value={edit.draft.password}
+            onChange={(e) => edit.set('password', e.target.value)}
+          />
+        )}
+      </Field>
+      <Field label="Herhaal wachtwoord">
+        {(id) => (
+          <input
+            id={id}
+            type="password"
+            autoComplete="new-password"
+            className="v1-input v1-input--narrow"
+            value={edit.draft.repeat}
+            onChange={(e) => edit.set('repeat', e.target.value)}
+          />
+        )}
+      </Field>
+    </EditableRow>
+  );
+}
+
+function OrgNameRow({ initialName, isOwner }: { initialName: string; isOwner: boolean }) {
+  const [name, setName] = useState(initialName);
+  const edit = useEditable({
+    current: () => ({ name }),
+    save: async (draft) => {
+      if (draft.name.trim() === name.trim()) return { ok: true };
+      const res = await updateOrgNameAction(draft.name);
+      if (!res.ok) return { ok: false, error: res.error };
+      setName(res.name);
+      return { ok: true };
+    },
+  });
+  return (
+    <EditableRow
+      label="Naam"
+      edit={edit}
+      canEdit={isOwner}
+      view={
+        <>
+          {name}
+          {!isOwner ? <div className="v1-row-sub">Alleen de eigenaar kan de naam wijzigen.</div> : null}
+        </>
+      }
+    >
+      <Field label="Organisatienaam">
+        {(id) => (
+          <input
+            id={id}
+            className="v1-input v1-input--narrow"
+            value={edit.draft.name}
+            onChange={(e) => edit.set('name', e.target.value)}
+          />
+        )}
+      </Field>
+    </EditableRow>
+  );
+}
+
+function WorkspaceIdRow({ orgId }: { orgId: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(orgId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Klembord geweigerd: niets doen, het ID staat zichtbaar in de rij.
+    }
+  }
+  return (
+    <Row
+      label="Workspace-ID"
+      action={
+        <Button variant="ghost" size="sm" onClick={copy}>
+          {copied ? 'Gekopieerd' : 'Kopiëren'}
+        </Button>
+      }
+    >
+      <span className="v1-row-sub" style={{ fontSize: 13 }}>
+        {orgId}
+      </span>
+    </Row>
   );
 }

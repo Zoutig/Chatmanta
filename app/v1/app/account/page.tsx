@@ -1,4 +1,4 @@
-// V1 Account — e-mail/wachtwoord (Supabase Auth) + organisatienaam (owner-only)
+// V1 Account: e-mail/wachtwoord (Supabase Auth) + organisatienaam (owner-only)
 // + verbruiksmetrics (gesprekken deze maand + documenten) via session-client RLS.
 //
 // E-mail komt uit de SESSIE (user.email), niet uit public.users — die mirror kan
@@ -10,7 +10,7 @@ import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { checkOrgMonthlyLimit, checkOrgDailyBudget } from '@/lib/v1/limits/usage-limits';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { PageHeader } from '@/app/v1/_ui/page-header';
 import { AccountForm } from './account-form';
 
 export const dynamic = 'force-dynamic';
@@ -21,9 +21,7 @@ export default async function V1AccountPage() {
     session = await getSessionOrg();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <PageHead eyebrow="Account" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
-      );
+      return <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />;
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
   }
@@ -54,11 +52,10 @@ export default async function V1AccountPage() {
     ]);
 
   return (
-    <>
-      <PageHead
-        eyebrow="Account"
-        title="Jouw account en workspace"
-        subtitle="Beheer je inloggegevens en de naam van je organisatie."
+    <div className="v1-page v1-page--narrow">
+      <PageHeader
+        title="Account"
+        description="Je inloggegevens, je organisatie en wat je deze maand hebt verbruikt."
       />
       <AccountForm
         email={user.email ?? ''}
@@ -69,6 +66,6 @@ export default async function V1AccountPage() {
         dailyBudget={dailyBudget}
         documentsCount={docCount ?? 0}
       />
-    </>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-// V1 Instellingen — klant configureert z'n chatbot (toon/taal/antwoordgedrag/fallback).
+// V1 Instellingen: klant configureert z'n chatbot (toon/taal/antwoordgedrag/fallback).
 //
 // Auth-keten = die van /v1/app: geen sessie → getSessionOrg → requireAuth → redirect
 // /v1/login; geen lid → AUTH_FORBIDDEN → "Geen toegang". Org uit de sessie. Read onder
@@ -8,7 +8,9 @@
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import Link from 'next/link';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { buttonClass } from '@/app/v1/_ui/button';
 import { getOrgChatbot } from '../rag-config';
 import { getChatbotSettings } from './settings-config';
 import { V1SettingsForm } from './settings-form';
@@ -21,9 +23,7 @@ export default async function V1InstellingenPage() {
     ({ orgId } = await getSessionOrg());
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <PageHead eyebrow="Instellingen" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
-      );
+      return <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />;
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
   }
@@ -31,30 +31,23 @@ export default async function V1InstellingenPage() {
   const supabase = await createClient();
   const chatbot = await getOrgChatbot(supabase, orgId);
   if (!chatbot) {
-    return (
-      <PageHead
-        eyebrow="Instellingen"
-        title="Hoe je chatbot praat en denkt"
-        subtitle="Deze organisatie heeft nog geen chatbot geconfigureerd."
-      />
-    );
+    return <PageHeader title="Chatbot" description="Er is nog geen chatbot voor je organisatie ingesteld." />;
   }
 
   const settings = await getChatbotSettings(supabase, chatbot.id);
 
   return (
-    <>
-      <PageHead
-        eyebrow="Instellingen"
-        title="Hoe je chatbot praat en denkt"
-        subtitle={
-          <>
-            Bepaal hoe <strong>{chatbot.name}</strong> antwoordt — toon, taal, antwoordgedrag en het fallbackbericht.
-            Wijzigingen werken direct door in nieuwe gesprekken.
-          </>
+    <div className="v1-page">
+      <PageHeader
+        title="Chatbot"
+        description="Hoe je chatbot heet, klinkt en antwoordt. Wijzigingen gelden direct voor nieuwe gesprekken."
+        actions={
+          <Link href="/v1/app/preview" className={buttonClass({ variant: 'secondary' })}>
+            Bekijk chatbot
+          </Link>
         }
       />
       <V1SettingsForm initial={settings} />
-    </>
+    </div>
   );
 }
