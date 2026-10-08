@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, Ref } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 export type ButtonSize = 'md' | 'sm';
@@ -19,6 +19,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   block?: boolean;
   /** Toont een spinner en blokkeert de knop zolang een actie loopt. */
   loading?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 };
 
 export function Button({
@@ -30,11 +31,13 @@ export function Button({
   disabled,
   type,
   children,
+  ref,
   ...rest
 }: ButtonProps) {
   return (
     <button
       {...rest}
+      ref={ref}
       type={type ?? 'button'}
       disabled={disabled || loading}
       aria-busy={loading || undefined}

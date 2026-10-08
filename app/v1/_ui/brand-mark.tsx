@@ -1,9 +1,6 @@
 // ChatManta-beeldmerk: het bestaande mono-logo (public/logo/mono-mark.png) als
-// wit masker op het accentvlak. Decoratief naast de tekst "ChatManta".
+// masker in de tekstkleur (wit op de zijbalk, navy op lichte vlakken).
+// Decoratief naast de tekst "ChatManta".
 export function BrandMark() {
-  return (
-    <span className="v1-mark" aria-hidden="true">
-      <span />
-    </span>
-  );
+  return <span className="v1-mark" aria-hidden="true" />;
 }
