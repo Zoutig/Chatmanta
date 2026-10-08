@@ -198,3 +198,51 @@ De nachtelijke holdout-run bleek tóch afgerond (het node-proces liep als wees d
 **Latency** (gepaard, zelfde moment): de TTFT-mediaan is gelijk (~4,0 s voor alle vier; overdag is OpenAI ~1 s trager dan 's nachts). Het gepaarde verschil per vraag is x6v−r1 +0,5 s en x6−v0.12e +0,06 s. De staart is dikker: TTFT p90 5,1 → 5,8 s, totaal p95 7,0 → 8,1 s. De oorzaak zit volledig in `generation` (het thinking-schema schrijft meer tokens vóór het antwoord). Retrieval, preprocess en verify zijn gelijk. Kosten per antwoord zijn gelijk.
 
 **Conclusie: promoveer v0.13x6 naar LATEST.** De holdout bevestigt de stress-sets en de hard-eval. Prijs: ~0,5 s extra in de staart.
+
+## 12. Ronde x7: precisie op de bekende x6-fouten (8 okt 2026, avond)
+
+**Doel:** de fouten die x6 in de holdout nog maakte gericht verhelpen, zonder de x6-winst te verliezen.
+
+**Wat x7 toevoegt aan x6** (prompt `V0_13X7_SYSTEM_PROMPT` + flag `smalltalkToneAware`):
+1. **Andere naam:** staat het antwoord er in andere woorden of onder een andere naam, dan geeft de bot het wel (en zegt hoe het heet).
+2. **Dienst-premisse:** een dienst die niet in het aanbodoverzicht staat, wordt rechtgezet ("staat niet in ons aanbod / ken ik niet uit ons aanbod" + wat wél past). De bot doet nooit alsof de dienst bestaat.
+3. **Titels zijn geen feiten:** getallen en voorwaarden komen uit de lopende tekst, niet uit een kop of URL ("Rijles vanaf 16 jaar" → 16,5 jaar). De bot legt geen beperking op die de tekst niet noemt.
+4. **Afstand:** algemene kennis over "duidelijk binnen / ruim buiten" een reistijdgrens mag, maar voorzichtig geformuleerd en met afstemming via contact.
+5. **Smalltalk in u-vorm** bij tone `formal` (pre-processor).
+
+**Meting** (nieuwe vragen, geblindeerde Claude-jury, gepaard per vraag):
+
+| meting | x6 / x6v | x7 / x7v | oordeel |
+|---|---|---|---|
+| Stress-set (40 nieuwe faalwijze-vragen ×4, V1-pad) | 60,5/100 · 1 kritiek · 20 ernstig | **43,4 · 0 · 16** | gepaard 35/11, **p=0,001** |
+| Verse holdout2 (120 nieuwe vragen ×2), V1-pad | 23,5 | 23,4 | gelijk (16/19, n.s.) |
+| Verse holdout2, V0-pad (hybrid) | 34,6 | 28,8 | gelijk (18/14, n.s.) |
+| Hard-eval (prod-gate) | x6v JA (AQ 95%) / x6 JA | **x7v JA / x7 JA (AQ 100%)**, 0 catastrofaal, 0 echte fails | ≥ |
+| Latency TTFT p50 | 3,7 s | 3,5 s | gelijk |
+
+Per faalwijze in de stress-set (zwaar = kritiek + ernstig): dienst-premisse 13 → 9 /48, titel-vs-tekst 5 → 3 /28, smalltalk-toon 2 → 0 (gewogen), afstand en andere-naam gelijk.
+
+**Bijvangsten (gefixt):**
+- **Taalbug** (`detectLanguage`): de letter "A" in "pakket A" telde als Engels woord → een Nederlandse vraag werd "mixed" → Engelse spiegel-directive → Engels antwoord (3/8 runs, x6v én x7v). "a" uit de EN-markers, NL-markers uitgebreid; test `detect-language.test.ts`.
+- **Meetlat:** weigering-marker "ik weet … niet" (vals veto op ot-acme-ander-bedrijf-01; uitzondering voor "ik weet zeker/wel/dat").
+
+**Restpunten (niet opgelost door x7):**
+- Dienst-premisse blijft het zwakste punt (9/48 zwaar): "Dat bedrag kan ik je niet noemen" bij een BE-aanhangeropleiding die niet bestaat.
+- Retrieval-missers: de bron met het antwoord wordt soms niet opgehaald (eigen-risico zonder hybrid, tarieventabel, "Standard-pakket"). Dit is een zoekprobleem, geen prompt-probleem → retrieval-ronde.
+- Testset-onderhoud: `aoc-globex-parkeerkosten-01` test niet wat hij moet testen (het antwoord staat wél in de bronnen).
+
+Vragensets: `eval-fixtures/x7/` (seed met `node --env-file=.env.local eval-fixtures/x7/seed-x7q.cjs --apply`). Kosten x7-ronde: ≈ $2,20 OpenAI; jury en vraaggeneratie via Claude ($0).
+
+## 13. Vervolg: ronde x8 op echte gesprekken
+
+Afgesproken op 8 okt 2026: **zodra de soft-launch echte gesprekken oplevert, volgt ronde x8 op die gesprekken** in plaats van op zelfbedachte vragen. Op 8 okt waren er 0 V1-gesprekken en 1 V0-gesprek.
+
+- **Start-signaal:** ongeveer 2-4 weken echt verkeer in V1 `query_log` (V1-prod) of in V0-widgetverkeer.
+- **Aanpak:**
+  1. Echte vragen reviewen: fallbacks, `gap_kind`, weigeringen en klachten.
+  2. Daaruit een testset + een aparte holdout maken (PII eerst redigeren).
+  3. Dezelfde gepaarde jury-methodiek gebruiken als in §11-12.
+- **Daarna** (volgorde ter bespreking):
+  1. Retrieval V1: hybrid search (eerst de V0-fusiebug), paginapad als chunk-kop, feitenblad per org. Eerst checken tegen de V2-scope.
+  2. Widget-API-robuustheid: assistant-beurten van de client valideren, history 4 → 8 beurten.
+  3. Latency: het thinking-schema kost ~0,5 s in de staart.

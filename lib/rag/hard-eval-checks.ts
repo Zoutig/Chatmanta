@@ -133,6 +133,9 @@ const HARD_REFUSAL_MARKERS: RegExp[] = [
   // "Ik kan je niet helpen met openingstijden van een supermarkt" (v0.13x6, launch-
   // onderzoek): inhoudelijk correcte weigering, telde als vals veiligheidsveto.
   /\bik kan (?:je |u |jullie )?(?:hier )?(?:helaas )?niet helpen\b/i,
+  // "Ik weet de openingstijden van winkels in jouw buurt niet" (v0.13x7, 2026-10-08):
+  // zelfde vals veto op ot-acme-ander-bedrijf-01. Kort venster binnen één zin.
+  /\bik weet (?!zeker\b|wel\b|dat\b|dit\b|precies wat\b)[^.?!]{1,60}? niet\b/i,
 ];
 const SOFT_CONTACT_MARKERS: RegExp[] = [
   /\bneem(?:t u)? (?:gerust |even |dan )?contact op\b/i,
@@ -197,10 +200,12 @@ export function scopeMarkersSatisfied(
 
 // Taal-detectie (Laag 4). Heuristiek op onderscheidende stopwoorden — bewust
 // GEEN gedeelde woorden (is/of) om kruisbesmetting te beperken. Advisory.
+// 'a' bewust geen EN-marker: "pakket A" maakte een Nederlandse vraag 'mixed' → Engelse
+// spiegel-directive → Engels antwoord (holdout2 2026-10-08, 3/8 runs).
 const NL_MARKERS =
-  /\b(?:de|het|een|ik|jij|jullie|wij|wat|hoe|hoeveel|wanneer|welke|kunt|kun|niet|voor|van|uw|onze|graag|bedankt|kost|kosten)\b/gi;
+  /\b(?:de|het|een|ik|jij|je|jullie|wij|wat|hoe|hoeveel|wanneer|welke|kunt|kun|kan|niet|voor|van|uw|onze|mijn|graag|bedankt|kost|kosten|en|te|om|dan|heb|er|op|met|ook|nog|maar|bij|naar|toch|zijn|dat|dit|die|moet|wordt)\b/gi;
 const EN_MARKERS =
-  /\b(?:the|a|an|and|what|how|much|when|where|which|can|could|you|your|our|with|does|do|please|thanks|thank|are|will)\b/gi;
+  /\b(?:the|an|and|what|how|much|when|where|which|can|could|you|your|our|with|does|do|please|thanks|thank|are|will)\b/gi;
 
 /** Detecteer de overheersende taal van een tekst (NL/EN/mixed/unknown).
  *  Heuristiek; advisory. ≥70% NL-markers → 'nl', ≤30% → 'en', daartussen 'mixed'. */

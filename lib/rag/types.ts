@@ -310,6 +310,8 @@ export type RagConfig = {
   premiseCheckNamesOnly?: boolean;
   /** v0.13: premisse-directive V2 — personen niet stellig ontkennen tenzij volledig overzicht; wel bekende namen noemen. */
   premiseCheckV2?: boolean;
+  /** v0.13x7: smalltalk-antwoord van de pre-processor volgt de u-vorm bij tone 'formal'. */
+  smalltalkToneAware?: boolean;
   /**
    * v0.8.1: anti-adoptie. Na generatie detecteert de pipeline of een
    * entiteit (persoonsnaam) die de user in de chat-history introduceerde —

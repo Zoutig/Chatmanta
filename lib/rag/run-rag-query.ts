@@ -183,6 +183,7 @@ async function preProcessInput(
   bot: RagConfig,
   persona: RagPersona,
   history: ChatHistoryTurn[] = [],
+  tone: Tone = DEFAULT_TONE,
 ): Promise<PreProcessResult> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS);
   const hasHistory = trimmed.length > 0;
@@ -213,9 +214,15 @@ async function preProcessInput(
   // pre-trained naam ("ChatManta") door als invul-default. Multi-turn addon
   // wordt apart gerendered want hij wordt geprepend, niet ingelezen.
   const rendered = composeBotPrompts(bot, persona);
-  const systemPrompt = useMultiTurnAddon
+  const basePreProcess = useMultiTurnAddon
     ? `${rendered.preProcessMultiTurnAddon}\n\n${rendered.preProcessSystem}`
     : rendered.preProcessSystem;
+  // v0.13x7: de smalltalk-reply passeert de STIJL-suffix van de antwoord-prompt
+  // niet, dus de u-vorm moet hier expliciet mee (holdout: je-vorm bij u-orgs).
+  const systemPrompt =
+    bot.smalltalkToneAware === true && tone === 'formal'
+      ? `${basePreProcess}\n\nSpreek de gebruiker in een smalltalk-antwoord aan met "u" (u-vorm), nooit met je/jij.`
+      : basePreProcess;
   const result = await chatComplete({
     model: auxModelOf(bot),
     system: systemPrompt,
@@ -1477,7 +1484,7 @@ export async function* runRagQuery(
   let preCacheEmbedCost = 0;
   let offTopicSuspected = false;
 
-  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history) : null;
+  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history, tone) : null;
   // cacheActive: alleen embedden als de cache écht gebruikt wordt. Zónder de
   // disableCache-gate hier zou een eval/script (disableCache:true) op een
   // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
