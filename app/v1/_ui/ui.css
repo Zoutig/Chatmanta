@@ -374,7 +374,11 @@ select.v1-input { cursor: pointer; }
 @media (max-width: 900px) {
   .v1-page-title { font-size: 24px; }
   .v1-panel { padding: 4px 18px 8px; }
-  .v1-row-label { flex-basis: 100%; }
+  /* Label + knop op de eerste regel, waarde eronder over de volle breedte. */
+  .v1-row { align-items: center; }
+  .v1-row-label { flex: 1 1 0; }
+  .v1-row-action { order: 1; }
+  .v1-row-value { order: 2; flex-basis: 100%; }
   .v1-subnav-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .v1-subnav {
     top: calc(56px + var(--safe-top, 0px)); z-index: 5; flex-direction: row; overflow-x: auto;
