@@ -2,7 +2,8 @@
 // (loading.tsx) al open is en niet opnieuw inschuift als de inhoud binnenkomt.
 
 import type { ReactNode } from 'react';
-import { ConversationDrawer } from '../../_conversation/conversation-drawer';
+import '@/app/v1/app/gesprekken/gesprekken.css';
+import { ConversationDrawer } from '@/app/v1/app/gesprekken/_conversation/conversation-drawer';
 
 export default function ConversationDrawerLayout({ children }: { children: ReactNode }) {
   return <ConversationDrawer>{children}</ConversationDrawer>;

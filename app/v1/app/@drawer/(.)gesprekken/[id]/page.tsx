@@ -2,8 +2,8 @@
 // de volledige pagina gesprekken/[id]; alleen de omlijsting verschilt.
 
 import { EmptyState } from '@/app/v1/_ui/feedback';
-import { loadConversation } from '../../_conversation/load';
-import { ConversationView } from '../../_conversation/conversation-view';
+import { loadConversation } from '@/app/v1/app/gesprekken/_conversation/load';
+import { ConversationView } from '@/app/v1/app/gesprekken/_conversation/conversation-view';
 
 export const dynamic = 'force-dynamic';
 

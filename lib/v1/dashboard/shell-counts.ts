@@ -84,7 +84,7 @@ export async function getShellCounts(
     // Ooit verkeer gehad? → 'live' (spiegelt hasTraffic in metrics.ts).
     client
       .from('query_log')
-      .select('id', { count: 'exact', head: true })
+      .select('id')
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
       .limit(1),
@@ -96,7 +96,7 @@ export async function getShellCounts(
       : {};
 
   const hasContent = (docRes.count ?? 0) > 0;
-  const hasTraffic = (trafficRes.count ?? 0) > 0;
+  const hasTraffic = (trafficRes.data?.length ?? 0) > 0;
 
   return {
     unansweredCount: unansweredRes.count ?? 0,

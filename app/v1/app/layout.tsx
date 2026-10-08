@@ -24,7 +24,14 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default async function V1AppLayout({ children }: { children: React.ReactNode }) {
+export default async function V1AppLayout({
+  children,
+  drawer,
+}: {
+  children: React.ReactNode;
+  /** Parallel slot: gesprek als zijpaneel (zie @drawer/(.)gesprekken/[id]). */
+  drawer: React.ReactNode;
+}) {
   // Defaults voor de lege-shell bij geen sessie / geen org / DB-fout.
   let orgName = '';
   let chatbotStatus: ChatbotStatus = 'concept';
@@ -73,6 +80,7 @@ export default async function V1AppLayout({ children }: { children: React.ReactN
       signals={signals}
     >
       {children}
+      {drawer}
     </ShellFrame>
   );
 }
