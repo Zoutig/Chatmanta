@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { Check } from 'lucide-react';
 import { Button } from './button';
 import { Panel } from './panel';
@@ -22,6 +22,8 @@ export type Editable<T> = {
   pending: boolean;
   error: string | null;
   justSaved: boolean;
+  /** Wijzigen-knop; krijgt de focus terug na Opslaan/Annuleren. */
+  triggerRef: RefObject<HTMLButtonElement | null>;
 };
 
 export function useEditable<T>({
@@ -37,6 +39,17 @@ export function useEditable<T>({
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocus = useRef(false);
+
+  // Na sluiten staat de Wijzigen-knop pas weer in de DOM; daarom hier (de hook
+  // leeft door) en niet in de knop zelf, die tijdens bewerken ontbreekt.
+  useEffect(() => {
+    if (!editing && restoreFocus.current) {
+      restoreFocus.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [editing]);
 
   useEffect(() => {
     if (!justSaved) return;
@@ -56,6 +69,7 @@ export function useEditable<T>({
     },
     cancel: () => {
       setError(null);
+      restoreFocus.current = true;
       setEditing(false);
     },
     submit: (e) => {
@@ -69,6 +83,7 @@ export function useEditable<T>({
           res = { ok: false, error: 'Opslaan is niet gelukt. Probeer het opnieuw.' };
         }
         if (res.ok) {
+          restoreFocus.current = true;
           setEditing(false);
           setJustSaved(true);
         } else {
@@ -79,6 +94,7 @@ export function useEditable<T>({
     pending,
     error,
     justSaved,
+    triggerRef,
   };
 }
 
@@ -120,14 +136,8 @@ function EditForm<T>({ edit, children }: { edit: Editable<T>; children: ReactNod
   );
 }
 
-/** Wijzigen-knop + "Opgeslagen"; zet de focus terug op de knop na sluiten. */
+/** Wijzigen-knop + "Opgeslagen". */
 function EditTrigger<T>({ edit, canEdit }: { edit: Editable<T>; canEdit: boolean }) {
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const wasEditing = useRef(edit.editing);
-  useEffect(() => {
-    if (wasEditing.current && !edit.editing) btnRef.current?.focus();
-    wasEditing.current = edit.editing;
-  }, [edit.editing]);
   return (
     <>
       {edit.justSaved ? (
@@ -137,7 +147,7 @@ function EditTrigger<T>({ edit, canEdit }: { edit: Editable<T>; canEdit: boolean
         </span>
       ) : null}
       {canEdit ? (
-        <Button ref={btnRef} variant="secondary" size="sm" onClick={edit.start}>
+        <Button ref={edit.triggerRef} variant="secondary" size="sm" onClick={edit.start}>
           Wijzigen
         </Button>
       ) : null}

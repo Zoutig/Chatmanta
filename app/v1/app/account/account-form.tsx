@@ -215,7 +215,7 @@ function OrgNameRow({ initialName, isOwner }: { initialName: string; isOwner: bo
         </>
       }
     >
-      <Field label="Organisatienaam">
+      <Field label="Nieuwe naam">
         {(id) => (
           <input
             id={id}

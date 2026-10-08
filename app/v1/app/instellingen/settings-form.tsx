@@ -65,6 +65,11 @@ const SECTIONS = [
   { id: 'contact', label: 'Contact' },
 ] as const;
 
+/** "Warm en toegankelijk." → "warm en toegankelijk" (voor achter een ·). */
+function asClause(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1).replace(/\.$/, '');
+}
+
 type Persist = (patch: Partial<V1ChatbotSettings>) => Promise<SaveResult>;
 
 export function V1SettingsForm({ initial }: { initial: V1ChatbotSettings }) {
@@ -112,7 +117,17 @@ function SectionNav() {
       { rootMargin: '-20% 0px -60% 0px' },
     );
     els.forEach((el) => obs.observe(el));
-    return () => obs.disconnect();
+    // Het laatste paneel haalt de meetzone bovenin nooit als de pagina eindigt:
+    // onderaan gescrold = laatste sectie actief.
+    const onScroll = () => {
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (atBottom) setActive(SECTIONS[SECTIONS.length - 1].id);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      obs.disconnect();
+      window.removeEventListener('scroll', onScroll);
+    };
   }, []);
 
   return (
@@ -289,7 +304,7 @@ function ToonPanel({ s, persist }: { s: V1ChatbotSettings; persist: Persist }) {
             {tone ? (
               <>
                 {tone.label}
-                <span className="v1-row-sub"> · {tone.help}</span>
+                <span className="v1-row-sub"> · {asClause(tone.help)}</span>
               </>
             ) : (
               <EmptyValue />

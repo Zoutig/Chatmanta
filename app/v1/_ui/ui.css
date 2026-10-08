@@ -176,7 +176,10 @@
 .v1-shell { display: flex; min-height: 100dvh; background: var(--v1-bg); color: var(--v1-ink); font-family: var(--v1-font); }
 .v1-main { flex: 1; min-width: 0; padding: 32px clamp(16px, 4vw, 48px) 56px; }
 .v1-main-inner { max-width: 1200px; margin: 0 auto; }
-.v1-page-enter { animation: v1-enter var(--v1-slow) var(--v1-ease) both; }
+/* backwards, niet both: een blijvende transform na afloop maakt van de pagina een
+   stacking context onder de zijbalk, waardoor fixed overlays (dialogen, rondleiding)
+   de zijbalk niet meer bedekken. */
+.v1-page-enter { animation: v1-enter var(--v1-slow) var(--v1-ease) backwards; }
 
 .v1-sidebar {
   /* z-index: sticky maakt een stacking context; zonder z-index valt de
