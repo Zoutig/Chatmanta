@@ -1,0 +1,26 @@
+/* Feedback geven (V1-ontwerplaag). Alleen onder .v1-ui, prefix v1-fb-. */
+
+.v1-ui .v1-fb-page { max-width: 720px; }
+.v1-ui .v1-fb-form { gap: 20px; }
+
+.v1-ui .v1-fb-file { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.v1-ui .v1-fb-file-btn { position: relative; }
+.v1-ui .v1-fb-file-btn:focus-within { box-shadow: var(--v1-focus); }
+.v1-ui .v1-fb-file-name { font-size: 13px; color: var(--v1-ink-2); overflow-wrap: anywhere; }
+
+.v1-ui .v1-fb-check { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.5; color: var(--v1-ink-2); cursor: pointer; }
+.v1-ui .v1-fb-check input { margin: 2px 0 0; width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--v1-accent); cursor: pointer; }
+.v1-ui .v1-fb-check a { color: var(--v1-accent-ink); font-weight: 600; text-decoration: none; }
+.v1-ui .v1-fb-check a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.v1-ui .v1-fb-submit { display: flex; justify-content: flex-end; }
+
+.v1-ui .v1-fb-done { display: flex; flex-direction: column; gap: 14px; animation: v1-enter var(--v1-base) var(--v1-ease) both; }
+.v1-ui .v1-fb-done-head { display: flex; align-items: center; gap: 12px; }
+.v1-ui .v1-fb-done-icon {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--v1-ok-soft); color: var(--v1-ok);
+}
+.v1-ui .v1-fb-done-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--v1-ink); }
+.v1-ui .v1-fb-done-text { margin: 2px 0 0; font-size: 14px; line-height: 1.5; color: var(--v1-muted); }
+.v1-ui .v1-fb-done-actions { display: flex; flex-wrap: wrap; gap: 8px; }

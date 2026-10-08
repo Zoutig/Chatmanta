@@ -1,14 +1,22 @@
-// V1 klant — Kennisbank-Quiz pagina. Port van app/klantendashboard/quiz/page.tsx.
+// V1 klant: Kennisbank-Quiz pagina. Port van app/klantendashboard/quiz/page.tsx.
 // Auth via getSessionOrg() + requireOrgMember(); org nooit uit client-input.
 
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSessionOrg, requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getActiveQuizForOrg, listAnswers, listQuestions } from '@/lib/v1/quiz/data';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { buttonClass } from '@/app/v1/_ui/button';
+import { EmptyState } from '@/app/v1/_ui/feedback';
 import { QuizRunner } from './quiz-runner';
+import './quiz.css';
 
+export const metadata = { title: 'Kennisquiz · ChatManta' };
 export const dynamic = 'force-dynamic';
+
+const KENNISBANK = '/v1/app/kennisbank';
 
 export default async function V1QuizPage() {
   let orgId: string;
@@ -25,11 +33,19 @@ export default async function V1QuizPage() {
 
   if (!quiz || quiz.status !== 'actief') {
     return (
-      <div className="klant-card" style={{ maxWidth: 540 }}>
-        <div className="klant-section-title">Kennisquiz</div>
-        <p className="klant-hint" style={{ marginTop: 6 }}>
-          Er staat nu geen quiz klaar. Zodra er een is, zie je die hier.
-        </p>
+      <div className="v1-page v1-qz-page">
+        <PageHeader title="Kennisquiz" />
+        <div className="v1-card">
+          <EmptyState
+            action={
+              <Link href={KENNISBANK} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                Naar kennisbank
+              </Link>
+            }
+          >
+            Er staat nu geen quiz klaar. Zodra er een is, zie je die hier.
+          </EmptyState>
+        </div>
       </div>
     );
   }
@@ -47,13 +63,22 @@ export default async function V1QuizPage() {
     const answeredCount = answers.filter((a) => a.antwoord !== null).length;
     const skippedCount = answers.filter((a) => a.antwoord === null).length;
     return (
-      <div className="klant-card" style={{ maxWidth: 540 }}>
-        <div className="klant-section-title">Quiz afgerond</div>
-        <p className="klant-hint" style={{ marginTop: 6 }}>
-          Bedankt. We hebben {answeredCount} {answeredCount === 1 ? 'antwoord' : 'antwoorden'} opgeslagen
-          {skippedCount > 0 ? ` (${skippedCount} overgeslagen)` : ''}.
-          Je kennisbank wordt de komende minuten bijgewerkt.
-        </p>
+      <div className="v1-page v1-qz-page">
+        <PageHeader title="Kennisquiz" />
+        <div className="v1-card">
+          <EmptyState
+            action={
+              <Link href={KENNISBANK} className={buttonClass({ variant: 'primary', size: 'sm' })}>
+                Terug naar kennisbank
+              </Link>
+            }
+          >
+            <strong>Quiz afgerond.</strong> We hebben {answeredCount}{' '}
+            {answeredCount === 1 ? 'antwoord' : 'antwoorden'} opgeslagen
+            {skippedCount > 0 ? ` (${skippedCount} overgeslagen)` : ''}. Je kennisbank wordt de komende minuten
+            bijgewerkt.
+          </EmptyState>
+        </div>
       </div>
     );
   }
@@ -63,13 +88,8 @@ export default async function V1QuizPage() {
   const total = questions.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div>
-        <h1 className="klant-page-title">Kennisquiz</h1>
-        <p className="klant-page-sub">
-          Een paar korte vragen. Je antwoorden gaan direct naar je kennisbank.
-        </p>
-      </div>
+    <div className="v1-page v1-qz-page">
+      <PageHeader title="Kennisquiz" description="Een paar korte vragen, je antwoorden gaan direct naar je kennisbank." />
       <QuizRunner question={current} index={index} total={total} />
     </div>
   );
