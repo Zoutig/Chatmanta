@@ -59,7 +59,10 @@ export function normalizeStarters(list: unknown, show: boolean | undefined): str
     if (typeof item !== 'string') continue;
     const q = item.trim();
     if (!q) continue;
-    out.push(q.length > MAX_STARTER_CHARS ? `${q.slice(0, MAX_STARTER_CHARS - 1).trimEnd()}…` : q);
+    const shown = q.length > MAX_STARTER_CHARS ? `${q.slice(0, MAX_STARTER_CHARS - 1).trimEnd()}…` : q;
+    // Dubbele vragen één keer tonen (ook als React-key uniek).
+    if (out.includes(shown)) continue;
+    out.push(shown);
     if (out.length === MAX_STARTERS) break;
   }
   return out;

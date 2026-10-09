@@ -42,6 +42,7 @@ test('normalizeStarters: trim, leeg eruit, max 4, max 120 tekens, uit = leeg', (
   assert.deepEqual(normalizeStarters(['a'], false), []);
   assert.deepEqual(normalizeStarters('a', true), []);
   assert.deepEqual(normalizeStarters([1, null, 'a'], true), ['a']);
+  assert.deepEqual(normalizeStarters(['a', ' a ', 'b'], true), ['a', 'b']);
 });
 
 const EXPECTED_KEYS = [

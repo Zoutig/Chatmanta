@@ -31,7 +31,9 @@ const POSITIONS = [
 
 function pickEditable(s: EditableAppearance): EditableAppearance {
   return {
-    accentColor: s.accentColor,
+    // Kleine letters: de server accepteert ook hoofdletters, de kiezer schrijft
+    // kleine; zonder normaliseren verschijnt de opslaanbalk zonder echte wijziging.
+    accentColor: s.accentColor.toLowerCase(),
     position: s.position,
     headerTitle: s.headerTitle,
     subtitle: s.subtitle,
@@ -52,9 +54,9 @@ export function AppearanceStep({
   starterQuestions: string[];
 }) {
   const toast = useToast();
-  const [base, setBase] = useState<EditableAppearance>(initial);
-  const [draft, setDraft] = useState<EditableAppearance>(initial);
-  const [hexText, setHexText] = useState(initial.accentColor);
+  const [base, setBase] = useState<EditableAppearance>(() => pickEditable(initial));
+  const [draft, setDraft] = useState<EditableAppearance>(() => pickEditable(initial));
+  const [hexText, setHexText] = useState(() => initial.accentColor.toLowerCase());
   const [hexError, setHexError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
@@ -91,13 +93,23 @@ export function AppearanceStep({
 
   function save() {
     if (!dirty || hexError) return;
+    const sent = patch;
+    const sentFrom = draft;
     startSave(async () => {
-      const res = await saveChatbotSettingsAction(patch);
+      const res = await saveChatbotSettingsAction(sent);
       if (res.ok) {
         const saved = pickEditable(res.settings);
         setBase(saved);
-        setDraft(saved);
-        setHexText(saved.accentColor);
+        // Per veld de serverwaarde overnemen, behalve wat tijdens het opslaan
+        // nog is aangepast: dat blijft staan (en blijft dus "gewijzigd").
+        setDraft((d) => {
+          const next = { ...d };
+          for (const k of Object.keys(saved) as (keyof EditableAppearance)[]) {
+            if (d[k] === sentFrom[k]) (next as Record<string, unknown>)[k] = saved[k];
+          }
+          return next;
+        });
+        setHexText((h) => (normalizeHex(h) === sentFrom.accentColor ? saved.accentColor : h));
         toast.success('Uiterlijk opgeslagen');
       } else {
         toast.error(res.error || 'Opslaan lukte niet. Probeer het opnieuw.');

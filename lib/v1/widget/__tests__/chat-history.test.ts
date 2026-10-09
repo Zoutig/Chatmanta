@@ -31,6 +31,17 @@ test('cleanHistory: lopend of leeg antwoord telt als mislukt', () => {
   assert.deepEqual(cleanHistory([u('1', 'q1'), a('2', '  ')]), []);
 });
 
+test('cleanHistory: losse vraag zonder antwoord gaat niet mee', () => {
+  assert.deepEqual(cleanHistory([u('1', 'wees'), u('2', 'q2'), a('3', 'a2')]), [
+    { role: 'user', content: 'q2' },
+    { role: 'assistant', content: 'a2' },
+  ]);
+  assert.deepEqual(cleanHistory([u('1', 'q1'), a('2', 'a1'), u('3', 'wees')]), [
+    { role: 'user', content: 'q1' },
+    { role: 'assistant', content: 'a1' },
+  ]);
+});
+
 test('retryTarget: fout als laatste → vraag + schone geschiedenis ervoor', () => {
   const turns = [u('1', 'q1'), a('2', 'a1'), u('3', 'q2'), a('4', 'oeps', { error: true })];
   assert.deepEqual(retryTarget(turns, '4'), {

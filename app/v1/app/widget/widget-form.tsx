@@ -31,6 +31,7 @@ export function V1WidgetForm({
   allowedDomains,
   liveStatus,
   widgetMissing,
+  missingAfterMs,
 }: {
   initial: EditableAppearance;
   fallbackTitle: string;
@@ -40,12 +41,13 @@ export function V1WidgetForm({
   allowedDomains: string[];
   liveStatus: WidgetLiveStatus;
   widgetMissing: boolean;
+  missingAfterMs: number;
 }) {
   return (
     <div className="v1-wg">
       <AppearanceStep initial={initial} fallbackTitle={fallbackTitle} starterQuestions={starterQuestions} />
       <InstallStep slug={slug} origin={origin} allowedDomains={allowedDomains} />
-      <StatusStep liveStatus={liveStatus} widgetMissing={widgetMissing} />
+      <StatusStep liveStatus={liveStatus} widgetMissing={widgetMissing} missingAfterMs={missingAfterMs} />
     </div>
   );
 }

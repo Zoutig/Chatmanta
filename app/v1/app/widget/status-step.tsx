@@ -15,18 +15,21 @@ import { formatLastSeen } from './format';
 export function StatusStep({
   liveStatus,
   widgetMissing,
+  missingAfterMs,
 }: {
   liveStatus: WidgetLiveStatus;
   /** Server-berekend: eerder gezien, maar al een week niet meer. */
   widgetMissing: boolean;
+  /** Drempel uit attention.ts (die module is server-only, dus als prop). */
+  missingAfterMs: number;
 }) {
   const toast = useToast();
   const [live, setLive] = useState<WidgetLiveStatus>(liveStatus);
   const [toggling, startToggle] = useTransition();
   const [checking, startCheck] = useTransition();
-  // Na een verse installatie-test vertrouwen we de nieuwe "laatst gezien" en
-  // tonen we de week-waarschuwing niet meer op basis van de oude serverwaarde.
-  const [checked, setChecked] = useState(false);
+  // Begint bij de serverwaarde; na een installatie-test of aan/uit opnieuw
+  // bepaald (in een handler, niet tijdens render: hydration).
+  const [missing, setMissing] = useState(widgetMissing);
 
   function toggle(next: boolean) {
     const prev = live.isActive;
@@ -35,6 +38,7 @@ export function StatusStep({
       const res = await toggleWidgetActiveAction(next);
       if (res.ok) {
         setLive((l) => ({ ...l, isActive: res.isActive }));
+        if (!res.isActive) setMissing(false);
         toast.success(res.isActive ? 'Je chatbot staat aan' : 'Je chatbot staat op pauze');
       } else {
         setLive((l) => ({ ...l, isActive: prev }));
@@ -51,13 +55,13 @@ export function StatusStep({
         return;
       }
       setLive({ isActive: res.isActive, lastSeenAt: res.lastSeenAt, lastSeenOrigin: res.lastSeenOrigin });
-      setChecked(true);
+      setMissing(
+        res.isActive && !!res.lastSeenAt && Date.now() - Date.parse(res.lastSeenAt) > missingAfterMs,
+      );
       if (res.lastSeenAt) toast.success(`Gevonden, laatst gezien ${formatLastSeen(res.lastSeenAt)}`);
       else toast.error('Nog niet gevonden. Open je website een keer en test opnieuw.');
     });
   }
-
-  const missing = widgetMissing && !checked;
 
   return (
     <section className="v1-wg-step" aria-labelledby="wg-step-3">

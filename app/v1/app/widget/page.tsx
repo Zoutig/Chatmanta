@@ -36,7 +36,8 @@ async function requestOrigin(): Promise<string> {
   const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host');
   if (!host) return 'https://www.chatmanta.nl';
-  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+  // Achter meerdere proxies kan dit een lijst zijn ("https,http"): eerste waarde.
+  const proto = h.get('x-forwarded-proto')?.split(',')[0].trim() || (host.startsWith('localhost') ? 'http' : 'https');
   return `${proto}://${host}`;
 }
 
@@ -118,6 +119,7 @@ export default async function V1WidgetPage() {
           lastSeenOrigin: (botRow?.widget_last_seen_origin as string | null) ?? null,
         }}
         widgetMissing={widgetMissing}
+        missingAfterMs={WIDGET_MISSING_AFTER_MS}
       />
     </div>
   );

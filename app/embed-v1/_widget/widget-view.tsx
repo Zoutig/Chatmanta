@@ -81,11 +81,20 @@ export function WidgetView({
   const showLauncher = !(fullscreen && open);
   const peekText = a.launcherText.trim();
 
-  // Auto-scroll bij nieuwe inhoud.
+  // Auto-scroll bij nieuwe inhoud, maar alleen als de lezer al onderaan zat (of
+  // net zelf iets stuurde): wie omhoog scrolt om terug te lezen, springt niet weg.
+  const stickRef = useRef(true);
+  const countRef = useRef(messages.length);
   useEffect(() => {
+    // Nieuw bericht (bv. net zelf verstuurd) → altijd mee naar beneden.
+    if (messages.length > countRef.current) stickRef.current = true;
+    countRef.current = messages.length;
     const el = bodyRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, open, belowMessages]);
+  useEffect(() => {
+    if (open) stickRef.current = true;
+  }, [open]);
 
   // Focus: naar het invoerveld bij openen (echte widget), terug naar de
   // launcher bij sluiten.
@@ -161,7 +170,14 @@ export function WidgetView({
             {empty && a.welcomeMessage.trim() ? <p className="cmw-greeting">{a.welcomeMessage}</p> : null}
           </header>
 
-          <div ref={bodyRef} className="cmw-body">
+          <div
+            ref={bodyRef}
+            className="cmw-body"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+            }}
+          >
             {messages.map((m) => (
               <div key={m.id} className="cmw-msg" data-role={m.role}>
                 {m.role === 'assistant' && m.streaming && !m.content ? (
@@ -182,7 +198,11 @@ export function WidgetView({
                     type="button"
                     className="cmw-retry"
                     disabled={pending || readOnly}
-                    onClick={() => onRetry(m.id)}
+                    onClick={() => {
+                      onRetry(m.id);
+                      // De knop verdwijnt met de foutbubbel; focus niet op body laten vallen.
+                      inputRef.current?.focus({ preventScroll: true });
+                    }}
                   >
                     <RetryIcon /> Opnieuw proberen
                   </button>

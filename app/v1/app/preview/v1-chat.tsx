@@ -65,9 +65,11 @@ function parseStored(raw: string | null): Message[] {
       out.push({
         id,
         role,
-        content: legacyError ? errorLabel('FAILED') : content,
+        // Oude foutbubbel: reden behouden (zonder het dubbele voorvoegsel), geen
+        // code → niet opnieuw te proberen (kan een limietfout zijn geweest).
+        content: legacyError ? content.replace(/^Er ging iets mis:\s*/, '') : content,
         error: error === true || legacyError,
-        code: typeof code === 'string' ? (code as ErrorCode) : legacyError ? 'FAILED' : undefined,
+        code: typeof code === 'string' ? (code as ErrorCode) : undefined,
       });
     }
     return out;

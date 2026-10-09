@@ -24,7 +24,10 @@ export function cleanHistory(turns: ChatTurn[]): HistoryTurn[] {
   for (let i = 0; i < turns.length; i++) {
     const m = turns[i];
     if (m.role === 'user') {
-      if (failed(turns[i + 1])) continue;
+      // Alleen een vraag mét geslaagd antwoord erachter; een losse vraag (geen
+      // antwoord, of direct weer een vraag) gaat ook niet mee.
+      const next = turns[i + 1];
+      if (!next || next.role !== 'assistant' || failed(next)) continue;
       out.push({ role: 'user', content: m.content });
     } else if (!failed(m)) {
       out.push({ role: 'assistant', content: m.content });
