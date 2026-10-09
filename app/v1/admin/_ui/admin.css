@@ -115,3 +115,16 @@
   .v1-ui .v1-adm-table-wrap { margin: 0 -18px; padding: 0 18px; }
   .v1-ui .v1-adm-metric-num { font-size: 22px; }
 }
+
+/* ---- Schil ---- */
+.v1-ui .v1-adm-brand-tag {
+  margin-left: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.v1-ui .v1-adm-denied { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
