@@ -80,10 +80,11 @@
   color: var(--cmw-fg);
   display: grid;
   place-items: center;
-  box-shadow: 0 8px 22px rgba(12, 30, 46, 0.26);
+  /* Begrensde blur: de collapsed-iframe is 110×110, grotere schaduwen snijden af. */
+  box-shadow: 0 6px 16px rgba(12, 30, 46, 0.26);
   transition: transform 200ms var(--cmw-ease), box-shadow 200ms ease;
 }
-.cmw-launcher:hover { transform: scale(1.06); box-shadow: 0 10px 26px rgba(12, 30, 46, 0.32); }
+.cmw-launcher:hover { transform: scale(1.06); box-shadow: 0 8px 18px rgba(12, 30, 46, 0.32); }
 .cmw-launcher:active { transform: scale(0.94); }
 .cmw-launcher-icon {
   grid-area: 1 / 1;
