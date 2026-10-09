@@ -101,6 +101,16 @@ function Tabs({ count }: { count: number }) {
   );
 }
 
+/** Kop van een genummerde stap (Widget-scherm). */
+function StepTitle() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <Skeleton width={26} height={26} radius={999} />
+      <Skeleton width={110} height={16} />
+    </div>
+  );
+}
+
 function Field({ tall = false }: { tall?: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -206,37 +216,63 @@ function Body({ variant }: { variant: PageSkeletonVariant }) {
       );
 
     case 'widget':
+      // Drie stappen onder elkaar: Uiterlijk (velden + voorbeeld), Installeren, Status.
       return (
         <>
-          <Head eyebrow />
-          <Card>
-            <Skeleton width={110} height={16} />
-            <Skeleton width="45%" height={12} />
-            <Skeleton height={64} radius={12} />
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} height={40} radius={10} />
-            ))}
-          </Card>
-          {[0, 1, 2].map((i) => (
-            <Card key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                <Skeleton width={100} height={16} />
-                <Skeleton width="40%" height={12} />
+          <Head actions={2} />
+          <StepTitle />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 20 }}>
+            <Card style={{ gap: 20 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {Array.from({ length: 11 }, (_, i) => (
+                  <Skeleton key={i} width={30} height={30} radius={999} />
+                ))}
               </div>
-              <Skeleton width={16} height={16} radius={4} />
+              <Field />
+              <Field />
+              <Field />
             </Card>
-          ))}
+            <Skeleton height={600} radius={22} />
+          </div>
+          <StepTitle />
+          <Card>
+            <Skeleton width="55%" height={14} />
+            <Skeleton height={52} radius={12} />
+            <Skeleton width={150} height={13} />
+          </Card>
+          <StepTitle />
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={180} height={14} />
+              <Skeleton width={44} height={26} radius={999} />
+            </div>
+            <Skeleton width="60%" height={13} />
+          </Card>
         </>
       );
 
     case 'chat':
+      // Nep-browservenster met de widget rechtsonder open.
       return (
         <>
-          <Head eyebrow />
-          <Skeleton height={520} radius={20} />
+          <Head actions={1} />
+          <div className="v1-skel-card" style={{ padding: 0, gap: 0, minHeight: 640, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--v1-line)' }}>
+              <Skeleton width={46} height={10} radius={999} />
+              <Skeleton width="min(360px, 60%)" height={22} radius={999} />
+            </div>
+            <div style={{ position: 'relative', flex: 1, minHeight: 590 }}>
+              <div
+                className="v1-skel"
+                style={{ position: 'absolute', right: 20, bottom: 88, top: 20, width: 'min(384px, calc(100% - 40px))', borderRadius: 22 }}
+              />
+              <div style={{ position: 'absolute', right: 20, bottom: 20 }}>
+                <Skeleton width={56} height={56} radius={999} />
+              </div>
+            </div>
+          </div>
         </>
       );
-
     case 'settings':
       return (
         <>
