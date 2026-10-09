@@ -171,10 +171,8 @@
 }
 
 /* ── Schil ───────────────────────────────────────────────── */
-.v1-shell[data-klant-scope] { overflow-x: clip; } /* klant.css zet overflow-x:hidden op de scope (≤900px); dat breekt sticky */
-/* Cijfers in het gewone V1-font i.p.v. JetBrains Mono (gestipte nul). Echte code
-   (embed-snippet) gebruikt --font-mono en blijft mono. */
-.v1-shell[data-klant-scope] { --klant-font-mono: var(--v1-font); }
+/* clip i.p.v. hidden: voorkomt horizontaal scrollen zonder sticky (zijbalk, opslaanbalk) te breken. */
+.v1-shell { overflow-x: clip; }
 .v1-main { font-variant-numeric: tabular-nums; }
 .v1-shell { display: flex; min-height: 100dvh; background: var(--v1-bg); color: var(--v1-ink); font-family: var(--v1-font); }
 .v1-main { flex: 1; min-width: 0; padding: 32px clamp(16px, 4vw, 48px) 56px; }

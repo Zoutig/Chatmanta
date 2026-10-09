@@ -13,8 +13,6 @@ import { V1Sidebar } from './sidebar';
 // Client-schil: houdt alleen de open/dicht-state van het mobiele menu bij.
 // Ook gebruikt door het admindashboard via de `sidebar`-render-prop; zonder die
 // prop rendert hij de klant-zijbalk, exact zoals voorheen.
-// data-klant-scope blijft staan zodat de (nog niet herontworpen) pagina's en de
-// zoek-palette hun --klant-*-tokens houden tot golf 3.
 export function ShellFrame({
   orgName = '',
   chatbotStatus = 'concept',
@@ -68,7 +66,7 @@ export function ShellFrame({
   }, [navOpen]);
 
   return (
-    <div className="v1-shell" data-klant-scope data-nav-open={navOpen ? 'true' : 'false'}>
+    <div className="v1-shell" data-nav-open={navOpen ? 'true' : 'false'}>
       <header className="v1-mobilebar">
         <button
           ref={menuButtonRef}
