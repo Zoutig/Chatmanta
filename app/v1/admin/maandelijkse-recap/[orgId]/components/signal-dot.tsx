@@ -1,5 +1,6 @@
-// Overzicht-bol voor de recap-signalering — ongewijzigd overgenomen van V0 (puur).
+// Signaleringsbol voor de maandrecap (overzicht en detail), in V1-stijl.
 
+import { Badge, type Tone } from '@/app/v1/_ui/feedback';
 import type { RecapSignalSeverity } from '@/lib/controlroom/types';
 
 export function SignalDot({
@@ -9,43 +10,21 @@ export function SignalDot({
   severity: RecapSignalSeverity | null;
   showLabel?: boolean;
 }) {
-  const color =
-    severity === 'actie_vereist'
-      ? 'var(--klant-danger)'
-      : severity === 'waarschuwing'
-        ? 'var(--klant-warn)'
-        : 'var(--klant-success)';
+  const tone: Tone = severity === 'actie_vereist' ? 'danger' : severity === 'waarschuwing' ? 'warn' : 'ok';
   const label =
     severity === 'actie_vereist'
-      ? 'Actie vereist'
+      ? 'Actie nodig'
       : severity === 'waarschuwing'
         ? 'Let op'
         : severity === 'inzicht'
           ? 'Inzicht beschikbaar'
           : 'Geen bijzonderheden';
+  if (!showLabel) {
+    return <span className="v1-adm-dot" data-tone={tone} role="img" aria-label={label} title={label} />;
+  }
   return (
-    <span
-      title={label}
-      aria-label={label}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 7,
-        fontSize: 12.5,
-        color: 'var(--klant-muted)',
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          width: 9,
-          height: 9,
-          borderRadius: '50%',
-          background: color,
-          flexShrink: 0,
-        }}
-      />
-      {showLabel ? label : null}
-    </span>
+    <Badge tone={tone} dot>
+      {label}
+    </Badge>
   );
 }

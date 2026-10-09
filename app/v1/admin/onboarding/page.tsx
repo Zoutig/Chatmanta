@@ -1,21 +1,20 @@
-// V1 Admin — Onboarding-overzicht. Port van app/admindashboard/onboarding/page.tsx.
+// V1 Admin — Onboarding-overzicht.
 //
-// Verschillen t.o.v. V0:
-//   - Geen KNOWN_ORGS: klanten komen uit getControlRoomKlanten() (V1 overview).
-//   - admin_onboarding_items direct batch-gelezen (IN-query over alle org-ids)
-//     in plaats van per-org via listOnboardingItems — voorkomt N+1 én auto-seed
-//     side-effect op een read-only overzichtspagina.
+//   - Klanten uit getControlRoomKlanten() (V1 overview).
+//   - admin_onboarding_items batch-gelezen (IN-query over alle org-ids) i.p.v. per
+//     org: geen N+1 en geen auto-seed op een read-only overzichtspagina.
 //   - admin-client via getJorionAdminClient() (V1 service-role, na requireJorionAdmin).
 
 import Link from 'next/link';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill } from '@/app/klantendashboard/components/ui/pill';
-import { ReloadButton } from '@/app/admindashboard/components/reload-button';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getControlRoomKlanten } from '@/lib/v1/admin/overview';
 import { ONBOARDING_PHASE_LABELS } from '@/lib/controlroom/types';
 import { isAppError } from '@/lib/errors/app-error';
 import type { OnboardingItemStatus } from '@/lib/controlroom/types';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { Badge, EmptyState } from '@/app/v1/_ui/feedback';
+import { DataTable, NumCell } from '../_ui/data-table';
+import { ReloadButton } from '../_ui/reload-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,29 +26,26 @@ export default async function V1OnboardingPage() {
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
 
-  // getControlRoomKlanten roept zelf getJorionAdminClient() aan; dubbele auth-check
-  // is benign. Parallel met de onboarding-items-batch-query.
   const klanten = await getControlRoomKlanten();
 
-  // Batch-read: alle onboarding-items over alle orgs in één query (geen N+1, geen auto-seed).
-  const { data: itemData } = klanten.length > 0
-    ? await admin
-        .from('admin_onboarding_items')
-        .select('organization_id, status')
-        .in('organization_id', klanten.map((k) => k.orgId))
-    : { data: [] as ItemRow[] };
+  // Batch-read: alle onboarding-items over alle orgs in één query.
+  const { data: itemData } =
+    klanten.length > 0
+      ? await admin
+          .from('admin_onboarding_items')
+          .select('organization_id, status')
+          .in(
+            'organization_id',
+            klanten.map((k) => k.orgId),
+          )
+      : { data: [] as ItemRow[] };
 
-  // Aggregeer per org: totaal, done, blocked.
+  // Aggregeer per org: totaal, klaar, geblokkeerd.
   const statsMap = new Map<string, { total: number; done: number; blocked: number }>();
   for (const r of (itemData ?? []) as ItemRow[]) {
     const s = statsMap.get(r.organization_id) ?? { total: 0, done: 0, blocked: 0 };
@@ -64,94 +60,70 @@ export default async function V1OnboardingPage() {
     ...(statsMap.get(k.orgId) ?? { total: 0, done: 0, blocked: 0 }),
   }));
 
-  // Niet-afgeronde klanten eerst (spiegelt V0-sort).
+  // Niet-afgeronde klanten eerst.
   rows.sort(
     (a, b) =>
-      Number(a.k.profile.onboardingPhase === 'completed') -
-      Number(b.k.profile.onboardingPhase === 'completed'),
+      Number(a.k.profile.onboardingPhase === 'completed') - Number(b.k.profile.onboardingPhase === 'completed'),
   );
 
   return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">Onboarding</h1>
-          <p className="klant-page-sub">
-            Alle klanten in onboarding: fase, eigenaar, voortgang, geblokkeerde stappen en de
-            volgende actie.
-          </p>
-        </div>
-        <ReloadButton />
-      </header>
+    <div className="v1-page">
+      <PageHeader
+        title="Onboarding"
+        description="Fase, eigenaar, voortgang en volgende actie van elke klant in onboarding."
+        actions={<ReloadButton />}
+      />
 
-      <Card padded={false}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="klant-table">
-            <thead>
-              <tr>
-                <th>Klant</th>
-                <th>Fase</th>
-                <th>Owner</th>
-                <th>Voortgang</th>
-                <th>Geblokkeerd</th>
-                <th>Volgende actie</th>
+      <section className="v1-card">
+        {rows.length === 0 ? (
+          <EmptyState>Nog geen klanten.</EmptyState>
+        ) : (
+          <DataTable
+            label="Onboarding per klant"
+            columns={[
+              { label: 'Klant' },
+              { label: 'Fase' },
+              { label: 'Eigenaar' },
+              { label: 'Voortgang', num: true },
+              { label: 'Geblokkeerd' },
+              { label: 'Volgende actie' },
+            ]}
+          >
+            {rows.map(({ k, total, done, blocked }) => (
+              <tr key={k.orgId}>
+                <td>
+                  <Link href={`/v1/admin/organizations/${k.orgId}`} className="v1-adm-clip">
+                    {k.name}
+                  </Link>
+                </td>
+                <td>
+                  {k.profile.onboardingPhase === 'completed' ? (
+                    <Badge tone="ok" dot>
+                      Afgerond
+                    </Badge>
+                  ) : (
+                    <span className="v1-adm-muted">{ONBOARDING_PHASE_LABELS[k.profile.onboardingPhase]}</span>
+                  )}
+                </td>
+                <td className="v1-adm-muted">{k.profile.customerOwner || 'Geen'}</td>
+                <NumCell>{total > 0 ? `${done} van ${total}` : 'Geen stappen'}</NumCell>
+                <td>
+                  {blocked > 0 ? (
+                    <Badge tone="danger" dot>
+                      {blocked}
+                    </Badge>
+                  ) : (
+                    <span className="v1-adm-muted">Geen</span>
+                  )}
+                </td>
+                <td className="v1-adm-muted">
+                  <span className="v1-adm-clip">{k.profile.nextAction ?? 'Geen'}</span>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ k, total, done, blocked }) => (
-                <tr key={k.slug}>
-                  <td>
-                    <Link
-                      href={`/v1/admin/organizations/${k.orgId}`}
-                      style={{
-                        textDecoration: 'none',
-                        color: 'var(--klant-ink)',
-                        fontWeight: 600,
-                        fontSize: 13.5,
-                      }}
-                    >
-                      {k.name}
-                    </Link>
-                  </td>
-                  <td>
-                    {k.profile.onboardingPhase === 'completed' ? (
-                      <Pill tone="success" dot>
-                        Afgerond
-                      </Pill>
-                    ) : (
-                      <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>
-                        {ONBOARDING_PHASE_LABELS[k.profile.onboardingPhase]}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>
-                    {k.profile.customerOwner}
-                  </td>
-                  <td style={{ fontSize: 13 }}>{total > 0 ? `${done}/${total}` : '—'}</td>
-                  <td>
-                    {blocked > 0 ? (
-                      <Pill tone="danger" dot>
-                        {blocked}
-                      </Pill>
-                    ) : (
-                      <span style={{ color: 'var(--klant-faint)', fontSize: 12 }}>—</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      fontSize: 12.5,
-                      color: 'var(--klant-muted)',
-                      maxWidth: 280,
-                    }}
-                  >
-                    {k.profile.nextAction ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </>
+            ))}
+          </DataTable>
+        )}
+      </section>
+    </div>
   );
 }

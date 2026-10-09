@@ -1,11 +1,14 @@
 'use client';
 
 // V1 admin — crawl-jobs tabel + status-filter + per-rij retry. Data komt serialiseerbaar
-// binnen (server bouwt de rijen); deze laag doet alleen filter + de retry-actie.
+// binnen (server bouwt de rijen, incl. de opgemaakte datum); deze laag doet alleen
+// filter + de retry-actie.
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
+import { Badge, EmptyState, type Tone } from '@/app/v1/_ui/feedback';
+import { Button } from '@/app/v1/_ui/button';
+import { DataTable, NumCell } from '../_ui/data-table';
 import { adminRetryCrawlAction } from './actions';
 
 export type JobRow = {
@@ -15,30 +18,17 @@ export type JobRow = {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   attempts: number;
   errorMessage: string | null;
-  createdAt: string;
+  /** Al op de server opgemaakt (Europe/Amsterdam). */
+  createdLabel: string;
   lastEvent: string | null;
 };
 
-const STATUS_TONE: Record<JobRow['status'], PillTone> = {
-  pending: 'neutral',
-  processing: 'info',
-  completed: 'success',
-  failed: 'danger',
+const STATUS: Record<JobRow['status'], { tone: Tone; label: string }> = {
+  pending: { tone: 'neutral', label: 'In wachtrij' },
+  processing: { tone: 'accent', label: 'Bezig' },
+  completed: { tone: 'ok', label: 'Klaar' },
+  failed: { tone: 'danger', label: 'Mislukt' },
 };
-
-function fmtWhen(iso: string): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
-const selectStyle = {
-  fontSize: 13,
-  padding: '6px 8px',
-  borderRadius: 'var(--klant-r-md)',
-  border: '1px solid var(--klant-border)',
-  background: 'var(--klant-surface)',
-  color: 'var(--klant-ink)',
-} as const;
 
 export function JobsClient({ rows }: { rows: JobRow[] }) {
   const router = useRouter();
@@ -59,82 +49,88 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
       const res = await adminRetryCrawlAction(jobId);
       setBusy(null);
       if (res.ok) router.refresh();
-      else setError(res.error ?? 'Er ging iets mis.');
+      else setError(res.error ?? 'Er ging iets mis. Probeer het opnieuw.');
     });
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {error && (
-        <div style={{ fontSize: 13, color: 'var(--klant-danger)', background: 'var(--klant-danger-soft)', borderRadius: 'var(--klant-r-md)', padding: '8px 12px' }}>
-          {error}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle} aria-label="Filter op status">
-          <option value="all">Alle statussen</option>
-          <option value="pending">In afwachting</option>
-          <option value="processing">Bezig</option>
-          <option value="completed">Voltooid</option>
-          <option value="failed">Mislukt</option>
-        </select>
-        <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>{filtered.length} van {rows.length}</span>
+    <section className="v1-card">
+      <div className="v1-adm-card-head">
+        <label className="v1-adm-inline-field">
+          <span className="v1-sr-only">Filter op status</span>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="v1-input v1-adm-select">
+            <option value="all">Alle statussen</option>
+            <option value="pending">In wachtrij</option>
+            <option value="processing">Bezig</option>
+            <option value="completed">Klaar</option>
+            <option value="failed">Mislukt</option>
+          </select>
+        </label>
+        <span className="v1-adm-muted">
+          {filtered.length} van {rows.length}
+        </span>
       </div>
 
+      {error ? (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {error}
+        </p>
+      ) : null}
+
       {filtered.length === 0 ? (
-        <div className="klant-empty">
-          <p className="klant-empty-title">Geen jobs</p>
-          <p className="klant-empty-sub">{rows.length === 0 ? 'Er zijn nog geen crawl-jobs.' : 'Geen jobs met deze status.'}</p>
-        </div>
+        <EmptyState>{rows.length === 0 ? 'Nog geen crawls.' : 'Geen crawls met deze status.'}</EmptyState>
       ) : (
-        <div className="klant-card" style={{ padding: 0, overflowX: 'auto' }}>
-          <table className="klant-table">
-            <thead>
-              <tr>
-                <th>Klant</th>
-                <th>Bron</th>
-                <th>Status</th>
-                <th>Pogingen</th>
-                <th>Laatste event</th>
-                <th>Aangemaakt</th>
-                <th></th>
+        <DataTable
+          label="Crawls"
+          columns={[
+            { label: 'Klant' },
+            { label: 'Bron' },
+            { label: 'Status' },
+            { label: 'Pogingen', num: true },
+            { label: 'Laatste melding' },
+            { label: 'Gestart' },
+            { label: <span className="v1-sr-only">Actie</span>, width: '1%' },
+          ]}
+        >
+          {filtered.map((r) => {
+            const terminal = r.status === 'failed' || r.status === 'completed';
+            const s = STATUS[r.status];
+            return (
+              <tr key={r.jobId}>
+                <td style={{ fontWeight: 500 }}>{r.orgName}</td>
+                <td title={r.host ?? ''}>
+                  <span className="v1-adm-clip">{r.host ?? 'Onbekend'}</span>
+                </td>
+                <td>
+                  <Badge tone={s.tone}>{s.label}</Badge>
+                </td>
+                <NumCell>{r.attempts}</NumCell>
+                <td
+                  className={r.errorMessage ? 'v1-adm-danger' : 'v1-adm-muted'}
+                  title={r.errorMessage ?? r.lastEvent ?? ''}
+                >
+                  <span className="v1-adm-clip">{r.errorMessage ?? r.lastEvent ?? 'Geen'}</span>
+                </td>
+                <td className="v1-adm-muted" style={{ whiteSpace: 'nowrap' }}>
+                  {r.createdLabel}
+                </td>
+                <td>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={pending || !terminal}
+                    loading={busy === r.jobId}
+                    onClick={() => retry(r.jobId)}
+                    title={terminal ? 'Start een nieuwe crawl voor deze bron (kost Firecrawl-tegoed)' : 'Crawl loopt nog'}
+                  >
+                    Opnieuw proberen
+                  </Button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => {
-                const terminal = r.status === 'failed' || r.status === 'completed';
-                return (
-                  <tr key={r.jobId}>
-                    <td style={{ fontSize: 13, fontWeight: 500 }}>{r.orgName}</td>
-                    <td style={{ fontSize: 13, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.host ?? ''}>
-                      {r.host ?? '—'}
-                    </td>
-                    <td><Pill tone={STATUS_TONE[r.status]}>{r.status}</Pill></td>
-                    <td style={{ fontSize: 12.5 }}>{r.attempts}</td>
-                    <td style={{ fontSize: 12.5, color: r.errorMessage ? 'var(--klant-danger)' : 'var(--klant-muted)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.errorMessage ?? r.lastEvent ?? ''}>
-                      {r.errorMessage ?? r.lastEvent ?? '—'}
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--klant-muted)', whiteSpace: 'nowrap' }}>{fmtWhen(r.createdAt)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="klant-btn"
-                        disabled={pending || !terminal}
-                        onClick={() => retry(r.jobId)}
-                        title={terminal ? 'Start een verse crawl voor deze bron (Firecrawl-credits)' : 'Crawl loopt nog'}
-                        style={{ fontSize: 12, padding: '5px 10px' }}
-                      >
-                        {busy === r.jobId ? 'Starten…' : 'Opnieuw proberen'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+            );
+          })}
+        </DataTable>
       )}
-    </div>
+    </section>
   );
 }

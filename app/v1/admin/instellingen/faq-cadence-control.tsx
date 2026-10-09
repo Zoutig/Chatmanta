@@ -1,70 +1,37 @@
 'use client';
 
-// V1 Admin — FAQ-cadans-control. Port van app/admindashboard/components/faq-cadence-control.tsx.
-// Enige verschil: importeert uit de V1-action en V1-config (niet de V0-paden).
+// V1 Admin — FAQ-cadans: optimistisch omzetten, terug bij een fout, bevestiging als toast.
 
 import { useState, useTransition } from 'react';
+import { Segmented } from '@/app/v1/_ui/controls';
+import { useToast } from '@/app/v1/_ui/toast';
 import { setFaqRefreshCadenceAction } from './set-faq-cadence-action';
 import type { FaqRefreshCadence } from '@/lib/v1/admin/config';
 
-const OPTIONS: { value: FaqRefreshCadence; label: string }[] = [
+const OPTIONS: ReadonlyArray<{ value: FaqRefreshCadence; label: string }> = [
   { value: 'weekly', label: 'Wekelijks' },
   { value: 'monthly', label: 'Maandelijks' },
 ];
 
 export function FaqCadenceControl({ current }: { current: FaqRefreshCadence }) {
+  const toast = useToast();
   const [cadence, setCadence] = useState<FaqRefreshCadence>(current);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const choose = (next: FaqRefreshCadence) => {
     if (next === cadence || pending) return;
     const prev = cadence;
     setCadence(next);
-    setSaved(false);
-    setError(null);
     startTransition(async () => {
       const res = await setFaqRefreshCadenceAction(next);
       if (!res.ok) {
         setCadence(prev);
-        setError(res.error);
+        toast.error(res.error || 'Opslaan lukte niet. Probeer het opnieuw.');
         return;
       }
-      setSaved(true);
+      toast.success(next === 'weekly' ? 'FAQ wordt voortaan wekelijks ververst' : 'FAQ wordt voortaan maandelijks ververst');
     });
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-      <div style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {OPTIONS.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className="klant-btn"
-            data-variant={o.value === cadence ? 'primary' : undefined}
-            aria-pressed={o.value === cadence}
-            disabled={pending}
-            onClick={() => choose(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
-        {pending && (
-          <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>Opslaan…</span>
-        )}
-        {!pending && saved && (
-          <span style={{ fontSize: 12.5, color: 'var(--klant-success)' }} role="status">
-            Opgeslagen
-          </span>
-        )}
-      </div>
-      {error && (
-        <span style={{ fontSize: 12.5, color: 'var(--klant-danger)' }} role="alert">
-          {error}
-        </span>
-      )}
-    </div>
-  );
+  return <Segmented label="FAQ-verversing" value={cadence} options={OPTIONS} onChange={choose} />;
 }

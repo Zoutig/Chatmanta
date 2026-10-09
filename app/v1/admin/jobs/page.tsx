@@ -1,6 +1,7 @@
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { isAppError } from '@/lib/errors/app-error';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { formatDateTime } from '../_ui/format';
 import { JobsClient, type JobRow } from './jobs-client';
 
 // V1 admin — cross-org crawl-jobs + retry. Reads via getJorionAdminClient() (service-role
@@ -26,12 +27,7 @@ export default async function AdminJobsPage() {
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e; // NEXT_REDIRECT → /v1/login
   }
@@ -71,27 +67,28 @@ export default async function AdminJobsPage() {
 
   const rows: JobRow[] = jobs.map((j) => ({
     jobId: j.id,
-    orgName: j.organizations?.name ?? '—',
+    orgName: j.organizations?.name ?? 'Onbekende klant',
     host: j.target_id ? hostById.get(j.target_id) ?? null : null,
     status: j.status,
     attempts: j.attempts ?? 0,
     errorMessage: j.error_message,
-    createdAt: j.created_at,
+    // Op de server opgemaakt: Node en de browser formatteren datums net anders (hydration).
+    createdLabel: formatDateTime(j.created_at),
     lastEvent: lastEventByJob.get(j.id) ?? null,
   }));
 
   return (
-    <>
-      <PageHead
-        title="Crawl-jobs"
-        subtitle="Cross-org website-crawls. 'Opnieuw proberen' start een verse crawl (Firecrawl-credits)."
+    <div className="v1-page">
+      <PageHeader
+        title="Crawls en taken"
+        description="Website-crawls van alle klanten. Opnieuw proberen start een nieuwe crawl en kost Firecrawl-tegoed."
       />
-      {error && (
-        <p role="alert" style={{ color: 'var(--klant-danger)', fontSize: 13 }}>
-          Kon de jobs niet laden: {error.message}
+      {error ? (
+        <p role="alert" className="v1-alert v1-alert--error">
+          Kon de crawls niet laden: {error.message}
         </p>
-      )}
+      ) : null}
       <JobsClient rows={rows} />
-    </>
+    </div>
   );
 }

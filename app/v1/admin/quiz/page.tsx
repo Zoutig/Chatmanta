@@ -1,13 +1,16 @@
-// V1 Admin — Quiz-overzicht: alle quizzen over alle klant-orgs.
-// Read-only lijst; authoring per klant via /v1/admin/quiz/[orgId].
+// V1 Admin — Quiz-overzicht: alle quizzen over alle klanten.
+// Read-only lijst; beheer per klant via /v1/admin/quiz/[orgId].
 
 import Link from 'next/link';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { isAppError } from '@/lib/errors/app-error';
 import { listQuizzes } from '@/lib/v1/quiz/data';
 import { QUIZ_STATUS_LABELS } from '@/lib/controlroom/types';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { EmptyState } from '@/app/v1/_ui/feedback';
+import { buttonClass } from '@/app/v1/_ui/button';
+import { DataTable, NumCell } from '../_ui/data-table';
+import { formatDate } from '../_ui/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,99 +20,80 @@ export default async function V1QuizOverviewPage() {
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
 
-  // Haal orgs op voor naam-weergave (join in memory — klein volume op V1-schaal).
+  // Orgs voor naam-weergave (join in memory, klein volume op V1-schaal).
   const [quizzes, orgsResult] = await Promise.all([
     listQuizzes(admin),
     admin.from('organizations').select('id, name, slug').is('deleted_at', null),
   ]);
 
   const orgMap = new Map(
-    ((orgsResult.data ?? []) as { id: string; name: string; slug: string }[]).map((o) => [
-      o.id,
-      { name: o.name, slug: o.slug },
-    ]),
+    ((orgsResult.data ?? []) as { id: string; name: string; slug: string }[]).map((o) => [o.id, { name: o.name, slug: o.slug }]),
   );
 
   return (
-    <>
-      <PageHead
-        eyebrow="Admin"
+    <div className="v1-page">
+      <PageHeader
         title="Quiz"
-        subtitle="Overzicht van alle Kennisbank-quizzen. Start of beheer een quiz via de klantpagina."
+        description="Alle kennisbank-quizzen. Een nieuwe quiz start je vanaf de pagina van een klant."
         actions={
-          <Link href="/v1/admin/organizations" className="klant-btn" data-variant="ghost">
-            Klanten →
+          <Link href="/v1/admin/organizations" className={buttonClass({ variant: 'secondary' })}>
+            Naar klanten
           </Link>
         }
       />
 
-      {quizzes.length === 0 ? (
-        <Card>
-          <span className="klant-hint">
-            Nog geen quizzen gegenereerd. Start er een via een klant{' '}→{' '}
-            <Link href="/v1/admin/organizations" style={{ color: 'var(--klant-accent)' }}>
-              Klanten
-            </Link>
-            {' → '}
-            <em>Quiz</em>.
-          </span>
-        </Card>
-      ) : (
-        <Card padded={false}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="klant-table">
-              <thead>
-                <tr>
-                  <th>Klant</th>
-                  <th>Status</th>
-                  <th>Vragen</th>
-                  <th>Beantwoord</th>
-                  <th>Overgeslagen</th>
-                  <th>Aangemaakt</th>
-                  <th></th>
+      <section className="v1-card">
+        {quizzes.length === 0 ? (
+          <EmptyState
+            action={
+              <Link href="/v1/admin/organizations" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                Naar klanten
+              </Link>
+            }
+          >
+            Nog geen quizzen. Start er een via de pagina van een klant.
+          </EmptyState>
+        ) : (
+          <DataTable
+            label="Quizzen"
+            columns={[
+              { label: 'Klant' },
+              { label: 'Status' },
+              { label: 'Vragen', num: true },
+              { label: 'Beantwoord', num: true },
+              { label: 'Overgeslagen', num: true },
+              { label: 'Aangemaakt' },
+              { label: <span className="v1-sr-only">Actie</span>, width: '1%' },
+            ]}
+          >
+            {quizzes.map((q) => {
+              const org = orgMap.get(q.organizationId);
+              return (
+                <tr key={q.id}>
+                  <td style={{ fontWeight: 500 }}>{org?.name ?? q.organizationId}</td>
+                  <td className="v1-adm-muted">{QUIZ_STATUS_LABELS[q.status]}</td>
+                  <NumCell>{q.questionCount}</NumCell>
+                  <NumCell>{q.answeredCount}</NumCell>
+                  <NumCell>{q.skippedCount}</NumCell>
+                  <td className="v1-adm-muted" style={{ whiteSpace: 'nowrap' }}>
+                    {formatDate(q.createdAt)}
+                  </td>
+                  <td>
+                    <Link href={`/v1/admin/quiz/${q.organizationId}`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                      Beheren
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {quizzes.map((q) => {
-                  const org = orgMap.get(q.organizationId);
-                  return (
-                    <tr key={q.id}>
-                      <td style={{ fontWeight: 500 }}>{org?.name ?? q.organizationId}</td>
-                      <td style={{ fontSize: 13 }}>{QUIZ_STATUS_LABELS[q.status]}</td>
-                      <td>{q.questionCount}</td>
-                      <td>{q.answeredCount}</td>
-                      <td>{q.skippedCount}</td>
-                      <td style={{ fontSize: 12.5, color: 'var(--klant-muted)', whiteSpace: 'nowrap' }}>
-                        {new Date(q.createdAt).toLocaleDateString('nl-NL')}
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <Link
-                          href={`/v1/admin/quiz/${q.organizationId}`}
-                          className="klant-btn"
-                          data-variant="ghost"
-                          style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}
-                        >
-                          Beheer →
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </>
+              );
+            })}
+          </DataTable>
+        )}
+      </section>
+    </div>
   );
 }

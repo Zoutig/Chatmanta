@@ -24,12 +24,13 @@ import type { AttentionSignals } from '@/lib/v1/dashboard/attention';
 // uit de layout (getShellCounts). Twee groepen, elk met een eigen glijdende
 // markering achter het actieve item.
 
-type NavDot = { tone: 'critical' | 'accent'; label: string };
-type NavEntry = { href: string; label: string; icon: React.ReactNode; exact?: boolean; count?: number; dot?: NavDot };
+export type NavDot = { tone: 'critical' | 'accent'; label: string };
+export type NavEntry = { href: string; label: string; icon: React.ReactNode; exact?: boolean; count?: number; dot?: NavDot };
 
 const ICON = { size: 18, strokeWidth: 1.8, 'aria-hidden': true } as const;
 
-function NavGroup({
+/** Ook gebruikt door de admin-zijbalk. */
+export function NavGroup({
   items,
   activeHref,
   onNavigate,

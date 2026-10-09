@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireJorionAdmin } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { PageHeader } from '@/app/v1/_ui/page-header';
 import { NewOrgForm } from './new-org-form';
 
 // V1 M1 — admin: nieuwe klant-organisatie aanmaken. requireJorionAdmin gate't de
@@ -13,26 +13,21 @@ export default async function NewOrganizationPage() {
     await requireJorionAdmin();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
   }
 
   return (
-    <>
-      <PageHead
-        eyebrow={<Link href="/v1/admin/organizations">← Organisaties</Link>}
+    <div className="v1-page v1-page--narrow">
+      <Link href="/v1/admin/organizations" className="v1-section-link">
+        Terug naar klanten
+      </Link>
+      <PageHeader
         title="Nieuwe klant"
-        subtitle="Maakt de organisatie + één chatbot aan en nodigt de owner uit per e-mail (magic-link)."
+        description="Maakt de organisatie en één chatbot aan, en stuurt de eigenaar een uitnodiging per e-mail."
       />
-      <div style={{ maxWidth: 480 }}>
-        <NewOrgForm />
-      </div>
-    </>
+      <NewOrgForm />
+    </div>
   );
 }

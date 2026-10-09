@@ -1,0 +1,155 @@
+/* Admindashboard-bouwstenen. Eigen prefix v1-adm-: deze CSS blijft geladen na
+   een soft-navigatie naar het klantendashboard, dus nooit bestaande klassen
+   herdefiniëren. */
+
+/* ---- Cijferkaarten ---- */
+.v1-ui .v1-adm-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.v1-ui .v1-adm-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: var(--v1-r-lg);
+  background: var(--v1-surface);
+  box-shadow: var(--v1-shadow-1);
+}
+.v1-ui .v1-adm-metric-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--v1-muted);
+}
+.v1-ui .v1-adm-metric-num {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--v1-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.v1-ui .v1-adm-metric-num[data-tone='ok'] { color: var(--v1-ok); }
+.v1-ui .v1-adm-metric-num[data-tone='warn'] { color: var(--v1-warn); }
+.v1-ui .v1-adm-metric-num[data-tone='danger'] { color: var(--v1-danger); }
+.v1-ui .v1-adm-metric-num[data-tone='accent'] { color: var(--v1-accent-ink); }
+.v1-ui .v1-adm-metric-sub { font-size: 12px; color: var(--v1-muted); line-height: 1.45; }
+
+/* ---- Tabel ---- */
+.v1-ui .v1-adm-table-wrap {
+  overflow-x: auto;
+  margin: 0 -24px;
+  padding: 0 24px;
+  -webkit-overflow-scrolling: touch;
+}
+.v1-ui .v1-adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  color: var(--v1-ink);
+}
+.v1-ui .v1-adm-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v1-muted);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--v1-line);
+}
+.v1-ui .v1-adm-table td {
+  padding: 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--v1-line);
+}
+.v1-ui .v1-adm-table tbody tr:last-child td { border-bottom: 0; }
+.v1-ui .v1-adm-table tbody tr:hover td { background: var(--v1-bg); }
+.v1-ui .v1-adm-table th:first-child,
+.v1-ui .v1-adm-table td:first-child { padding-left: 0; }
+.v1-ui .v1-adm-table th:last-child,
+.v1-ui .v1-adm-table td:last-child { padding-right: 0; }
+.v1-ui .v1-adm-table [data-num] { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v1-ui .v1-adm-table a:not(.v1-btn):not(.v1-section-link) { color: var(--v1-ink); font-weight: 600; text-decoration: none; }
+.v1-ui .v1-adm-table a:not(.v1-btn):not(.v1-section-link):hover { text-decoration: underline; text-underline-offset: 3px; }
+.v1-ui .v1-adm-muted { color: var(--v1-muted); font-size: 12.5px; }
+.v1-ui .v1-adm-clip { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Filters ---- */
+.v1-ui .v1-adm-filters { display: flex; flex-direction: column; gap: 10px; }
+.v1-ui .v1-adm-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.v1-ui .v1-adm-filter-label { min-width: 72px; font-size: 12.5px; font-weight: 600; color: var(--v1-muted); }
+.v1-ui .v1-adm-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v1-ui .v1-adm-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--v1-surface-2);
+  color: var(--v1-ink-2, var(--v1-ink));
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--v1-fast) ease, box-shadow var(--v1-fast) ease;
+}
+.v1-ui .v1-adm-chip:hover { background: #e4e9ef; }
+.v1-ui .v1-adm-chip[aria-current='true'] { background: var(--v1-ink); color: #fff; }
+.v1-ui .v1-adm-chip:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+
+/* ---- Grafiek ---- */
+.v1-ui .v1-adm-chart { display: flex; flex-direction: column; }
+
+/* ---- Paginabouw ---- */
+.v1-ui .v1-adm-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.v1-ui .v1-adm-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+
+@media (max-width: 1100px) {
+  .v1-ui .v1-adm-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .v1-ui .v1-adm-table-wrap { margin: 0 -18px; padding: 0 18px; }
+  .v1-ui .v1-adm-metric-num { font-size: 22px; }
+}
+
+/* ---- Schil ---- */
+.v1-ui .v1-adm-brand-tag {
+  margin-left: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.v1-ui .v1-adm-denied { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
+.v1-ui .v1-adm-empty { padding-top: 10px; }
+.v1-ui .v1-adm-danger { color: var(--v1-danger); font-size: 12.5px; }
+.v1-ui .v1-adm-select { width: auto; min-width: 180px; height: 36px; }
+.v1-ui .v1-adm-inline-field { display: inline-flex; }
+.v1-ui .v1-adm-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.v1-ui .v1-adm-list { margin-top: 12px; }
+.v1-ui .v1-adm-filters { margin-top: 12px; }
+.v1-ui .v1-adm-filter-details > summary { gap: 10px; }
+.v1-ui .v1-adm-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; }
+.v1-ui .v1-adm-stat-row { display: flex; flex-wrap: wrap; gap: 14px 28px; margin-top: 10px; }
+.v1-ui .v1-adm-stat { display: flex; flex-direction: column; gap: 2px; min-width: 120px; }
+.v1-ui .v1-adm-stat-label { font-size: 12.5px; color: var(--v1-muted); }
+.v1-ui .v1-adm-stat-value { font-size: 18px; font-weight: 700; color: var(--v1-ink); font-variant-numeric: tabular-nums; }
+.v1-ui .v1-adm-stat-sub { font-size: 12px; color: var(--v1-muted); }
+.v1-ui .v1-adm-divider { border: 0; border-top: 1px solid var(--v1-line); margin: 16px 0 12px; }
+.v1-ui .v1-adm-title-row { display: flex; align-items: center; gap: 6px; }
+.v1-ui .v1-adm-note { margin: 0; line-height: 1.6; }
+.v1-ui .v1-adm-muted-card { background: var(--v1-surface-2); box-shadow: none; }
+.v1-ui .v1-adm-strong { margin: 0 0 4px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-adm-inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.v1-ui .v1-adm-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--v1-ok); }
+.v1-ui .v1-adm-dot[data-tone='warn'] { background: var(--v1-warn); }
+.v1-ui .v1-adm-dot[data-tone='danger'] { background: var(--v1-danger); }
+/* sr-only-kolomkoppen (absolute) mogen niet buiten de scrollcontainer de pagina verbreden. */
+.v1-ui .v1-adm-table-wrap { position: relative; }

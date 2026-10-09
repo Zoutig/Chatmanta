@@ -1,52 +1,38 @@
-// V1 Admin — Instellingen. Port van app/admindashboard/instellingen/page.tsx.
+// V1 Admin — Instellingen.
 //
-// Verschillen t.o.v. V0:
-//   - Key-checks op V1-namen (NEXT_PUBLIC_V1_SUPABASE_URL, V1_SUPABASE_SERVICE_ROLE_KEY)
-//     in plaats van V0_*. V0_COOKIE_SECRET en ANTHROPIC_API_KEY geschrapt.
+//   - Key-checks op V1-namen (NEXT_PUBLIC_V1_SUPABASE_URL, V1_SUPABASE_SERVICE_ROLE_KEY).
 //   - getFaqRefreshCadence() leest uit lib/v1/admin/config (V1 admin_config-tabel).
-//   - FaqCadenceControl importeert de V1-action.
-//   - MONTHLY_CONVERSATION_LIMITS geschrapt — V1 gebruikt per-org EUR dag-budget
-//     (instelbaar via de organisatie-deep-dive, niet een globale constante).
-//   - PRIVACY_DEFAULTS blijft ongewijzigd hergebruikt uit lib/controlroom/types.
+//   - Geen globale gesprekslimieten: V1 gebruikt een per-org EUR-dagbudget
+//     (instelbaar op de klantpagina).
+//   - PRIVACY_DEFAULTS hergebruikt uit lib/controlroom/types.
 
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill } from '@/app/klantendashboard/components/ui/pill';
-import { ReloadButton } from '@/app/admindashboard/components/reload-button';
 import { PRIVACY_DEFAULTS } from '@/lib/controlroom/types';
 import { getFaqRefreshCadence } from '@/lib/v1/admin/config';
 import { isAppError } from '@/lib/errors/app-error';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { Panel, Row, Rows } from '@/app/v1/_ui/panel';
+import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
+import { ReloadButton } from '../_ui/reload-button';
+import { formatEur } from '../_ui/format';
 import { FaqCadenceControl } from './faq-cadence-control';
 
 export const dynamic = 'force-dynamic';
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        gap: 16,
-        padding: '8px 0',
-        borderBottom: '1px solid var(--klant-border)',
-        fontSize: 13.5,
-      }}
-    >
-      <span style={{ color: 'var(--klant-muted)' }}>{label}</span>
-      <span style={{ color: 'var(--klant-ink)', textAlign: 'right' }}>{value}</span>
-    </div>
-  );
-}
+const ENV_LABEL: Record<string, string> = {
+  production: 'Productie',
+  preview: 'Preview',
+  development: 'Ontwikkeling',
+  test: 'Test',
+};
 
 function KeyStatus({ present }: { present: boolean }) {
   return present ? (
-    <Pill tone="success" dot>
+    <Badge tone="ok" dot>
       Ingesteld
-    </Pill>
+    </Badge>
   ) : (
-    <Pill tone="neutral" dot>
-      Ontbreekt
-    </Pill>
+    <Badge dot>Ontbreekt</Badge>
   );
 }
 
@@ -57,17 +43,12 @@ export default async function V1InstellingenPage() {
     await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
 
-  // Alleen aanwezigheid lezen — waardes worden NOOIT gerenderd.
+  // Alleen aanwezigheid lezen: waardes worden NOOIT gerenderd.
   const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const faqCadence = await getFaqRefreshCadence();
 
@@ -80,95 +61,69 @@ export default async function V1InstellingenPage() {
   };
 
   return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">Instellingen</h1>
-          <p className="klant-page-sub">
-            Globale operator-configuratie. De FAQ-verversing is instelbaar; de technische config
-            is read-only — secrets worden nooit getoond, modelkeuze en keys wijzigen vereist
-            code + versiebeheer.
-          </p>
-        </div>
-        <ReloadButton />
-      </header>
+    <div className="v1-page v1-page--narrow">
+      <PageHeader
+        title="Instellingen"
+        description={
+          <>
+            Algemene instellingen voor alle klanten. Alleen de FAQ-verversing is hier te wijzigen.{' '}
+            <InfoTip text="De technische instellingen zijn alleen-lezen. Geheime sleutels worden nooit getoond; modellen of sleutels wijzigen gaat via code en versiebeheer." />
+          </>
+        }
+        actions={<ReloadButton />}
+      />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: 16,
-        }}
-      >
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>
-            FAQ-verversing
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: '0 0 10px' }}>
-            Bepaalt hoe vaak de &lsquo;Meest gestelde vragen&rsquo;-ranglijst van klanten
-            automatisch wordt herberekend.
-          </p>
-          <FaqCadenceControl current={faqCadence} />
-        </Card>
+      <Panel title="FAQ-verversing">
+        <Rows>
+          <Row label="Meest gestelde vragen">
+            <FaqCadenceControl current={faqCadence} />
+          </Row>
+        </Rows>
+      </Panel>
 
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>
-            Modellen
-          </div>
-          <Row label="Chat / preprocess" value="gpt-4o-mini" />
-          <Row label="Eval-judge / cascade" value="gpt-4o" />
-          <Row label="Embeddings" value="text-embedding-3-small (1536)" />
-        </Card>
+      <Panel title="Modellen">
+        <Rows>
+          <Row label="Chat en voorbewerking">gpt-4o-mini</Row>
+          <Row label="Beoordeling en vangnet">gpt-4o</Row>
+          <Row label="Embeddings">text-embedding-3-small (1536)</Row>
+        </Rows>
+      </Panel>
 
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>
-            Standaard bewaartermijnen
-          </div>
-          <Row label="Gesprekken" value={`${PRIVACY_DEFAULTS.chatRetentionDays} dagen`} />
-          <Row label="Issue-gesprekken" value={`${PRIVACY_DEFAULTS.issueRetentionDays} dagen`} />
-          <Row
-            label="Metadata"
-            value={`${PRIVACY_DEFAULTS.metadataRetentionMonths} maanden`}
-          />
-        </Card>
+      <Panel title="Standaard bewaartermijnen">
+        <Rows>
+          <Row label="Gesprekken">{PRIVACY_DEFAULTS.chatRetentionDays} dagen</Row>
+          <Row label="Gesprekken met een issue">{PRIVACY_DEFAULTS.issueRetentionDays} dagen</Row>
+          <Row label="Metadata">{PRIVACY_DEFAULTS.metadataRetentionMonths} maanden</Row>
+        </Rows>
+      </Panel>
 
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>
-            Budget-limieten
-          </div>
-          <Row label="Default dag-budget per org" value="€1,00 / dag" />
-          <Row
-            label="Instellen"
-            value={
-              <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>
-                via organisatie-deep-dive
-              </span>
-            }
-          />
-        </Card>
+      <Panel title="Budget">
+        <Rows>
+          <Row label="Standaard dagbudget per klant">{formatEur(1)} per dag</Row>
+          <Row label="Aanpassen">Per klant, op de klantpagina</Row>
+        </Rows>
+      </Panel>
 
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>
-            Crawler &amp; omgeving
-          </div>
-          <Row label="Crawler" value="Firecrawl" />
-          <Row label="Max pagina&apos;s per crawl" value="50" />
-          <Row
-            label="Firecrawl-creditlimiet (maand)"
-            value={Number(process.env.FIRECRAWL_MONTHLY_CREDIT_LIMIT) || 1000}
-          />
-          <Row label="Environment" value={env} />
-        </Card>
+      <Panel title="Crawler en omgeving">
+        <Rows>
+          <Row label="Crawler">Firecrawl</Row>
+          <Row label="Maximaal pagina's per crawl">50</Row>
+          <Row label="Firecrawl-tegoed per maand">
+            {(Number(process.env.FIRECRAWL_MONTHLY_CREDIT_LIMIT) || 1000).toLocaleString('nl-NL')}
+          </Row>
+          <Row label="Omgeving">{ENV_LABEL[env] ?? env}</Row>
+        </Rows>
+      </Panel>
 
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>
-            API-keys (alleen aanwezigheid)
-          </div>
+      <Panel title="Sleutels (alleen of ze er zijn)">
+        <Rows>
           {Object.entries(keys).map(([name, present]) => (
-            <Row key={name} label={name} value={<KeyStatus present={present} />} />
+            <Row key={name} label={name}>
+              <KeyStatus present={present} />
+            </Row>
           ))}
-        </Card>
-      </div>
-    </>
+        </Rows>
+      </Panel>
+    </div>
   );
 }

@@ -1,17 +1,12 @@
-// V1 admin — Issues. Port van app/admindashboard/issues/page.tsx.
-// V1-aanpassingen:
-//   * Geen KNOWN_ORGS/ALL_ORG_SLUGS → org-filter chip weggelaten (orgs uit DB zijn
-//     onbeperkt; een zoekbare org-filter is een apart feature als er behoefte aan is).
-//   * Geen afgeleide signalen (buildIssues / getControlRoomKlanten) — die zijn V0-specifiek.
+// V1 admin — Issues: gelogde fouten uit alle onderdelen.
+//   * Geen org-filter (orgs uit de DB zijn onbeperkt; een zoekbare org-filter is een
+//     apart feature als er behoefte aan is).
 //   * listErrorGroups / getErrorSummary via lib/v1/admin/errors (getJorionAdminClient).
 //   * Auth: requireJorionAdmin via getJorionAdminClient() intern; catch AUTH_FORBIDDEN.
 
 import Link from 'next/link';
 import { isAppError } from '@/lib/errors/app-error';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import {
   getErrorSummary,
   listErrorGroups,
@@ -20,14 +15,21 @@ import {
 } from '@/lib/v1/admin/errors';
 import { formatRelativeNL } from '@/lib/controlroom/format';
 import type { ErrorSeverity, ErrorStatus, ErrorSurface } from '@/lib/observability/sink';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { Badge, EmptyState, type Tone } from '@/app/v1/_ui/feedback';
+import { FilterChip, FilterRow } from '../_ui/filter-chips';
 
 export const dynamic = 'force-dynamic';
 
-const SEV_TONE: Record<ErrorSeverity, PillTone> = { error: 'danger', warning: 'warn', info: 'info' };
+const SEV_TONE: Record<ErrorSeverity, Tone> = { error: 'danger', warning: 'warn', info: 'accent' };
 const SEV_LABEL: Record<ErrorSeverity, string> = { error: 'Fout', warning: 'Waarschuwing', info: 'Info' };
 const SURFACE_LABEL: Record<ErrorSurface, string> = {
-  widget: 'Widget', dashboard: 'Dashboard', chatbot: 'Chatbot',
-  api: 'API', cron: 'Cron', system: 'Systeem',
+  widget: 'Widget',
+  dashboard: 'Dashboard',
+  chatbot: 'Chatbot',
+  api: 'API',
+  cron: 'Geplande taak',
+  system: 'Systeem',
 };
 const SURFACES: ErrorSurface[] = ['widget', 'dashboard', 'chatbot', 'api', 'cron', 'system'];
 const STATUSES: ErrorStatus[] = ['open', 'resolved', 'ignored'];
@@ -44,71 +46,46 @@ function buildHref(sp: SP, patch: Partial<SP>): string {
   return qs ? `/v1/admin/issues?${qs}` : '/v1/admin/issues';
 }
 
-function Chip({ active, href, children }: { active: boolean; href: string; children: React.ReactNode }) {
+function HealthStrip({ summary }: { summary: ErrorSummary }) {
+  const openCount = summary.openError + summary.openWarning;
+  const tone: Tone = summary.openError > 0 ? 'danger' : summary.openWarning > 0 ? 'warn' : 'ok';
+  const label =
+    openCount === 0
+      ? 'Alles draait'
+      : `${openCount} open: ${summary.openError} ${summary.openError === 1 ? 'fout' : 'fouten'}, ${summary.openWarning} ${summary.openWarning === 1 ? 'waarschuwing' : 'waarschuwingen'}`;
   return (
-    <Link
-      href={href}
-      className="klant-btn"
-      style={{
-        fontSize: 12,
-        padding: '3px 10px',
-        background: active ? 'var(--klant-accent-soft)' : undefined,
-        borderColor: active ? 'var(--klant-accent-border)' : undefined,
-        color: active ? 'var(--klant-accent)' : undefined,
-      }}
-    >
-      {children}
-    </Link>
-  );
-}
-
-function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, color: 'var(--klant-dim)', minWidth: 64, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+    <div className="v1-adm-strip">
+      <Badge tone={tone} dot>
         {label}
+      </Badge>
+      <span className="v1-adm-muted">
+        {summary.last24hError} {summary.last24hError === 1 ? 'fout' : 'fouten'} in de laatste 24 uur, {summary.openInfo} info-meldingen verborgen
       </span>
-      {children}
     </div>
   );
 }
 
-function HealthStrip({ summary }: { summary: ErrorSummary }) {
-  const openCount = summary.openError + summary.openWarning;
-  const tone: PillTone = summary.openError > 0 ? 'danger' : summary.openWarning > 0 ? 'warn' : 'success';
-  const label =
-    openCount === 0
-      ? 'Alles draait ✓'
-      : `${openCount} open (${summary.openError} fout · ${summary.openWarning} waarschuwing)`;
-  return (
-    <Card>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <Pill tone={tone} dot>{label}</Pill>
-        <span style={{ fontSize: 12.5, color: 'var(--klant-muted)' }}>
-          {summary.last24hError} fout{summary.last24hError === 1 ? '' : 'en'} in de laatste 24u · {summary.openInfo} info verborgen
-        </span>
-      </div>
-    </Card>
-  );
-}
-
 function IssueRow({ g }: { g: ErrorGroupV1 }) {
-  const orgLabel = g.orgName ?? (g.organizationId ? g.organizationId.slice(0, 8) + '…' : '—');
+  const orgLabel = g.orgName ?? (g.organizationId ? g.organizationId.slice(0, 8) + '…' : 'Geen klant');
   return (
-    <Link
-      href={`/v1/admin/issues/${g.id}`}
-      className="klant-convo-row"
-      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--klant-r-md)', textDecoration: 'none', color: 'var(--klant-ink)' }}
-    >
-      <Pill tone={SEV_TONE[g.severity]} dot>{SEV_LABEL[g.severity]}</Pill>
-      <Pill tone="neutral">{SURFACE_LABEL[g.surface]}</Pill>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
-        <div style={{ fontSize: 12, color: 'var(--klant-muted)' }}>{g.code} · {orgLabel}</div>
-      </div>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--klant-muted)', whiteSpace: 'nowrap' }}>{g.count}×</span>
-      <span style={{ fontSize: 12, color: 'var(--klant-dim)', whiteSpace: 'nowrap' }}>{formatRelativeNL(g.lastSeenAt)}</span>
-    </Link>
+    <li>
+      <Link href={`/v1/admin/issues/${g.id}`} className="v1-list-row v1-list-row--link">
+        <Badge tone={SEV_TONE[g.severity]} dot>
+          {SEV_LABEL[g.severity]}
+        </Badge>
+        <Badge>{SURFACE_LABEL[g.surface]}</Badge>
+        <span className="v1-list-main">
+          <span className="v1-list-title">{g.title}</span>
+          <span className="v1-list-meta">
+            {g.code}, {orgLabel}
+          </span>
+        </span>
+        <span className="v1-list-end v1-adm-muted">
+          <span>{g.count}×</span>
+          <span>{formatRelativeNL(g.lastSeenAt)}</span>
+        </span>
+      </Link>
+    </li>
   );
 }
 
@@ -117,12 +94,7 @@ export default async function V1IssuesPage({ searchParams }: { searchParams: Pro
     await getJorionAdminClient(); // gate + vroeg-falen vóór de data-fetches
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e; // NEXT_REDIRECT (geen sessie) → /v1/login
   }
@@ -137,59 +109,61 @@ export default async function V1IssuesPage({ searchParams }: { searchParams: Pro
     ? (sp.surface as ErrorSurface)
     : undefined;
 
-  const [summary, groups] = await Promise.all([
-    getErrorSummary(),
-    listErrorGroups({ status, severity, surface }),
-  ]);
+  const [summary, groups] = await Promise.all([getErrorSummary(), listErrorGroups({ status, severity, surface })]);
 
   return (
-    <>
-      <PageHead
+    <div className="v1-page">
+      <PageHeader
         title="Issues"
-        subtitle="Gelogde fouten uit alle surfaces (widget, dashboard, chatbot, API). Klik een fout voor de volledige context + &ldquo;Kopieer voor Claude Code&rdquo;."
+        description="Gelogde fouten uit widget, dashboard, chatbot en API. Open een fout voor de volledige context."
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <HealthStrip summary={summary} />
+      <HealthStrip summary={summary} />
 
-        <Card>
-          <div className="klant-section-title" style={{ marginBottom: 10 }}>Gelogde fouten</div>
+      <section className="v1-card">
+        <h2 className="v1-section-title">Gelogde fouten</h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            <FilterRow label="Status">
-              {STATUSES.map((s) => (
-                <Chip key={s} active={status === s} href={buildHref(sp, { status: s === 'open' ? '' : s })}>
-                  {STATUS_LABEL[s]}
-                </Chip>
-              ))}
-            </FilterRow>
-            <FilterRow label="Severity">
-              <Chip active={sevParam === ''} href={buildHref(sp, { sev: '' })}>Fout + waarschuwing</Chip>
-              <Chip active={sevParam === 'error'} href={buildHref(sp, { sev: 'error' })}>Alleen fouten</Chip>
-              <Chip active={sevParam === 'all'} href={buildHref(sp, { sev: 'all' })}>Incl. info</Chip>
-            </FilterRow>
-            <FilterRow label="Surface">
-              <Chip active={!surface} href={buildHref(sp, { surface: '' })}>Alle</Chip>
-              {SURFACES.map((s) => (
-                <Chip key={s} active={surface === s} href={buildHref(sp, { surface: s })}>{SURFACE_LABEL[s]}</Chip>
-              ))}
-            </FilterRow>
-          </div>
+        <div className="v1-adm-filters">
+          <FilterRow label="Status">
+            {STATUSES.map((s) => (
+              <FilterChip key={s} active={status === s} href={buildHref(sp, { status: s === 'open' ? '' : s })}>
+                {STATUS_LABEL[s]}
+              </FilterChip>
+            ))}
+          </FilterRow>
+          <FilterRow label="Ernst">
+            <FilterChip active={sevParam === ''} href={buildHref(sp, { sev: '' })}>
+              Fouten en waarschuwingen
+            </FilterChip>
+            <FilterChip active={sevParam === 'error'} href={buildHref(sp, { sev: 'error' })}>
+              Alleen fouten
+            </FilterChip>
+            <FilterChip active={sevParam === 'all'} href={buildHref(sp, { sev: 'all' })}>
+              Ook info
+            </FilterChip>
+          </FilterRow>
+          <FilterRow label="Onderdeel">
+            <FilterChip active={!surface} href={buildHref(sp, { surface: '' })}>
+              Alle
+            </FilterChip>
+            {SURFACES.map((s) => (
+              <FilterChip key={s} active={surface === s} href={buildHref(sp, { surface: s })}>
+                {SURFACE_LABEL[s]}
+              </FilterChip>
+            ))}
+          </FilterRow>
+        </div>
 
-          {groups.length === 0 ? (
-            <div className="klant-empty">
-              <p className="klant-empty-title">Geen gelogde fouten 🎉</p>
-              <p className="klant-empty-sub">Geen fouten die aan dit filter voldoen — alles draait.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {groups.map((g) => (
-                <IssueRow key={g.id} g={g} />
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-    </>
+        {groups.length === 0 ? (
+          <EmptyState>Geen fouten die bij dit filter passen.</EmptyState>
+        ) : (
+          <ul className="v1-list v1-adm-list">
+            {groups.map((g) => (
+              <IssueRow key={g.id} g={g} />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }
