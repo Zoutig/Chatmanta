@@ -1,24 +1,16 @@
-// V1 Admin — Bot prestaties. Port van app/admindashboard/bot-prestaties/page.tsx.
+// V1 Admin — Botprestaties.
 //
-// V1-aanpassingen t.o.v. V0:
 //  - Data via lib/v1/admin/bot-performance (getJorionAdminClient, `feedback`-tabel,
 //    geen bot_version-filter).
 //  - Org-identificatie door UUID (?org=<uuid>), niet slug.
-//  - Geen "versie"-regel in de header (V1 heeft geen LATEST_BOT_VERSION-constante).
-//  - Disclaimer-links verwijzen naar /v1/admin/usage en /v1/admin/maandelijkse-recap.
 //  - Auth: layout requireJorionAdmin gate't de hele route-group; getJorionAdminClient()
-//    gooit AUTH_FORBIDDEN door — hier opgevangen voor een nette weergave.
+//    gooit AUTH_FORBIDDEN door, hier opgevangen voor een nette weergave.
 //
 // PROXIES, geen accuraatheid: live verkeer heeft geen ground-truth labels.
 
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { isAppError } from '@/lib/errors/app-error';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill } from '@/app/klantendashboard/components/ui/pill';
-import { MetricCard } from '@/app/admindashboard/components/metric-card';
-import { DailyLineChart } from '@/app/admindashboard/components/daily-line-chart';
-import { ReloadButton } from '@/app/admindashboard/components/reload-button';
 import { formatRelativeNL } from '@/lib/controlroom/format';
 import {
   getBotPerfDetail,
@@ -35,15 +27,22 @@ import {
   type RecentNegative,
   type UngroundedFact,
 } from '@/lib/v1/admin/bot-performance';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
+import { Metric, MetricGrid } from '../_ui/metric';
+import { LineChart } from '../_ui/line-chart';
+import { ReloadButton } from '../_ui/reload-button';
+import { DataTable, NumCell } from '../_ui/data-table';
+import { FilterChip } from '../_ui/filter-chips';
 
 export const dynamic = 'force-dynamic';
 
 type SP = { org?: string; window?: string };
 
-// ───────────────────────── formatters ─────────────────────────
+// ───────────────────────── opmaak ─────────────────────────
 
-const fmtPct = (n: number | null) => (n == null ? '—' : `${n}%`);
-const fmtMs = (n: number | null) => (n == null ? '—' : `${n.toLocaleString('nl-NL')} ms`);
+const fmtPct = (n: number | null) => (n == null ? 'Geen data' : `${n}%`);
+const fmtMs = (n: number | null) => (n == null ? 'Geen data' : `${n.toLocaleString('nl-NL')} ms`);
 
 function hrefFor(orgId: string | null, window: PerfWindow): string {
   const sp = new URLSearchParams();
@@ -52,79 +51,89 @@ function hrefFor(orgId: string | null, window: PerfWindow): string {
   return `/v1/admin/bot-prestaties?${sp.toString()}`;
 }
 
-// ───────────────────────── small UI helpers ─────────────────────────
+// ───────────────────────── kleine bouwstenen ─────────────────────────
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div style={{ minWidth: 110 }}>
-      <div style={{ fontSize: 11, color: 'var(--klant-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--klant-ink)', marginTop: 2 }}>{value}</div>
-      {sub ? <div style={{ fontSize: 11.5, color: 'var(--klant-muted)', marginTop: 1 }}>{sub}</div> : null}
+    <div className="v1-adm-stat">
+      <span className="v1-adm-stat-label">{label}</span>
+      <span className="v1-adm-stat-value">{value}</span>
+      {sub ? <span className="v1-adm-stat-sub">{sub}</span> : null}
     </div>
   );
 }
 
-function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
+function SectionCard({ title, info, children }: { title: string; info?: string; children: ReactNode }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div className="klant-section-title">{children}</div>
-      {hint ? <div style={{ fontSize: 12, color: 'var(--klant-dim)', marginTop: 2 }}>{hint}</div> : null}
-    </div>
+    <section className="v1-card">
+      <h2 className="v1-section-title v1-adm-title-row">
+        {title}
+        {info ? <InfoTip text={info} /> : null}
+      </h2>
+      {children}
+    </section>
   );
 }
 
-function StatRow({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 22, rowGap: 14 }}>{children}</div>;
+function StatRow({ children }: { children: ReactNode }) {
+  return <div className="v1-adm-stat-row">{children}</div>;
+}
+
+function Divider() {
+  return <hr className="v1-adm-divider" />;
 }
 
 function WindowToggle({ window, orgId }: { window: PerfWindow; orgId: string | null }) {
   const opts: PerfWindow[] = ['30d', 'month'];
   return (
-    <div style={{ display: 'inline-flex', gap: 6 }}>
+    <div className="v1-adm-filter-chips" role="group" aria-label="Periode">
       {opts.map((w) => (
-        <Link key={w} href={hrefFor(orgId, w)} style={{ textDecoration: 'none' }}>
-          <Pill tone={w === window ? 'accent' : 'neutral'}>{WINDOW_LABEL[w]}</Pill>
-        </Link>
+        <FilterChip key={w} href={hrefFor(orgId, w)} active={w === window}>
+          {WINDOW_LABEL[w]}
+        </FilterChip>
       ))}
     </div>
   );
 }
 
+const DISCLAIMER =
+  'Signalen uit live verkeer (benaderingen en duimfeedback), geen meting van juistheid: live verkeer heeft geen vaste antwoorden om tegen te toetsen. De testchat in het dashboard telt niet mee, alleen echte bezoekers.';
+
 function Disclaimer() {
   return (
-    <p className="klant-hint" style={{ marginTop: 2 }}>
-      Observationele kwaliteit uit <strong>live verkeer</strong> (proxies + duim-feedback) —{' '}
-      <strong>geen accuraatheidsmeting</strong>, want live verkeer heeft geen ground-truth. De
-      in-dashboard test-tool telt niet mee; alleen echte bezoekers. Voor kosten/volume zie{' '}
-      <Link href="/v1/admin/usage" style={{ color: 'var(--klant-accent)' }}>Usage &amp; Kosten</Link>, voor
-      het maand-narratief de{' '}
-      <Link href="/v1/admin/maandelijkse-recap" style={{ color: 'var(--klant-accent)' }}>Maandelijkse Recap</Link>.
+    <p className="v1-adm-muted v1-adm-note">
+      Signalen uit live verkeer, geen meting van juistheid. <InfoTip text={DISCLAIMER} /> Kosten en volume staan bij{' '}
+      <Link href="/v1/admin/usage" className="v1-section-link">
+        Gebruik en kosten
+      </Link>
+      , het maandverhaal bij de{' '}
+      <Link href="/v1/admin/maandelijkse-recap" className="v1-section-link">
+        Maandrecap
+      </Link>
+      .
     </p>
   );
 }
 
-// ───────────────────────── metric blocks ─────────────────────────
+// ───────────────────────── blokken ─────────────────────────
 
 function VolumeNotice({ stats, window }: { stats: BotPerfStats; window: PerfWindow }) {
   if (stats.total === 0) {
     return (
-      <Card muted style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13.5, color: 'var(--klant-ink)', fontWeight: 600 }}>Nog geen live verkeer</div>
-        <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: '4px 0 0' }}>
-          Geen vragen in {WINDOW_LABEL[window]}. Zodra echte bezoekers de widget gebruiken
-          verschijnen hier signalen. (De in-dashboard test-tool schrijft geen telemetrie.)
+      <section className="v1-card v1-adm-muted-card">
+        <p className="v1-adm-strong">Nog geen live verkeer</p>
+        <p className="v1-adm-muted">
+          Geen vragen in {WINDOW_LABEL[window].toLowerCase()}. Zodra echte bezoekers de widget gebruiken, verschijnen hier signalen.
         </p>
-      </Card>
+      </section>
     );
   }
   if (stats.lowVolume) {
     return (
-      <div style={{ marginBottom: 12 }}>
-        <Pill tone="warn">
-          Lage volume — {stats.total} vragen (&lt; {LOW_VOLUME_THRESHOLD}) · cijfers indicatief
-        </Pill>
+      <div>
+        <Badge tone="warn">
+          Laag volume: {stats.total} vragen (minder dan {LOW_VOLUME_THRESHOLD}), cijfers zijn een indicatie
+        </Badge>
       </div>
     );
   }
@@ -132,137 +141,116 @@ function VolumeNotice({ stats, window }: { stats: BotPerfStats; window: PerfWind
 }
 
 function StatsGrid({ stats, window }: { stats: BotPerfStats; window: PerfWindow }) {
-  const dimmed = stats.lowVolume;
   return (
-    <div className="klant-metrics-grid" style={dimmed ? { opacity: 0.62 } : undefined}>
-      <MetricCard label="Vragen (live)" value={stats.total} sub={WINDOW_LABEL[window]} />
-      <MetricCard
-        label="Weiger-/fallback-ratio"
-        value={fmtPct(stats.fallbackPct)}
-        sub={`${stats.fallback}/${stats.total} · proxy, geen fout-%`}
-      />
-      <MetricCard
-        label="Grounding-support"
-        value={fmtPct(stats.groundedPct)}
-        sub={stats.groundedChecked > 0 ? `${stats.groundedTrue}/${stats.groundedChecked} geverifieerd` : 'geen verifier-runs'}
-      />
-      <MetricCard
-        label="👎-ratio (feedback)"
-        value={fmtPct(stats.feedback.downPct)}
-        sub={`${stats.feedback.up} 👍 · ${stats.feedback.down} 👎`}
-      />
-      <MetricCard
-        label="TTFT p95"
-        value={fmtMs(stats.ttftP95)}
-        sub={stats.ttftN > 0 ? `p50 ${fmtMs(stats.ttftP50)} · n=${stats.ttftN}${stats.capped ? ' · steekproef' : ''}` : 'geen TTFT-data'}
-      />
-      <MetricCard
-        label="Kennisgaten"
-        value={fmtPct(stats.gapAnyPct)}
-        sub={`${stats.gapAny} van ${stats.total} vragen`}
-      />
+    <div style={stats.lowVolume ? { opacity: 0.62 } : undefined}>
+      <MetricGrid>
+        <Metric label="Vragen (live)" value={stats.total} sub={WINDOW_LABEL[window]} />
+        <Metric
+          label="Weiger- en fallbackratio"
+          value={fmtPct(stats.fallbackPct)}
+          sub={`${stats.fallback} van ${stats.total}, benadering, geen foutpercentage`}
+        />
+        <Metric
+          label="Onderbouwd door bronnen"
+          value={fmtPct(stats.groundedPct)}
+          sub={stats.groundedChecked > 0 ? `${stats.groundedTrue} van ${stats.groundedChecked} gecontroleerd` : 'Nog niet gecontroleerd'}
+        />
+        <Metric
+          label="Negatieve feedback"
+          value={fmtPct(stats.feedback.downPct)}
+          sub={`${stats.feedback.up} positief, ${stats.feedback.down} negatief`}
+        />
+        <Metric
+          label="Eerste woord (p95)"
+          value={fmtMs(stats.ttftP95)}
+          sub={
+            stats.ttftN > 0
+              ? `Mediaan ${fmtMs(stats.ttftP50)}, n=${stats.ttftN}${stats.capped ? ', steekproef' : ''}`
+              : 'Nog geen metingen'
+          }
+        />
+        <Metric label="Kennisgaten" value={fmtPct(stats.gapAnyPct)} sub={`${stats.gapAny} van ${stats.total} vragen`} />
+      </MetricGrid>
     </div>
   );
 }
 
 function GapSection({ stats }: { stats: BotPerfStats }) {
   return (
-    <Card>
-      <SectionTitle hint="Waar de bot tegen de grenzen van zijn kennis liep, plus de routering van vragen.">
-        Dekking &amp; kennisgaten
-      </SectionTitle>
+    <SectionCard title="Dekking en kennisgaten" info="Waar de bot tegen de grenzen van zijn kennis liep, plus hoe vragen gerouteerd werden.">
       <StatRow>
-        <Stat label="Zero-hits" value={String(stats.gap.zeroHits)} sub="geen enkele chunk" />
-        <Stat label="Lage confidence" value={String(stats.gap.lowConfidence)} />
-        <Stat label="Lage grounding" value={String(stats.gap.lowGrounding)} />
-        <Stat label="Off-topic" value={String(stats.gap.offTopic)} />
-        <Stat label="Geen bron" value={String(stats.zeroSource)} sub={`${fmtPct(stats.zeroSourcePct)} van vragen`} />
+        <Stat label="Niets gevonden" value={String(stats.gap.zeroHits)} sub="Geen enkel tekstblok" />
+        <Stat label="Lage zekerheid" value={String(stats.gap.lowConfidence)} />
+        <Stat label="Zwak onderbouwd" value={String(stats.gap.lowGrounding)} />
+        <Stat label="Buiten onderwerp" value={String(stats.gap.offTopic)} />
+        <Stat label="Geen bron" value={String(stats.zeroSource)} sub={`${fmtPct(stats.zeroSourcePct)} van de vragen`} />
       </StatRow>
-      <div style={{ height: 1, background: 'var(--klant-border)', margin: '14px 0' }} />
+      <Divider />
       <StatRow>
         <Stat label="Zoekvragen" value={String(stats.category.search)} />
         <Stat label="Algemene kennis" value={String(stats.category.general)} />
-        <Stat label="Off-topic" value={String(stats.category.offTopic)} />
-        <Stat label="Smalltalk" value={String(stats.category.smalltalk)} />
+        <Stat label="Buiten onderwerp" value={String(stats.category.offTopic)} />
+        <Stat label="Praatjes" value={String(stats.category.smalltalk)} />
       </StatRow>
-    </Card>
+    </SectionCard>
   );
 }
 
 function LatencySection({ stats }: { stats: BotPerfStats }) {
   return (
-    <Card>
-      <SectionTitle hint={stats.capped ? 'Percentielen over een steekproef (rij-cap geraakt).' : 'Percentielen over alle gemeten antwoorden in het venster.'}>
-        Snelheid
-      </SectionTitle>
+    <SectionCard
+      title="Snelheid"
+      info={stats.capped ? 'Percentielen over een steekproef (de rijlimiet is geraakt).' : 'Percentielen over alle gemeten antwoorden in de periode.'}
+    >
       <StatRow>
-        <Stat label="TTFT p50" value={fmtMs(stats.ttftP50)} sub="tijd tot 1e token" />
-        <Stat label="TTFT p95" value={fmtMs(stats.ttftP95)} sub={`n=${stats.ttftN}`} />
-        <Stat label="Totaal p50" value={fmtMs(stats.totalP50)} />
-        <Stat label="Totaal p95" value={fmtMs(stats.totalP95)} sub={`n=${stats.totalN}`} />
-        <Stat label="Cache-hit" value={fmtPct(stats.fromCachePct)} sub={`${stats.fromCache} antwoorden`} />
+        <Stat label="Eerste woord, mediaan" value={fmtMs(stats.ttftP50)} />
+        <Stat label="Eerste woord, p95" value={fmtMs(stats.ttftP95)} sub={`n=${stats.ttftN}`} />
+        <Stat label="Totaal, mediaan" value={fmtMs(stats.totalP50)} />
+        <Stat label="Totaal, p95" value={fmtMs(stats.totalP95)} sub={`n=${stats.totalN}`} />
+        <Stat label="Uit de cache" value={fmtPct(stats.fromCachePct)} sub={`${stats.fromCache} antwoorden`} />
       </StatRow>
-    </Card>
+    </SectionCard>
   );
 }
 
 function FeedbackSection({ stats, negatives }: { stats: BotPerfStats; negatives?: RecentNegative[] }) {
   return (
-    <Card>
-      <SectionTitle hint="Duim-feedback uit de widget (V1: `feedback`-tabel, versie-agnostisch).">
-        Gebruikersfeedback
-      </SectionTitle>
+    <SectionCard title="Feedback van bezoekers" info="Duimfeedback uit de widget (tabel feedback, voor alle botversies).">
       <StatRow>
-        <Stat label="👍 Positief" value={String(stats.feedback.up)} />
-        <Stat label="👎 Negatief" value={String(stats.feedback.down)} />
-        <Stat label="👎-ratio" value={fmtPct(stats.feedback.downPct)} />
+        <Stat label="Positief" value={String(stats.feedback.up)} />
+        <Stat label="Negatief" value={String(stats.feedback.down)} />
+        <Stat label="Aandeel negatief" value={fmtPct(stats.feedback.downPct)} />
       </StatRow>
       {negatives && negatives.length > 0 ? (
         <>
-          <div style={{ height: 1, background: 'var(--klant-border)', margin: '14px 0' }} />
-          <div style={{ fontSize: 12, color: 'var(--klant-dim)', marginBottom: 8 }}>
-            Recente 👎 met toelichting (bezoeker-vrije-tekst):
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Divider />
+          <p className="v1-adm-muted">Recente negatieve feedback met toelichting van de bezoeker:</p>
+          <ul className="v1-list">
             {negatives.map((nf, i) => (
-              <div key={i} style={{ borderLeft: '2px solid var(--klant-danger-border)', paddingLeft: 10 }}>
-                <div style={{ fontSize: 13, color: 'var(--klant-ink)' }}>{nf.comment}</div>
-                {nf.question ? (
-                  <div style={{ fontSize: 12, color: 'var(--klant-muted)', marginTop: 2 }}>
-                    bij vraag: &ldquo;{nf.question}&rdquo;
-                  </div>
-                ) : null}
-                <div style={{ fontSize: 11, color: 'var(--klant-dim)', marginTop: 2 }}>
-                  {formatRelativeNL(nf.createdAt)}
-                </div>
-              </div>
+              <li key={i} className="v1-list-row">
+                <span className="v1-list-main">
+                  <span className="v1-list-title v1-list-title--wrap">{nf.comment}</span>
+                  {nf.question ? <span className="v1-list-meta">Bij de vraag: &ldquo;{nf.question}&rdquo;</span> : null}
+                </span>
+                <span className="v1-list-end v1-adm-muted">{formatRelativeNL(nf.createdAt)}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </>
       ) : null}
-    </Card>
+    </SectionCard>
   );
 }
 
-// ───────────────────────── WP7: injectie / RAG-internals / grounding-drilldown ────
-
-function InjectionSection({
-  injection,
-  perOrg,
-}: {
-  injection: InjectionSummary;
-  perOrg?: OrgBotPerf[];
-}) {
+function InjectionSection({ injection, perOrg }: { injection: InjectionSummary; perOrg?: OrgBotPerf[] }) {
   const withAttempts = (perOrg ?? []).filter((o) => o.injection.last30 > 0);
   return (
-    <Card>
-      <SectionTitle hint="Gedetecteerde prompt-injectie-pogingen (regex-heuristiek, log-only). Getoond zijn patroon-namen — nooit de ruwe vraagtekst.">
-        Misbruikpogingen (prompt-injectie)
-      </SectionTitle>
+    <SectionCard
+      title="Misbruikpogingen (prompt-injectie)"
+      info="Herkende pogingen om de bot instructies te geven (patroonherkenning, alleen gelogd). Je ziet alleen patroonnamen, nooit de vraag zelf."
+    >
       {injection.last30 === 0 ? (
-        <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0 }}>
-          Geen injectie-pogingen gedetecteerd in de laatste 30 dagen.
-        </p>
+        <p className="v1-adm-muted">Geen pogingen gezien in de laatste 30 dagen.</p>
       ) : (
         <>
           <StatRow>
@@ -271,271 +259,227 @@ function InjectionSection({
           </StatRow>
           {injection.patterns.length > 0 ? (
             <>
-              <div style={{ fontSize: 12, color: 'var(--klant-dim)', margin: '14px 0 8px' }}>
-                Meest voorkomende patronen (30d):
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <p className="v1-adm-muted v1-adm-note">Meest voorkomende patronen (30 dagen):</p>
+              <div className="v1-adm-filter-chips">
                 {injection.patterns.map((p) => (
-                  <Pill key={p.name} tone="warn">
-                    {/* plain text — patroon-naam uit INJECTION_PATTERNS, geen markdown */}
-                    {p.name} · {p.count}
-                  </Pill>
+                  <Badge key={p.name} tone="warn">
+                    {/* platte tekst: patroonnaam uit INJECTION_PATTERNS */}
+                    {p.name}: {p.count}
+                  </Badge>
                 ))}
               </div>
             </>
           ) : null}
           {withAttempts.length > 0 ? (
             <>
-              <div style={{ height: 1, background: 'var(--klant-border)', margin: '14px 0' }} />
-              <div style={{ fontSize: 12, color: 'var(--klant-dim)', marginBottom: 8 }}>
-                Per klant (30d):
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Divider />
+              <p className="v1-adm-muted">Per klant (30 dagen):</p>
+              <ul className="v1-list">
                 {withAttempts
                   .sort((a, b) => b.injection.last30 - a.injection.last30)
                   .map((o) => (
-                    <div
-                      key={o.orgId}
-                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 12 }}
-                    >
-                      <span style={{ color: 'var(--klant-ink)' }}>{o.name}</span>
-                      <span style={{ color: 'var(--klant-muted)' }}>
-                        {o.injection.last7} (7d) · {o.injection.last30} (30d)
+                    <li key={o.orgId} className="v1-list-row">
+                      <span className="v1-list-main">
+                        <span className="v1-list-title">{o.name}</span>
                       </span>
-                    </div>
+                      <span className="v1-list-end v1-adm-muted">
+                        {o.injection.last7} in 7 dagen, {o.injection.last30} in 30 dagen
+                      </span>
+                    </li>
                   ))}
-              </div>
+              </ul>
             </>
           ) : null}
         </>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
 function RagInternalsSection({ stats }: { stats: BotPerfStats }) {
   const { rag } = stats;
   return (
-    <Card>
-      <SectionTitle hint="Interne RAG-signalen uit de telemetrie — dev-gericht. Per-fase p50 (median) over gemeten antwoorden in het venster.">
-        RAG-internals
-      </SectionTitle>
+    <SectionCard
+      title="Binnenkant van de bot"
+      info="Interne signalen uit de telemetrie, vooral voor ontwikkeling. Per fase de mediaan over de gemeten antwoorden in de periode."
+    >
       <StatRow>
-        <Stat label="Embedding p50" value={fmtMs(rag.embeddingP50)} />
-        <Stat label="Retrieval p50" value={fmtMs(rag.retrievalP50)} />
-        <Stat label="Rerank p50" value={fmtMs(rag.rerankP50)} />
-        <Stat label="Generatie p50" value={fmtMs(rag.generationP50)} />
+        <Stat label="Embedding, mediaan" value={fmtMs(rag.embeddingP50)} />
+        <Stat label="Zoeken, mediaan" value={fmtMs(rag.retrievalP50)} />
+        <Stat label="Herordenen, mediaan" value={fmtMs(rag.rerankP50)} />
+        <Stat label="Antwoord maken, mediaan" value={fmtMs(rag.generationP50)} />
       </StatRow>
-      <div style={{ height: 1, background: 'var(--klant-border)', margin: '14px 0' }} />
+      <Divider />
       <StatRow>
         <Stat
           label="Algemene kennis gebruikt"
-          value={rag.gkChecked > 0 ? String(rag.gkActual) : '—'}
-          sub={rag.gkChecked > 0 ? `van ${rag.gkChecked} antwoorden` : 'geen data'}
+          value={rag.gkChecked > 0 ? String(rag.gkActual) : 'Geen data'}
+          sub={rag.gkChecked > 0 ? `van ${rag.gkChecked} antwoorden` : undefined}
         />
         <Stat
-          label="Claim-confidence (gem.)"
-          value={rag.claimConfAvg == null ? '—' : rag.claimConfAvg.toFixed(2)}
-          sub={rag.claimConfN > 0 ? `n=${rag.claimConfN} verifier-runs` : 'geen verifier-runs'}
+          label="Zekerheid van beweringen (gem.)"
+          value={rag.claimConfAvg == null ? 'Geen data' : rag.claimConfAvg.toLocaleString('nl-NL', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+          sub={rag.claimConfN > 0 ? `n=${rag.claimConfN} controles` : undefined}
         />
       </StatRow>
-    </Card>
+    </SectionCard>
   );
 }
 
 function UngroundedFactsSection({ facts }: { facts: UngroundedFact[] }) {
   if (facts.length === 0) return null;
   return (
-    <Card>
-      <details>
-        <summary style={{ cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: 'var(--klant-ink)' }}>
-          Ongefundeerde feiten — recentste {facts.length} (grounding-drilldown)
+    <section className="v1-card">
+      <details className="v1-details">
+        <summary>
+          Niet-onderbouwde feiten: de laatste {facts.length}
+          <InfoTip text="Antwoorden waarin de controle harde feiten (bedragen, datums, aantallen, contactgegevens) niet in de bronnen terugvond. De vraag is ontdaan van persoonsgegevens." />
         </summary>
-        <p style={{ fontSize: 12, color: 'var(--klant-dim)', margin: '6px 0 10px' }}>
-          Antwoorden waar de verifier harde feiten (bedragen/datums/aantallen/contact) niet in de
-          bronnen kon terugvinden. De feiten zijn categorie-prefixed; de vraag is PII-geredacteerd.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <ul className="v1-list v1-details-body">
           {facts.map((f, i) => (
-            <div key={i} style={{ borderLeft: '2px solid var(--klant-warn-border)', paddingLeft: 10 }}>
-              <div style={{ fontSize: 13, color: 'var(--klant-ink)' }}>
-                {f.facts.length > 0 ? f.facts.join(', ') : '(geen feit-labels geregistreerd)'}
-              </div>
-              {f.question ? (
-                <div style={{ fontSize: 12, color: 'var(--klant-muted)', marginTop: 2 }}>
-                  bij vraag: &ldquo;{f.question}&rdquo;
-                </div>
-              ) : null}
-              <div style={{ fontSize: 11, color: 'var(--klant-dim)', marginTop: 2 }}>
-                {formatRelativeNL(f.createdAt)}
-              </div>
-            </div>
+            <li key={i} className="v1-list-row">
+              <span className="v1-list-main">
+                <span className="v1-list-title v1-list-title--wrap">
+                  {f.facts.length > 0 ? f.facts.join(', ') : 'Geen feitlabels geregistreerd'}
+                </span>
+                {f.question ? <span className="v1-list-meta">Bij de vraag: &ldquo;{f.question}&rdquo;</span> : null}
+              </span>
+              <span className="v1-list-end v1-adm-muted">{formatRelativeNL(f.createdAt)}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </details>
-    </Card>
+    </section>
   );
 }
 
-function TrendChart({
-  daily,
-  window,
-  hasTraffic,
-}: {
-  daily: BotPerfOverview['daily'];
-  window: PerfWindow;
-  hasTraffic: boolean;
-}) {
+function TrendChart({ daily, window, hasTraffic }: { daily: BotPerfOverview['daily']; window: PerfWindow; hasTraffic: boolean }) {
   return (
-    <DailyLineChart
+    <LineChart
       points={daily}
       hasData={hasTraffic}
-      title="Weiger-ratio per dag"
+      title="Weigerratio per dag"
       formatValue={(n) => `${n}%`}
       peakPrefix="piek"
-      emptyText={`Nog geen verkeer in ${WINDOW_LABEL[window]}.`}
-      ariaLabel="Lijngrafiek van de dagelijkse weiger-/fallback-ratio over het venster"
-      footnote="Aandeel vragen dat op een fallback uitkwam, per dag. Een knik omhoog ná een deploy is een regressie-signaal — geen fout-%."
+      gradientId="v1-adm-perf-trend"
+      emptyText={`Nog geen verkeer in ${WINDOW_LABEL[window].toLowerCase()}.`}
+      ariaLabel="Lijngrafiek van de dagelijkse weiger- en fallbackratio over de periode"
+      footnote="Aandeel vragen dat op een fallback uitkwam. Een stijging na een release kan op een regressie wijzen."
     />
   );
 }
 
-// ───────────────────────── cross-org tabel ─────────────────────────
+// ───────────────────────── tabel per klant ─────────────────────────
 
 function CrossOrgTable({ orgs, window }: { orgs: OrgBotPerf[]; window: PerfWindow }) {
-  // Aandacht eerst: hoogste weiger-ratio bovenaan; orgs zonder verkeer onderaan.
-  const sorted = [...orgs].sort((a, b) => {
-    const av = a.stats.fallbackPct ?? -1;
-    const bv = b.stats.fallbackPct ?? -1;
-    return bv - av;
-  });
+  // Aandacht eerst: hoogste weigerratio bovenaan; klanten zonder verkeer onderaan.
+  const sorted = [...orgs].sort((a, b) => (b.stats.fallbackPct ?? -1) - (a.stats.fallbackPct ?? -1));
   return (
-    <Card padded={false}>
-      <div style={{ overflowX: 'auto' }} className="table-scroll">
-        <table className="klant-table">
-          <thead>
-            <tr>
-              <th>Klant</th>
-              <th>Vragen</th>
-              <th>Weiger %</th>
-              <th>Grounding %</th>
-              <th>👎</th>
-              <th>TTFT p95</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((o) => (
-              <tr key={o.orgId}>
-                <td>
-                  {/* V1: link via orgId (UUID), niet slug */}
-                  <Link
-                    href={hrefFor(o.orgId, window)}
-                    style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}
-                  >
-                    {o.name}
-                  </Link>
-                </td>
-                <td style={{ fontSize: 13 }}>{o.stats.total}</td>
-                <td style={{ fontSize: 13 }}>{fmtPct(o.stats.fallbackPct)}</td>
-                <td style={{ fontSize: 13 }}>{fmtPct(o.stats.groundedPct)}</td>
-                <td style={{ fontSize: 13 }}>{o.stats.feedback.down}</td>
-                <td style={{ fontSize: 13 }}>{fmtMs(o.stats.ttftP95)}</td>
-                <td>
-                  {o.stats.total === 0 ? (
-                    <Pill tone="neutral">geen verkeer</Pill>
-                  ) : o.stats.lowVolume ? (
-                    <Pill tone="warn">lage volume</Pill>
-                  ) : (
-                    <Pill tone="success" dot>
-                      ok
-                    </Pill>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+    <section className="v1-card">
+      <h2 className="v1-section-title v1-adm-title-row">
+        Per klant
+        <InfoTip text="Klik een klant voor de details." />
+      </h2>
+      <DataTable
+        label="Botprestaties per klant"
+        columns={[
+          { label: 'Klant' },
+          { label: 'Vragen', num: true },
+          { label: 'Weigerratio', num: true },
+          { label: 'Onderbouwd', num: true },
+          { label: 'Negatief', num: true },
+          { label: 'Eerste woord (p95)', num: true },
+          { label: 'Status' },
+        ]}
+      >
+        {sorted.map((o) => (
+          <tr key={o.orgId}>
+            <td>
+              <Link href={hrefFor(o.orgId, window)} className="v1-adm-clip">
+                {o.name}
+              </Link>
+            </td>
+            <NumCell>{o.stats.total}</NumCell>
+            <NumCell>{fmtPct(o.stats.fallbackPct)}</NumCell>
+            <NumCell>{fmtPct(o.stats.groundedPct)}</NumCell>
+            <NumCell>{o.stats.feedback.down}</NumCell>
+            <NumCell>{fmtMs(o.stats.ttftP95)}</NumCell>
+            <td>
+              {o.stats.total === 0 ? (
+                <Badge>Geen verkeer</Badge>
+              ) : o.stats.lowVolume ? (
+                <Badge tone="warn">Laag volume</Badge>
+              ) : (
+                <Badge tone="ok" dot>
+                  Genoeg data
+                </Badge>
+              )}
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
   );
 }
 
-// ───────────────────────── views ─────────────────────────
+// ───────────────────────── weergaven ─────────────────────────
 
 function OverviewView({ overview }: { overview: BotPerfOverview }) {
   const { aggregate, orgs, daily, window, injectionAgg } = overview;
   return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">Bot prestaties</h1>
-          <p className="klant-page-sub">{WINDOW_LABEL[window]} · alle klanten</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <WindowToggle window={window} orgId={null} />
-          <ReloadButton />
-        </div>
-      </header>
-
+    <div className="v1-page">
+      <PageHeader
+        title="Botprestaties"
+        description={`${WINDOW_LABEL[window]}, alle klanten.`}
+        actions={
+          <>
+            <WindowToggle window={window} orgId={null} />
+            <ReloadButton />
+          </>
+        }
+      />
       <Disclaimer />
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
-        <VolumeNotice stats={aggregate} window={window} />
-        <StatsGrid stats={aggregate} window={window} />
-        <TrendChart daily={daily} window={window} hasTraffic={aggregate.total > 0} />
-        <GapSection stats={aggregate} />
-        <LatencySection stats={aggregate} />
-        <RagInternalsSection stats={aggregate} />
-        <InjectionSection injection={injectionAgg} perOrg={orgs} />
-        <FeedbackSection stats={aggregate} />
-
-        <div>
-          <SectionTitle hint="Klik een klant voor de drill-down.">Per klant</SectionTitle>
-          <CrossOrgTable orgs={orgs} window={window} />
-        </div>
-      </div>
-    </>
+      <VolumeNotice stats={aggregate} window={window} />
+      <StatsGrid stats={aggregate} window={window} />
+      <TrendChart daily={daily} window={window} hasTraffic={aggregate.total > 0} />
+      <GapSection stats={aggregate} />
+      <LatencySection stats={aggregate} />
+      <RagInternalsSection stats={aggregate} />
+      <InjectionSection injection={injectionAgg} perOrg={orgs} />
+      <FeedbackSection stats={aggregate} />
+      <CrossOrgTable orgs={orgs} window={window} />
+    </div>
   );
 }
 
 function DetailView({ detail }: { detail: BotPerfDetail }) {
   const { org, daily, recentNegatives, ungroundedFacts, window } = detail;
   return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <Link
-            href={hrefFor(null, window)}
-            className="klant-nav-item"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 0', marginBottom: 6, fontSize: 13 }}
-          >
-            <ArrowLeft size={15} strokeWidth={1.8} />
-            Alle klanten
-          </Link>
-          <h1 className="klant-page-title">{org.name} — bot prestaties</h1>
-          <p className="klant-page-sub">{WINDOW_LABEL[window]}</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <WindowToggle window={window} orgId={org.orgId} />
-          <ReloadButton />
-        </div>
-      </header>
-
+    <div className="v1-page">
+      <Link href={hrefFor(null, window)} className="v1-section-link">
+        Terug naar alle klanten
+      </Link>
+      <PageHeader
+        title={`Botprestaties: ${org.name}`}
+        description={`${WINDOW_LABEL[window]}.`}
+        actions={
+          <>
+            <WindowToggle window={window} orgId={org.orgId} />
+            <ReloadButton />
+          </>
+        }
+      />
       <Disclaimer />
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
-        <VolumeNotice stats={org.stats} window={window} />
-        <StatsGrid stats={org.stats} window={window} />
-        <UngroundedFactsSection facts={ungroundedFacts} />
-        <TrendChart daily={daily} window={window} hasTraffic={org.stats.total > 0} />
-        <GapSection stats={org.stats} />
-        <LatencySection stats={org.stats} />
-        <RagInternalsSection stats={org.stats} />
-        <InjectionSection injection={org.injection} />
-        <FeedbackSection stats={org.stats} negatives={recentNegatives} />
-      </div>
-    </>
+      <VolumeNotice stats={org.stats} window={window} />
+      <StatsGrid stats={org.stats} window={window} />
+      <UngroundedFactsSection facts={ungroundedFacts} />
+      <TrendChart daily={daily} window={window} hasTraffic={org.stats.total > 0} />
+      <GapSection stats={org.stats} />
+      <LatencySection stats={org.stats} />
+      <RagInternalsSection stats={org.stats} />
+      <InjectionSection injection={org.injection} />
+      <FeedbackSection stats={org.stats} negatives={recentNegatives} />
+    </div>
   );
 }
 
@@ -543,7 +487,7 @@ export default async function BotPrestatiesPage({ searchParams }: { searchParams
   const sp = await searchParams;
   const window: PerfWindow = isPerfWindow(sp.window) ? sp.window : '30d';
 
-  // org-param is een UUID in V1 (V0 gebruikte slug)
+  // org-param is een UUID in V1
   const orgId = sp.org && sp.org.length > 0 ? sp.org : null;
 
   try {
@@ -557,12 +501,7 @@ export default async function BotPrestatiesPage({ searchParams }: { searchParams
     return <OverviewView overview={overview} />;
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }

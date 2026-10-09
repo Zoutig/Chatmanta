@@ -1,11 +1,10 @@
 'use client';
 
-// "Recap genereren" / "Opnieuw genereren" — V1 variant.
-// Enige verschil t.o.v. V0: prop heet `orgId` (UUID) i.p.v. `slug`,
-// en de action-import komt uit de V1 actions.
+// "Samenvatting maken" / "Opnieuw maken" voor de maandrecap (overzicht en detail).
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/app/v1/_ui/button';
 import { generateRecapAction } from '@/app/v1/admin/maandelijkse-recap/actions';
 
 export function GenerateRecapButton({
@@ -27,7 +26,7 @@ export function GenerateRecapButton({
     if (
       hasRecap &&
       !window.confirm(
-        'De bestaande AI-samenvatting wordt opnieuw gegenereerd en overschreven. Je notities blijven behouden. Doorgaan?',
+        'De bestaande AI-samenvatting wordt opnieuw gemaakt en overschreven. Je notities blijven bewaard. Doorgaan?',
       )
     ) {
       return;
@@ -41,18 +40,14 @@ export function GenerateRecapButton({
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-      <button
-        type="button"
-        className="klant-btn"
-        data-variant={hasRecap ? 'ghost' : 'primary'}
-        onClick={onClick}
-        disabled={pending}
-      >
-        {pending ? 'Bezig…' : hasRecap ? 'Opnieuw genereren' : 'Recap genereren'}
-      </button>
+    <span className="v1-adm-inline">
+      <Button variant={hasRecap ? 'ghost' : 'secondary'} size="sm" onClick={onClick} loading={pending}>
+        {hasRecap ? 'Opnieuw maken' : 'Samenvatting maken'}
+      </Button>
       {error ? (
-        <span style={{ color: 'var(--klant-danger)', fontSize: 12 }}>{error}</span>
+        <span role="alert" className="v1-adm-danger">
+          {error}
+        </span>
       ) : null}
     </span>
   );

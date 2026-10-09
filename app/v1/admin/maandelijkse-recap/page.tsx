@@ -1,16 +1,11 @@
-// V1 admin — Maandelijkse Recap (overzicht alle klanten).
-//
-// Port van app/admindashboard/maandelijkse-recap/page.tsx.
-// Aanpassingen t.o.v. V0:
-//  - Orgs uit DB (organizations-tabel) i.p.v. KNOWN_ORGS.
-//  - Links naar [orgId] (UUID) i.p.v. [orgSlug].
+// V1 admin — Maandrecap (overzicht alle klanten).
+//  - Orgs uit de DB (organizations-tabel).
+//  - Links naar [orgId] (UUID).
 //  - Auth via getJorionAdminClient() (gooit AUTH_FORBIDDEN).
 
 import Link from 'next/link';
 import { isAppError } from '@/lib/errors/app-error';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
 import {
   buildMonthOptions,
   formatDuration,
@@ -21,10 +16,13 @@ import {
   periodMonthKey,
 } from '@/lib/controlroom/recap-logic';
 import { getV1RecapOverviewRow, type V1RecapOverviewRow } from '@/lib/v1/admin/recap';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { AttentionBlock, EmptyState, InfoTip } from '@/app/v1/_ui/feedback';
 import { MonthSelector } from './[orgId]/components/month-selector';
 import { GenerateRecapButton } from './[orgId]/components/generate-recap-button';
 import { SignalDot } from './[orgId]/components/signal-dot';
-import { ReloadButton } from '@/app/admindashboard/components/reload-button';
+import { ReloadButton } from '../_ui/reload-button';
+import { DataTable, NumCell } from '../_ui/data-table';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -41,12 +39,7 @@ export default async function V1MaandRecapOverviewPage({
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e; // NEXT_REDIRECT (geen sessie) → /v1/login
   }
@@ -62,7 +55,7 @@ export default async function V1MaandRecapOverviewPage({
     options.unshift({ value: currentKey, label: monthLabelNL(year, month) });
   }
 
-  // Haal alle orgs op; fan-out per org voor de recap-statistieken.
+  // Alle orgs; fan-out per org voor de recap-statistieken.
   const { data: orgs } = await admin
     .from('organizations')
     .select('id, name')
@@ -72,133 +65,95 @@ export default async function V1MaandRecapOverviewPage({
   const orgList = (orgs ?? []) as { id: string; name: string }[];
 
   const settled = await Promise.all(
-    orgList.map((o) =>
-      getV1RecapOverviewRow(admin, o.id, o.name, year, month).catch(() => null),
-    ),
+    orgList.map((o) => getV1RecapOverviewRow(admin, o.id, o.name, year, month).catch(() => null)),
   );
   const rows = settled.filter((r): r is V1RecapOverviewRow => r != null);
 
   return (
-    <>
-      <PageHead
-        title="Maandelijkse Recap"
-        subtitle="Maandoverzicht per klant: kerncijfers, signaleringen en een AI-samenvatting."
+    <div className="v1-page">
+      <PageHeader
+        title="Maandrecap"
+        description="Per klant de kerncijfers van de maand, signaleringen en een AI-samenvatting."
         actions={
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <>
             <MonthSelector current={currentKey} options={options} basePath={BASE_PATH} />
             <ReloadButton />
-          </span>
+          </>
         }
       />
 
       {isCur ? (
-        <p className="klant-hint" style={{ marginBottom: 14, color: 'var(--klant-warn)' }}>
-          Let op: dit is de lopende maand — de cijfers zijn nog onvolledig en veranderen dagelijks.
-          Kies een afgesloten maand voor een definitieve recap.
-        </p>
+        <AttentionBlock level="attention" title="Dit is de lopende maand">
+          De cijfers zijn nog niet compleet. Kies een afgesloten maand voor een definitieve recap.
+        </AttentionBlock>
       ) : null}
 
-      <Card padded={false}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="klant-table">
-            <thead>
-              <tr>
-                <th>Klant</th>
-                <th>Gesprekken</th>
-                <th>Bezoekers</th>
-                <th>Gem. duur</th>
-                <th>Gem. berichten</th>
-                <th>Onbeantwoord</th>
-                <th>Signalering</th>
-                <th>Notitie</th>
-                <th>Recap</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((k) => {
-                const detailHref = `${BASE_PATH}/${k.orgId}?period=${currentKey}`;
-                return (
-                  <tr key={k.orgId}>
-                    <td>
-                      <Link
-                        href={detailHref}
-                        style={{
-                          textDecoration: 'none',
-                          color: 'var(--klant-ink)',
-                          fontWeight: 600,
-                          fontSize: 13.5,
-                        }}
-                      >
-                        {k.name}
+      <section className="v1-card">
+        {rows.length === 0 ? (
+          <EmptyState>Geen klanten om te tonen.</EmptyState>
+        ) : (
+          <DataTable
+            label="Maandrecap per klant"
+            columns={[
+              { label: 'Klant' },
+              { label: 'Gesprekken', num: true },
+              {
+                label: (
+                  <>
+                    Bezoekers <InfoTip text="Alleen websitebezoekers. Intern testverkeer heeft geen bezoekerscookie en telt niet mee." />
+                  </>
+                ),
+                num: true,
+              },
+              { label: 'Gem. duur', num: true },
+              { label: 'Gem. berichten', num: true },
+              { label: 'Onbeantwoord', num: true },
+              { label: 'Signalering' },
+              { label: 'Notitie' },
+              { label: 'Samenvatting' },
+            ]}
+          >
+            {rows.map((k) => {
+              const detailHref = `${BASE_PATH}/${k.orgId}?period=${currentKey}`;
+              const has = k.totalConversations > 0;
+              return (
+                <tr key={k.orgId}>
+                  <td>
+                    <Link href={detailHref} className="v1-adm-clip">
+                      {k.name}
+                    </Link>
+                  </td>
+                  <NumCell>{k.totalConversations}</NumCell>
+                  <NumCell>{k.uniqueVisitors}</NumCell>
+                  <NumCell>{has ? formatDuration(k.avgDurationSeconds) : 'Geen data'}</NumCell>
+                  <NumCell>
+                    {has ? k.avgMessagesPerConversation.toLocaleString('nl-NL', { maximumFractionDigits: 1 }) : 'Geen data'}
+                  </NumCell>
+                  <NumCell>{k.unansweredCount}</NumCell>
+                  <td>
+                    <SignalDot severity={k.signalSeverity} />
+                  </td>
+                  <td className="v1-adm-muted">{k.hasNotes ? 'Ja' : 'Nee'}</td>
+                  <td>
+                    <span className="v1-adm-inline">
+                      <Link href={detailHref} className="v1-section-link">
+                        Bekijken
                       </Link>
-                    </td>
-                    <td style={{ fontSize: 13 }}>{k.totalConversations}</td>
-                    <td style={{ fontSize: 13 }}>{k.uniqueVisitors}</td>
-                    <td style={{ fontSize: 13 }}>
-                      {k.totalConversations > 0 ? formatDuration(k.avgDurationSeconds) : '—'}
-                    </td>
-                    <td style={{ fontSize: 13 }}>
-                      {k.totalConversations > 0 ? k.avgMessagesPerConversation : '—'}
-                    </td>
-                    <td style={{ fontSize: 13 }}>{k.unansweredCount}</td>
-                    <td>
-                      <SignalDot severity={k.signalSeverity} />
-                    </td>
-                    <td style={{ fontSize: 13 }}>
-                      {k.hasNotes ? (
-                        <span title="Notitie toegevoegd" aria-label="Notitie toegevoegd">
-                          ✏️
-                        </span>
-                      ) : (
-                        <span style={{ color: 'var(--klant-faint)' }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <Link
-                          href={detailHref}
-                          style={{
-                            fontSize: 13,
-                            color: 'var(--klant-accent)',
-                            textDecoration: 'none',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Bekijk →
-                        </Link>
-                        <GenerateRecapButton
-                          orgId={k.orgId}
-                          year={year}
-                          month={month}
-                          hasRecap={k.hasRecap}
-                        />
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+                      <GenerateRecapButton orgId={k.orgId} year={year} month={month} hasRecap={k.hasRecap} />
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </DataTable>
+        )}
+      </section>
 
       {rows.length < orgList.length ? (
-        <p className="klant-hint" style={{ marginTop: 12 }}>
-          Sommige klanten konden niet worden geladen — probeer te herladen.
+        <p role="alert" className="v1-alert v1-alert--error">
+          Sommige klanten konden niet worden geladen. Probeer het opnieuw met Herladen.
         </p>
       ) : null}
-
-      <p className="klant-hint" style={{ marginTop: 12 }}>
-        🟢 geen bijzonderheden · 🟡 let op · 🔴 actie vereist. "Bezoekers" telt alleen
-        website-bezoekers (intern testverkeer heeft geen bezoeker-cookie en telt niet mee).
-      </p>
-    </>
+    </div>
   );
 }
