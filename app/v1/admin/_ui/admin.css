@@ -129,3 +129,11 @@
 }
 .v1-ui .v1-adm-denied { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
 .v1-ui .v1-adm-empty { padding-top: 10px; }
+.v1-ui .v1-adm-danger { color: var(--v1-danger); font-size: 12.5px; }
+.v1-ui .v1-adm-select { width: auto; min-width: 180px; height: 36px; }
+.v1-ui .v1-adm-inline-field { display: inline-flex; }
+.v1-ui .v1-adm-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.v1-ui .v1-adm-list { margin-top: 12px; }
+.v1-ui .v1-adm-filters { margin-top: 12px; }
+.v1-ui .v1-adm-filter-details > summary { gap: 10px; }
+.v1-ui .v1-adm-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; }
