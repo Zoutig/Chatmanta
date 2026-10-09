@@ -74,8 +74,8 @@
 .v1-ui .v1-adm-table th:last-child,
 .v1-ui .v1-adm-table td:last-child { padding-right: 0; }
 .v1-ui .v1-adm-table [data-num] { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.v1-ui .v1-adm-table a { color: var(--v1-ink); font-weight: 600; text-decoration: none; }
-.v1-ui .v1-adm-table a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.v1-ui .v1-adm-table a:not(.v1-btn):not(.v1-section-link) { color: var(--v1-ink); font-weight: 600; text-decoration: none; }
+.v1-ui .v1-adm-table a:not(.v1-btn):not(.v1-section-link):hover { text-decoration: underline; text-underline-offset: 3px; }
 .v1-ui .v1-adm-muted { color: var(--v1-muted); font-size: 12.5px; }
 .v1-ui .v1-adm-clip { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
