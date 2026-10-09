@@ -151,3 +151,5 @@
 .v1-ui .v1-adm-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--v1-ok); }
 .v1-ui .v1-adm-dot[data-tone='warn'] { background: var(--v1-warn); }
 .v1-ui .v1-adm-dot[data-tone='danger'] { background: var(--v1-danger); }
+/* sr-only-kolomkoppen (absolute) mogen niet buiten de scrollcontainer de pagina verbreden. */
+.v1-ui .v1-adm-table-wrap { position: relative; }

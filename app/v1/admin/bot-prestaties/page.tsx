@@ -43,6 +43,8 @@ type SP = { org?: string; window?: string };
 
 const fmtPct = (n: number | null) => (n == null ? 'Geen data' : `${n}%`);
 const fmtMs = (n: number | null) => (n == null ? 'Geen data' : `${n.toLocaleString('nl-NL')} ms`);
+/** WINDOW_LABEL begint met een kleine letter ("laatste 30 dagen"); hier als zinsbegin. */
+const windowTitle = (w: PerfWindow) => WINDOW_LABEL[w].charAt(0).toUpperCase() + WINDOW_LABEL[w].slice(1);
 
 function hrefFor(orgId: string | null, window: PerfWindow): string {
   const sp = new URLSearchParams();
@@ -89,7 +91,7 @@ function WindowToggle({ window, orgId }: { window: PerfWindow; orgId: string | n
     <div className="v1-adm-filter-chips" role="group" aria-label="Periode">
       {opts.map((w) => (
         <FilterChip key={w} href={hrefFor(orgId, w)} active={w === window}>
-          {WINDOW_LABEL[w]}
+          {windowTitle(w)}
         </FilterChip>
       ))}
     </div>
@@ -144,7 +146,7 @@ function StatsGrid({ stats, window }: { stats: BotPerfStats; window: PerfWindow 
   return (
     <div style={stats.lowVolume ? { opacity: 0.62 } : undefined}>
       <MetricGrid>
-        <Metric label="Vragen (live)" value={stats.total} sub={WINDOW_LABEL[window]} />
+        <Metric label="Vragen (live)" value={stats.total} sub={windowTitle(window)} />
         <Metric
           label="Weiger- en fallbackratio"
           value={fmtPct(stats.fallbackPct)}
@@ -183,7 +185,7 @@ function GapSection({ stats }: { stats: BotPerfStats }) {
         <Stat label="Lage zekerheid" value={String(stats.gap.lowConfidence)} />
         <Stat label="Zwak onderbouwd" value={String(stats.gap.lowGrounding)} />
         <Stat label="Buiten onderwerp" value={String(stats.gap.offTopic)} />
-        <Stat label="Geen bron" value={String(stats.zeroSource)} sub={`${fmtPct(stats.zeroSourcePct)} van de vragen`} />
+        <Stat label="Geen bron" value={String(stats.zeroSource)} sub={stats.zeroSourcePct == null ? undefined : `${stats.zeroSourcePct}% van de vragen`} />
       </StatRow>
       <Divider />
       <StatRow>
@@ -430,7 +432,7 @@ function OverviewView({ overview }: { overview: BotPerfOverview }) {
     <div className="v1-page">
       <PageHeader
         title="Botprestaties"
-        description={`${WINDOW_LABEL[window]}, alle klanten.`}
+        description={`${windowTitle(window)}, alle klanten.`}
         actions={
           <>
             <WindowToggle window={window} orgId={null} />
@@ -461,7 +463,7 @@ function DetailView({ detail }: { detail: BotPerfDetail }) {
       </Link>
       <PageHeader
         title={`Botprestaties: ${org.name}`}
-        description={`${WINDOW_LABEL[window]}.`}
+        description={`${windowTitle(window)}.`}
         actions={
           <>
             <WindowToggle window={window} orgId={org.orgId} />
