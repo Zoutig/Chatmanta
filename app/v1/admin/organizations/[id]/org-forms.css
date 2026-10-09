@@ -1,0 +1,88 @@
+/* Formulieren op de admin-detailpagina van een organisatie (golf 4b).
+   Alleen klassen met prefix v1-adm-of-; bouwt op de tokens van ui.css. */
+
+.v1-ui .v1-adm-of-stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.v1-ui .v1-adm-of-card { display: flex; flex-direction: column; gap: 16px; }
+.v1-ui .v1-adm-of-card-head { display: flex; flex-direction: column; gap: 4px; }
+.v1-ui .v1-adm-of-card-help { margin: 0; font-size: 13px; line-height: 1.5; color: var(--v1-muted); }
+.v1-ui .v1-adm-of-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.v1-ui .v1-adm-of-actions--end { justify-content: flex-end; }
+.v1-ui .v1-adm-of-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.v1-ui .v1-adm-of-row > .v1-field { flex: 1 1 200px; min-width: 0; }
+.v1-ui .v1-adm-of-num { width: 140px; max-width: 100%; }
+.v1-ui .v1-adm-of-mono { font-family: var(--font-jetbrains), ui-monospace, monospace; font-size: 13px; }
+.v1-ui .v1-adm-of-wide { grid-column: 1 / -1; }
+
+/* Opslaanbalk onderaan een lang formulier */
+.v1-ui .v1-adm-of-savebar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 14px 12px 18px;
+  border-radius: var(--v1-r-lg);
+  background: var(--v1-surface);
+  box-shadow: 0 12px 30px rgba(12, 30, 46, 0.18);
+}
+.v1-ui .v1-adm-of-savebar .v1-alert { flex: 1 1 200px; }
+
+/* Logo-voorbeeld bij "Eigen logo" */
+.v1-ui .v1-adm-of-logo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.v1-ui .v1-adm-of-logo img { width: 40px; height: 40px; object-fit: contain; border-radius: var(--v1-r-sm); background: #fff; box-shadow: inset 0 0 0 1px var(--v1-line); }
+
+/* Upload-vak */
+.v1-ui .v1-adm-of-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px dashed var(--v1-line);
+  border-radius: var(--v1-r-md);
+  background: var(--v1-bg);
+  text-align: center;
+  cursor: pointer;
+  transition: background-color var(--v1-fast) ease, border-color var(--v1-fast) ease;
+}
+.v1-ui .v1-adm-of-drop:hover,
+.v1-ui .v1-adm-of-drop[data-over='true'] { border-color: var(--v1-accent); background: var(--v1-surface-2); }
+.v1-ui .v1-adm-of-drop[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
+.v1-ui .v1-adm-of-drop:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-ui .v1-adm-of-drop-title { font-size: 14px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-adm-of-drop-icon { color: var(--v1-accent); margin-bottom: 4px; }
+
+/* Gevarenzone */
+.v1-ui .v1-adm-of-danger {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--v1-r-md);
+  background: var(--v1-danger-soft);
+}
+.v1-ui .v1-adm-of-danger p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--v1-ink); }
+.v1-ui .v1-adm-of-btn-danger,
+.v1-ui .v1-adm-of-btn-danger:hover:not(:disabled) { background: var(--v1-danger); color: #fff; }
+
+/* Voortgangsbalk (onboarding) */
+.v1-ui .v1-adm-of-progress { display: flex; flex-direction: column; gap: 6px; }
+.v1-ui .v1-adm-of-progress-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--v1-muted); }
+.v1-ui .v1-adm-of-progress-head strong { color: var(--v1-ink); font-variant-numeric: tabular-nums; }
+.v1-ui .v1-adm-of-bar { height: 8px; border-radius: 999px; background: var(--v1-surface-2); overflow: hidden; }
+.v1-ui .v1-adm-of-bar > span { display: block; height: 100%; background: var(--v1-accent); transition: width var(--v1-base) var(--v1-ease); }
+
+/* Checklistrijen */
+.v1-ui .v1-adm-of-check { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.v1-ui .v1-adm-of-check-label { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 220px; font-size: 14px; color: var(--v1-ink); }
+.v1-ui .v1-adm-of-check-label[data-done='true'] { color: var(--v1-muted); }
+.v1-ui .v1-adm-of-check .v1-input { width: auto; min-width: 160px; }
+
+@media (max-width: 640px) {
+  .v1-ui .v1-adm-of-savebar { justify-content: stretch; }
+  .v1-ui .v1-adm-of-savebar .v1-btn { flex: 1 1 auto; }
+  .v1-ui .v1-adm-of-check .v1-input { width: 100%; }
+}

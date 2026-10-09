@@ -1,8 +1,8 @@
 // V1 Admin Dashboard — root layout.
 //
 // Schil = die van het klantendashboard (ShellFrame, donkere zijbalk, mobiel menu)
-// met een eigen admin-zijbalk. klant.css + data-klant-scope (via ShellFrame)
-// blijven tot golf 4b staan: de detailpagina's gebruiken nog --klant-*-tokens.
+// met een eigen admin-zijbalk. Volledig op de V1-ontwerplaag; klant.css (V0)
+// wordt in V1 niet meer geladen.
 //
 // Render-gate: requireJorionAdmin() gate't de hele admin-route-group (geen sessie
 // → NEXT_REDIRECT naar /v1/login; ingelogd-niet-admin → "Geen toegang"-render,
@@ -10,7 +10,6 @@
 // zelf getJorionAdminClient() (intern gegated) en elke server-action z'n eigen
 // requireJorionAdmin() — layouts beschermen geen actions.
 
-import '@/app/klantendashboard/klant.css';
 import './_ui/admin.css';
 import type { Metadata } from 'next';
 import { requireJorionAdmin } from '@/lib/auth';

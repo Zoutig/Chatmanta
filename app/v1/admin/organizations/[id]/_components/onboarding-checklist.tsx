@@ -11,12 +11,14 @@ import {
   type OnboardingItem,
   type OnboardingItemStatus,
 } from '@/lib/controlroom/types';
+import { Badge, type Tone } from '@/app/v1/_ui/feedback';
+import '../org-forms.css';
 
-const STATUS_TONE: Record<OnboardingItemStatus, string> = {
-  todo: 'var(--klant-dim)',
-  done: 'var(--klant-success)',
-  blocked: 'var(--klant-danger)',
-  not_applicable: 'var(--klant-faint)',
+const STATUS_TONE: Record<OnboardingItemStatus, Tone> = {
+  todo: 'neutral',
+  done: 'ok',
+  blocked: 'danger',
+  not_applicable: 'neutral',
 };
 
 export function OnboardingChecklist({ orgId, items }: { orgId: string; items: OnboardingItem[] }) {
@@ -41,55 +43,61 @@ export function OnboardingChecklist({ orgId, items }: { orgId: string; items: On
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-          <span style={{ color: 'var(--klant-muted)' }}>Voortgang</span>
-          <span style={{ fontWeight: 600 }}>{done}/{total} ({pct}%)</span>
+    <div className="v1-form">
+      <div className="v1-adm-of-progress">
+        <div className="v1-adm-of-progress-head">
+          <span>Voortgang</span>
+          <strong>
+            {done}/{total} ({pct}%)
+          </strong>
         </div>
-        <div style={{ height: 8, borderRadius: 999, background: 'var(--klant-surface-muted)', overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--klant-accent)' }} />
+        <div
+          className="v1-adm-of-bar"
+          role="progressbar"
+          aria-label="Voortgang onboarding"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+        >
+          <span style={{ width: `${pct}%` }} />
         </div>
       </div>
 
-      {error ? <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span> : null}
+      {error ? (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {error}
+        </p>
+      ) : null}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {items.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '8px 10px',
-              borderRadius: 'var(--klant-r-md)',
-              opacity: busyId === item.id && pending ? 0.6 : 1,
-            }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: 999, background: STATUS_TONE[item.status], flexShrink: 0 }} />
-            <span style={{
-              flex: 1,
-              fontSize: 13.5,
-              textDecoration: item.status === 'done' ? 'line-through' : 'none',
-              color: item.status === 'done' ? 'var(--klant-muted)' : 'var(--klant-ink)',
-            }}>
-              {item.label}
-            </span>
-            <select
-              className="klant-select"
-              style={{ width: 'auto', padding: '5px 8px', fontSize: 12.5 }}
-              value={item.status}
-              disabled={pending && busyId === item.id}
-              onChange={(e) => setStatus(item, e.target.value as OnboardingItemStatus)}
-            >
-              {ONBOARDING_ITEM_STATUSES.map((s) => (
-                <option key={s} value={s}>{ONBOARDING_ITEM_STATUS_LABELS[s]}</option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
+      <ul className="v1-list">
+        {items.map((item) => {
+          const busy = pending && busyId === item.id;
+          const isDone = item.status === 'done';
+          return (
+            <li key={item.id} className="v1-list-row v1-adm-of-check" style={busy ? { opacity: 0.6 } : undefined}>
+              <span className="v1-adm-of-check-label" data-done={isDone || undefined}>
+                <Badge tone={STATUS_TONE[item.status]} dot>
+                  {ONBOARDING_ITEM_STATUS_LABELS[item.status]}
+                </Badge>
+                <span style={isDone ? { textDecoration: 'line-through' } : undefined}>{item.label}</span>
+              </span>
+              <select
+                className="v1-input"
+                aria-label={`Status van ${item.label}`}
+                value={item.status}
+                disabled={busy}
+                onChange={(e) => setStatus(item, e.target.value as OnboardingItemStatus)}
+              >
+                {ONBOARDING_ITEM_STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    {ONBOARDING_ITEM_STATUS_LABELS[st]}
+                  </option>
+                ))}
+              </select>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

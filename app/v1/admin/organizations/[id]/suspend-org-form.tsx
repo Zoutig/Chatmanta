@@ -6,6 +6,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setOrgSuspendedAction } from './actions';
+import { Button } from '@/app/v1/_ui/button';
+import './org-forms.css';
 
 export function SuspendOrgForm({ orgId, suspended }: { orgId: string; suspended: boolean }) {
   const router = useRouter();
@@ -36,24 +38,16 @@ export function SuspendOrgForm({ orgId, suspended }: { orgId: string; suspended:
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <button
-        type="button"
-        onClick={toggle}
-        className="klant-btn"
-        data-variant={suspended ? 'primary' : 'secondary'}
-        disabled={pending}
-        style={{ padding: '8px 14px' }}
-      >
-        {pending ? 'Bezig…' : suspended ? 'Hervatten' : 'Pauzeren'}
-      </button>
+    <div className="v1-form">
+      <div className="v1-adm-of-actions">
+        <Button variant={suspended ? 'primary' : 'secondary'} onClick={toggle} loading={pending}>
+          {suspended ? 'Hervatten' : 'Pauzeren'}
+        </Button>
+      </div>
       {msg && (
-        <span
-          role={msg.ok ? 'status' : 'alert'}
-          style={{ fontSize: 13, color: msg.ok ? 'var(--klant-success)' : 'var(--klant-danger)' }}
-        >
+        <p role={msg.ok ? 'status' : 'alert'} className={`v1-alert ${msg.ok ? 'v1-alert--ok' : 'v1-alert--error'}`}>
           {msg.text}
-        </span>
+        </p>
       )}
     </div>
   );

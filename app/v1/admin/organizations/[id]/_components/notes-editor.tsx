@@ -5,6 +5,9 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateNotesAction } from '../overlay-actions';
+import { Check } from 'lucide-react';
+import { Button } from '@/app/v1/_ui/button';
+import '../org-forms.css';
 
 export function NotesEditor({ orgId, notes }: { orgId: string; notes: string | null }) {
   const router = useRouter();
@@ -28,21 +31,30 @@ export function NotesEditor({ orgId, notes }: { orgId: string; notes: string | n
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="v1-form">
       <textarea
-        className="klant-textarea"
+        className="v1-input"
+        aria-label="Interne notities"
         value={value}
         onChange={(e) => { setValue(e.target.value); setSaved(false); }}
-        placeholder="Interne notities: afspraken, bekende risico's, laatste feedback…"
+        placeholder="Interne notities: afspraken, bekende risico's, laatste feedback..."
         style={{ minHeight: 160 }}
       />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="klant-btn" data-variant="primary" onClick={save} disabled={pending}>
-          {pending ? 'Opslaan…' : 'Notitie opslaan'}
-        </button>
-        {saved ? <span style={{ fontSize: 13, color: 'var(--klant-success)' }}>Opgeslagen ✓</span> : null}
-        {error ? <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span> : null}
+      <div className="v1-adm-of-actions">
+        <Button variant="primary" onClick={save} loading={pending}>
+          Notitie opslaan
+        </Button>
+        {saved ? (
+          <span className="v1-saved" role="status">
+            <Check size={14} /> Opgeslagen
+          </span>
+        ) : null}
       </div>
+      {error ? (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -3,64 +3,70 @@
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { listAdminSources } from '@/lib/v1/admin/klant-detail';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
+import { Badge, EmptyState, type Tone } from '@/app/v1/_ui/feedback';
+import { DataTable, NumCell } from '@/app/v1/admin/_ui/data-table';
 import { AdminUploadDoc } from '../admin-upload-doc';
 
-const SOURCE_TONE: Record<string, PillTone> = {
-  ready: 'success',
-  crawling: 'info',
-  pending: 'neutral',
-  failed: 'danger',
+// knowledge_sources.status CHECK: pending | crawling | ready | failed (V1 migr 0003).
+const SOURCE_STATUS: Record<string, { tone: Tone; label: string }> = {
+  ready: { tone: 'ok', label: 'Klaar' },
+  crawling: { tone: 'accent', label: 'Bezig met ophalen' },
+  pending: { tone: 'neutral', label: 'Wachtend' },
+  failed: { tone: 'danger', label: 'Mislukt' },
 };
 
-const dim = { fontSize: 12, color: 'var(--klant-muted)' } as const;
-const sectionTitle = { fontSize: 14, fontWeight: 600, margin: '0 0 10px', color: 'var(--klant-ink)' } as const;
+const SOURCE_TYPE: Record<string, string> = { website: 'Website' };
 
 export async function BronnenTab({ orgId, chatbotId }: { orgId: string; chatbotId: string | null }) {
   const admin = await getJorionAdminClient();
   const sources = await listAdminSources(admin, orgId, chatbotId);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div className="v1-stack">
       {/* WP5c — upload namens de klant */}
-      <Card>
-        <h3 style={sectionTitle}>Document uploaden namens de klant</h3>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title">Document uploaden namens de klant</h2>
+        </div>
         <AdminUploadDoc orgId={orgId} chatbotId={chatbotId} />
-      </Card>
+      </section>
 
-      {sources.length === 0 ? (
-        <Card><p style={dim}>Nog geen kennisbronnen voor deze organisatie.</p></Card>
-      ) : (
-        <Card padded={false}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="klant-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Host / URL</th>
-                  <th>Status</th>
-                  <th>Docs</th>
-                  <th>Gecrawld</th>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title">Kennisbronnen</h2>
+        </div>
+        {sources.length === 0 ? (
+          <EmptyState>Nog geen kennisbronnen voor deze organisatie.</EmptyState>
+        ) : (
+          <DataTable
+            label="Kennisbronnen"
+            columns={[
+              { label: 'Type' },
+              { label: 'Website' },
+              { label: 'Status' },
+              { label: 'Documenten', num: true },
+              { label: 'Opgehaalde pagina’s', num: true },
+            ]}
+          >
+            {sources.map((s) => {
+              const status = SOURCE_STATUS[s.status] ?? { tone: 'neutral' as const, label: s.status };
+              return (
+                <tr key={s.id}>
+                  <td>{SOURCE_TYPE[s.type] ?? s.type}</td>
+                  <td>
+                    <span className="v1-adm-clip">{s.normalizedHost ?? s.rootUrl ?? 'Onbekend'}</span>
+                  </td>
+                  <td>
+                    <Badge tone={status.tone}>{status.label}</Badge>
+                  </td>
+                  <NumCell>{s.documentCount}</NumCell>
+                  <NumCell>{s.crawledPageCount}</NumCell>
                 </tr>
-              </thead>
-              <tbody>
-                {sources.map((s) => (
-                  <tr key={s.id}>
-                    <td style={{ fontSize: 12.5 }}>{s.type}</td>
-                    <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>
-                      {s.normalizedHost ?? s.rootUrl ?? '—'}
-                    </td>
-                    <td><Pill tone={SOURCE_TONE[s.status] ?? 'neutral'}>{s.status}</Pill></td>
-                    <td style={{ fontSize: 13 }}>{s.documentCount}</td>
-                    <td style={{ fontSize: 13 }}>{s.crawledPageCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+              );
+            })}
+          </DataTable>
+        )}
+      </section>
     </div>
   );
 }

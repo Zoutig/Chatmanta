@@ -7,7 +7,6 @@
 //
 // Zo redirect de layout NOOIT zelf — de page doet dat. De shell rendert altijd
 // (leeg bij niet-ingelogd), wat Next.js streaming-SSR correct laat werken.
-import '../../klantendashboard/klant.css';
 import type { Metadata } from 'next';
 import { getSessionOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/v1/server';

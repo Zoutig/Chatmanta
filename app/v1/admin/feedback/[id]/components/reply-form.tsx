@@ -1,10 +1,13 @@
 'use client';
 
-// V1 port van app/admindashboard/feedback/[id]/components/reply-form.tsx.
+// Reactie per e-mail naar de indiener van een feedbackmelding (V1-ontwerplaag).
+// Flow ongewijzigd: tekst schrijven, bevestigen, versturen.
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { sendFeedbackReplyV1Action } from '@/app/v1/admin/feedback/actions';
+import { Field } from '@/app/v1/_ui/controls';
+import { Button } from '@/app/v1/_ui/button';
 
 const MAX = 4000;
 
@@ -25,9 +28,7 @@ export function FeedbackReplyFormV1({
   const router = useRouter();
 
   if (disabledReason) {
-    return (
-      <p style={{ fontSize: 13, color: 'var(--klant-dim)', margin: 0 }}>{disabledReason}</p>
-    );
+    return <p className="v1-adm-muted">{disabledReason}</p>;
   }
 
   const send = () => {
@@ -52,30 +53,37 @@ export function FeedbackReplyFormV1({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <p style={{ fontSize: 12.5, color: 'var(--klant-muted)', margin: 0 }}>
-        Stuur een reactie per e-mail naar <strong>{submitterEmail}</strong>. De klant ontvangt
-        alleen jouw tekst hieronder.
-      </p>
-      <textarea
-        className="klant-textarea"
-        rows={4}
-        maxLength={MAX}
-        value={body}
-        onChange={(e) => {
-          setBody(e.target.value);
-          setResult(null);
-        }}
-        placeholder="Schrijf je reactie naar de klant…"
-        style={{ resize: 'vertical' }}
-        disabled={pending}
-      />
+    <div className="v1-form">
+      <Field
+        label="Reactie"
+        hint={
+          <>
+            Gaat per e-mail naar <strong>{submitterEmail}</strong>. De klant ontvangt alleen deze tekst.{' '}
+            {body.length}/{MAX} tekens
+          </>
+        }
+      >
+        {(fieldId) => (
+          <textarea
+            id={fieldId}
+            className="v1-input"
+            rows={4}
+            maxLength={MAX}
+            value={body}
+            onChange={(e) => {
+              setBody(e.target.value);
+              setResult(null);
+            }}
+            placeholder="Schrijf je reactie naar de klant…"
+            disabled={pending}
+          />
+        )}
+      </Field>
       {!confirming ? (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button
-            type="button"
-            className="klant-btn"
-            data-variant="primary"
+        <div className="v1-adm-inline">
+          <Button
+            variant="primary"
+            size="sm"
             disabled={pending || !body.trim()}
             onClick={() => {
               setError(null);
@@ -83,42 +91,28 @@ export function FeedbackReplyFormV1({
             }}
           >
             Reactie versturen&hellip;
-          </button>
-          <span style={{ fontSize: 11.5, color: 'var(--klant-dim)' }}>{body.length}/{MAX}</span>
+          </Button>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            padding: '10px 12px',
-            background: 'var(--klant-warn-soft)',
-            border: '1px solid var(--klant-warn-border)',
-            borderRadius: 'var(--klant-r-md)',
-          }}
-        >
-          <span style={{ fontSize: 13, color: 'var(--klant-ink)' }}>
+        <div className="v1-adm-fbd-confirm">
+          <span>
             Verstuur deze reactie per e-mail naar <strong>{submitterEmail}</strong>?
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="klant-btn" data-variant="primary" disabled={pending} onClick={send}>
+          <div className="v1-adm-inline">
+            <Button variant="primary" size="sm" loading={pending} onClick={send}>
               {pending ? 'Versturen…' : 'Ja, versturen'}
-            </button>
-            <button type="button" className="klant-btn" data-variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+            </Button>
+            <Button variant="ghost" size="sm" disabled={pending} onClick={() => setConfirming(false)}>
               Annuleren
-            </button>
+            </Button>
           </div>
         </div>
       )}
-      {error && <span style={{ fontSize: 12.5, color: 'var(--klant-danger)' }} role="alert">{error}</span>}
+      {error && <p className="v1-alert v1-alert--error" role="alert">{error}</p>}
       {result && (
-        <span
-          style={{ fontSize: 12.5, color: result.sent ? 'var(--klant-success)' : 'var(--klant-danger)' }}
-          role="status"
-        >
+        <p className={`v1-alert ${result.sent ? 'v1-alert--ok' : 'v1-alert--error'}`} role="status">
           {result.detail}
-        </span>
+        </p>
       )}
     </div>
   );

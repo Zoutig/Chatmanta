@@ -7,6 +7,9 @@
 import { useState, useTransition, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { setAllowedDomainsAction } from './actions';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import './org-forms.css';
 
 export function AllowedDomainsEditor({ orgId, current }: { orgId: string; current: string[] }) {
   const router = useRouter();
@@ -24,7 +27,7 @@ export function AllowedDomainsEditor({ orgId, current }: { orgId: string; curren
         setValue(res.domains.join('\n'));
         setMsg({
           ok: true,
-          text: res.domains.length > 0 ? 'Domeinen opgeslagen.' : 'Opgeslagen — geen beperking (widget werkt overal).',
+          text: res.domains.length > 0 ? 'Domeinen opgeslagen.' : 'Opgeslagen. Geen beperking: de widget werkt overal.',
         });
         router.refresh();
       } else {
@@ -34,43 +37,32 @@ export function AllowedDomainsEditor({ orgId, current }: { orgId: string; curren
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-        Toegestane websites (één per regel)
-        <textarea
-          rows={3}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={'bakkerij.nl\nwinkel.bakkerij.nl'}
-          style={{
-            padding: '8px 10px',
-            fontSize: 14,
-            fontFamily: 'var(--klant-font-mono)',
-            borderRadius: 'var(--klant-r-md)',
-            border: '1px solid var(--klant-border)',
-            background: 'var(--klant-surface)',
-            color: 'var(--klant-ink)',
-            resize: 'vertical',
-          }}
-        />
-      </label>
-      <p style={{ fontSize: 12, color: 'var(--klant-muted)', margin: 0 }}>
-        www. telt automatisch mee (bakkerij.nl dekt ook www.bakkerij.nl). Leeg = de widget werkt op
-        élke website — vul dit vóór livegang in.
-      </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <button type="submit" className="klant-btn" data-variant="primary" disabled={pending} style={{ padding: '8px 14px' }}>
-          {pending ? 'Opslaan…' : 'Domeinen opslaan'}
-        </button>
-        {msg && (
-          <span
-            role={msg.ok ? 'status' : 'alert'}
-            style={{ fontSize: 13, color: msg.ok ? 'var(--klant-success)' : 'var(--klant-danger)' }}
-          >
-            {msg.text}
-          </span>
+    <form onSubmit={onSubmit} className="v1-form">
+      <Field
+        label="Toegestane websites (één per regel)"
+        hint="www. telt automatisch mee (bakkerij.nl dekt ook www.bakkerij.nl). Leeg betekent dat de widget op elke website werkt, dus vul dit in vóór livegang."
+      >
+        {(id) => (
+          <textarea
+            id={id}
+            rows={3}
+            className="v1-input v1-adm-of-mono"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={'bakkerij.nl\nwinkel.bakkerij.nl'}
+          />
         )}
+      </Field>
+      <div className="v1-adm-of-actions">
+        <Button type="submit" variant="primary" size="sm" loading={pending}>
+          Domeinen opslaan
+        </Button>
       </div>
+      {msg && (
+        <p role={msg.ok ? 'status' : 'alert'} className={`v1-alert ${msg.ok ? 'v1-alert--ok' : 'v1-alert--error'}`}>
+          {msg.text}
+        </p>
+      )}
     </form>
   );
 }

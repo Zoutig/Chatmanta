@@ -1,27 +1,37 @@
-// V1 admin — Privacy & Data tab (server RSC).
+// V1 admin — Privacy en data tab (server RSC).
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getPrivacy } from '@/lib/v1/admin/privacy';
-import { formatDateNL } from '@/lib/controlroom/format';
-import { Card } from '@/app/klantendashboard/components/ui/card';
+import { InfoTip } from '@/app/v1/_ui/feedback';
+import { formatDate } from '@/app/v1/admin/_ui/format';
 import { PrivacyForm } from '../_components/privacy-form';
+
+function dateOrNever(iso: string | null): string {
+  return iso ? formatDate(iso) : 'Nog niet';
+}
 
 export async function PrivacyTab({ orgId }: { orgId: string }) {
   const admin = await getJorionAdminClient();
   const privacy = await getPrivacy(admin, orgId);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card>
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--klant-ink)' }}>
-          Bewaartermijnen &amp; AVG
+    <section className="v1-card">
+      <div className="v1-adm-card-head">
+        <h2 className="v1-section-title v1-adm-title-row">
+          Bewaartermijnen en AVG
+          <InfoTip text="De instellingen worden opgeslagen. Het daadwerkelijk opschonen loopt later via een geplande taak (V2)." />
+        </h2>
+      </div>
+      <div className="v1-adm-stat-row" style={{ margin: '0 0 16px' }}>
+        <div className="v1-adm-stat">
+          <span className="v1-adm-stat-label">Laatste export</span>
+          <span>{dateOrNever(privacy.lastDataExportAt)}</span>
         </div>
-        <p className="klant-hint" style={{ marginTop: 0, marginBottom: 14 }}>
-          Instellingen worden opgeslagen. De daadwerkelijke opschoning loopt via een geplande service
-          (V2). Laatste export: {formatDateNL(privacy.lastDataExportAt)} · laatste verwijdering:{' '}
-          {formatDateNL(privacy.lastDataDeletionAt)}.
-        </p>
-        <PrivacyForm orgId={orgId} privacy={privacy} />
-      </Card>
-    </div>
+        <div className="v1-adm-stat">
+          <span className="v1-adm-stat-label">Laatste verwijdering</span>
+          <span>{dateOrNever(privacy.lastDataDeletionAt)}</span>
+        </div>
+      </div>
+      <PrivacyForm orgId={orgId} privacy={privacy} />
+    </section>
   );
 }

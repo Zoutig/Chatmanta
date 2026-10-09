@@ -6,12 +6,13 @@
 //  - Org-naam uit DB (organizations-tabel) i.p.v. KNOWN_ORGS.
 //  - PDF-link → /api/v1/pdf/recap/[orgId]/[month].
 //  - Auth via getJorionAdminClient() (gooit AUTH_FORBIDDEN).
+//  - Presentatie in de V1-ontwerplaag (golf 4b).
 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import { isAppError } from '@/lib/errors/app-error';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
-import { formatDateNL } from '@/lib/controlroom/format';
 import { RECAP_SIGNAL_TYPE_LABELS } from '@/lib/controlroom/types';
 import {
   buildMonthOptions,
@@ -24,9 +25,14 @@ import {
   type RecapSignal,
 } from '@/lib/controlroom/recap-logic';
 import { getV1RecapDetail, listRecapMonths } from '@/lib/v1/admin/recap';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { MetricCard } from '@/app/admindashboard/components/metric-card';
-import { ReloadButton } from '@/app/admindashboard/components/reload-button';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { buttonClass } from '@/app/v1/_ui/button';
+import { AttentionBlock, Badge, EmptyState } from '@/app/v1/_ui/feedback';
+import { List, ListRow } from '@/app/v1/_ui/list';
+import { Metric, MetricGrid } from '../../_ui/metric';
+import { ReloadButton } from '../../_ui/reload-button';
+import { DataTable } from '../../_ui/data-table';
+import { formatDate } from '../../_ui/format';
 import { MonthSelector } from './components/month-selector';
 import { GenerateRecapButton } from './components/generate-recap-button';
 import { SignalDot } from './components/signal-dot';
@@ -37,18 +43,6 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const BASE_PATH = '/v1/admin/maandelijkse-recap';
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="klant-section-title" style={{ margin: '22px 0 10px' }}>
-      {children}
-    </div>
-  );
-}
-
-function EmptyInline({ text }: { text: string }) {
-  return <p style={{ fontSize: 13.5, color: 'var(--klant-dim)', margin: 0 }}>{text}</p>;
-}
 
 function SignalRow({
   sig,
@@ -63,22 +57,20 @@ function SignalRow({
 }) {
   const dimmed = sig.status !== 'nieuw';
   return (
-    <div
-      style={{
-        padding: '12px 0',
-        borderTop: '1px solid var(--klant-border)',
-        opacity: dimmed ? 0.55 : 1,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <SignalDot severity={sig.severity} showLabel={false} />
-        <strong style={{ fontSize: 13.5 }}>{RECAP_SIGNAL_TYPE_LABELS[sig.type]}</strong>
+    <li>
+      <div className="v1-list-row" style={{ opacity: dimmed ? 0.55 : 1 }}>
+        <span className="v1-list-main">
+          <span className="v1-adm-title-row">
+            <SignalDot severity={sig.severity} showLabel={false} />
+            <span className="v1-list-title v1-list-title--wrap">{RECAP_SIGNAL_TYPE_LABELS[sig.type]}</span>
+          </span>
+          <span className="v1-list-meta">{sig.message}</span>
+          <span style={{ marginTop: 6 }}>
+            <SignalActions orgId={orgId} year={year} month={month} signalType={sig.type} status={sig.status} />
+          </span>
+        </span>
       </div>
-      <p style={{ fontSize: 13.5, color: 'var(--klant-muted)', margin: '0 0 8px' }}>
-        {sig.message}
-      </p>
-      <SignalActions orgId={orgId} year={year} month={month} signalType={sig.type} status={sig.status} />
-    </div>
+    </li>
   );
 }
 
@@ -94,12 +86,7 @@ export default async function V1MaandRecapDetailPage({
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
@@ -134,235 +121,155 @@ export default async function V1MaandRecapDetailPage({
   }
 
   return (
-    <>
-      <header className="klant-page-header">
-        <div>
-          <h1 className="klant-page-title">{orgName}</h1>
-          <p className="klant-page-sub">
-            Recap {monthLabelNL(year, month)}
-            {stored?.generatedAt
-              ? ` · gegenereerd op ${formatDateNL(stored.generatedAt)}`
-              : ''}
-            {' · Gegenereerd door: Niels Jochems — ChatManta'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <MonthSelector
-            current={currentKey}
-            options={options}
-            basePath={`${BASE_PATH}/${orgId}`}
-          />
-          {hasData ? (
-            <GenerateRecapButton
-              orgId={orgId}
-              year={year}
-              month={month}
-              hasRecap={stored?.generatedAt != null}
-            />
-          ) : null}
-          <a
-            className="klant-btn"
-            data-variant="ghost"
-            href={`/api/v1/pdf/recap/${orgId}/${currentKey}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            📄 Exporteer als PDF
-          </a>
-          <ReloadButton />
-        </div>
-      </header>
+    <div className="v1-page">
+      <Link href={`${BASE_PATH}?period=${currentKey}`} className="v1-section-link">
+        Terug naar overzicht
+      </Link>
 
-      <p style={{ marginBottom: 16 }}>
-        <Link
-          href={`${BASE_PATH}?period=${currentKey}`}
-          style={{ fontSize: 13, color: 'var(--klant-accent)', textDecoration: 'none' }}
-        >
-          ← Terug naar overzicht
-        </Link>
-      </p>
+      <PageHeader
+        title={orgName}
+        description={
+          <>
+            Recap {monthLabelNL(year, month)}
+            {stored?.generatedAt ? ` · gegenereerd op ${formatDate(stored.generatedAt)}` : ''}
+            {' · Gegenereerd door Niels Jochems, ChatManta'}
+          </>
+        }
+        actions={
+          <>
+            <MonthSelector current={currentKey} options={options} basePath={`${BASE_PATH}/${orgId}`} />
+            {hasData ? (
+              <GenerateRecapButton orgId={orgId} year={year} month={month} hasRecap={stored?.generatedAt != null} />
+            ) : null}
+            <a
+              className={buttonClass({ variant: 'secondary' })}
+              href={`/api/v1/pdf/recap/${orgId}/${currentKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <FileText size={15} strokeWidth={1.8} aria-hidden="true" />
+              Exporteer als PDF
+            </a>
+            <ReloadButton />
+          </>
+        }
+      />
 
       {isCurrentMonth(year, month) ? (
-        <p className="klant-hint" style={{ marginBottom: 14, color: 'var(--klant-warn)' }}>
-          Lopende maand — de cijfers zijn nog onvolledig en veranderen dagelijks.
-        </p>
+        <AttentionBlock level="attention" title="Dit is de lopende maand">
+          De cijfers zijn nog onvolledig en veranderen dagelijks.
+        </AttentionBlock>
       ) : null}
 
       {!hasData ? (
-        <Card>
-          <EmptyInline
-            text={`Geen gesprekken gevonden voor ${monthLabelNL(year, month)}. Er valt voor deze maand geen recap te genereren.`}
-          />
-        </Card>
+        <section className="v1-card">
+          <EmptyState>
+            Geen gesprekken gevonden voor {monthLabelNL(year, month)}. Er valt voor deze maand geen recap te genereren.
+          </EmptyState>
+        </section>
       ) : (
         <>
-          {/* Sectie 1 — Statistieken */}
-          <div className="klant-metrics-grid" style={{ marginBottom: 4 }}>
-            <MetricCard label="Totaal gesprekken" value={stats.totalConversations} />
-            <MetricCard
-              label="Unieke bezoekers"
-              value={stats.uniqueVisitors}
-              sub="alleen website-bezoekers"
-            />
-            <MetricCard
+          {/* Sectie 1: statistieken */}
+          <MetricGrid>
+            <Metric label="Totaal gesprekken" value={stats.totalConversations} />
+            <Metric label="Unieke bezoekers" value={stats.uniqueVisitors} sub="alleen websitebezoekers" />
+            <Metric
               label="Gem. gespreksduur"
               value={formatDuration(stats.avgDurationSeconds)}
               sub="tijd tot laatste activiteit"
             />
-            <MetricCard
-              label="Gem. berichten/gesprek"
-              value={stats.avgMessagesPerConversation}
-            />
-            <MetricCard
+            <Metric label="Gem. berichten/gesprek" value={stats.avgMessagesPerConversation} />
+            <Metric
               label="Onbeantwoorde vragen"
               value={stats.unansweredCount}
               tone={stats.unansweredCount > 0 ? 'warn' : 'ink'}
             />
-            <MetricCard
+            <Metric
               label="Piekuur"
-              value={stats.peakHour != null ? `${stats.peakHour}:00` : '—'}
+              value={stats.peakHour != null ? `${stats.peakHour}:00` : 'Onbekend'}
               sub="drukste uur (gesprek-starts)"
             />
-          </div>
+          </MetricGrid>
 
-          {/* Sectie 2 — Meest gestelde vragen */}
-          <SectionTitle>Meest gestelde vragen</SectionTitle>
-          <Card>
+          {/* Sectie 2: meest gestelde vragen */}
+          <section className="v1-card">
+            <h2 className="v1-section-title">Meest gestelde vragen</h2>
             {topQuestions.length > 0 ? (
-              <ol
-                style={{
-                  margin: 0,
-                  paddingLeft: 0,
-                  listStyle: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}
-              >
+              <List label="Meest gestelde vragen">
                 {topQuestions.map((q, i) => (
-                  <li
+                  <ListRow
                     key={i}
-                    style={{ display: 'flex', alignItems: 'baseline', gap: 12, fontSize: 13.5 }}
-                  >
-                    <span
-                      style={{
-                        color: 'var(--klant-dim)',
-                        fontVariantNumeric: 'tabular-nums',
-                        width: 22,
-                      }}
-                    >
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span style={{ flex: 1, color: 'var(--klant-ink)' }}>{q.question}</span>
-                    <span
-                      style={{ color: 'var(--klant-dim)', fontVariantNumeric: 'tabular-nums' }}
-                    >
-                      {q.count}×
-                    </span>
-                    <span
-                      style={{
-                        color: q.answered ? 'var(--klant-success)' : 'var(--klant-warn)',
-                        fontSize: 12.5,
-                        minWidth: 110,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {q.answered ? 'beantwoord' : 'niet beantwoord ⚠️'}
-                    </span>
-                  </li>
+                    wrap
+                    title={`${i + 1}. ${q.question}`}
+                    end={
+                      <>
+                        <span className="v1-adm-muted">{q.count}×</span>
+                        <Badge tone={q.answered ? 'ok' : 'warn'}>{q.answered ? 'Beantwoord' : 'Niet beantwoord'}</Badge>
+                      </>
+                    }
+                  />
                 ))}
-              </ol>
+              </List>
             ) : (
-              <EmptyInline text="Geen vragen gevonden voor deze maand." />
+              <EmptyState>Geen vragen gevonden voor deze maand.</EmptyState>
             )}
-          </Card>
+          </section>
 
-          {/* Sectie 3 — Meest voorkomende onbeantwoorde vragen */}
-          <SectionTitle>Meest voorkomende onbeantwoorde vragen</SectionTitle>
-          <Card>
+          {/* Sectie 3: meest voorkomende onbeantwoorde vragen */}
+          <section className="v1-card">
+            <h2 className="v1-section-title">Meest voorkomende onbeantwoorde vragen</h2>
             {topUnanswered.length > 0 ? (
-              <ol
-                style={{
-                  margin: 0,
-                  paddingLeft: 0,
-                  listStyle: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}
-              >
+              <List label="Meest voorkomende onbeantwoorde vragen">
                 {topUnanswered.map((q, i) => (
-                  <li
+                  <ListRow
                     key={i}
-                    style={{ display: 'flex', alignItems: 'baseline', gap: 12, fontSize: 13.5 }}
-                  >
-                    <span
-                      style={{
-                        color: 'var(--klant-dim)',
-                        fontVariantNumeric: 'tabular-nums',
-                        width: 22,
-                      }}
-                    >
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span style={{ flex: 1, color: 'var(--klant-ink)' }}>{q.question}</span>
-                    <span
-                      style={{ color: 'var(--klant-dim)', fontVariantNumeric: 'tabular-nums' }}
-                    >
-                      {q.count}×
-                    </span>
-                  </li>
+                    wrap
+                    title={`${i + 1}. ${q.question}`}
+                    end={<span className="v1-adm-muted">{q.count}×</span>}
+                  />
                 ))}
-              </ol>
+              </List>
             ) : (
-              <EmptyInline text="Geen onbeantwoorde vragen — mooi resultaat." />
+              <EmptyState>Geen onbeantwoorde vragen. Mooi resultaat.</EmptyState>
             )}
-          </Card>
+          </section>
         </>
       )}
 
-      {/* Sectie 4 — AI-samenvatting */}
-      <SectionTitle>AI-samenvatting</SectionTitle>
-      <Card>
+      {/* Sectie 4: AI-samenvatting */}
+      <section className="v1-card">
+        <h2 className="v1-section-title">AI-samenvatting</h2>
         {stored?.aiSummary ? (
           <>
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--klant-ink)', margin: 0 }}>
-              {stored.aiSummary}
-            </p>
+            <p className="v1-adm-note">{stored.aiSummary}</p>
             {stored.generatedAt ? (
-              <div className="klant-hint" style={{ marginTop: 10 }}>
-                Gegenereerd door AI op {formatDateNL(stored.generatedAt)}
-              </div>
+              <p className="v1-hint">Gegenereerd door AI op {formatDate(stored.generatedAt)}</p>
             ) : null}
           </>
         ) : (
-          <EmptyInline
-            text={
-              hasData
-                ? "Nog geen samenvatting — klik op 'Recap genereren'."
-                : 'Geen samenvatting (geen gesprekken deze maand).'
-            }
-          />
+          <EmptyState>
+            {hasData
+              ? "Nog geen samenvatting. Klik op 'Samenvatting maken'."
+              : 'Geen samenvatting (geen gesprekken deze maand).'}
+          </EmptyState>
         )}
-      </Card>
+      </section>
 
-      {/* Sectie 5 — Signaleringen */}
+      {/* Sectie 5: signaleringen */}
       {signals.length > 0 ? (
-        <>
-          <SectionTitle>Signaleringen</SectionTitle>
-          <Card>
-            <div style={{ marginTop: -12 }}>
-              {signals.map((sig) => (
-                <SignalRow key={sig.type} sig={sig} orgId={orgId} year={year} month={month} />
-              ))}
-            </div>
-          </Card>
-        </>
+        <section className="v1-card">
+          <h2 className="v1-section-title">Signaleringen</h2>
+          <ul className="v1-list" aria-label="Signaleringen">
+            {signals.map((sig) => (
+              <SignalRow key={sig.type} sig={sig} orgId={orgId} year={year} month={month} />
+            ))}
+          </ul>
+        </section>
       ) : null}
 
-      {/* Sectie 6 — Notities van Niels */}
-      <SectionTitle>Notities</SectionTitle>
-      <Card>
+      {/* Sectie 6: notities van Niels */}
+      <section className="v1-card">
+        <h2 className="v1-section-title">Notities</h2>
         {/* key op de recap-identiteit → remount bij maand-/klant-wissel */}
         <NotesEditor
           key={`${orgId}-${currentKey}`}
@@ -371,71 +278,45 @@ export default async function V1MaandRecapDetailPage({
           month={month}
           initialNotes={stored?.nielsNotes ?? null}
         />
-      </Card>
+      </section>
 
-      {/* Archief — Eerdere recaps */}
+      {/* Archief: eerdere recaps */}
       {archive.length > 0 ? (
-        <>
-          <SectionTitle>Eerdere recaps</SectionTitle>
-          <Card padded={false}>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="klant-table">
-                <thead>
-                  <tr>
-                    <th>Maand</th>
-                    <th>Gegenereerd op</th>
-                    <th>Notitie</th>
-                    <th>Recap</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {archive.map((a) => {
-                    const p = parsePeriodMonth(a.periodMonth);
-                    const label = p ? monthLabelNL(p.year, p.month) : a.periodMonth;
-                    return (
-                      <tr key={a.periodMonth}>
-                        <td style={{ fontSize: 13 }}>{label}</td>
-                        <td style={{ fontSize: 13 }}>
-                          {a.generatedAt ? formatDateNL(a.generatedAt) : '—'}
-                        </td>
-                        <td style={{ fontSize: 13 }}>{a.hasNotes ? '✏️' : '—'}</td>
-                        <td>
-                          <span style={{ display: 'inline-flex', gap: 12 }}>
-                            <Link
-                              href={`${BASE_PATH}/${orgId}?period=${a.periodMonth}`}
-                              style={{
-                                fontSize: 13,
-                                color: 'var(--klant-accent)',
-                                textDecoration: 'none',
-                                fontWeight: 600,
-                              }}
-                            >
-                              Bekijk
-                            </Link>
-                            <a
-                              href={`/api/v1/pdf/recap/${orgId}/${a.periodMonth}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                fontSize: 13,
-                                color: 'var(--klant-accent)',
-                                textDecoration: 'none',
-                                fontWeight: 600,
-                              }}
-                            >
-                              PDF
-                            </a>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </>
+        <section className="v1-card">
+          <h2 className="v1-section-title">Eerdere recaps</h2>
+          <DataTable
+            label="Eerdere recaps"
+            columns={[{ label: 'Maand' }, { label: 'Gegenereerd op' }, { label: 'Notitie' }, { label: 'Recap' }]}
+          >
+            {archive.map((a) => {
+              const p = parsePeriodMonth(a.periodMonth);
+              const label = p ? monthLabelNL(p.year, p.month) : a.periodMonth;
+              return (
+                <tr key={a.periodMonth}>
+                  <td>{label}</td>
+                  <td className="v1-adm-muted">{a.generatedAt ? formatDate(a.generatedAt) : 'Geen'}</td>
+                  <td className="v1-adm-muted">{a.hasNotes ? 'Ja' : 'Nee'}</td>
+                  <td>
+                    <span className="v1-adm-inline">
+                      <Link href={`${BASE_PATH}/${orgId}?period=${a.periodMonth}`} className="v1-section-link">
+                        Bekijk
+                      </Link>
+                      <a
+                        href={`/api/v1/pdf/recap/${orgId}/${a.periodMonth}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="v1-section-link"
+                      >
+                        PDF
+                      </a>
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </DataTable>
+        </section>
       ) : null}
-    </>
+    </div>
   );
 }

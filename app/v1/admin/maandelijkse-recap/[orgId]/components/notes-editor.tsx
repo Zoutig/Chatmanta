@@ -6,6 +6,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/app/v1/_ui/button';
 import { saveRecapNotesAction } from '@/app/v1/admin/maandelijkse-recap/actions';
 
 const NOTES_MAX = 8000;
@@ -41,9 +42,10 @@ export function NotesEditor({
   }
 
   return (
-    <div>
+    <div className="v1-form">
       <textarea
-        className="klant-textarea"
+        className="v1-input"
+        aria-label="Notities voor deze maand"
         value={notes}
         maxLength={NOTES_MAX}
         onChange={(e) => {
@@ -52,23 +54,20 @@ export function NotesEditor({
         }}
         rows={5}
         placeholder="Schrijf hier je observaties voor deze maand…"
-        style={{ width: '100%', resize: 'vertical', minHeight: 96 }}
       />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
-        <button
-          type="button"
-          className="klant-btn"
-          data-variant="primary"
-          onClick={save}
-          disabled={pending}
-        >
+      <div className="v1-adm-inline">
+        <Button variant="primary" size="sm" onClick={save} loading={pending}>
           {pending ? 'Bezig…' : 'Opslaan'}
-        </button>
+        </Button>
         {saved ? (
-          <span style={{ fontSize: 12.5, color: 'var(--klant-success)' }}>Opgeslagen</span>
+          <span role="status" className="v1-adm-muted">
+            Opgeslagen
+          </span>
         ) : null}
         {error ? (
-          <span style={{ fontSize: 12.5, color: 'var(--klant-danger)' }}>{error}</span>
+          <span role="alert" className="v1-adm-danger">
+            {error}
+          </span>
         ) : null}
       </div>
     </div>

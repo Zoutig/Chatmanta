@@ -3,6 +3,7 @@
 // V1 operator-UI voor de Kennisbank-Quiz. Port van
 // app/admindashboard/klanten/[orgSlug]/components/quiz-manager.tsx.
 // Werkt op orgId (UUID) i.p.v. orgSlug; actions uit app/v1/admin/quiz/actions.ts.
+// Presentatie in de V1-ontwerplaag (golf 4b); stappen en acties ongewijzigd.
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -24,6 +25,9 @@ import {
   type QuizQuestion,
   type QuizQuestionType,
 } from '@/lib/controlroom/types';
+import { Button } from '@/app/v1/_ui/button';
+import { Field, Switch } from '@/app/v1/_ui/controls';
+import { EmptyState } from '@/app/v1/_ui/feedback';
 
 type ActResult = { ok: boolean; error?: string };
 
@@ -32,6 +36,45 @@ function optiesToText(opties: string[] | null): string {
 }
 function textToOpties(text: string): string[] {
   return text.split('\n').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+// De lib-labels bevatten een em-dash; in de UI tonen we een komma.
+function modelLabel(m: QuizAnalyseModel): string {
+  return QUIZ_ANALYSE_MODEL_LABELS[m].replace(/\s+—\s+/g, ', ');
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  open: 'Open vraag',
+  meerkeuze: 'Meerkeuze',
+};
+
+function QuestionMeta({ question }: { question: QuizQuestion }) {
+  return (
+    <p className="v1-list-meta" style={{ margin: 0 }}>
+      {question.categorieLabel ?? question.categorie} · {TYPE_LABELS[question.type] ?? question.type}
+      {question.bron === 'niels' ? ' · handmatig' : ''}
+    </p>
+  );
+}
+
+function QuestionBody({ question }: { question: QuizQuestion }) {
+  return (
+    <>
+      {question.context ? (
+        <p className="v1-hint" style={{ margin: '4px 0 0' }}>
+          {question.context}
+        </p>
+      ) : null}
+      <p className="v1-adm-strong" style={{ margin: '4px 0 0' }}>
+        {question.vraag}
+      </p>
+      {question.opties && question.opties.length > 0 ? (
+        <p className="v1-adm-muted" style={{ margin: '4px 0 0' }}>
+          {question.opties.join(' · ')}
+        </p>
+      ) : null}
+    </>
+  );
 }
 
 export function QuizManager({
@@ -58,9 +101,9 @@ export function QuizManager({
   }
 
   const errorBar = error ? (
-    <div className="klant-card" style={{ borderColor: 'var(--klant-danger)', color: 'var(--klant-danger)', fontSize: 13 }}>
+    <p role="alert" className="v1-alert v1-alert--error">
       {error}
-    </div>
+    </p>
   ) : null;
 
   // ── Trigger-paneel (geen quiz / leeg / mislukt / generating) ────────────────
@@ -68,87 +111,80 @@ export function QuizManager({
   if (showTrigger) {
     const isRetry = !!quiz && (quiz.status === 'mislukt' || quiz.status === 'leeg');
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <>
         {errorBar}
-        <div className="klant-card">
-          <div className="klant-section-title" style={{ marginBottom: 8 }}>Kennisbank-Quiz</div>
+        <section className="v1-card">
+          <h2 className="v1-section-title">Quiz genereren</h2>
           {quiz?.status === 'leeg' && (
-            <p className="klant-hint" style={{ marginTop: 0 }}>
-              De vorige analyse vond geen duidelijke gaten — de kennisbank lijkt volledig. Je kunt opnieuw genereren.
+            <p className="v1-hint">
+              De vorige analyse vond geen duidelijke gaten. De kennisbank lijkt volledig. Je kunt opnieuw genereren.
             </p>
           )}
           {quiz?.status === 'mislukt' && (
-            <p className="klant-hint" style={{ marginTop: 0, color: 'var(--klant-danger)' }}>
+            <p role="alert" className="v1-alert v1-alert--error">
               De vorige analyse is mislukt{quiz.error ? `: ${quiz.error}` : ''}. Probeer het opnieuw.
             </p>
           )}
           {quiz?.status === 'generating' && (
-            <p className="klant-hint" style={{ marginTop: 0 }}>
-              Een analyse lijkt te zijn afgebroken (status: bezig). Start opnieuw om verder te gaan.
-            </p>
+            <p className="v1-hint">Een analyse lijkt te zijn afgebroken (status: bezig). Start opnieuw om verder te gaan.</p>
           )}
           {!quiz && (
-            <p className="klant-hint" style={{ marginTop: 0 }}>
-              De AI analyseert de kennisbank van deze klant, bepaalt welke informatie ontbreekt en genereert
-              quizvragen. Jij beoordeelt ze daarna voordat de klant ze ziet.
+            <p className="v1-hint">
+              De AI zoekt welke informatie in de kennisbank van deze klant ontbreekt en maakt daar quizvragen van. Jij
+              beoordeelt ze voordat de klant ze ziet.
             </p>
           )}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className="klant-label">Model</span>
-              <select
-                className="klant-select"
-                style={{ width: 'auto', minWidth: 220 }}
-                value={model}
-                disabled={pending}
-                onChange={(e) => setModel(e.target.value as QuizAnalyseModel)}
-              >
-                {QUIZ_ANALYSE_MODELS.map((m) => (
-                  <option key={m} value={m}>{QUIZ_ANALYSE_MODEL_LABELS[m]}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="klant-btn"
-              data-variant="primary"
-              disabled={pending}
-              onClick={() => run(() => generateQuizForOrgAction(orgId, model))}
-            >
-              {pending ? 'Bezig met analyseren… (tot ~1 min)' : isRetry ? 'Opnieuw genereren' : 'Genereer quiz'}
-            </button>
+          <div className="v1-form" style={{ marginTop: 14 }}>
+            <Field label="Model">
+              {(id) => (
+                <select
+                  id={id}
+                  className="v1-input v1-adm-select"
+                  value={model}
+                  disabled={pending}
+                  onChange={(e) => setModel(e.target.value as QuizAnalyseModel)}
+                >
+                  {QUIZ_ANALYSE_MODELS.map((m) => (
+                    <option key={m} value={m}>
+                      {modelLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <div>
+              <Button variant="primary" loading={pending} onClick={() => run(() => generateQuizForOrgAction(orgId, model))}>
+                {pending ? 'Bezig met analyseren (tot ongeveer 1 minuut)' : isRetry ? 'Opnieuw genereren' : 'Genereer quiz'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </>
     );
   }
 
   // ── Actief / voltooid → stats + read-only ───────────────────────────────────
   if (quiz.status === 'actief' || quiz.status === 'voltooid') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <>
         {errorBar}
-        <div className="klant-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <section className="v1-card">
+          <div className="v1-adm-card-head" style={{ flexWrap: 'wrap', alignItems: 'center', marginBottom: 0 }}>
             <div>
-              <div className="klant-section-title">Quiz {QUIZ_STATUS_LABELS[quiz.status]}</div>
-              <p className="klant-hint" style={{ margin: '4px 0 0' }}>
-                {quiz.questionCount} vragen &middot; {quiz.answeredCount} beantwoord &middot; {quiz.skippedCount} overgeslagen
+              <h2 className="v1-section-title">Quiz {QUIZ_STATUS_LABELS[quiz.status].toLowerCase()}</h2>
+              <p className="v1-hint" style={{ margin: '4px 0 0' }}>
+                {quiz.questionCount} vragen · {quiz.answeredCount} beantwoord · {quiz.skippedCount} overgeslagen
               </p>
             </div>
             {quiz.status === 'actief' && (
-              <button
-                className="klant-btn"
-                data-variant="ghost"
-                disabled={pending}
-                onClick={() => run(() => cancelQuizAction(orgId, quiz.id))}
-              >
+              <Button variant="secondary" disabled={pending} onClick={() => run(() => cancelQuizAction(orgId, quiz.id))}>
                 Quiz annuleren
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </section>
         <QuestionList questions={questions} readOnly />
-      </div>
+      </>
     );
   }
 
@@ -156,84 +192,67 @@ export function QuizManager({
   const visible = questions.filter((q) => !q.verwijderd);
   const approvedCount = visible.filter((q) => q.goedgekeurd).length;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <>
       {errorBar}
-      <div className="klant-card">
-        <div className="klant-section-title" style={{ marginBottom: 6 }}>Concept &mdash; wacht op jouw goedkeuring</div>
+      <section className="v1-card">
+        <h2 className="v1-section-title">Concept, wacht op jouw goedkeuring</h2>
         {(quiz.bedrijfscontext?.branche || quiz.bedrijfscontext?.beschrijving) && (
-          <p className="klant-hint" style={{ marginTop: 0 }}>
-            Gedetecteerd: <strong>{quiz.bedrijfscontext.branche ?? '—'}</strong>
+          <p className="v1-hint">
+            Gedetecteerd: <strong>{quiz.bedrijfscontext.branche ?? 'Onbekend'}</strong>
             {quiz.bedrijfscontext.doelgroep ? ` · doelgroep: ${quiz.bedrijfscontext.doelgroep}` : ''}
           </p>
         )}
-        <p className="klant-hint" style={{ marginTop: 0 }}>
-          {visible.length} vragen &middot; {approvedCount} goedgekeurd. Keur minimaal een vraag goed en activeer dan de quiz.
+        <p className="v1-hint">
+          {visible.length} vragen · {approvedCount} goedgekeurd. Keur minimaal een vraag goed en activeer dan de quiz.
         </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-          <button
-            className="klant-btn"
-            data-variant="primary"
+        <div className="v1-adm-inline" style={{ marginTop: 12 }}>
+          <Button
+            variant="primary"
             disabled={pending || approvedCount === 0}
             onClick={() => run(() => activateQuizAction(orgId, quiz.id))}
           >
             Quiz activeren ({approvedCount})
-          </button>
-          <button
-            className="klant-btn"
-            data-variant="ghost"
-            disabled={pending}
-            onClick={() => run(() => generateQuizForOrgAction(orgId, model))}
-          >
+          </Button>
+          <Button variant="secondary" disabled={pending} onClick={() => run(() => generateQuizForOrgAction(orgId, model))}>
             Opnieuw genereren
-          </button>
-          <button
-            className="klant-btn"
-            data-variant="ghost"
-            disabled={pending}
-            onClick={() => run(() => cancelQuizAction(orgId, quiz.id))}
-          >
+          </Button>
+          <Button variant="ghost" disabled={pending} onClick={() => run(() => cancelQuizAction(orgId, quiz.id))}>
             Annuleren
-          </button>
+          </Button>
         </div>
-      </div>
+      </section>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {visible.map((q) => (
-          <ConceptQuestionCard
-            key={q.id}
-            orgId={orgId}
-            quizId={quiz.id}
-            question={q}
-            pending={pending}
-            run={run}
-          />
-        ))}
-      </div>
+      {visible.map((q) => (
+        <ConceptQuestionCard key={q.id} orgId={orgId} quizId={quiz.id} question={q} pending={pending} run={run} />
+      ))}
 
       <AddQuestionForm orgId={orgId} quizId={quiz.id} pending={pending} run={run} />
-    </div>
+    </>
   );
 }
 
 // ── Read-only vragenlijst (actief/voltooid) ──────────────────────────────────
 function QuestionList({ questions, readOnly: _readOnly }: { questions: QuizQuestion[]; readOnly: boolean }) {
   const visible = questions.filter((q) => !q.verwijderd && q.goedgekeurd);
-  if (visible.length === 0) return <div className="klant-card"><span className="klant-hint">Geen actieve vragen.</span></div>;
+  if (visible.length === 0) {
+    return (
+      <section className="v1-card">
+        <EmptyState>Geen actieve vragen.</EmptyState>
+      </section>
+    );
+  }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {visible.map((q) => (
-        <div key={q.id} className="klant-card">
-          <div style={{ fontSize: 11, color: 'var(--klant-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {q.categorieLabel ?? q.categorie} &middot; {q.type}
-          </div>
-          {q.context && <div style={{ fontSize: 12.5, color: 'var(--klant-dim)', marginTop: 4 }}>{q.context}</div>}
-          <div style={{ fontSize: 14, marginTop: 4 }}>{q.vraag}</div>
-          {q.opties && q.opties.length > 0 && (
-            <div style={{ fontSize: 12.5, color: 'var(--klant-muted)', marginTop: 4 }}>{q.opties.join(' · ')}</div>
-          )}
-        </div>
-      ))}
-    </div>
+    <section className="v1-card">
+      <h2 className="v1-section-title">Vragen</h2>
+      <ul className="v1-list" aria-label="Quizvragen">
+        {visible.map((q) => (
+          <li key={q.id} style={{ padding: '13px 0' }}>
+            <QuestionMeta question={q} />
+            <QuestionBody question={q} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -268,49 +287,77 @@ function ConceptQuestionCard({
   }
 
   return (
-    <div className="klant-card" style={{ opacity: question.goedgekeurd ? 1 : 0.82 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, whiteSpace: 'nowrap', paddingTop: 2 }}>
-          <input
-            type="checkbox"
-            checked={question.goedgekeurd}
-            disabled={pending}
-            onChange={(e) => run(() => setQuizQuestionApprovedAction(orgId, question.id, e.target.checked))}
-          />
-          Goedgekeurd
-        </label>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--klant-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {question.categorieLabel ?? question.categorie} &middot; {question.type} {question.bron === 'niels' ? '· handmatig' : ''}
-          </div>
-          {editing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-              <input className="klant-input" value={context} placeholder="Contextzin (optioneel)" disabled={pending} onChange={(e) => setContext(e.target.value)} />
-              <textarea className="klant-textarea" rows={2} value={vraag} disabled={pending} onChange={(e) => setVraag(e.target.value)} />
-              {question.type === 'meerkeuze' && (
-                <textarea className="klant-textarea" rows={3} value={optiesText} placeholder="Een optie per regel" disabled={pending} onChange={(e) => setOptiesText(e.target.value)} />
+    <section className="v1-card" style={{ opacity: question.goedgekeurd ? 1 : 0.82 }}>
+      <Switch
+        label="Goedgekeurd"
+        checked={question.goedgekeurd}
+        disabled={pending}
+        onChange={(next) => run(() => setQuizQuestionApprovedAction(orgId, question.id, next))}
+      />
+      <div className="v1-adm-divider" />
+      <QuestionMeta question={question} />
+      {editing ? (
+        <div className="v1-form" style={{ marginTop: 10 }}>
+          <Field label="Contextzin (optioneel)">
+            {(id) => (
+              <input id={id} className="v1-input" value={context} disabled={pending} onChange={(e) => setContext(e.target.value)} />
+            )}
+          </Field>
+          <Field label="Vraag">
+            {(id) => (
+              <textarea
+                id={id}
+                className="v1-input"
+                rows={2}
+                value={vraag}
+                disabled={pending}
+                onChange={(e) => setVraag(e.target.value)}
+              />
+            )}
+          </Field>
+          {question.type === 'meerkeuze' && (
+            <Field label="Opties" hint="Een optie per regel.">
+              {(id) => (
+                <textarea
+                  id={id}
+                  className="v1-input"
+                  rows={3}
+                  value={optiesText}
+                  disabled={pending}
+                  onChange={(e) => setOptiesText(e.target.value)}
+                />
               )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="klant-btn" data-variant="primary" disabled={pending || vraag.trim().length === 0} onClick={save}>Opslaan</button>
-                <button className="klant-btn" data-variant="ghost" disabled={pending} onClick={() => setEditing(false)}>Annuleren</button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {question.context && <div style={{ fontSize: 12.5, color: 'var(--klant-dim)', marginTop: 4 }}>{question.context}</div>}
-              <div style={{ fontSize: 14, marginTop: 4 }}>{question.vraag}</div>
-              {question.opties && question.opties.length > 0 && (
-                <div style={{ fontSize: 12.5, color: 'var(--klant-muted)', marginTop: 4 }}>{question.opties.join(' · ')}</div>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="klant-btn" data-variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pending} onClick={() => setEditing(true)}>Bewerken</button>
-                <button className="klant-btn" data-variant="ghost" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--klant-danger)' }} disabled={pending} onClick={() => run(() => deleteQuizQuestionAction(orgId, quizId, question.id))}>Verwijderen</button>
-              </div>
-            </>
+            </Field>
           )}
+          <div className="v1-adm-inline">
+            <Button variant="primary" size="sm" disabled={pending || vraag.trim().length === 0} onClick={save}>
+              Opslaan
+            </Button>
+            <Button variant="ghost" size="sm" disabled={pending} onClick={() => setEditing(false)}>
+              Annuleren
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      ) : (
+        <>
+          <QuestionBody question={question} />
+          <div className="v1-adm-inline" style={{ marginTop: 10 }}>
+            <Button variant="secondary" size="sm" disabled={pending} onClick={() => setEditing(true)}>
+              Bewerken
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="v1-adm-danger"
+              disabled={pending}
+              onClick={() => run(() => deleteQuizQuestionAction(orgId, quizId, question.id))}
+            >
+              Verwijderen
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -352,28 +399,69 @@ function AddQuestionForm({
 
   if (!open) {
     return (
-      <button className="klant-btn" data-variant="ghost" disabled={pending} onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start' }}>
-        + Vraag toevoegen
-      </button>
+      <div>
+        <Button variant="secondary" disabled={pending} onClick={() => setOpen(true)}>
+          Vraag toevoegen
+        </Button>
+      </div>
     );
   }
   return (
-    <div className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div className="klant-section-title">Vraag toevoegen</div>
-      <input className="klant-input" value={categorie} placeholder="Categorie (bv. Prijzen)" disabled={pending} onChange={(e) => setCategorie(e.target.value)} />
-      <input className="klant-input" value={context} placeholder="Contextzin (optioneel)" disabled={pending} onChange={(e) => setContext(e.target.value)} />
-      <textarea className="klant-textarea" rows={2} value={vraag} placeholder="De vraag" disabled={pending} onChange={(e) => setVraag(e.target.value)} />
-      <select className="klant-select" style={{ width: 'auto' }} value={type} disabled={pending} onChange={(e) => setType(e.target.value as QuizQuestionType)}>
-        <option value="open">Open vraag</option>
-        <option value="meerkeuze">Meerkeuze</option>
-      </select>
-      {type === 'meerkeuze' && (
-        <textarea className="klant-textarea" rows={3} value={optiesText} placeholder="Een optie per regel" disabled={pending} onChange={(e) => setOptiesText(e.target.value)} />
-      )}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="klant-btn" data-variant="primary" disabled={pending || vraag.trim().length === 0} onClick={add}>Toevoegen</button>
-        <button className="klant-btn" data-variant="ghost" disabled={pending} onClick={reset}>Annuleren</button>
+    <section className="v1-card">
+      <h2 className="v1-section-title">Vraag toevoegen</h2>
+      <div className="v1-form" style={{ marginTop: 10 }}>
+        <Field label="Categorie" hint="Bijvoorbeeld Prijzen.">
+          {(id) => (
+            <input id={id} className="v1-input" value={categorie} disabled={pending} onChange={(e) => setCategorie(e.target.value)} />
+          )}
+        </Field>
+        <Field label="Contextzin (optioneel)">
+          {(id) => (
+            <input id={id} className="v1-input" value={context} disabled={pending} onChange={(e) => setContext(e.target.value)} />
+          )}
+        </Field>
+        <Field label="Vraag">
+          {(id) => (
+            <textarea id={id} className="v1-input" rows={2} value={vraag} disabled={pending} onChange={(e) => setVraag(e.target.value)} />
+          )}
+        </Field>
+        <Field label="Soort vraag">
+          {(id) => (
+            <select
+              id={id}
+              className="v1-input v1-adm-select"
+              value={type}
+              disabled={pending}
+              onChange={(e) => setType(e.target.value as QuizQuestionType)}
+            >
+              <option value="open">Open vraag</option>
+              <option value="meerkeuze">Meerkeuze</option>
+            </select>
+          )}
+        </Field>
+        {type === 'meerkeuze' && (
+          <Field label="Opties" hint="Een optie per regel.">
+            {(id) => (
+              <textarea
+                id={id}
+                className="v1-input"
+                rows={3}
+                value={optiesText}
+                disabled={pending}
+                onChange={(e) => setOptiesText(e.target.value)}
+              />
+            )}
+          </Field>
+        )}
+        <div className="v1-adm-inline">
+          <Button variant="primary" disabled={pending || vraag.trim().length === 0} onClick={add}>
+            Toevoegen
+          </Button>
+          <Button variant="ghost" disabled={pending} onClick={reset}>
+            Annuleren
+          </Button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

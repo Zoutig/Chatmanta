@@ -6,6 +6,9 @@
 import { useState, useTransition, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { setOrgDailyBudgetAction } from './actions';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import './org-forms.css';
 
 export function BudgetEditor({ orgId, currentEur }: { orgId: string; currentEur: number }) {
   const router = useRouter();
@@ -34,38 +37,31 @@ export function BudgetEditor({ orgId, currentEur }: { orgId: string; currentEur:
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-        Dagbudget (€)
-        <input
-          type="number"
-          required
-          min={0}
-          max={1000}
-          step={0.5}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          style={{
-            padding: '8px 10px',
-            fontSize: 14,
-            width: 120,
-            borderRadius: 'var(--klant-r-md)',
-            border: '1px solid var(--klant-border)',
-            background: 'var(--klant-surface)',
-            color: 'var(--klant-ink)',
-          }}
-        />
-      </label>
-      <button type="submit" className="klant-btn" data-variant="primary" disabled={pending} style={{ padding: '8px 14px' }}>
-        {pending ? 'Opslaan…' : 'Opslaan'}
-      </button>
+    <form onSubmit={onSubmit} className="v1-form">
+      <div className="v1-adm-of-row">
+        <Field label="Dagbudget in euro">
+          {(id) => (
+            <input
+              id={id}
+              type="number"
+              required
+              min={0}
+              max={1000}
+              step={0.5}
+              className="v1-input v1-adm-of-num"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          )}
+        </Field>
+        <Button type="submit" variant="primary" loading={pending}>
+          Opslaan
+        </Button>
+      </div>
       {msg && (
-        <span
-          role={msg.ok ? 'status' : 'alert'}
-          style={{ fontSize: 13, color: msg.ok ? 'var(--klant-success)' : 'var(--klant-danger)' }}
-        >
+        <p role={msg.ok ? 'status' : 'alert'} className={`v1-alert ${msg.ok ? 'v1-alert--ok' : 'v1-alert--error'}`}>
           {msg.text}
-        </span>
+        </p>
       )}
     </form>
   );
