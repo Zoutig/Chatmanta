@@ -4,17 +4,15 @@
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
-import { Card } from '@/app/klantendashboard/components/ui/card';
+import { EmptyState } from '@/app/v1/_ui/feedback';
 import { AdminSettingsForm } from '../admin-settings-form';
-
-const dim = { fontSize: 13, color: 'var(--klant-muted)' } as const;
 
 export async function InstellingenTab({ orgId, chatbotId }: { orgId: string; chatbotId: string | null }) {
   if (!chatbotId) {
     return (
-      <Card>
-        <p style={dim}>Deze organisatie heeft nog geen chatbot om in te stellen.</p>
-      </Card>
+      <section className="v1-card">
+        <EmptyState>Deze organisatie heeft nog geen chatbot om in te stellen.</EmptyState>
+      </section>
     );
   }
   const admin = await getJorionAdminClient();

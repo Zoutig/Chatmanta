@@ -6,15 +6,10 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updatePrivacyAction } from '../overlay-actions';
 import type { PrivacySettings, PrivacySettingsPatch } from '@/lib/controlroom/types';
-
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, cursor: 'pointer' }}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
-  );
-}
+import { Check } from 'lucide-react';
+import { Button } from '@/app/v1/_ui/button';
+import { Field, Switch } from '@/app/v1/_ui/controls';
+import '../org-forms.css';
 
 export function PrivacyForm({ orgId, privacy }: { orgId: string; privacy: PrivacySettings }) {
   const router = useRouter();
@@ -55,37 +50,46 @@ export function PrivacyForm({ orgId, privacy }: { orgId: string; privacy: Privac
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-        <div>
-          <label className="klant-label">Gesprekken bewaren (dagen)</label>
-          <input className="klant-input" type="number" min={1} max={365} value={chatDays} onChange={(e) => setChatDays(Number(e.target.value))} />
-        </div>
-        <div>
-          <label className="klant-label">Issue-gesprekken bewaren (dagen)</label>
-          <input className="klant-input" type="number" min={1} max={730} value={issueDays} onChange={(e) => setIssueDays(Number(e.target.value))} />
-        </div>
-        <div>
-          <label className="klant-label">Metadata bewaren (maanden)</label>
-          <input className="klant-input" type="number" min={1} max={60} value={metaMonths} onChange={(e) => setMetaMonths(Number(e.target.value))} />
-        </div>
+    <div className="v1-form">
+      <div className="v1-edit-grid">
+        <Field label="Gesprekken bewaren (dagen)">
+          {(id) => (
+            <input id={id} className="v1-input" type="number" min={1} max={365} value={chatDays} onChange={(e) => setChatDays(Number(e.target.value))} />
+          )}
+        </Field>
+        <Field label="Issue-gesprekken bewaren (dagen)">
+          {(id) => (
+            <input id={id} className="v1-input" type="number" min={1} max={730} value={issueDays} onChange={(e) => setIssueDays(Number(e.target.value))} />
+          )}
+        </Field>
+        <Field label="Metadata bewaren (maanden)">
+          {(id) => (
+            <input id={id} className="v1-input" type="number" min={1} max={60} value={metaMonths} onChange={(e) => setMetaMonths(Number(e.target.value))} />
+          )}
+        </Field>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <Toggle label="Volledige gesprekslogging aan" checked={fullLogging} onChange={setFullLogging} />
-        <Toggle label="PII-redactie aan" checked={pii} onChange={setPii} />
-        <Toggle label="Verwerkersovereenkomst getekend" checked={dpa} onChange={setDpa} />
-        <Toggle label="Privacytekst gedeeld met klant" checked={privacyText} onChange={setPrivacyText} />
-        <Toggle label="Subprocessor-info gedeeld" checked={subproc} onChange={setSubproc} />
-      </div>
+      <Switch label="Volledige gesprekslogging aan" checked={fullLogging} onChange={setFullLogging} />
+      <Switch label="PII-redactie aan" checked={pii} onChange={setPii} />
+      <Switch label="Verwerkersovereenkomst getekend" checked={dpa} onChange={setDpa} />
+      <Switch label="Privacytekst gedeeld met klant" checked={privacyText} onChange={setPrivacyText} />
+      <Switch label="Informatie over subverwerkers gedeeld" checked={subproc} onChange={setSubproc} />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="klant-btn" data-variant="primary" onClick={save} disabled={pending}>
-          {pending ? 'Opslaan…' : 'Privacy-instellingen opslaan'}
-        </button>
-        {saved ? <span style={{ fontSize: 13, color: 'var(--klant-success)' }}>Opgeslagen ✓</span> : null}
-        {error ? <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span> : null}
+      <div className="v1-adm-of-actions">
+        <Button variant="primary" onClick={save} loading={pending}>
+          Privacy-instellingen opslaan
+        </Button>
+        {saved ? (
+          <span className="v1-saved" role="status">
+            <Check size={14} /> Opgeslagen
+          </span>
+        ) : null}
       </div>
+      {error ? (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

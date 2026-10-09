@@ -1,0 +1,19 @@
+/* Transcript op de admin-gespreksdetailpagina. Alleen V1-tokens. */
+.v1-ui .v1-adm-gs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.v1-ui .v1-adm-gs-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--v1-r-md);
+  background: var(--v1-surface);
+  border: 1px solid var(--v1-line);
+  min-width: 0;
+}
+.v1-ui .v1-adm-gs-msg[data-role='user'] { background: var(--v1-surface-2); }
+.v1-ui .v1-adm-gs-head { display: flex; align-items: center; gap: 8px; }
+.v1-ui .v1-adm-gs-role { font-size: 12.5px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-adm-gs-msg[data-role='assistant'] .v1-adm-gs-role { color: var(--v1-accent-ink); }
+.v1-ui .v1-adm-gs-msg[data-role='system'] .v1-adm-gs-role { color: var(--v1-muted); }
+.v1-ui .v1-adm-gs-time { margin-left: auto; font-size: 12px; color: var(--v1-muted); font-variant-numeric: tabular-nums; }
+.v1-ui .v1-adm-gs-text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--v1-ink); white-space: pre-wrap; overflow-wrap: anywhere; }

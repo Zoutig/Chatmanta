@@ -1,6 +1,6 @@
 'use client';
 
-// V1 port van app/admindashboard/feedback/[id]/components/priority-actions.tsx.
+// Prioriteit-knoppen voor een feedbackmelding (V1-ontwerplaag).
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,6 +10,7 @@ import {
   FEEDBACK_PRIORITY_LABELS,
   type FeedbackPriority,
 } from '@/lib/controlroom/types';
+import { Button } from '@/app/v1/_ui/button';
 
 export function FeedbackPriorityActionsV1({ id, priority }: { id: string; priority: FeedbackPriority | null }) {
   const [pending, startTransition] = useTransition();
@@ -28,25 +29,25 @@ export function FeedbackPriorityActionsV1({ id, priority }: { id: string; priori
     });
 
   return (
-    <div style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="v1-adm-inline">
       {FEEDBACK_PRIORITIES.map((p) => (
-        <button
+        <Button
           key={p}
-          type="button"
-          className="klant-btn"
-          data-variant={p === priority ? 'primary' : undefined}
+          variant={p === priority ? 'primary' : 'secondary'}
+          size="sm"
+          aria-pressed={p === priority}
           disabled={pending}
           onClick={() => setPriority(p)}
         >
           {FEEDBACK_PRIORITY_LABELS[p]}
-        </button>
+        </Button>
       ))}
       {priority && (
-        <button type="button" className="klant-btn" disabled={pending} onClick={() => setPriority('')}>
+        <Button variant="ghost" size="sm" disabled={pending} onClick={() => setPriority('')}>
           Wissen
-        </button>
+        </Button>
       )}
-      {error && <span style={{ fontSize: 12.5, color: 'var(--klant-danger)' }} role="alert">{error}</span>}
+      {error && <span className="v1-adm-danger" role="alert">{error}</span>}
     </div>
   );
 }

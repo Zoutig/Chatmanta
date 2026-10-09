@@ -1,8 +1,7 @@
 'use client';
 
 // Status-knoppen voor een gelogde fout-groep (opgelost / negeer / heropen).
-// Port van app/admindashboard/issues/[groupId]/components/status-actions.tsx.
-// Enige wijziging: importeert V1-actions i.p.v. de V0 controlroom-actions.
+// V1-ontwerplaag; roept de V1-actions aan.
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,6 +11,7 @@ import {
   reopenErrorGroupV1Action,
 } from '../actions';
 import type { ErrorStatus } from '@/lib/observability/sink';
+import { Button } from '@/app/v1/_ui/button';
 
 export function ErrorStatusActionsV1({ id, status }: { id: string; status: ErrorStatus }) {
   const [pending, startTransition] = useTransition();
@@ -24,21 +24,21 @@ export function ErrorStatusActionsV1({ id, status }: { id: string; status: Error
     });
 
   return (
-    <div style={{ display: 'inline-flex', gap: 8 }}>
+    <div className="v1-adm-inline">
       {status !== 'resolved' && (
-        <button type="button" className="klant-btn" disabled={pending} onClick={() => run(resolveErrorGroupV1Action)}>
+        <Button variant="secondary" size="sm" disabled={pending} onClick={() => run(resolveErrorGroupV1Action)}>
           Markeer opgelost
-        </button>
+        </Button>
       )}
       {status !== 'ignored' && (
-        <button type="button" className="klant-btn" disabled={pending} onClick={() => run(ignoreErrorGroupV1Action)}>
+        <Button variant="secondary" size="sm" disabled={pending} onClick={() => run(ignoreErrorGroupV1Action)}>
           Negeer
-        </button>
+        </Button>
       )}
       {status !== 'open' && (
-        <button type="button" className="klant-btn" disabled={pending} onClick={() => run(reopenErrorGroupV1Action)}>
+        <Button variant="secondary" size="sm" disabled={pending} onClick={() => run(reopenErrorGroupV1Action)}>
           Heropen
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -8,23 +8,13 @@ import { notFound } from 'next/navigation';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { isAppError } from '@/lib/errors/app-error';
 import { getAdminThread } from '@/lib/v1/admin/klant-detail';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
-import { Card } from '@/app/klantendashboard/components/ui/card';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { formatDateTime } from '@/app/v1/admin/_ui/format';
+import './gesprek.css';
 
 export const dynamic = 'force-dynamic';
 
-function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('nl-NL', {
-    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  });
-}
-
 const ROLE_LABEL: Record<string, string> = { user: 'Bezoeker', assistant: 'Bot', system: 'Systeem' };
-const ROLE_COLOR: Record<string, string> = {
-  user: 'var(--klant-ink)',
-  assistant: 'var(--klant-accent)',
-  system: 'var(--klant-dim)',
-};
 
 export default async function GesprekDetailPage({
   params,
@@ -38,12 +28,7 @@ export default async function GesprekDetailPage({
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
@@ -51,52 +36,28 @@ export default async function GesprekDetailPage({
   const thread = await getAdminThread(admin, threadId, orgId);
   if (!thread) notFound();
 
-  const firstQuestion = thread.messages.find((m) => m.role === 'user')?.content ?? '(geen vraag)';
+  const firstQuestion = thread.messages.find((m) => m.role === 'user')?.content ?? 'Geen vraag';
 
   return (
-    <>
-      <PageHead
-        eyebrow={
-          <Link href={`/v1/admin/organizations/${orgId}?tab=gesprekken`}>
-            ← Gesprekken
-          </Link>
-        }
-        title={firstQuestion.slice(0, 80)}
-        subtitle={`Thread · ${fmtDateTime(thread.createdAt)}`}
-      />
+    <div className="v1-page">
+      <Link href={`/v1/admin/organizations/${orgId}?tab=gesprekken`} className="v1-section-link">
+        Terug naar gesprekken
+      </Link>
+      <PageHeader title={firstQuestion.slice(0, 80)} description={`Gesprek gestart op ${formatDateTime(thread.createdAt)}`} />
 
-      <Card>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <section className="v1-card">
+        <ol className="v1-adm-gs-list">
           {thread.messages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-                padding: '12px 14px',
-                borderRadius: 'var(--klant-r-md)',
-                background: msg.role === 'user'
-                  ? 'var(--klant-surface-muted)'
-                  : 'var(--klant-surface)',
-                border: '1px solid var(--klant-border)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: ROLE_COLOR[msg.role] ?? 'var(--klant-dim)' }}>
-                  {ROLE_LABEL[msg.role] ?? msg.role}
-                </span>
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--klant-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtDateTime(msg.createdAt)}
-                </span>
+            <li key={msg.id} className="v1-adm-gs-msg" data-role={msg.role}>
+              <div className="v1-adm-gs-head">
+                <span className="v1-adm-gs-role">{ROLE_LABEL[msg.role] ?? msg.role}</span>
+                <span className="v1-adm-gs-time">{formatDateTime(msg.createdAt)}</span>
               </div>
-              <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'var(--klant-ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {msg.content}
-              </p>
-            </div>
+              <p className="v1-adm-gs-text">{msg.content}</p>
+            </li>
           ))}
-        </div>
-      </Card>
-    </>
+        </ol>
+      </section>
+    </div>
   );
 }

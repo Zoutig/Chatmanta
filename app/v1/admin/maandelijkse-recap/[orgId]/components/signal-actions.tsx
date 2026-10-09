@@ -6,6 +6,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/app/v1/_ui/button';
 import { setRecapSignalStatusAction } from '@/app/v1/admin/maandelijkse-recap/actions';
 import type { RecapSignalStatus } from '@/lib/controlroom/types';
 
@@ -36,41 +37,25 @@ export function SignalActions({
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+    <span className="v1-adm-inline">
       {status === 'nieuw' ? (
         <>
-          <button
-            type="button"
-            className="klant-btn"
-            data-variant="ghost"
-            disabled={pending}
-            onClick={() => set('genegeerd')}
-          >
+          <Button variant="ghost" size="sm" disabled={pending} onClick={() => set('genegeerd')}>
             Negeren
-          </button>
-          <button
-            type="button"
-            className="klant-btn"
-            data-variant="ghost"
-            disabled={pending}
-            onClick={() => set('behandeld')}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" disabled={pending} onClick={() => set('behandeld')}>
             Markeer als behandeld
-          </button>
+          </Button>
         </>
       ) : (
-        <button
-          type="button"
-          className="klant-btn"
-          data-variant="ghost"
-          disabled={pending}
-          onClick={() => set('nieuw')}
-        >
+        <Button variant="ghost" size="sm" disabled={pending} onClick={() => set('nieuw')}>
           Herstel
-        </button>
+        </Button>
       )}
       {error ? (
-        <span style={{ fontSize: 12, color: 'var(--klant-danger)' }}>{error}</span>
+        <span role="alert" className="v1-adm-danger">
+          {error}
+        </span>
       ) : null}
     </span>
   );

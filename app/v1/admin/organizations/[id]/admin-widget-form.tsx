@@ -4,16 +4,31 @@
 // als de admin-settings-form: de klant-V1WidgetForm is hardwired aan session-gescopete
 // actions. Deze variant bewerkt de widget-uiterlijk-velden (dezelfde chatbots.settings
 // jsonb) via adminSaveChatbotSettingsAction(orgId, patch). Read-only levenscyclus-status
-// (is_active / last_seen) toont de tab-RSC erboven. Hergebruikt PresetColorPicker +
-// Mark/BubblePreview uit de klant-widget-UI.
+// (is_active / last_seen) toont de tab-RSC erboven. Kleur via de V1-ColorField,
+// icoonkeuze via ChoiceTiles (geen live-voorbeeld; dat toont het klantscherm).
 
 import { useRef, useState, useTransition } from 'react';
 import { Check, Upload, X } from 'lucide-react';
 import { adminSaveChatbotSettingsAction } from './actions';
-import { PresetColorPicker } from '@/app/klantendashboard/widget/components/preset-color-picker';
-import { MarkPreview, BubblePreview } from '@/app/klantendashboard/components/widget-logo';
 import type { V1ChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import type { WidgetPosition, WidgetTheme } from '@/lib/v0/klantendashboard/types';
+import { Button } from '@/app/v1/_ui/button';
+import { ChoiceTiles, Field, Segmented } from '@/app/v1/_ui/controls';
+import { ColorField } from '@/app/v1/_ui/color-field';
+import './org-forms.css';
+
+type LogoStyle = V1ChatbotSettings['logoStyle'];
+
+const LOGO_OPTIONS: { value: LogoStyle; label: string; help: string }[] = [
+  { value: 'brand-mark', label: 'ChatManta-mark', help: 'Merkteken, kleurt mee met de accentkleur.' },
+  { value: 'chat-bubble', label: 'Chat-bubbel', help: 'Universeel pictogram.' },
+  { value: 'custom-logo', label: 'Eigen logo', help: 'PNG, JPG, WebP of SVG, maximaal 200 KB.' },
+];
+
+const POSITION_OPTIONS: { value: WidgetPosition; label: string }[] = [
+  { value: 'bottom-left', label: 'Linksonder' },
+  { value: 'bottom-right', label: 'Rechtsonder' },
+];
 
 const MAX_LOGO_BYTES = 200 * 1024;
 const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
@@ -83,7 +98,7 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
       return;
     }
     if (file.size > MAX_LOGO_BYTES) {
-      setError(`Bestand is te groot (${(file.size / 1024).toFixed(0)} KB). Max ${MAX_LOGO_BYTES / 1024} KB.`);
+      setError(`Bestand is te groot (${Math.round(file.size / 1024)} KB). Maximaal ${MAX_LOGO_BYTES / 1024} KB.`);
       return;
     }
     const reader = new FileReader();
@@ -96,56 +111,38 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
   }
 
   return (
-    <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <header>
-        <h3 className="klant-section-title">Widget-uiterlijk</h3>
-        <p className="klant-section-help">Kleur, icoon, positie en teksten van de embed-widget van deze klant.</p>
+    <section className="v1-card v1-adm-of-card">
+      <header className="v1-adm-of-card-head">
+        <h2 className="v1-section-title">Widget-uiterlijk</h2>
+        <p className="v1-adm-of-card-help">Kleur, icoon, positie en teksten van de embed-widget van deze klant.</p>
       </header>
 
-      {/* Accentkleur */}
-      <div>
-        <label className="klant-label">Accentkleur</label>
-        <PresetColorPicker
-          label="Accentkleur"
-          hint="Chat-knop, header & verstuurknop"
-          value={a.accentColor}
-          onChange={(v) => update('accentColor', v)}
-        />
-      </div>
+      <ColorField label="Accentkleur" value={a.accentColor} onChange={(v) => update('accentColor', v)} disabled={pending} />
 
-      {/* Logo-stijl */}
-      <div>
-        <label className="klant-label">Icoon op de chatknop</label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-          <LogoChoice active={a.logoStyle === 'brand-mark'} onClick={() => update('logoStyle', 'brand-mark')} label="ChatManta-mark" hint="Merkteken, kleurt mee." preview={<MarkPreview color={a.accentColor} />} />
-          <LogoChoice active={a.logoStyle === 'chat-bubble'} onClick={() => update('logoStyle', 'chat-bubble')} label="Chat-bubbel" hint="Universeel pictogram." preview={<BubblePreview color={a.accentColor} />} />
-          <LogoChoice
-            active={a.logoStyle === 'custom-logo'}
-            onClick={() => {
-              if (a.customLogoDataUrl) update('logoStyle', 'custom-logo');
-              else fileInputRef.current?.click();
-            }}
-            label="Eigen logo"
-            hint="PNG, JPG, WebP of SVG · max 200 KB."
-            preview={
-              a.customLogoDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.customLogoDataUrl} alt="" style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 6 }} />
-              ) : (
-                <Upload size={22} strokeWidth={1.6} style={{ color: 'var(--klant-fg-muted)' }} />
-              )
-            }
-          />
-        </div>
+      <div className="v1-field">
+        <span className="v1-label">Icoon op de chatknop</span>
+        <ChoiceTiles
+          label="Icoon op de chatknop"
+          value={a.logoStyle}
+          options={LOGO_OPTIONS}
+          onChange={(v) => {
+            if (v === 'custom-logo' && !a.customLogoDataUrl) fileInputRef.current?.click();
+            else update('logoStyle', v);
+          }}
+        />
         {a.logoStyle === 'custom-logo' && (
-          <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--klant-surface)', borderRadius: 'var(--klant-r-md)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="klant-btn" disabled={pending}>
-              <Upload size={13} strokeWidth={1.8} /> {a.customLogoDataUrl ? 'Vervangen' : 'Bestand kiezen'}
-            </button>
+          <div className="v1-adm-of-logo">
+            {a.customLogoDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={a.customLogoDataUrl} alt="Huidig logo" />
+            ) : null}
+            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={pending}>
+              <Upload size={14} strokeWidth={1.8} /> {a.customLogoDataUrl ? 'Vervangen' : 'Bestand kiezen'}
+            </Button>
             {a.customLogoDataUrl && (
-              <button type="button" onClick={() => update('customLogoDataUrl', null)} className="klant-btn" data-variant="danger" disabled={pending}>
-                <X size={13} strokeWidth={1.8} /> Verwijderen
-              </button>
+              <Button variant="ghost" size="sm" onClick={() => update('customLogoDataUrl', null)} disabled={pending}>
+                <X size={14} strokeWidth={1.8} /> Verwijderen
+              </Button>
             )}
           </div>
         )}
@@ -153,7 +150,7 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
           ref={fileInputRef}
           type="file"
           accept={ALLOWED_LOGO_TYPES.join(',')}
-          style={{ display: 'none' }}
+          hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) handleLogoUpload(f);
@@ -162,90 +159,67 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
         />
       </div>
 
-      {/* Overige velden */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-        <Field label="Positie">
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['bottom-left', 'bottom-right'] as WidgetPosition[]).map((v) => (
-              <button key={v} type="button" onClick={() => update('position', v)} className="klant-btn" data-variant={a.position === v ? 'primary' : 'ghost'} style={{ flex: 1 }}>
-                {v === 'bottom-left' ? 'Linksonder' : 'Rechtsonder'}
-              </button>
-            ))}
-          </div>
-        </Field>
+      <div className="v1-edit-grid">
+        <div className="v1-field">
+          <span className="v1-label">Positie</span>
+          <Segmented label="Positie" value={a.position} options={POSITION_OPTIONS} onChange={(v) => update('position', v)} />
+        </div>
         <Field label="Thema">
-          <select className="klant-select" value={a.theme} onChange={(e) => update('theme', e.target.value as WidgetTheme)}>
-            <option value="auto">Automatisch (volg website)</option>
-            <option value="light">Licht</option>
-            <option value="dark">Donker</option>
-          </select>
+          {(id) => (
+            <select id={id} className="v1-input" value={a.theme} onChange={(e) => update('theme', e.target.value as WidgetTheme)}>
+              <option value="auto">Automatisch (volg website)</option>
+              <option value="light">Licht</option>
+              <option value="dark">Donker</option>
+            </select>
+          )}
         </Field>
-        <Field label="Widget-titel" hint="Leeg → de chatbotnaam wordt gebruikt.">
-          <input className="klant-input" value={a.headerTitle} onChange={(e) => update('headerTitle', e.target.value)} />
+        <Field label="Widget-titel" hint="Leeg laten voor de chatbotnaam.">
+          {(id) => <input id={id} className="v1-input" value={a.headerTitle} onChange={(e) => update('headerTitle', e.target.value)} />}
         </Field>
         <Field label="Ondertitel">
-          <input className="klant-input" value={a.subtitle} onChange={(e) => update('subtitle', e.target.value)} placeholder="Bijv. 'Powered by AI'" />
+          {(id) => (
+            <input
+              id={id}
+              className="v1-input"
+              value={a.subtitle}
+              onChange={(e) => update('subtitle', e.target.value)}
+              placeholder="Bijvoorbeeld: meestal binnen een minuut antwoord"
+            />
+          )}
         </Field>
         <Field label="Welkomstbericht" hint="Het eerste bericht dat de bezoeker ziet.">
-          <input className="klant-input" value={a.welcomeMessage} onChange={(e) => update('welcomeMessage', e.target.value)} />
+          {(id) => <input id={id} className="v1-input" value={a.welcomeMessage} onChange={(e) => update('welcomeMessage', e.target.value)} />}
         </Field>
-        <div style={{ gridColumn: '1 / -1' }}>
-          <Field label="Tekst bij de knop" hint="Optioneel tooltip-bubbeltje. Leeg = geen tooltip.">
-            <input className="klant-input" value={a.launcherText} onChange={(e) => update('launcherText', e.target.value)} placeholder="Hoi! Heb je een vraag?" />
+        <div className="v1-adm-of-wide">
+          <Field label="Tekst bij de knop" hint="Optioneel tekstballonnetje naast de knop. Leeg laten voor geen ballonnetje.">
+            {(id) => (
+              <input
+                id={id}
+                className="v1-input"
+                value={a.launcherText}
+                onChange={(e) => update('launcherText', e.target.value)}
+                placeholder="Hoi! Heb je een vraag?"
+              />
+            )}
           </Field>
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, alignItems: 'center' }}>
-        {error && <span role="alert" style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>}
+      {error && (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {error}
+        </p>
+      )}
+      <div className="v1-adm-of-actions v1-adm-of-actions--end">
         {saved && (
-          <span style={{ fontSize: 13, color: 'var(--klant-success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="v1-saved" role="status">
             <Check size={14} /> Opgeslagen
           </span>
         )}
-        <button type="button" onClick={save} className="klant-btn" data-variant="primary" disabled={pending || !dirty}>
-          {pending ? 'Bezig…' : 'Uiterlijk opslaan'}
-        </button>
+        <Button variant="primary" onClick={save} loading={pending} disabled={!dirty}>
+          Uiterlijk opslaan
+        </Button>
       </div>
     </section>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="klant-label">{label}</label>
-      {children}
-      {hint && <div className="klant-hint">{hint}</div>}
-    </div>
-  );
-}
-
-function LogoChoice({ active, onClick, label, hint, preview }: { active: boolean; onClick: () => void; label: string; hint: string; preview: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: 12,
-        textAlign: 'left',
-        borderRadius: 'var(--klant-r-md)',
-        border: '1px solid ' + (active ? 'var(--klant-accent)' : 'var(--klant-border)'),
-        background: active ? 'var(--klant-accent-soft)' : 'var(--klant-surface)',
-        color: 'var(--klant-fg)',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        position: 'relative',
-      }}
-    >
-      <div style={{ width: '100%', height: 56, borderRadius: 'var(--klant-r-sm)', background: '#ffffff', border: '1px solid var(--klant-border)', display: 'grid', placeItems: 'center' }}>
-        {preview}
-      </div>
-      <span style={{ fontWeight: 600, fontSize: 13 }}>{label}</span>
-      <span style={{ fontSize: 11, color: 'var(--klant-fg-muted)', lineHeight: 1.4 }}>{hint}</span>
-      {active && <Check size={14} strokeWidth={2.2} style={{ position: 'absolute', top: 10, right: 10, color: 'var(--klant-accent)' }} />}
-    </button>
   );
 }

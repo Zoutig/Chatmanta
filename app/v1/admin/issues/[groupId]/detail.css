@@ -1,0 +1,13 @@
+/* Fout-detail (admin): codeblokken voor stacktrace en Claude Code-payload.
+ * Lokaal bij de pagina; alle klassen met prefix v1-adm-iss-. */
+
+.v1-ui .v1-adm-iss-head { margin-bottom: 12px; }
+.v1-ui .v1-adm-iss-text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-ui .v1-adm-iss-sub { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-adm-iss-input { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--v1-ink-2); overflow-wrap: anywhere; }
+.v1-ui .v1-adm-iss-pre {
+  margin: 0; padding: 12px 14px; max-height: 480px; overflow: auto;
+  border-radius: var(--v1-r-md); background: var(--v1-surface-2); color: var(--v1-ink);
+  font: 400 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-word;
+}

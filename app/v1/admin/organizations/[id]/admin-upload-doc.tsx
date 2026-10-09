@@ -11,6 +11,7 @@ import { UploadCloud } from 'lucide-react';
 import { createClient } from '@/lib/supabase/v1/client';
 import { ALLOWED_DOC_EXT } from '@/lib/rag/doc-ext';
 import { adminCreateUploadUrlAction, adminProcessUploadedDocAction } from './actions';
+import './org-forms.css';
 
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
 const ACCEPT = ALLOWED_DOC_EXT.map((e) => `.${e}`).join(',');
@@ -45,7 +46,7 @@ export function AdminUploadDoc({ orgId, chatbotId }: { orgId: string; chatbotId:
       if (up.error) { setFeedback({ ok: false, text: `Upload mislukt: ${up.error.message}` }); return; }
       const proc = await adminProcessUploadedDocAction(orgId, urlRes.path, file.name);
       if (!proc.ok) { setFeedback({ ok: false, text: proc.error }); return; }
-      setFeedback({ ok: true, text: `"${file.name}" toegevoegd — ${proc.chunks} stukjes in de kennisbank.` });
+      setFeedback({ ok: true, text: `"${file.name}" toegevoegd: ${proc.chunks} stukjes in de kennisbank.` });
       router.refresh();
     });
   }
@@ -56,14 +57,14 @@ export function AdminUploadDoc({ orgId, chatbotId }: { orgId: string; chatbotId:
 
   if (disabled) {
     return (
-      <p style={{ fontSize: 13, color: 'var(--klant-muted)', margin: 0 }}>
-        Deze organisatie heeft nog geen chatbot — voer eerst een crawl of ingest uit voordat je documenten namens de klant kunt uploaden.
+      <p className="v1-adm-muted" style={{ margin: 0 }}>
+        Deze organisatie heeft nog geen chatbot. Voer eerst een crawl of ingest uit voordat je documenten namens de klant kunt uploaden.
       </p>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="v1-form">
       <div
         onDragOver={(e) => { e.preventDefault(); if (!pending) setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
@@ -72,42 +73,30 @@ export function AdminUploadDoc({ orgId, chatbotId }: { orgId: string; chatbotId:
         role="button"
         tabIndex={0}
         aria-label="Document uploaden namens de klant"
-        onKeyDown={(e) => { if (!pending && (e.key === 'Enter' || e.key === ' ')) fileRef.current?.click(); }}
-        style={{
-          padding: 20,
-          border: '2px dashed ' + (dragOver ? 'var(--klant-accent)' : 'var(--klant-border)'),
-          borderRadius: 'var(--klant-r-md)',
-          background: dragOver ? 'var(--klant-accent-soft)' : 'var(--klant-surface)',
-          textAlign: 'center',
-          cursor: pending ? 'progress' : 'pointer',
-          opacity: pending ? 0.7 : 1,
-          transition: 'background 120ms ease, border-color 120ms ease',
-        }}
+        aria-disabled={pending || undefined}
+        data-over={dragOver || undefined}
+        onKeyDown={(e) => { if (!pending && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); fileRef.current?.click(); } }}
+        className="v1-adm-of-drop"
       >
-        <UploadCloud size={20} strokeWidth={1.7} style={{ color: 'var(--klant-accent)', marginBottom: 6 }} />
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--klant-ink)' }}>
-          {pending ? 'Bezig met verwerken…' : 'Sleep een document hierheen of klik om te uploaden'}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--klant-muted)', marginTop: 2 }}>
-          PDF, DOCX, TXT of MD — max 10 MB. Wordt direct aan de kennisbank van deze klant toegevoegd.
-        </div>
+        <UploadCloud size={22} strokeWidth={1.7} className="v1-adm-of-drop-icon" aria-hidden="true" />
+        <span className="v1-adm-of-drop-title">
+          {pending ? 'Bezig met verwerken...' : 'Sleep een document hierheen of klik om te uploaden'}
+        </span>
+        <span className="v1-hint">PDF, DOCX, TXT of MD, maximaal 10 MB. Wordt direct aan de kennisbank van deze klant toegevoegd.</span>
         <input
           ref={fileRef}
           type="file"
           multiple
           accept={ACCEPT}
           disabled={pending}
-          style={{ display: 'none' }}
+          hidden
           onChange={(e) => { if (e.target.files) ingest(e.target.files); e.target.value = ''; }}
         />
       </div>
       {feedback && (
-        <span
-          role={feedback.ok ? 'status' : 'alert'}
-          style={{ fontSize: 13, color: feedback.ok ? 'var(--klant-success)' : 'var(--klant-danger)' }}
-        >
+        <p role={feedback.ok ? 'status' : 'alert'} className={`v1-alert ${feedback.ok ? 'v1-alert--ok' : 'v1-alert--error'}`}>
           {feedback.text}
-        </span>
+        </p>
       )}
     </div>
   );

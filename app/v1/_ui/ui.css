@@ -561,3 +561,14 @@ a.v1-stat:focus-visible { outline: none; box-shadow: inset var(--v1-focus); }
 .v1-ui .v1-color-hex { max-width: 160px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .v1-ui .v1-color-error { color: var(--v1-danger); }
 @media (prefers-reduced-motion: reduce) { .v1-ui .v1-color-swatch { transition: none; } }
+
+/* ---- Aanraakschermen: tikdoelen minstens ~40px (WCAG 2.5.8), zonder het
+   uiterlijk te veranderen waar dat niet nodig is. ---- */
+@media (pointer: coarse) {
+  .v1-ui .v1-section-link { display: inline-flex; align-items: center; min-height: 40px; }
+  .v1-ui .v1-switch::before { content: ''; position: absolute; inset: -10px -4px; }
+  .v1-ui .v1-color-swatches .v1-color-swatch,
+  .v1-ui .v1-wg-swatches .v1-wg-swatch { width: 36px; height: 36px; }
+  .v1-ui .v1-adm-filter-chips .v1-adm-chip { height: 36px; }
+  .v1-ui .v1-iconbtn { min-width: 40px; min-height: 40px; }
+}

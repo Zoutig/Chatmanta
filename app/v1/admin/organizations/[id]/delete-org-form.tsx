@@ -7,6 +7,9 @@
 import { useState, useTransition, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { deleteOrgDataAction } from './actions';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import './org-forms.css';
 
 export function DeleteOrgForm({ orgId, slug }: { orgId: string; slug: string }) {
   const router = useRouter();
@@ -31,63 +34,41 @@ export function DeleteOrgForm({ orgId, slug }: { orgId: string; slug: string }) 
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      style={{
-        border: '1px solid var(--klant-danger)',
-        borderRadius: 'var(--klant-r-md)',
-        padding: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}
-    >
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--klant-muted)' }}>
+    <form onSubmit={onSubmit} className="v1-adm-of-danger">
+      <p>
         Verwijdert de organisatie, alle leden (auth-accounts), chatbots, kennisbronnen,
-        documenten en logs. <strong>Onomkeerbaar.</strong> Typ de slug{' '}
+        documenten en logs. <strong>Dit kan niet ongedaan worden gemaakt.</strong> Typ de slug{' '}
         <code>{slug}</code> om te bevestigen.
       </p>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-        Bevestig met de org-slug
-        <input
-          type="text"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          placeholder={slug}
-          autoComplete="off"
-          style={{
-            padding: '8px 10px',
-            fontSize: 14,
-            maxWidth: 320,
-            borderRadius: 'var(--klant-r-md)',
-            border: '1px solid var(--klant-border)',
-            background: 'var(--klant-surface)',
-            color: 'var(--klant-ink)',
-          }}
-        />
-      </label>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button
-          type="submit"
-          className="klant-btn"
-          data-variant="danger"
-          disabled={pending || !matches}
-          style={{
-            padding: '8px 14px',
-            background: matches ? 'var(--klant-danger)' : 'var(--klant-border)',
-            color: '#fff',
-            cursor: pending || !matches ? 'not-allowed' : 'pointer',
-            opacity: pending || !matches ? 0.6 : 1,
-          }}
-        >
-          {pending ? 'Verwijderen…' : 'Organisatie + alle data verwijderen'}
-        </button>
-        {msg && (
-          <span role="alert" style={{ fontSize: 13, color: 'var(--klant-danger)' }}>
-            {msg.text}
-          </span>
+      <Field label="Bevestig met de org-slug">
+        {(id) => (
+          <input
+            id={id}
+            type="text"
+            className="v1-input v1-input--narrow"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder={slug}
+            autoComplete="off"
+          />
         )}
+      </Field>
+      <div className="v1-adm-of-actions">
+        <Button
+          type="submit"
+          variant={matches ? 'primary' : 'secondary'}
+          className={matches ? 'v1-adm-of-btn-danger' : undefined}
+          loading={pending}
+          disabled={!matches}
+        >
+          Organisatie en alle data verwijderen
+        </Button>
       </div>
+      {msg && (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {msg.text}
+        </p>
+      )}
     </form>
   );
 }

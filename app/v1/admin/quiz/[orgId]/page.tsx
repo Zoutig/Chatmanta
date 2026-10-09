@@ -7,7 +7,7 @@ import { notFound } from 'next/navigation';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { isAppError } from '@/lib/errors/app-error';
 import { getActiveQuizForOrg, listQuestions } from '@/lib/v1/quiz/data';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { PageHeader } from '@/app/v1/_ui/page-header';
 import { QuizManager } from './quiz-manager';
 
 export const dynamic = 'force-dynamic';
@@ -25,12 +25,7 @@ export default async function V1AdminQuizOrgPage({
     admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
@@ -49,21 +44,15 @@ export default async function V1AdminQuizOrgPage({
   const questions = quiz ? await listQuestions(admin, quiz.id) : [];
 
   return (
-    <>
-      <PageHead
-        eyebrow={`Admin · ${(org as { name: string }).name}`}
+    <div className="v1-page">
+      <Link href="/v1/admin/quiz" className="v1-section-link">
+        Terug naar alle quizzen
+      </Link>
+      <PageHeader
         title="Kennisbank-Quiz"
-        actions={
-          <Link href="/v1/admin/quiz" className="klant-btn" data-variant="ghost">
-            ← Alle quizzen
-          </Link>
-        }
+        description={`Quiz voor ${(org as { name: string }).name}. Jij keurt de vragen goed voordat de klant ze ziet.`}
       />
-      <QuizManager
-        orgId={orgId}
-        quiz={quiz}
-        questions={questions}
-      />
-    </>
+      <QuizManager orgId={orgId} quiz={quiz} questions={questions} />
+    </div>
   );
 }

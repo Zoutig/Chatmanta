@@ -1,7 +1,6 @@
 'use client';
 
-// V1 port van app/admindashboard/feedback/[id]/components/status-actions.tsx.
-// Enige wijziging: importeert setFeedbackStatusV1Action i.p.v. V0-action.
+// Status-knoppen voor een feedbackmelding (V1-ontwerplaag).
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,6 +10,7 @@ import {
   FEEDBACK_STATUS_LABELS,
   type FeedbackStatus,
 } from '@/lib/controlroom/types';
+import { Button } from '@/app/v1/_ui/button';
 
 export function FeedbackStatusActionsV1({ id, status }: { id: string; status: FeedbackStatus }) {
   const [pending, startTransition] = useTransition();
@@ -29,20 +29,19 @@ export function FeedbackStatusActionsV1({ id, status }: { id: string; status: Fe
     });
 
   return (
-    <div style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="v1-adm-inline">
       {FEEDBACK_STATUSES.filter((s) => s !== status).map((s) => (
-        <button
+        <Button
           key={s}
-          type="button"
-          className="klant-btn"
-          data-variant={s === 'opgelost' ? 'primary' : undefined}
+          variant={s === 'opgelost' ? 'primary' : 'secondary'}
+          size="sm"
           disabled={pending}
           onClick={() => setStatus(s)}
         >
           {FEEDBACK_STATUS_LABELS[s]}
-        </button>
+        </Button>
       ))}
-      {error && <span style={{ fontSize: 12.5, color: 'var(--klant-danger)' }} role="alert">{error}</span>}
+      {error && <span className="v1-adm-danger" role="alert">{error}</span>}
     </div>
   );
 }

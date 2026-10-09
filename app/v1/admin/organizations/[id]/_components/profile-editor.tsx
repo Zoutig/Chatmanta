@@ -1,8 +1,8 @@
 'use client';
 
 // V1 admin-overlay — ProfileEditor (port van V0's profile-editor).
-// Identiek qua UI; enig verschil: orgId (uuid) in plaats van orgSlug + import
-// uit overlay-actions in plaats van app/actions/controlroom.
+// Zelfde velden; verschil: orgId (uuid) in plaats van orgSlug + import uit
+// overlay-actions in plaats van app/actions/controlroom. Opmaak via de V1-laag.
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,16 +22,14 @@ import {
   type Owner,
   type TechnicalStatus,
 } from '@/lib/controlroom/types';
+import { Check } from 'lucide-react';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import '../org-forms.css';
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
-  return (
-    <div>
-      <label className="klant-label">{label}</label>
-      {children}
-      {hint ? <p className="klant-hint">{hint}</p> : null}
-    </div>
-  );
-}
+// Engelstalige labels uit de gedeelde (V0) lib-map lokaal vertalen.
+const COMMERCIAL_LABEL: Record<CommercialStatus, string> = { ...COMMERCIAL_STATUS_LABELS, trial: 'Proefperiode' };
+const TECHNICAL_LABEL: Record<TechnicalStatus, string> = { ...TECHNICAL_STATUS_LABELS, setup: 'Inrichten', error: 'Fout' };
 
 export function ProfileEditor({ orgId, profile }: { orgId: string; profile: AdminOrgProfile }) {
   const router = useRouter();
@@ -79,82 +77,135 @@ export function ProfileEditor({ orgId, profile }: { orgId: string; profile: Admi
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+    <div className="v1-form">
+      <div className="v1-edit-grid">
         <Field label="Commerciële status">
-          <select className="klant-select" value={commercialStatus} onChange={(e) => setCommercialStatus(e.target.value as CommercialStatus)}>
-            {COMMERCIAL_STATUSES.map((s) => (
-              <option key={s} value={s}>{COMMERCIAL_STATUS_LABELS[s]}</option>
-            ))}
-          </select>
+          {(id) => (
+            <select id={id} className="v1-input" value={commercialStatus} onChange={(e) => setCommercialStatus(e.target.value as CommercialStatus)}>
+              {COMMERCIAL_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {COMMERCIAL_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
-        <Field label="Technische status (override)" hint="Leeg = automatisch afgeleid uit signalen.">
-          <select className="klant-select" value={technicalOverride} onChange={(e) => setTechnicalOverride(e.target.value)}>
-            <option value="">— Afgeleid —</option>
-            {TECHNICAL_STATUSES.map((s) => (
-              <option key={s} value={s}>{TECHNICAL_STATUS_LABELS[s]}</option>
-            ))}
-          </select>
+        <Field label="Technische status (handmatig)" hint="Leeg laten om de status automatisch af te leiden uit signalen.">
+          {(id) => (
+            <select id={id} className="v1-input" value={technicalOverride} onChange={(e) => setTechnicalOverride(e.target.value)}>
+              <option value="">Automatisch afgeleid</option>
+              {TECHNICAL_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {TECHNICAL_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Onboarding-fase">
-          <select className="klant-select" value={onboardingPhase} onChange={(e) => setOnboardingPhase(e.target.value as OnboardingPhase)}>
-            {ONBOARDING_PHASES.map((p) => (
-              <option key={p} value={p}>{ONBOARDING_PHASE_LABELS[p]}</option>
-            ))}
-          </select>
+          {(id) => (
+            <select id={id} className="v1-input" value={onboardingPhase} onChange={(e) => setOnboardingPhase(e.target.value as OnboardingPhase)}>
+              {ONBOARDING_PHASES.map((p) => (
+                <option key={p} value={p}>
+                  {ONBOARDING_PHASE_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
-        <Field label="Customer owner">
-          <select className="klant-select" value={customerOwner} onChange={(e) => setCustomerOwner(e.target.value as Owner)}>
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
+        <Field label="Klanteigenaar">
+          {(id) => (
+            <select id={id} className="v1-input" value={customerOwner} onChange={(e) => setCustomerOwner(e.target.value as Owner)}>
+              {OWNERS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
-        <Field label="Technical owner">
-          <select className="klant-select" value={technicalOwner} onChange={(e) => setTechnicalOwner(e.target.value as Owner)}>
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
+        <Field label="Technisch eigenaar">
+          {(id) => (
+            <select id={id} className="v1-input" value={technicalOwner} onChange={(e) => setTechnicalOwner(e.target.value as Owner)}>
+              {OWNERS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+      <div className="v1-edit-grid">
         <Field label="Contactpersoon">
-          <input className="klant-input" value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Naam" />
+          {(id) => <input id={id} className="v1-input" value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Naam" />}
         </Field>
         <Field label="Contact e-mail">
-          <input className="klant-input" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="naam@bedrijf.nl" />
+          {(id) => (
+            <input
+              id={id}
+              className="v1-input"
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="naam@bedrijf.nl"
+            />
+          )}
         </Field>
         <Field label="Contact telefoon">
-          <input className="klant-input" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="06 …" />
+          {(id) => (
+            <input id={id} className="v1-input" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="06 12345678" />
+          )}
         </Field>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+      <div className="v1-edit-grid">
         <Field label="Volgende actie">
-          <input className="klant-input" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="Wat moet er gebeuren?" />
+          {(id) => (
+            <input
+              id={id}
+              className="v1-input"
+              value={nextAction}
+              onChange={(e) => setNextAction(e.target.value)}
+              placeholder="Wat moet er gebeuren?"
+            />
+          )}
         </Field>
         <Field label="Actie-eigenaar">
-          <select className="klant-select" value={nextActionOwner} onChange={(e) => setNextActionOwner(e.target.value)}>
-            <option value="">— Geen —</option>
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
+          {(id) => (
+            <select id={id} className="v1-input" value={nextActionOwner} onChange={(e) => setNextActionOwner(e.target.value)}>
+              <option value="">Geen</option>
+              {OWNERS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Actie-deadline">
-          <input className="klant-input" type="date" value={nextActionDue} onChange={(e) => setNextActionDue(e.target.value)} />
+          {(id) => (
+            <input id={id} className="v1-input" type="date" value={nextActionDue} onChange={(e) => setNextActionDue(e.target.value)} />
+          )}
         </Field>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="klant-btn" data-variant="primary" onClick={save} disabled={pending}>
-          {pending ? 'Opslaan…' : 'Opslaan'}
-        </button>
-        {saved ? <span style={{ fontSize: 13, color: 'var(--klant-success)' }}>Opgeslagen ✓</span> : null}
-        {error ? <span style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span> : null}
+      <div className="v1-adm-of-actions">
+        <Button variant="primary" onClick={save} loading={pending}>
+          Opslaan
+        </Button>
+        {saved ? (
+          <span className="v1-saved" role="status">
+            <Check size={14} /> Opgeslagen
+          </span>
+        ) : null}
       </div>
+      {error ? (
+        <p role="alert" className="v1-alert v1-alert--error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

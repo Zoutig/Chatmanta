@@ -6,13 +6,16 @@
 // van de admin raken, niet de klant). Deze variant schrijft via adminSaveChatbotSettings-
 // Action(orgId, patch) — org uit de route-param, Jorion-admin-gate. Geen AI-generate-
 // knoppen (session-gescoped, zinloos voor cross-org support). Widget-uiterlijk zit in
-// een aparte tab/patch. Klassen + veldset spiegelen de klant-instellingen.
+// een aparte tab/patch. Veldset spiegelt de klant-instellingen; opmaak via de V1-laag.
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 import { Check, Save } from 'lucide-react';
 import { adminSaveChatbotSettingsAction } from './actions';
 import type { V1ChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import type { AnswerLength, Language, SourceStrictness, ToneOfVoice } from '@/lib/v0/klantendashboard/types';
+import { Button } from '@/app/v1/_ui/button';
+import { ChoiceTiles, Field, Segmented, Switch } from '@/app/v1/_ui/controls';
+import './org-forms.css';
 
 const TONE_OPTIONS: { value: ToneOfVoice; label: string; help: string }[] = [
   { value: 'personal', label: 'Persoonlijk', help: 'Warm en informeel, met af en toe een emoji.' },
@@ -30,6 +33,18 @@ const LANG_LABEL: Record<Language, string> = {
   fr: 'Frans',
   es: 'Spaans',
 };
+
+const LENGTH_OPTIONS: { value: AnswerLength; label: string }[] = [
+  { value: 'short', label: 'Kort' },
+  { value: 'normal', label: 'Normaal' },
+  { value: 'long', label: 'Uitgebreid' },
+];
+
+const STRICTNESS_OPTIONS: { value: SourceStrictness; label: string }[] = [
+  { value: 'strict', label: 'Strikt' },
+  { value: 'normal', label: 'Normaal' },
+  { value: 'flexible', label: 'Flexibel' },
+];
 
 export function AdminSettingsForm({ orgId, initial }: { orgId: string; initial: V1ChatbotSettings }) {
   const [s, setS] = useState<V1ChatbotSettings>(initial);
@@ -86,218 +101,173 @@ export function AdminSettingsForm({ orgId, initial }: { orgId: string; initial: 
 
   return (
     <form
+      className="v1-adm-of-stack"
       onSubmit={(e) => {
         e.preventDefault();
         save();
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
     >
-      <Section title="Basis" help="Naam, welkomstbericht en algemene info die de chatbot gebruikt.">
+      <Section title="Basis" help="Naam, startsuggesties en algemene info die de chatbot gebruikt.">
         <Field label="Chatbotnaam" hint="De naam zoals bezoekers hem zien in de widget.">
-          <input className="klant-input" value={s.chatbotName} onChange={(e) => update('chatbotName', e.target.value)} />
+          {(id) => <input id={id} className="v1-input" value={s.chatbotName} onChange={(e) => update('chatbotName', e.target.value)} />}
         </Field>
-        <Field label="Korte bedrijfsomschrijving" hint="Eén of twee zinnen — gebruikt in de system-prompt.">
-          <textarea className="klant-textarea" rows={2} value={s.companyDescription} onChange={(e) => update('companyDescription', e.target.value)} />
+        <Field label="Korte bedrijfsomschrijving" hint="Eén of twee zinnen. Wordt gebruikt in de system-prompt.">
+          {(id) => (
+            <textarea id={id} className="v1-input" rows={2} value={s.companyDescription} onChange={(e) => update('companyDescription', e.target.value)} />
+          )}
         </Field>
-        <Field label="Startsuggesties" hint="Voorbeeldvragen — één per regel.">
-          <textarea
-            className="klant-textarea"
-            rows={3}
-            placeholder="Eén vraag per regel"
-            value={s.starterQuestions.join('\n')}
-            onChange={(e) => update('starterQuestions', e.target.value.split('\n').filter((x) => x.trim().length > 0))}
-          />
+        <Field label="Startsuggesties" hint="Voorbeeldvragen, één per regel.">
+          {(id) => (
+            <textarea
+              id={id}
+              className="v1-input"
+              rows={3}
+              placeholder="Eén vraag per regel"
+              value={s.starterQuestions.join('\n')}
+              onChange={(e) => update('starterQuestions', e.target.value.split('\n').filter((x) => x.trim().length > 0))}
+            />
+          )}
         </Field>
-        <Toggle
+        <Switch
           label="Startsuggesties tonen"
-          help="Aan: de widget toont klikbare voorbeeldvragen bij een leeg gesprek."
-          value={s.showStarterQuestions !== false}
+          description="De widget toont klikbare voorbeeldvragen bij een leeg gesprek."
+          checked={s.showStarterQuestions !== false}
           onChange={(v) => update('showStarterQuestions', v)}
         />
       </Section>
 
       <Section title="Taal" help="In welke taal beantwoordt de chatbot vragen?">
         <Field label="Hoofdtaal">
-          <select className="klant-select" value={s.primaryLanguage} onChange={(e) => update('primaryLanguage', e.target.value as Language)}>
-            {(['nl', 'en', 'de', 'fr', 'es'] as Language[]).map((l) => (
-              <option key={l} value={l}>
-                {LANG_LABEL[l]}
-              </option>
-            ))}
-          </select>
+          {(id) => (
+            <select
+              id={id}
+              className="v1-input v1-input--narrow"
+              value={s.primaryLanguage}
+              onChange={(e) => update('primaryLanguage', e.target.value as Language)}
+            >
+              {(['nl', 'en', 'de', 'fr', 'es'] as Language[]).map((l) => (
+                <option key={l} value={l}>
+                  {LANG_LABEL[l]}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
-        <Toggle
+        <Switch
           label="Automatisch taal herkennen"
-          help="Aan: antwoordt in de taal van de bezoeker. Uit: altijd de hoofdtaal."
-          value={s.autoDetectLanguage}
+          description="Aan: antwoordt in de taal van de bezoeker. Uit: altijd de hoofdtaal."
+          checked={s.autoDetectLanguage}
           onChange={(v) => update('autoDetectLanguage', v)}
         />
       </Section>
 
-      <Section title="Tone of voice" help="Hoe klinkt de chatbot?">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-          {TONE_OPTIONS.map((opt) => {
-            const active = s.toneOfVoice === opt.value;
-            return (
-              <button
-                type="button"
-                key={opt.value}
-                onClick={() => update('toneOfVoice', opt.value)}
-                style={{
-                  padding: 12,
-                  textAlign: 'left',
-                  borderRadius: 'var(--klant-r-md)',
-                  border: '1px solid ' + (active ? 'var(--klant-accent)' : 'var(--klant-border)'),
-                  background: active ? 'var(--klant-accent-soft)' : 'var(--klant-surface)',
-                  color: 'var(--klant-fg)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                }}
-              >
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{opt.label}</span>
-                <span style={{ fontSize: 12, color: 'var(--klant-fg-muted)', lineHeight: 1.5 }}>{opt.help}</span>
-              </button>
-            );
-          })}
-        </div>
-        <Field label="Extra instructies" hint="Bijv. 'Verwijs bij twijfel altijd naar de contactpagina.'">
-          <textarea className="klant-textarea" rows={3} value={s.extraInstructions} onChange={(e) => update('extraInstructions', e.target.value)} />
+      <Section title="Toon" help="Hoe klinkt de chatbot?">
+        <ChoiceTiles label="Toon" value={s.toneOfVoice} options={TONE_OPTIONS} onChange={(v) => update('toneOfVoice', v)} />
+        <Field label="Extra instructies" hint="Bijvoorbeeld: verwijs bij twijfel altijd naar de contactpagina.">
+          {(id) => (
+            <textarea id={id} className="v1-input" rows={3} value={s.extraInstructions} onChange={(e) => update('extraInstructions', e.target.value)} />
+          )}
         </Field>
       </Section>
 
       <Section title="Antwoordgedrag" help="Hoe ver mag de chatbot gaan in zijn antwoorden?">
-        <Field label="Antwoordlengte">
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['short', 'normal', 'long'] as AnswerLength[]).map((v) => {
-              const labels = { short: 'Kort', normal: 'Normaal', long: 'Uitgebreid' } as const;
-              return (
-                <button key={v} type="button" onClick={() => update('answerLength', v)} className="klant-btn" data-variant={s.answerLength === v ? 'primary' : 'ghost'} style={{ flex: 1 }}>
-                  {labels[v]}
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-        <Toggle label="Mag prijzen noemen?" help="Bij 'nee' verwijst de bot voor prijzen naar de contactpagina." value={s.mayMentionPrices} onChange={(v) => update('mayMentionPrices', v)} />
-        <Toggle label="Mag contactgegevens tonen?" help="E-mail, telefoon en contactpagina-URL mag worden gedeeld." value={s.mayShareContact} onChange={(v) => update('mayShareContact', v)} />
-        <Field label="Hoe strikt mag de chatbot van zijn bronnen afwijken?" hint="'Strikt' = alleen wat letterlijk in de bronnen staat.">
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['strict', 'normal', 'flexible'] as SourceStrictness[]).map((v) => {
-              const labels = { strict: 'Strikt', normal: 'Normaal', flexible: 'Flexibel' } as const;
-              return (
-                <button key={v} type="button" onClick={() => update('sourceStrictness', v)} className="klant-btn" data-variant={s.sourceStrictness === v ? 'primary' : 'ghost'} style={{ flex: 1 }}>
-                  {labels[v]}
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-        <Toggle label="Bij twijfel: eerlijk zeggen dat hij het niet weet" help="Aanbevolen aan. Voorkomt verzinsels." value={s.honestAboutUnknown} onChange={(v) => update('honestAboutUnknown', v)} />
+        <div className="v1-field">
+          <span className="v1-label">Antwoordlengte</span>
+          <Segmented label="Antwoordlengte" value={s.answerLength} options={LENGTH_OPTIONS} onChange={(v) => update('answerLength', v)} />
+        </div>
+        <Switch
+          label="Mag prijzen noemen"
+          description="Uit: de bot verwijst voor prijzen naar de contactpagina."
+          checked={s.mayMentionPrices}
+          onChange={(v) => update('mayMentionPrices', v)}
+        />
+        <Switch
+          label="Mag contactgegevens tonen"
+          description="E-mail, telefoon en contactpagina mogen worden gedeeld."
+          checked={s.mayShareContact}
+          onChange={(v) => update('mayShareContact', v)}
+        />
+        <div className="v1-field">
+          <span className="v1-label">Hoe strikt mag de chatbot van zijn bronnen afwijken?</span>
+          <Segmented
+            label="Bronstriktheid"
+            value={s.sourceStrictness}
+            options={STRICTNESS_OPTIONS}
+            onChange={(v) => update('sourceStrictness', v)}
+          />
+          <p className="v1-hint">Strikt: alleen wat letterlijk in de bronnen staat.</p>
+        </div>
+        <Switch
+          label="Bij twijfel eerlijk zeggen dat hij het niet weet"
+          description="Aanbevolen. Voorkomt verzinsels."
+          checked={s.honestAboutUnknown}
+          onChange={(v) => update('honestAboutUnknown', v)}
+        />
         {s.honestAboutUnknown && (
-          <Field label="Formulering bij twijfel" hint="Leeg = generieke 'ik weet het niet zeker'-formulering.">
-            <textarea className="klant-textarea" rows={2} value={s.unknownAnswerMessage} onChange={(e) => update('unknownAnswerMessage', e.target.value)} />
+          <Field label="Formulering bij twijfel" hint="Leeg laten voor een algemene formulering.">
+            {(id) => (
+              <textarea
+                id={id}
+                className="v1-input"
+                rows={2}
+                value={s.unknownAnswerMessage}
+                onChange={(e) => update('unknownAnswerMessage', e.target.value)}
+              />
+            )}
           </Field>
         )}
       </Section>
 
-      <Section title="Fallback & contact" help="Wat doet de chatbot als hij het antwoord niet weet?">
-        <Field label="Fallbackbericht" hint="Getoond als de chatbot geen antwoord kon vinden.">
-          <textarea className="klant-textarea" rows={3} value={s.fallbackMessage} onChange={(e) => update('fallbackMessage', e.target.value)} />
+      <Section title="Terugval en contact" help="Wat doet de chatbot als hij het antwoord niet weet?">
+        <Field label="Terugvalbericht" hint="Getoond als de chatbot geen antwoord kon vinden.">
+          {(id) => (
+            <textarea id={id} className="v1-input" rows={3} value={s.fallbackMessage} onChange={(e) => update('fallbackMessage', e.target.value)} />
+          )}
         </Field>
-        <Field label="Contact e-mailadres">
-          <input type="email" className="klant-input" value={s.contactEmail} onChange={(e) => update('contactEmail', e.target.value)} />
-        </Field>
-        <Field label="Telefoonnummer">
-          <input className="klant-input" value={s.contactPhone} onChange={(e) => update('contactPhone', e.target.value)} />
-        </Field>
-        <Field label="Contactpagina URL">
-          <input type="url" className="klant-input" value={s.contactPageUrl} onChange={(e) => update('contactPageUrl', e.target.value)} />
-        </Field>
+        <div className="v1-edit-grid">
+          <Field label="Contact e-mailadres">
+            {(id) => (
+              <input id={id} type="email" className="v1-input" value={s.contactEmail} onChange={(e) => update('contactEmail', e.target.value)} />
+            )}
+          </Field>
+          <Field label="Telefoonnummer">
+            {(id) => <input id={id} className="v1-input" value={s.contactPhone} onChange={(e) => update('contactPhone', e.target.value)} />}
+          </Field>
+          <Field label="Contactpagina URL">
+            {(id) => (
+              <input id={id} type="url" className="v1-input" value={s.contactPageUrl} onChange={(e) => update('contactPageUrl', e.target.value)} />
+            )}
+          </Field>
+        </div>
       </Section>
 
-      <div
-        style={{
-          position: 'sticky',
-          bottom: 16,
-          marginTop: 8,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 12,
-          alignItems: 'center',
-          padding: '12px 16px',
-          background: 'var(--klant-bg-elev)',
-          border: '1px solid var(--klant-border-strong)',
-          borderRadius: 'var(--klant-r-md)',
-          boxShadow: '0 8px 24px -10px rgba(0,0,0,0.35)',
-        }}
-      >
-        {error && <span role="alert" style={{ fontSize: 13, color: 'var(--klant-danger)' }}>{error}</span>}
+      <div className="v1-adm-of-savebar">
+        {error && (
+          <p role="alert" className="v1-alert v1-alert--error">
+            {error}
+          </p>
+        )}
         {saved && (
-          <span style={{ fontSize: 13, color: 'var(--klant-success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="v1-saved" role="status">
             <Check size={14} /> Opgeslagen
           </span>
         )}
-        <button type="submit" className="klant-btn" data-variant="primary" disabled={pending || !dirty}>
-          <Save size={14} strokeWidth={1.8} /> {pending ? 'Bezig…' : 'Instellingen opslaan'}
-        </button>
+        <Button type="submit" variant="primary" loading={pending} disabled={!dirty}>
+          {pending ? null : <Save size={14} strokeWidth={1.8} />} Instellingen opslaan
+        </Button>
       </div>
     </form>
   );
 }
 
-// ── kleine lokale primitieven (gespiegeld van de klant-instellingen) ──
-
-function Section({ title, help, children }: { title: string; help: string; children: React.ReactNode }) {
+function Section({ title, help, children }: { title: string; help: string; children: ReactNode }) {
   return (
-    <section className="klant-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header>
-        <h3 className="klant-section-title">{title}</h3>
-        <p className="klant-section-help">{help}</p>
+    <section className="v1-card v1-adm-of-card">
+      <header className="v1-adm-of-card-head">
+        <h2 className="v1-section-title">{title}</h2>
+        <p className="v1-adm-of-card-help">{help}</p>
       </header>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{children}</div>
-    </section>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="klant-label">{label}</label>
       {children}
-      {hint && <div className="klant-hint">{hint}</div>}
-    </div>
-  );
-}
-
-function Toggle({ label, help, value, onChange }: { label: string; help: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', padding: '4px 0' }}>
-      <button
-        type="button"
-        onClick={() => onChange(!value)}
-        aria-pressed={value}
-        aria-label={label}
-        style={{
-          flexShrink: 0,
-          marginTop: 2,
-          width: 34,
-          height: 20,
-          borderRadius: 999,
-          border: 'none',
-          background: value ? 'var(--klant-accent)' : 'var(--klant-border-strong)',
-          position: 'relative',
-          cursor: 'pointer',
-          transition: 'background 120ms ease',
-        }}
-      >
-        <span style={{ position: 'absolute', top: 2, left: value ? 16 : 2, width: 16, height: 16, borderRadius: 999, background: '#fff', transition: 'left 120ms ease' }} />
-      </button>
-      <div>
-        <div style={{ fontSize: 14, color: 'var(--klant-fg)', fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 12, color: 'var(--klant-fg-muted)', marginTop: 2 }}>{help}</div>
-      </div>
-    </label>
+    </section>
   );
 }

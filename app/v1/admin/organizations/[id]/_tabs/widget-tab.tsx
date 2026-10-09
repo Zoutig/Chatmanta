@@ -5,26 +5,18 @@
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
-import { Card } from '@/app/klantendashboard/components/ui/card';
+import { Badge, EmptyState, InfoTip } from '@/app/v1/_ui/feedback';
+import { Panel, Rows, Row } from '@/app/v1/_ui/panel';
+import { formatDateTime } from '@/app/v1/admin/_ui/format';
 import { AdminWidgetForm } from '../admin-widget-form';
 import { AllowedDomainsEditor } from '../allowed-domains-editor';
-
-const dim = { fontSize: 13, color: 'var(--klant-muted)' } as const;
-const cellLabel = { fontSize: 11, color: 'var(--klant-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.03em' };
-
-function formatLastSeen(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
 
 export async function WidgetTab({ orgId, chatbotId }: { orgId: string; chatbotId: string | null }) {
   if (!chatbotId) {
     return (
-      <Card>
-        <p style={dim}>Deze organisatie heeft nog geen chatbot / widget.</p>
-      </Card>
+      <section className="v1-card">
+        <EmptyState>Deze organisatie heeft nog geen chatbot of widget.</EmptyState>
+      </section>
     );
   }
   const admin = await getJorionAdminClient();
@@ -42,39 +34,44 @@ export async function WidgetTab({ orgId, chatbotId }: { orgId: string; chatbotId
   const allowedDomains = ((bot?.allowed_domains as string[] | null) ?? []).filter(Boolean);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="v1-stack">
       {/* Live-status (read-only) */}
-      <Card>
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 12px', color: 'var(--klant-ink)' }}>Live-status</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-          <Cell label="Status" value={isActive ? 'Actief' : 'Gepauzeerd'} tone={isActive ? 'success' : 'warning'} />
-          <Cell label="Gevonden op website" value={lastSeenAt ? (lastSeenOrigin ? `Ja — ${lastSeenOrigin}` : 'Ja') : 'Nog niet gezien'} tone={lastSeenAt ? 'success' : 'warning'} />
-          <Cell label="Laatst gezien" value={formatLastSeen(lastSeenAt)} tone="neutral" />
-          <Cell label="Domeinen" value={allowedDomains.length > 0 ? `${allowedDomains.length} geconfigureerd` : 'Geen beperking'} tone="neutral" />
-        </div>
-        <p style={{ ...dim, margin: '10px 0 0' }}>
-          Pauzeren/activeren doet de klant zelf in de widget-instellingen; dit paneel is read-only voor support.
-        </p>
-      </Card>
+      <Panel
+        title="Live-status"
+        meta={
+          <InfoTip text="Pauzeren en activeren doet de klant zelf in de widget-instellingen. Dit paneel is alleen-lezen voor support." />
+        }
+      >
+        <Rows>
+          <Row label="Status">
+            <Badge tone={isActive ? 'ok' : 'warn'} dot>
+              {isActive ? 'Actief' : 'Gepauzeerd'}
+            </Badge>
+          </Row>
+          <Row label="Gevonden op website">
+            {lastSeenAt ? (
+              <Badge tone="ok">{lastSeenOrigin ? `Ja, op ${lastSeenOrigin}` : 'Ja'}</Badge>
+            ) : (
+              <Badge tone="warn">Nog niet gezien</Badge>
+            )}
+          </Row>
+          <Row label="Laatst gezien">{lastSeenAt ? formatDateTime(lastSeenAt) : 'Nog niet gezien'}</Row>
+          <Row label="Domeinen">
+            {allowedDomains.length > 0 ? `${allowedDomains.length} ingesteld` : 'Geen beperking'}
+          </Row>
+        </Rows>
+      </Panel>
 
       {/* Toegestane domeinen (Jorion-beheerd; klant ziet ze read-only) */}
-      <Card>
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 12px', color: 'var(--klant-ink)' }}>Toegestane websites</h3>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title">Toegestane websites</h2>
+        </div>
         <AllowedDomainsEditor orgId={orgId} current={allowedDomains} />
-      </Card>
+      </section>
 
       {/* Uiterlijk (bewerkbaar) */}
       <AdminWidgetForm orgId={orgId} initial={settings} />
-    </div>
-  );
-}
-
-function Cell({ label, value, tone }: { label: string; value: string; tone: 'success' | 'warning' | 'neutral' }) {
-  const color = tone === 'success' ? 'var(--klant-success)' : tone === 'warning' ? 'var(--klant-warning)' : 'var(--klant-ink)';
-  return (
-    <div style={{ padding: 12, background: 'var(--klant-surface)', borderRadius: 'var(--klant-r-sm)' }}>
-      <div style={cellLabel}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 500, color, marginTop: 4 }}>{value}</div>
     </div>
   );
 }

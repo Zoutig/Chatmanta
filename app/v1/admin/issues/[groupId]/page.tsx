@@ -1,50 +1,38 @@
-// V1 admin — fout-detail. Port van app/admindashboard/issues/[groupId]/page.tsx.
+// V1 admin — fout-detail (V1-ontwerplaag; port van de V0-admin-foutdetail).
 // V1-aanpassingen:
 //   * getErrorGroup via lib/v1/admin/errors (getJorionAdminClient).
 //   * orgName komt via JOIN in getErrorGroup (geen KNOWN_ORGS).
-//   * CopyButton uit @/app/admindashboard/components/copy-button (gedeeld, geen kopie nodig).
+//   * CopyButton uit de V1-admin-bouwstenen (met toast).
 //   * Terug-link → /v1/admin/issues.
 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { isAppError } from '@/lib/errors/app-error';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getErrorGroup } from '@/lib/v1/admin/errors';
 import { buildClaudePayload } from '@/lib/observability/claude-payload';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill, type PillTone } from '@/app/klantendashboard/components/ui/pill';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
-import { formatDateNL, formatRelativeNL } from '@/lib/controlroom/format';
-import { CopyButton } from '@/app/admindashboard/components/copy-button';
+import { formatRelativeNL } from '@/lib/controlroom/format';
+import type { ErrorSeverity, ErrorStatus } from '@/lib/observability/sink';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { Panel, Rows, Row } from '@/app/v1/_ui/panel';
+import { Badge, type Tone } from '@/app/v1/_ui/feedback';
+import { CopyButton } from '@/app/v1/admin/_ui/copy-button';
+import { formatDate } from '@/app/v1/admin/_ui/format';
 import { ErrorStatusActionsV1 } from './components/status-actions';
-import type { ErrorSeverity } from '@/lib/observability/sink';
+import './detail.css';
 
 export const dynamic = 'force-dynamic';
 
-const SEV_TONE: Record<ErrorSeverity, PillTone> = { error: 'danger', warning: 'warn', info: 'info' };
+const SEV_TONE: Record<ErrorSeverity, Tone> = { error: 'danger', warning: 'warn', info: 'accent' };
 const SEV_LABEL: Record<ErrorSeverity, string> = { error: 'Fout', warning: 'Waarschuwing', info: 'Info' };
+const STATUS_TONE: Record<ErrorStatus, Tone> = { open: 'warn', resolved: 'ok', ignored: 'neutral' };
+const STATUS_LABEL: Record<ErrorStatus, string> = { open: 'Open', resolved: 'Opgelost', ignored: 'Genegeerd' };
 
-const codeBlock = {
-  background: 'var(--klant-surface-muted)',
-  border: '1px solid var(--klant-border)',
-  borderRadius: 'var(--klant-r-md)',
-  padding: 12,
-  fontSize: 12,
-  fontFamily: 'var(--klant-font-mono)',
-  overflowX: 'auto' as const,
-  margin: 0,
-  whiteSpace: 'pre-wrap' as const,
-  wordBreak: 'break-word' as const,
-};
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+/** Lees-rij die (zoals voorheen) wegvalt als er geen waarde is. */
+function OptionalRow({ label, value }: { label: string; value: ReactNode }) {
   if (value == null || value === '') return null;
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: 'var(--klant-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontSize: 13.5, marginTop: 3, color: 'var(--klant-ink)', wordBreak: 'break-word' }}>{value}</div>
-    </div>
-  );
+  return <Row label={label}>{value}</Row>;
 }
 
 export default async function V1ErrorGroupDetail({ params }: { params: Promise<{ groupId: string }> }) {
@@ -52,12 +40,7 @@ export default async function V1ErrorGroupDetail({ params }: { params: Promise<{
     await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <>
-          <h1 className="klant-page-title">Geen toegang</h1>
-          <p className="klant-page-sub">Deze pagina is alleen voor Jorion-admins.</p>
-        </>
-      );
+      return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
     }
     throw e;
   }
@@ -71,66 +54,62 @@ export default async function V1ErrorGroupDetail({ params }: { params: Promise<{
   const c = group.context ?? {};
 
   return (
-    <>
-      <PageHead
-        eyebrow={`Issues · ${group.surface}`}
+    <div className="v1-page">
+      <Link href="/v1/admin/issues" className="v1-section-link">Terug naar Issues</Link>
+
+      <PageHeader
         title={group.title}
+        description={`Issues · ${group.surface}`}
         actions={
           <>
-            <Pill tone={SEV_TONE[group.severity]} dot>{SEV_LABEL[group.severity]}</Pill>
-            <Pill tone={group.status === 'open' ? 'warn' : group.status === 'resolved' ? 'success' : 'neutral'}>
-              {group.status}
-            </Pill>
+            <Badge tone={SEV_TONE[group.severity]} dot>{SEV_LABEL[group.severity]}</Badge>
+            <Badge tone={STATUS_TONE[group.status] ?? 'neutral'}>{STATUS_LABEL[group.status] ?? group.status}</Badge>
           </>
         }
       />
 
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-          <CopyButton text={payload} label="Kopieer voor Claude Code" />
-          <ErrorStatusActionsV1 id={group.id} status={group.status} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
-          <Row label="Code" value={group.code} />
-          <Row label="Surface" value={group.surface} />
-          <Row label="Org" value={group.orgName ?? group.organizationId ?? '—'} />
-          <Row label="Voorgekomen" value={`${group.count}×`} />
-          <Row label="Eerst gezien" value={formatDateNL(group.firstSeenAt)} />
-          <Row label="Laatst gezien" value={formatRelativeNL(group.lastSeenAt)} />
-          <Row label="Request-ID" value={c.requestId} />
-          <Row label="Route" value={[c.method, c.route].filter(Boolean).join(' ') || undefined} />
-          <Row label="Bot-versie" value={c.botVersion} />
-          <Row label="Commit" value={c.commit} />
-          <Row label="Env" value={c.env} />
-          <Row label="Origin verdacht" value={c.originSuspect ? 'ja' : undefined} />
-        </div>
-      </Card>
+      <Panel id="fout-gegevens" title="Gegevens" meta={<CopyButton text={payload} label="Kopieer voor Claude Code" />}>
+        <Rows>
+          <Row label="Status wijzigen">
+            <ErrorStatusActionsV1 id={group.id} status={group.status} />
+          </Row>
+          <OptionalRow label="Code" value={group.code} />
+          <OptionalRow label="Onderdeel" value={group.surface} />
+          <Row label="Organisatie">{group.orgName ?? group.organizationId ?? 'Geen'}</Row>
+          <Row label="Voorgekomen">{`${group.count}×`}</Row>
+          <Row label="Eerst gezien">{formatDate(group.firstSeenAt)}</Row>
+          <Row label="Laatst gezien">{formatRelativeNL(group.lastSeenAt)}</Row>
+          <OptionalRow label="Request-ID" value={c.requestId} />
+          <OptionalRow label="Route" value={[c.method, c.route].filter(Boolean).join(' ') || undefined} />
+          <OptionalRow label="Bot-versie" value={c.botVersion} />
+          <OptionalRow label="Commit" value={c.commit} />
+          <OptionalRow label="Omgeving" value={c.env} />
+          <OptionalRow label="Origin verdacht" value={c.originSuspect ? 'Ja' : undefined} />
+        </Rows>
+      </Panel>
 
-      <Card style={{ marginBottom: 16 }}>
-        <div className="klant-section-title" style={{ marginBottom: 8 }}>Foutmelding</div>
-        <p style={{ fontSize: 13.5, margin: 0, color: 'var(--klant-ink)', wordBreak: 'break-word' }}>
-          {group.message ?? group.title}
-        </p>
+      <section className="v1-card">
+        <h2 className="v1-section-title v1-adm-iss-head">Foutmelding</h2>
+        <p className="v1-adm-iss-text">{group.message ?? group.title}</p>
         {c.inputRedacted ? (
           <>
-            <div className="klant-section-title" style={{ margin: '14px 0 6px' }}>Gebruikersinvoer (PII-geredigeerd)</div>
-            <p style={{ fontSize: 13, margin: 0, color: 'var(--klant-muted)', wordBreak: 'break-word' }}>{c.inputRedacted}</p>
+            <h3 className="v1-adm-iss-sub">Gebruikersinvoer (PII-geredigeerd)</h3>
+            <p className="v1-adm-iss-input">{c.inputRedacted}</p>
           </>
         ) : null}
-      </Card>
+      </section>
 
-      <Card style={{ marginBottom: 16 }}>
-        <div className="klant-section-title" style={{ marginBottom: 8 }}>Stacktrace</div>
-        <pre style={codeBlock}>{c.stack || c.topFrame || '(geen stacktrace beschikbaar)'}</pre>
-      </Card>
+      <section className="v1-card">
+        <h2 className="v1-section-title v1-adm-iss-head">Stacktrace</h2>
+        <pre className="v1-adm-iss-pre">{c.stack || c.topFrame || '(geen stacktrace beschikbaar)'}</pre>
+      </section>
 
-      <Card>
-        <div className="klant-section-title" style={{ marginBottom: 8 }}>Claude Code-payload (preview)</div>
-        <pre style={codeBlock}>{payload}</pre>
-        <div style={{ marginTop: 10 }}>
-          <Link href="/v1/admin/issues" className="klant-btn">← Terug naar Issues</Link>
+      <details className="v1-details">
+        <summary>Claude Code-payload (voorbeeld)</summary>
+        <div className="v1-details-body">
+          <pre className="v1-adm-iss-pre">{payload}</pre>
         </div>
-      </Card>
-    </>
+      </details>
+    </div>
   );
 }

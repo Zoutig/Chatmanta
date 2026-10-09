@@ -14,10 +14,15 @@ import {
   adminRemoveMemberAction,
 } from './actions';
 import type { AdminMember } from '@/lib/v1/admin/members';
+import { Button } from '@/app/v1/_ui/button';
+import { Field } from '@/app/v1/_ui/controls';
+import { Badge } from '@/app/v1/_ui/feedback';
+import { DataTable } from '@/app/v1/admin/_ui/data-table';
+import './org-forms.css';
 
 const ROLE_LABEL: Record<AdminMember['role'], string> = {
-  owner: 'Owner',
-  admin: 'Admin',
+  owner: 'Eigenaar',
+  admin: 'Beheerder',
   member: 'Lid',
 };
 
@@ -74,97 +79,92 @@ export function MembersManager({ orgId, members }: { orgId: string; members: Adm
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="v1-form">
       {/* Ledenlijst */}
       {members.length === 0 ? (
-        <p style={{ fontSize: 13, color: 'var(--klant-muted)' }}>Nog geen leden.</p>
+        <p className="v1-adm-muted" style={{ margin: 0 }}>Nog geen leden.</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="klant-table">
-            <thead>
-              <tr>
-                <th>E-mail</th>
-                <th>Rol</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Acties</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => {
-                const rowBusy = pending && busyUser === m.userId;
-                return (
-                  <tr key={m.userId}>
-                    <td style={{ fontSize: 13 }}>
-                      {m.email}
-                      {m.fullName && <span style={{ color: 'var(--klant-muted)' }}> · {m.fullName}</span>}
-                    </td>
-                    <td style={{ fontSize: 13 }}>{ROLE_LABEL[m.role]}</td>
-                    <td style={{ fontSize: 12.5, color: m.neverLoggedIn ? 'var(--klant-warning)' : 'var(--klant-success)' }}>
-                      {m.neverLoggedIn ? 'Nog nooit ingelogd' : 'Actief'}
-                    </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {m.neverLoggedIn && (
-                        <button
-                          type="button"
-                          className="klant-btn"
-                          data-variant="ghost"
-                          disabled={rowBusy}
-                          onClick={() => resend(m)}
-                          title="Invite opnieuw sturen"
-                          style={{ padding: '5px 9px', marginRight: 6 }}
-                        >
-                          <RefreshCw size={13} strokeWidth={1.8} /> Opnieuw
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="klant-btn"
-                        data-variant="danger"
+        <DataTable
+          label="Leden"
+          columns={[{ label: 'E-mail' }, { label: 'Rol' }, { label: 'Status' }, { label: 'Acties', num: true, width: '1%' }]}
+        >
+          {members.map((m) => {
+            const rowBusy = pending && busyUser === m.userId;
+            return (
+              <tr key={m.userId}>
+                <td>
+                  {m.email}
+                  {m.fullName && <span className="v1-adm-muted"> · {m.fullName}</span>}
+                </td>
+                <td>{ROLE_LABEL[m.role]}</td>
+                <td>
+                  <Badge tone={m.neverLoggedIn ? 'warn' : 'ok'} dot>
+                    {m.neverLoggedIn ? 'Nog nooit ingelogd' : 'Actief'}
+                  </Badge>
+                </td>
+                <td data-num>
+                  <span className="v1-adm-inline" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                    {m.neverLoggedIn && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         disabled={rowBusy}
-                        onClick={() => remove(m)}
-                        title="Lid verwijderen"
-                        style={{ padding: '5px 9px' }}
+                        onClick={() => resend(m)}
+                        title="Uitnodiging opnieuw sturen"
                       >
-                        <Trash2 size={13} strokeWidth={1.8} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        <RefreshCw size={13} strokeWidth={1.8} /> Opnieuw
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={rowBusy}
+                      onClick={() => remove(m)}
+                      title="Lid verwijderen"
+                      aria-label={`Lid ${m.email} verwijderen`}
+                    >
+                      <Trash2 size={13} strokeWidth={1.8} />
+                    </Button>
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </DataTable>
       )}
 
       {/* Lid uitnodigen */}
-      <form onSubmit={invite} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, flex: '1 1 220px' }}>
-          E-mailadres
-          <input
-            type="email"
-            className="klant-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="naam@bedrijf.nl"
-          />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-          Rol
-          <select className="klant-select" value={role} onChange={(e) => setRole(e.target.value as AdminMember['role'])}>
-            <option value="member">Lid</option>
-            <option value="admin">Admin</option>
-            <option value="owner">Owner</option>
-          </select>
-        </label>
-        <button type="submit" className="klant-btn" data-variant="primary" disabled={pending} style={{ padding: '8px 14px' }}>
-          <Mail size={14} strokeWidth={1.8} /> {pending && busyUser === null ? 'Bezig…' : 'Uitnodigen'}
-        </button>
+      <form onSubmit={invite} className="v1-adm-of-row">
+        <Field label="E-mailadres">
+          {(id) => (
+            <input
+              id={id}
+              type="email"
+              className="v1-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="naam@bedrijf.nl"
+            />
+          )}
+        </Field>
+        <Field label="Rol">
+          {(id) => (
+            <select id={id} className="v1-input" value={role} onChange={(e) => setRole(e.target.value as AdminMember['role'])}>
+              <option value="member">Lid</option>
+              <option value="admin">Beheerder</option>
+              <option value="owner">Eigenaar</option>
+            </select>
+          )}
+        </Field>
+        <Button type="submit" variant="primary" loading={pending && busyUser === null} disabled={pending}>
+          <Mail size={14} strokeWidth={1.8} /> Uitnodigen
+        </Button>
       </form>
 
       {msg && (
-        <span role={msg.ok ? 'status' : 'alert'} style={{ fontSize: 13, color: msg.ok ? 'var(--klant-success)' : 'var(--klant-danger)' }}>
+        <p role={msg.ok ? 'status' : 'alert'} className={`v1-alert ${msg.ok ? 'v1-alert--ok' : 'v1-alert--error'}`}>
           {msg.text}
-        </span>
+        </p>
       )}
     </div>
   );

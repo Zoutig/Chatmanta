@@ -1,0 +1,19 @@
+/* Feedback-detail (admin): bijlage-afbeelding en historie-tijdlijn.
+ * Lokaal bij de pagina; alle klassen met prefix v1-adm-fbd-. */
+
+.v1-ui .v1-adm-fbd-text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--v1-ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.v1-ui .v1-adm-fbd-sub { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-adm-fbd-question { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--v1-ink-2); overflow-wrap: anywhere; }
+.v1-ui .v1-adm-fbd-head { margin-bottom: 12px; }
+
+.v1-ui .v1-adm-fbd-img { display: block; max-width: 100%; max-height: 480px; height: auto; margin-bottom: 12px; border-radius: var(--v1-r-md); border: 1px solid var(--v1-line); }
+
+.v1-ui .v1-adm-fbd-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.v1-ui .v1-adm-fbd-event { display: flex; gap: 10px; align-items: flex-start; }
+.v1-ui .v1-adm-fbd-dot { flex-shrink: 0; width: 7px; height: 7px; margin-top: 7px; border-radius: 999px; background: var(--v1-accent); }
+.v1-ui .v1-adm-fbd-event-main { min-width: 0; }
+.v1-ui .v1-adm-fbd-event-title { font-size: 13.5px; color: var(--v1-ink); }
+.v1-ui .v1-adm-fbd-event-body { font-size: 13px; color: var(--v1-ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.v1-ui .v1-adm-fbd-event-meta { margin-top: 2px; font-size: 12px; color: var(--v1-muted); }
+
+.v1-ui .v1-adm-fbd-confirm { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: var(--v1-r-md); background: var(--v1-warn-soft); font-size: 13.5px; color: var(--v1-ink); overflow-wrap: anywhere; }

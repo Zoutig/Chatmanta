@@ -5,15 +5,13 @@
 import { resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { listOrgMembers } from '@/lib/v1/admin/members';
-import { Card } from '@/app/klantendashboard/components/ui/card';
-import { Pill } from '@/app/klantendashboard/components/ui/pill';
+import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
+import { buttonClass } from '@/app/v1/_ui/button';
+import { formatEur } from '@/app/v1/admin/_ui/format';
 import { BudgetEditor } from '../budget-editor';
 import { DeleteOrgForm } from '../delete-org-form';
 import { MembersManager } from '../members-manager';
 import { SuspendOrgForm } from '../suspend-org-form';
-
-const labelStyle = { fontSize: 12, color: 'var(--klant-muted)' } as const;
-const sectionTitle = { fontSize: 14, fontWeight: 600, margin: '0 0 8px', color: 'var(--klant-ink)' } as const;
 
 type Props = {
   orgId: string;
@@ -29,61 +27,70 @@ export async function BeheerTab({ orgId, slug, dailyBudgetRaw, suspendedAt }: Pr
   const members = await listOrgMembers(admin, orgId);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="v1-stack">
       {/* Status (operator-suspend) */}
-      <Card>
-        <h3 style={sectionTitle}>Status</h3>
-        <p style={{ ...labelStyle, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Pill tone={suspended ? 'danger' : 'success'} dot>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title">Status</h2>
+        </div>
+        <p className="v1-adm-strip v1-adm-muted" style={{ margin: '0 0 12px' }}>
+          <Badge tone={suspended ? 'danger' : 'ok'} dot>
             {suspended ? 'Opgeschort' : 'Actief'}
-          </Pill>
-          {suspended
-            ? 'De widget rendert niet en de chatbot toont een eerlijke "tijdelijk niet beschikbaar"-melding.'
-            : 'De chatbot is beschikbaar. Pauzeer om een niet-betalende klant tijdelijk stil te zetten.'}
+          </Badge>
+          <span>
+            {suspended
+              ? 'De widget verschijnt niet en de chatbot meldt dat hij tijdelijk niet beschikbaar is.'
+              : 'De chatbot is beschikbaar. Pauzeer om een niet-betalende klant tijdelijk stil te zetten.'}
+          </span>
         </p>
         <SuspendOrgForm orgId={orgId} suspended={suspended} />
-      </Card>
+      </section>
 
       {/* Leden */}
-      <Card>
-        <h3 style={sectionTitle}>Leden</h3>
-        <p style={{ ...labelStyle, margin: '0 0 12px' }}>
-          Nodig teamleden uit, stuur een invite opnieuw of verwijder een lid. De laatste owner kan niet worden verwijderd.
-        </p>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title v1-adm-title-row">
+            Leden
+            <InfoTip text="Nodig teamleden uit, stuur een uitnodiging opnieuw of verwijder een lid. De laatste eigenaar kan niet worden verwijderd." />
+          </h2>
+        </div>
         <MembersManager orgId={orgId} members={members} />
-      </Card>
+      </section>
 
       {/* Dagbudget */}
-      <Card>
-        <h3 style={sectionTitle}>Dagbudget</h3>
-        <p style={{ ...labelStyle, margin: '0 0 10px' }}>
-          Huidig: {capEur === 0 ? 'uit' : `€${capEur.toFixed(2)}`}/dag.
-          0 = budget uit (bot weigert bij overschrijding). Bovengrens €1000/dag.
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title v1-adm-title-row">
+            Dagbudget
+            <InfoTip text="0 betekent budget uit. Bij overschrijding weigert de bot verdere vragen. De bovengrens is 1000 euro per dag." />
+          </h2>
+        </div>
+        <p className="v1-adm-muted" style={{ margin: '0 0 12px' }}>
+          Huidig: {capEur === 0 ? 'Uit' : `${formatEur(capEur)} per dag`}
         </p>
         <BudgetEditor orgId={orgId} currentEur={capEur} />
-      </Card>
+      </section>
 
       {/* Data-export */}
-      <Card>
-        <h3 style={sectionTitle}>Exporteren (AVG)</h3>
-        <p style={{ ...labelStyle, margin: '0 0 10px' }}>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title">Exporteren (AVG)</h2>
+        </div>
+        <p className="v1-adm-muted" style={{ margin: '0 0 12px' }}>
           Download alle data van deze organisatie als JSON (gegevensportabiliteit).
         </p>
-        <a
-          href={`/v1/admin/organizations/${orgId}/export`}
-          className="klant-btn"
-          data-variant="secondary"
-          style={{ padding: '8px 14px', display: 'inline-block' }}
-        >
-          Exporteer org-data (JSON)
+        <a href={`/v1/admin/organizations/${orgId}/export`} className={buttonClass({ variant: 'secondary' })}>
+          Exporteer organisatiedata (JSON)
         </a>
-      </Card>
+      </section>
 
       {/* Gevarenzone */}
-      <Card>
-        <h3 style={{ ...sectionTitle, color: 'var(--klant-danger)' }}>Gevarenzone</h3>
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title v1-adm-danger">Gevarenzone</h2>
+        </div>
         <DeleteOrgForm orgId={orgId} slug={slug} />
-      </Card>
+      </section>
     </div>
   );
 }
