@@ -27,7 +27,7 @@ import { buttonClass } from '@/app/v1/_ui/button';
 import { AttentionBlock, EmptyState, StatusPill } from '@/app/v1/_ui/feedback';
 import { StatStrip, type Stat } from '@/app/v1/_ui/stat-strip';
 import { List, ListRow, SectionHead } from '@/app/v1/_ui/list';
-import { OnboardingTour, type TourStep } from '@/app/klantendashboard/components/onboarding-tour';
+import { OnboardingTour, type TourStep } from '@/app/v1/_ui/tour';
 import { getOrgChatbot } from './rag-config';
 import { NextStep } from './_overview/next-step';
 import { TourButton } from './_overview/tour-button';

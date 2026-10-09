@@ -93,9 +93,9 @@ export function V1SearchTrigger() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 'min(520px, 100%)',
-              background: 'var(--klant-surface)',
-              border: '1px solid var(--klant-border-strong)',
-              borderRadius: 'var(--klant-r-lg)',
+              background: 'var(--v1-surface)',
+              border: '1px solid var(--v1-line)',
+              borderRadius: 'var(--v1-r-lg)',
               boxShadow: '0 24px 60px -16px rgba(0,0,0,0.45)',
               overflow: 'hidden',
             }}
@@ -106,10 +106,10 @@ export function V1SearchTrigger() {
                 alignItems: 'center',
                 gap: 10,
                 padding: '12px 14px',
-                borderBottom: '1px solid var(--klant-border)',
+                borderBottom: '1px solid var(--v1-line)',
               }}
             >
-              <Search size={16} strokeWidth={1.8} style={{ color: 'var(--klant-dim)' }} />
+              <Search size={16} strokeWidth={1.8} style={{ color: 'var(--v1-muted)' }} />
               <input
                 ref={inputRef}
                 value={query}
@@ -134,15 +134,15 @@ export function V1SearchTrigger() {
                   border: 'none',
                   outline: 'none',
                   background: 'transparent',
-                  color: 'var(--klant-ink)',
-                  fontFamily: 'var(--klant-font-body)',
+                  color: 'var(--v1-ink)',
+                  fontFamily: 'inherit',
                   fontSize: 14,
                 }}
               />
             </div>
             <ul style={{ listStyle: 'none', margin: 0, padding: 6, maxHeight: 320, overflow: 'auto' }}>
               {results.length === 0 && (
-                <li style={{ padding: '16px 12px', color: 'var(--klant-dim)', fontSize: 13 }}>
+                <li style={{ padding: '16px 12px', color: 'var(--v1-muted)', fontSize: 13 }}>
                   Geen scherm gevonden.
                 </li>
               )}
@@ -159,17 +159,17 @@ export function V1SearchTrigger() {
                       alignItems: 'baseline',
                       gap: 10,
                       padding: '9px 11px',
-                      borderRadius: 'var(--klant-r-sm)',
+                      borderRadius: 'var(--v1-r-sm)',
                       border: 'none',
                       cursor: 'pointer',
-                      background: i === active ? 'var(--klant-accent-soft)' : 'transparent',
-                      fontFamily: 'var(--klant-font-body)',
+                      background: i === active ? 'rgba(13, 148, 136, 0.1)' : 'transparent',
+                      fontFamily: 'inherit',
                     }}
                   >
-                    <span style={{ fontSize: 13.5, color: 'var(--klant-ink)', fontWeight: 500 }}>
+                    <span style={{ fontSize: 13.5, color: 'var(--v1-ink)', fontWeight: 500 }}>
                       {r.label}
                     </span>
-                    <span style={{ fontSize: 12, color: 'var(--klant-dim)' }}>{r.hint}</span>
+                    <span style={{ fontSize: 12, color: 'var(--v1-muted)' }}>{r.hint}</span>
                   </button>
                 </li>
               ))}
