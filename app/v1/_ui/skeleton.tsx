@@ -28,7 +28,8 @@ export type PageSkeletonVariant =
   | 'settings'
   | 'account'
   | 'feedback'
-  | 'quiz';
+  | 'quiz'
+  | 'table';
 
 function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return (
@@ -331,6 +332,22 @@ function Body({ variant }: { variant: PageSkeletonVariant }) {
             </div>
           </Card>
         </div>
+      );
+
+    case 'table':
+      // Lijstpagina's (admin): kop, filterregel, kaart met tabelrijen.
+      return (
+        <>
+          <Head actions={1} />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[90, 110, 80, 120].map((w, i) => (
+              <Skeleton key={i} width={w} height={30} radius={999} />
+            ))}
+          </div>
+          <Card style={{ gap: 0 }}>
+            <ListRows count={7} />
+          </Card>
+        </>
       );
 
     case 'quiz':
