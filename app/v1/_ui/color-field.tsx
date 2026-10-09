@@ -51,6 +51,12 @@ export function ColorField({
       setError('Gebruik een kleurcode als #0C1E2E.');
       return;
     }
+    // Zelfde kleur (bv. alleen hoofdletters anders): geen wijziging melden,
+    // anders wordt een formulier "gewijzigd" door alleen het veld te verlaten.
+    if (hex === value.toLowerCase()) {
+      setText(value);
+      return;
+    }
     pick(hex);
   };
 
