@@ -1,19 +1,23 @@
-// V1 Preview — "Test je chatbot": FAB+paneel widget-look over een faux-website-mockup,
-// gespiegeld op V0's preview-pagina. Auth-keten = die van /v1/app: geen sessie →
-// getSessionOrg → requireAuth → redirect /v1/login; geen lid → AUTH_FORBIDDEN.
-// Org uit de sessie; chatbot + settings onder de session-client (RLS).
+// V1 Preview (spec §7.6b): de echte V1-widget-weergave op een neutrale nep-website.
+// Geen menu-item; bereikbaar via "Bekijk chatbot" op Overzicht en Widget.
+// Auth-keten = die van /v1/app: geen sessie → redirect /v1/login; geen lid →
+// AUTH_FORBIDDEN. Org uit de sessie; chatbot + settings onder de session-client (RLS).
 //
-// Firecrawl-screenshot is bewust overgeslagen (billable) — de PreviewFrame toont
-// een stijlvol mockup-backdrop in plaats van een echte screenshot.
+// Privacy: de client krijgt alleen WidgetAppearance (expliciet per veld), nooit
+// de ruwe settings.
 
+import Link from 'next/link';
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import { PageHead } from '@/app/klantendashboard/components/ui/page-head';
+import { toWidgetAppearance } from '@/lib/v1/widget/appearance';
+import { PageHeader } from '@/app/v1/_ui/page-header';
+import { buttonClass } from '@/app/v1/_ui/button';
 import { getOrgChatbot } from '../rag-config';
 import { getChatbotSettings } from '../instellingen/settings-config';
 import { PreviewFrame } from './preview-frame';
 import { V1PreviewWidget } from './v1-chat';
+import './preview.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,46 +27,33 @@ export default async function V1PreviewPage() {
     ({ orgId } = await getSessionOrg());
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
-      return (
-        <PageHead eyebrow="Preview" title="Geen toegang" subtitle="Je bent geen lid van deze organisatie." />
-      );
+      return <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />;
     }
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
   }
 
   const supabase = await createClient();
   const chatbot = await getOrgChatbot(supabase, orgId);
-  const settings = chatbot ? await getChatbotSettings(supabase, chatbot.id) : null;
+  if (!chatbot) {
+    return <PageHeader title="Test je chatbot" description="Er is nog geen chatbot ingesteld." />;
+  }
+  const settings = await getChatbotSettings(supabase, chatbot.id);
+  const appearance = toWidgetAppearance(settings, chatbot.name);
 
   return (
-    <>
-      <PageHead
-        eyebrow="Preview"
+    <div className="v1-page">
+      <PageHeader
         title="Test je chatbot"
-        subtitle="Stel een vraag en zie precies wat je bezoekers te zien krijgen."
+        description="Stel een vraag en zie precies wat je bezoekers te zien krijgen."
+        actions={
+          <Link href="/v1/app/widget" className={buttonClass({ variant: 'secondary' })}>
+            Naar Widget
+          </Link>
+        }
       />
-      {chatbot && settings ? (
-        <PreviewFrame>
-          <V1PreviewWidget
-            orgId={orgId}
-            chatbotId={chatbot.id}
-            chatbotName={chatbot.name}
-            welcomeMessage={settings.welcomeMessage}
-            // showStarterQuestions=false → geen chips; undefined/true → toon ze.
-            starterQuestions={settings.showStarterQuestions === false ? [] : (settings.starterQuestions ?? [])}
-            accentColor={settings.accentColor}
-            position={settings.position}
-            headerTitle={settings.headerTitle}
-            launcherText={settings.launcherText}
-          />
-        </PreviewFrame>
-      ) : (
-        <div className="klant-card" style={{ width: 'min(560px, 100%)' }}>
-          <p style={{ fontSize: 14, color: 'var(--klant-muted)', margin: 0 }}>
-            Er is nog geen chatbot ingesteld.
-          </p>
-        </div>
-      )}
-    </>
+      <PreviewFrame>
+        <V1PreviewWidget orgId={orgId} chatbotId={chatbot.id} appearance={appearance} />
+      </PreviewFrame>
+    </div>
   );
 }

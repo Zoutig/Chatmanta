@@ -1,30 +1,28 @@
 'use client';
 
-// Gefocuste V1-widget: FAB-launcher → chat-paneel → NDJSON-streaming chat, met
-// token-refresh-op-401 en postMessage-resize naar de loader. Bewust GEEN V0-extra's
-// (thread-drawer, feedback-duimen, contact-formulier, org-skins, fake-site) — die
-// zijn V2 (zie M-B_SPEC §G). Hergebruikt de NEUTRALE lib/widget-helpers.
+// V1-widget in de iframe van public/widget-v1.js: launcher → chatpaneel →
+// NDJSON-streaming chat, met token-refresh-op-401 en postMessage-resize naar de
+// loader. De weergave is de gedeelde WidgetView (bord B · Diepzee); hier zit
+// alleen de logica. Bewust geen V0-extra's (thread-drawer, duimpjes, org-skins).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { getOrCreateVisitorId } from '@/lib/widget/visitor-id';
-import { bestForegroundOn } from '@/lib/widget/contrast';
-import type { WidgetPosition } from '@/lib/v0/klantendashboard/types';
+import type { WidgetAppearance } from '@/lib/v1/widget/appearance';
+import { cleanHistory, isRetryable, retryTarget, type HistoryTurn } from '@/lib/v1/widget/chat-history';
+import { WidgetView, type WidgetMessage } from '../_widget/widget-view';
+import { ContactForm, type ContactPayload } from '../_widget/contact-form';
 
 export type V1WidgetProps = {
   slug: string;
   embedToken: string;
   botVersion: string;
-  accentColor: string;
-  position: WidgetPosition;
-  headerTitle: string;
-  welcomeMessage: string;
-  launcherText: string;
+  /** Alleen publieke merk-velden; opgebouwd via toWidgetAppearance (expliciet per veld). */
+  appearance: WidgetAppearance;
   /**
-   * Toont de "persoonlijk contact"-knop + -formulier in de widget. Komt uit de
-   * embed-payload (load-embed → org-settings). Default false → fail-closed: zonder
-   * expliciet aan-staan bieden we het formulier niet aan. De submit-route
-   * (/api/v1/contact-request) is de autoritatieve gate; dit is enkel de UI-zichtbaarheid.
+   * Toont de "persoonlijk contact"-knop + -formulier. Default false → fail-closed.
+   * De submit-route (/api/v1/contact-request) is de autoritatieve gate; dit is
+   * enkel de UI-zichtbaarheid.
    */
   contactRequestsEnabled?: boolean;
 };
@@ -36,14 +34,23 @@ type Msg = {
   streaming?: boolean;
   error?: boolean;
   // queryLogId komt binnen via het 'meta'-event (eerste regel van de stream).
-  // De 👍/👎-knoppen zijn bewust verwijderd (soft-launch 2026-10-06); de koppeling
+  // De duimpjes zijn bewust verwijderd (soft-launch 2026-10-06); de koppeling
   // blijft staan zodat ze zonder stream-wijziging terug kunnen.
   queryLogId?: string;
 };
 
 // We posten naar de loader met targetOrigin '*': de signalen (ready/resize) zijn
-// niet-gevoelig, en de loader valideert zélf e.origin vóór hij iets doet.
+// niet-gevoelig, en de loader valideert zelf e.origin vóór hij iets doet.
 const PARENT_TARGET = '*';
+
+// Het paneel mag pas animeren als de loader de iframe op open-formaat heeft
+// gezet; anders begint de animatie in de 110×110-iframe.
+const OPEN_MIN_HEIGHT = 200;
+const READY_FALLBACK_MS = 300;
+
+const MSG_UNAVAILABLE = 'Deze chat is even niet beschikbaar.';
+const MSG_FAILED = 'Er ging iets mis. Probeer het zo nog eens.';
+const MSG_DROPPED = 'De verbinding viel weg.';
 
 function makeId(): string {
   try {
@@ -54,9 +61,9 @@ function makeId(): string {
 }
 
 export function V1Widget(props: V1WidgetProps) {
-  const { slug, botVersion, accentColor, position, headerTitle, welcomeMessage, launcherText } = props;
+  const { slug, botVersion, appearance } = props;
+  const { accentColor, position, launcherText } = appearance;
   const contactEnabled = props.contactRequestsEnabled === true;
-  const fg = bestForegroundOn(accentColor);
 
   // Heartbeat: één ping bij mount (V0-embed-parity). host komt uit ?h= dat de
   // loader meegaf; voedt widget_last_seen_at voor Live-status + admin-widgetStatus.
@@ -75,37 +82,23 @@ export function V1Widget(props: V1WidgetProps) {
   }, [props.embedToken, slug]);
 
   const [open, setOpen] = useState(false);
+  const [ready, setReady] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [input, setInput] = useState('');
   const [pending, setPending] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [tooltipVisible, setTooltipVisible] = useState(false);
-  // Contact-formulier: dicht/open/verzonden. Eén sessie = één verzending (daarna
-  // tonen we de bedankt-staat i.p.v. het formulier opnieuw).
+  // Contact-formulier: dicht/open/verzonden. Eén sessie = één verzending.
   const [contactOpen, setContactOpen] = useState(false);
   const [contactDone, setContactDone] = useState(false);
 
   const embedTokenRef = useRef(props.embedToken);
   const visitorIdRef = useRef<string | null>(null);
   // Stabiele sessie-thread-id (één per widget-mount). Gaat als threadId mee in elke
-  // chat-POST zodat de turns server-side in één thread landen. Géén autorisatie-rol.
+  // chat-POST zodat de turns server-side in één thread landen. Geen autorisatie-rol.
   const threadIdRef = useRef<string>(makeId());
   const abortRef = useRef<AbortController | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Patch één message op id — gebruikt door de stream-handler.
-  const patchMsg = useCallback((id: string, patch: Partial<Msg>) => {
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === id);
-      if (idx < 0) return prev;
-      const next = prev.slice();
-      next[idx] = { ...next[idx], ...patch };
-      return next;
-    });
-  }, []);
-
-  // Host-grootte: de iframe-viewport zegt niets over het échte scherm. De loader
+  // Host-grootte: de iframe-viewport zegt niets over het echte scherm. De loader
   // (in de hostpagina) stuurt 'chatmanta:host'; init uit ?m=1 (anti-flits).
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -120,7 +113,7 @@ export function V1Widget(props: V1WidgetProps) {
     try {
       window.parent.postMessage({ type: 'chatmanta:ready' }, PARENT_TARGET);
     } catch {
-      /* parent niet bereikbaar — init uit ?m=1 blijft staan */
+      /* parent niet bereikbaar: init uit ?m=1 blijft staan */
     }
     return () => window.removeEventListener('message', onMsg);
   }, []);
@@ -133,6 +126,29 @@ export function V1Widget(props: V1WidgetProps) {
     window.parent.postMessage({ type: 'chatmanta:resize', state, side: position }, PARENT_TARGET);
   }, [open, tooltipVisible, position, launcherText]);
 
+  // Open-animatie pas starten als de iframe echt groot is (resize-event), met een
+  // vangnet-timer. Sluiten gaat direct.
+  useEffect(() => {
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    const big = () => window.innerHeight > OPEN_MIN_HEIGHT;
+    if (big()) {
+      setReady(true);
+      return;
+    }
+    const onResize = () => {
+      if (big()) setReady(true);
+    };
+    window.addEventListener('resize', onResize);
+    const t = setTimeout(() => setReady(true), READY_FALLBACK_MS);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      clearTimeout(t);
+    };
+  }, [open]);
+
   // Tooltip 1× tonen 4s na mount (alleen als er launcherText is), dan weg.
   useEffect(() => {
     if (open || !launcherText.trim()) return;
@@ -143,12 +159,6 @@ export function V1Widget(props: V1WidgetProps) {
       clearTimeout(hide);
     };
   }, [open, launcherText]);
-
-  // Auto-scroll bij nieuwe content.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, open]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -165,20 +175,12 @@ export function V1Widget(props: V1WidgetProps) {
     }
   }, [slug]);
 
-  // Contactformulier → /api/v1/contact-request. Spiegelt de chat-fetch: zelfde org-slug,
-  // x-chatmanta-embed-token, en 401→token-refresh→1×-retry zodat een traag ingevuld
-  // formulier de lead niet kost op een verlopen 30-min-token. consentGiven hard true
-  // (de route + DB-CHECK borgen het ook). Geeft true bij 200/201.
+  // Contactformulier → /api/v1/contact-request. Spiegelt de chat-fetch: zelfde
+  // org-slug, x-chatmanta-embed-token, en 401→token-refresh→1×-retry zodat een traag
+  // ingevuld formulier de lead niet kost op een verlopen 30-min-token. consentGiven
+  // hard true (de route + DB-CHECK borgen het ook). Geeft true bij 200/201.
   const submitContact = useCallback(
-    async (payload: {
-      name: string;
-      email: string | null;
-      phone: string | null;
-      preferredContact: 'call' | 'email';
-      subject: string | null;
-      message: string | null;
-      company_url: string;
-    }): Promise<boolean> => {
+    async (payload: ContactPayload): Promise<boolean> => {
       const post = (token: string) =>
         fetch(`/api/v1/contact-request?org=${encodeURIComponent(slug)}`, {
           method: 'POST',
@@ -200,7 +202,7 @@ export function V1Widget(props: V1WidgetProps) {
   );
 
   const runChat = useCallback(
-    async (question: string, assistantId: string, history: { role: 'user' | 'assistant'; content: string }[]) => {
+    async (question: string, assistantId: string, history: HistoryTurn[]) => {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       const visitorId = visitorIdRef.current ?? (visitorIdRef.current = getOrCreateVisitorId());
@@ -217,12 +219,12 @@ export function V1Widget(props: V1WidgetProps) {
           signal: ctrl.signal,
         });
 
-      const setAssistant = (patch: Partial<Msg>) =>
+      const patch = (p: Partial<Msg> | ((m: Msg) => Partial<Msg>)) =>
         setMessages((prev) => {
           const idx = prev.findIndex((m) => m.id === assistantId);
           if (idx < 0) return prev;
           const next = prev.slice();
-          next[idx] = { ...next[idx], ...patch };
+          next[idx] = { ...next[idx], ...(typeof p === 'function' ? p(next[idx]) : p) };
           return next;
         });
 
@@ -234,11 +236,7 @@ export function V1Widget(props: V1WidgetProps) {
           if (fresh) res = await postChat(fresh);
         }
         if (!res.ok || !res.body) {
-          setAssistant({
-            content: 'Deze chat is even niet beschikbaar. Ververs de pagina en probeer het opnieuw.',
-            error: true,
-            streaming: false,
-          });
+          patch({ content: MSG_UNAVAILABLE, error: true, streaming: false });
           return;
         }
 
@@ -261,18 +259,13 @@ export function V1Widget(props: V1WidgetProps) {
               continue;
             }
             if (ev.kind === 'meta') {
-              // Eerste regel van de stream — koppel de query_log-id aan deze bubble.
-              if (typeof ev.queryLogId === 'string') patchMsg(assistantId, { queryLogId: ev.queryLogId });
+              // Eerste regel van de stream: koppel de query_log-id aan deze bubbel.
+              if (typeof ev.queryLogId === 'string') patch({ queryLogId: ev.queryLogId });
             } else if (ev.kind === 'answer-start') {
-              setAssistant({ content: '', streaming: true });
+              patch({ content: '', streaming: true });
             } else if (ev.kind === 'answer-delta' && typeof ev.text === 'string') {
-              setMessages((prev) => {
-                const idx = prev.findIndex((m) => m.id === assistantId);
-                if (idx < 0) return prev;
-                const next = prev.slice();
-                next[idx] = { ...next[idx], content: next[idx].content + ev.text, streaming: true };
-                return next;
-              });
+              const delta = ev.text;
+              patch((m) => ({ content: m.content + delta, streaming: true }));
             } else if (
               ev.kind === 'answer-done' ||
               ev.kind === 'smalltalk' ||
@@ -280,461 +273,115 @@ export function V1Widget(props: V1WidgetProps) {
               ev.kind === 'replacement'
             ) {
               const answer = ev.response?.answer;
-              if (typeof answer === 'string') setAssistant({ content: answer, streaming: false });
-              else setAssistant({ streaming: false });
+              if (typeof answer === 'string') patch({ content: answer, streaming: false });
+              else patch({ streaming: false });
             } else if (ev.kind === 'error') {
-              setAssistant({
-                content: 'Er ging iets mis. Probeer het zo nog eens.',
-                error: true,
-                streaming: false,
-              });
+              patch({ content: MSG_FAILED, error: true, streaming: false });
             }
           }
         }
-        setAssistant({ streaming: false });
+        // Stream klaar zonder antwoord → als fout tonen (met Opnieuw proberen),
+        // niet als lege witte bubbel.
+        patch((m) =>
+          m.error || m.content.trim()
+            ? { streaming: false }
+            : { content: MSG_FAILED, error: true, streaming: false },
+        );
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;
-        setAssistant({ content: 'Verbinding viel weg — probeer het opnieuw.', error: true, streaming: false });
+        patch({ content: MSG_DROPPED, error: true, streaming: false });
       } finally {
         setPending(false);
         abortRef.current = null;
       }
     },
-    [slug, botVersion, refreshEmbedToken, patchMsg],
+    [slug, botVersion, refreshEmbedToken],
   );
 
-  const send = useCallback(() => {
-    const trimmed = input.trim();
-    if (!trimmed || pending) return;
-    const userMsg: Msg = { id: makeId(), role: 'user', content: trimmed };
-    const assistantId = makeId();
-    const history = messages
-      .filter((m) => m.role === 'user' || (m.role === 'assistant' && !m.streaming && !m.error))
-      .map((m) => ({ role: m.role, content: m.content }));
-    setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '', streaming: true }]);
-    setInput('');
-    setPending(true);
-    void runChat(trimmed, assistantId, history);
-  }, [input, pending, messages, runChat]);
+  const send = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || pending) return;
+      const userMsg: Msg = { id: makeId(), role: 'user', content: trimmed };
+      const assistantId = makeId();
+      const history = cleanHistory(messages);
+      setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '', streaming: true }]);
+      setPending(true);
+      void runChat(trimmed, assistantId, history);
+    },
+    [pending, messages, runChat],
+  );
 
-  // ---- styling ----
-  const radius = isMobile ? 0 : 16;
-  const panelStyle: React.CSSProperties = {
-    position: 'fixed',
-    inset: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    background: '#fff',
-    borderRadius: radius,
-    overflow: 'hidden',
-    boxShadow: isMobile ? 'none' : '0 12px 40px rgba(0,0,0,0.18)',
-    fontFamily: 'system-ui, sans-serif',
-  };
-  const fabSide = position === 'bottom-left' ? { left: 24 } : { right: 24 };
+  // Opnieuw proberen: alleen op de laatste foutbubbel. Die wordt vervangen door
+  // een nieuwe lege antwoordbubbel; zelfde chatpad, zelfde token-refresh.
+  const retry = useCallback(
+    (errorId: string) => {
+      if (pending) return;
+      const target = retryTarget(messages, errorId);
+      if (!target) return;
+      const assistantId = makeId();
+      setMessages((prev) =>
+        prev.map((m) => (m.id === errorId ? { id: assistantId, role: 'assistant', content: '', streaming: true } : m)),
+      );
+      setPending(true);
+      void runChat(target.question, assistantId, target.history);
+    },
+    [pending, messages, runChat],
+  );
 
-  if (!open) {
-    return (
-      <div>
-        {tooltipVisible && launcherText.trim() && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: 84,
-              ...fabSide,
-              maxWidth: 240,
-              background: '#fff',
-              color: '#111',
-              padding: '8px 12px',
-              borderRadius: 12,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-            }}
-          >
-            {launcherText}
-          </div>
-        )}
-        <button
-          type="button"
-          aria-label="Chat openen"
-          onClick={() => setOpen(true)}
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            ...fabSide,
-            width: 56,
-            height: 56,
-            borderRadius: '50%',
-            border: 'none',
-            background: accentColor,
-            color: fg,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
-          }}
-        >
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1Z"
-              fill="currentColor"
-            />
-          </svg>
-        </button>
-      </div>
-    );
-  }
+  const view: WidgetMessage[] = messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    streaming: m.streaming,
+    error: m.error,
+    retryable: m.error && isRetryable(messages, m.id),
+    content:
+      m.role === 'assistant' && m.content && !m.error
+        ? // linkify=false ALTIJD: widget-contract = sourceLinksEnabled UIT →
+          // links nooit klikbaar (label → platte tekst), ook niet bij een
+          // gedeelde answer_cache-hit die met sourceLinksEnabled=true schreef.
+          renderMarkdownLite(m.content, accentColor, false)
+        : m.content,
+  }));
 
-  return (
-    <div style={panelStyle}>
-      <header
-        style={{
-          background: accentColor,
-          color: fg,
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: 15 }}>{headerTitle}</span>
-        <button
-          type="button"
-          aria-label="Chat sluiten"
-          onClick={() => setOpen(false)}
-          style={{ background: 'transparent', border: 'none', color: fg, cursor: 'pointer', fontSize: 22, lineHeight: 1 }}
-        >
-          ×
-        </button>
-      </header>
-
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {messages.length === 0 && welcomeMessage.trim() && (
-          <Bubble role="assistant" accentColor={accentColor}>
-            {welcomeMessage}
-          </Bubble>
-        )}
-        {messages.map((m) => (
-          <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <Bubble role={m.role} accentColor={accentColor} error={m.error} fg={fg}>
-              {m.role === 'assistant'
-                ? m.content
-                  ? // linkify=false ALTIJD: widget-contract = sourceLinksEnabled UIT →
-                    // links nooit klikbaar (label → platte tekst), óók niet bij een
-                    // gedeelde answer_cache-hit die met sourceLinksEnabled=true schreef.
-                    renderMarkdownLite(m.content, accentColor, false)
-                  : m.streaming
-                  ? '…'
-                  : ''
-                : m.content}
-            </Bubble>
-          </div>
-        ))}
-
-        {/* Persoonlijk-contact: alleen als de org de feature aan heeft. */}
-        {contactEnabled && messages.length > 0 && (
-          contactDone ? (
-            <div style={{ alignSelf: 'flex-start', fontSize: 13, color: '#15803d', padding: '4px 2px' }}>
-              Bedankt! We nemen zo snel mogelijk contact met je op.
-            </div>
-          ) : contactOpen ? (
-            <ContactForm
-              accentColor={accentColor}
-              fg={fg}
-              onCancel={() => setContactOpen(false)}
-              onSubmit={submitContact}
-              onDone={() => {
-                setContactOpen(false);
-                setContactDone(true);
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setContactOpen(true)}
-              style={{
-                alignSelf: 'flex-start',
-                background: '#fff',
-                border: `1px solid ${accentColor}`,
-                color: accentColor,
-                borderRadius: 10,
-                padding: '7px 12px',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              Liever persoonlijk contact?
-            </button>
-          )
-        )}
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-        style={{ display: 'flex', gap: 8, padding: 12, borderTop: '1px solid #eee', flexShrink: 0 }}
-      >
-        <textarea
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          rows={1}
-          placeholder="Typ je vraag…"
-          aria-label="Je vraag"
-          style={{
-            flex: 1,
-            resize: 'none',
-            padding: '10px 12px',
-            fontSize: 14,
-            border: '1px solid #ccc',
-            borderRadius: 10,
-            fontFamily: 'inherit',
-            outline: 'none',
+  // Persoonlijk contact: alleen als de org de feature aan heeft.
+  const contactSlot =
+    contactEnabled && messages.length > 0 ? (
+      contactDone ? (
+        <div className="cmw-thanks" role="status">
+          Bedankt! We nemen zo snel mogelijk contact met je op.
+        </div>
+      ) : contactOpen ? (
+        <ContactForm
+          onCancel={() => setContactOpen(false)}
+          onSubmit={submitContact}
+          onDone={() => {
+            setContactOpen(false);
+            setContactDone(true);
           }}
         />
-        <button
-          type="submit"
-          disabled={pending || !input.trim()}
-          aria-label="Versturen"
-          style={{
-            background: accentColor,
-            color: fg,
-            border: 'none',
-            borderRadius: 10,
-            padding: '0 16px',
-            cursor: pending || !input.trim() ? 'default' : 'pointer',
-            opacity: pending || !input.trim() ? 0.6 : 1,
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          ➤
-        </button>
-      </form>
-    </div>
-  );
-}
-
-function Bubble({
-  role,
-  children,
-  accentColor,
-  error,
-  fg,
-}: {
-  role: 'user' | 'assistant';
-  children: React.ReactNode;
-  accentColor: string;
-  error?: boolean;
-  fg?: string;
-}) {
-  const isUser = role === 'user';
-  return (
-    <div
-      style={{
-        alignSelf: isUser ? 'flex-end' : 'flex-start',
-        maxWidth: '85%',
-        background: isUser ? accentColor : error ? '#fde8e8' : '#f1f1f3',
-        color: isUser ? fg ?? '#fff' : error ? '#a11' : '#111',
-        padding: '8px 12px',
-        borderRadius: 14,
-        fontSize: 14,
-        lineHeight: 1.45,
-        wordBreak: 'break-word',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ContactForm({
-  accentColor,
-  fg,
-  onCancel,
-  onSubmit,
-  onDone,
-}: {
-  accentColor: string;
-  fg: string;
-  onCancel: () => void;
-  onSubmit: (payload: {
-    name: string;
-    email: string | null;
-    phone: string | null;
-    preferredContact: 'call' | 'email';
-    subject: string | null;
-    message: string | null;
-    company_url: string;
-  }) => Promise<boolean>;
-  onDone: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [preferred, setPreferred] = useState<'email' | 'call'>('email');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
-  const [consent, setConsent] = useState(false);
-  // Honeypot — onzichtbaar voor mensen; bots vullen 'm. Gaat 1:1 mee naar de route.
-  const [honeypot, setHoneypot] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const valid =
-    name.trim().length > 0 &&
-    consent &&
-    (preferred === 'email' ? email.trim().length > 0 : phone.trim().length > 0);
-
-  const submit = async () => {
-    if (!valid || sending) return;
-    setSending(true);
-    setError(null);
-    const ok = await onSubmit({
-      name: name.trim(),
-      email: email.trim() || null,
-      phone: phone.trim() || null,
-      preferredContact: preferred,
-      subject: null,
-      message: message.trim() || null,
-      company_url: honeypot,
-    });
-    setSending(false);
-    if (ok) onDone();
-    else setError('Versturen lukte niet. Probeer het zo nog eens.');
-  };
-
-  const field: React.CSSProperties = {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '8px 10px',
-    fontSize: 13,
-    border: '1px solid #d1d5db',
-    borderRadius: 8,
-    fontFamily: 'inherit',
-    outline: 'none',
-  };
-  const label: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#374151' };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void submit();
-      }}
-      style={{
-        alignSelf: 'stretch',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        background: '#fff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 12,
-        padding: 12,
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>Persoonlijk contact</div>
-
-      {/* Honeypot: off-screen, niet focusbaar voor toetsenbord-gebruikers. */}
-      <input
-        type="text"
-        tabIndex={-1}
-        autoComplete="off"
-        aria-hidden="true"
-        value={honeypot}
-        onChange={(e) => setHoneypot(e.target.value)}
-        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
-      />
-
-      <label style={label}>
-        Naam
-        <input style={field} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
-      </label>
-
-      <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-          <input type="radio" name="prefer" checked={preferred === 'email'} onChange={() => setPreferred('email')} />
-          E-mail
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-          <input type="radio" name="prefer" checked={preferred === 'call'} onChange={() => setPreferred('call')} />
-          Telefoon
-        </label>
-      </div>
-
-      {preferred === 'email' ? (
-        <label style={label}>
-          E-mailadres
-          <input style={field} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={320} />
-        </label>
       ) : (
-        <label style={label}>
-          Telefoonnummer
-          <input style={field} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
-        </label>
-      )}
-
-      <label style={label}>
-        Bericht (optioneel)
-        <textarea
-          style={{ ...field, resize: 'vertical', minHeight: 56 }}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          maxLength={4000}
-        />
-      </label>
-
-      <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#374151', cursor: 'pointer' }}>
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 2 }} />
-        <span>Ik geef toestemming om mijn gegevens te gebruiken om contact met mij op te nemen.</span>
-      </label>
-
-      {error && <div style={{ fontSize: 12, color: '#b91c1c' }}>{error}</div>}
-
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          onClick={onCancel}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#6b7280',
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          Annuleren
+        <button type="button" className="cmw-soft-btn" onClick={() => setContactOpen(true)}>
+          Liever persoonlijk contact?
         </button>
-        <button
-          type="submit"
-          disabled={!valid || sending}
-          style={{
-            background: !valid || sending ? '#d1d5db' : accentColor,
-            color: !valid || sending ? '#6b7280' : fg,
-            border: 'none',
-            borderRadius: 8,
-            padding: '8px 14px',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: !valid || sending ? 'default' : 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          {sending ? 'Versturen…' : 'Versturen'}
-        </button>
-      </div>
-    </form>
+      )
+    ) : null;
+
+  return (
+    <WidgetView
+      appearance={appearance}
+      mode="embed"
+      isMobile={isMobile}
+      open={open}
+      onOpenChange={setOpen}
+      messages={view}
+      pending={pending}
+      onSend={send}
+      onRetry={retry}
+      peek={tooltipVisible}
+      belowMessages={contactSlot}
+      ready={ready}
+      autoFocus={!isMobile}
+    />
   );
 }

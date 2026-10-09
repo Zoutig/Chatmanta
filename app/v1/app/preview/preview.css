@@ -1,0 +1,67 @@
+/* Nep-website rond de widget op Preview en het Widget-scherm. */
+
+.v1-ui .v1-pv-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 640px;
+  height: min(760px, calc(100dvh - 220px));
+  border-radius: var(--v1-r-xl);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--v1-shadow-1);
+}
+.v1-ui .v1-pv-frame[data-compact] { min-height: 560px; height: 600px; }
+
+.v1-ui .v1-pv-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(12, 30, 46, 0.06);
+  background: #fbfcfd;
+}
+.v1-ui .v1-pv-dots { display: inline-flex; gap: 6px; }
+.v1-ui .v1-pv-dots i { width: 10px; height: 10px; border-radius: 50%; background: #dfe5eb; }
+.v1-ui .v1-pv-address {
+  flex: 1;
+  min-width: 0;
+  max-width: 360px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #f1f4f7;
+  font-size: 12px;
+  color: var(--v1-ink-3, #5b6b7b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v1-ui .v1-pv-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #f6f8fa;
+}
+.v1-ui .v1-pv-site { position: absolute; inset: 0; padding: 0 0 40px; }
+.v1-ui .v1-pv-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+  border-bottom: 1px solid rgba(12, 30, 46, 0.05);
+}
+.v1-ui .v1-pv-logo { width: 96px; height: 14px; border-radius: 7px; background: #dbe2e9; }
+.v1-ui .v1-pv-links { display: inline-flex; gap: 18px; }
+.v1-ui .v1-pv-links i { width: 48px; height: 8px; border-radius: 4px; background: #e3e8ee; }
+.v1-ui .v1-pv-hero { display: flex; flex-direction: column; gap: 10px; padding: 44px 28px 0; max-width: 520px; }
+.v1-ui .v1-pv-hero span { display: block; height: 11px; border-radius: 6px; background: #e3e8ee; }
+.v1-ui .v1-pv-hero span:first-child { background: #d5dde5; }
+.v1-ui .v1-pv-cards { display: flex; flex-wrap: wrap; gap: 16px; padding: 36px 28px 0; max-width: 620px; }
+.v1-ui .v1-pv-cards i { flex: 1 1 140px; height: 92px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px rgba(12, 30, 46, 0.05); }
+
+@media (max-width: 640px) {
+  .v1-ui .v1-pv-frame { min-height: 600px; height: calc(100dvh - 180px); border-radius: var(--v1-r-lg); }
+  .v1-ui .v1-pv-cards { display: none; }
+}

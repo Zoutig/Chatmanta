@@ -8,6 +8,7 @@ import { headers } from 'next/headers';
 import { loadV1Embed } from '@/lib/v1/widget/load-embed';
 import { V1Widget } from './v1-widget';
 import { EmbedBlocked } from './embed-blocked';
+import { v1Font } from '@/app/v1/_ui/fonts';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,10 @@ export default async function EmbedV1Page({ params, searchParams }: PageProps) {
   return (
     <>
       <style>{TRANSPARENT}</style>
-      <V1Widget {...result.props} />
+      {/* Plus Jakarta 400-700 (de root-layout laadt alleen 600-800). */}
+      <div className={v1Font.variable}>
+        <V1Widget {...result.props} />
+      </div>
     </>
   );
 }

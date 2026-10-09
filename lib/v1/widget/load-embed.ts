@@ -8,6 +8,7 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { mergeChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import { evaluateEmbedAccess } from '@/lib/widget/origin-allowlist';
 import { createEmbedToken } from './embed-token';
+import { toWidgetAppearance } from './appearance';
 import type { V1WidgetProps } from '@/app/embed-v1/[slug]/v1-widget';
 
 export type EmbedLoadResult =
@@ -62,7 +63,9 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
   }
 
   const settings = mergeChatbotSettings(chatbot.settings);
-  const headerTitle = settings.headerTitle.trim() || settings.chatbotName.trim() || chatbot.name;
+  // Alleen publieke merk-velden, expliciet per veld (nooit settings spreaden:
+  // daar zitten ook notificationEmail, extraInstructions en contactgegevens in).
+  const appearance = toWidgetAppearance(settings, chatbot.name);
   // Per-org feature-flag (settings-agent voegt het veld toe aan settings-config).
   // Defensief gelezen zodat dit ook vóór die wiring werkt (fail-closed → false).
   // De submit-route is de autoritatieve gate; dit stuurt alleen de UI-zichtbaarheid.
@@ -75,11 +78,7 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
       slug,
       embedToken: token,
       botVersion: chatbot.bot_version,
-      accentColor: settings.accentColor,
-      position: settings.position,
-      headerTitle,
-      welcomeMessage: settings.welcomeMessage,
-      launcherText: settings.launcherText,
+      appearance,
       contactRequestsEnabled,
     },
   };
