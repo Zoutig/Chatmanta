@@ -1,0 +1,145 @@
+/* Kennisbank (V1, golf 3b): lokale aanvullingen op app/v1/_ui/ui.css.
+ * Alles onder .v1-ui met prefix .v1-kb-; alleen tokens (var(--v1-...)). */
+
+/* ── Slepen-en-neerzetten ────────────────────────────────── */
+.v1-ui .v1-kb-file-input { display: none; }
+.v1-ui .v1-kb-overlay {
+  position: fixed; inset: 0; z-index: 1150; display: grid; place-items: center; padding: 24px;
+  background: rgba(12, 30, 46, 0.28); pointer-events: none; animation: v1-fade var(--v1-fast) ease both;
+}
+.v1-ui .v1-kb-overlay-card {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 36px;
+  border-radius: var(--v1-r-xl); background: var(--v1-surface); box-shadow: var(--v1-shadow-pop);
+  color: var(--v1-ink); font-size: 16px; font-weight: 700; text-align: center;
+  animation: v1-enter var(--v1-base) var(--v1-ease) both;
+}
+.v1-ui .v1-kb-overlay-card span { font-size: 13px; font-weight: 500; color: var(--v1-muted); }
+.v1-ui .v1-kb-overlay-icon {
+  width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+  background: rgba(13, 148, 136, 0.1); color: var(--v1-accent-ink);
+}
+
+/* ── Algemeen ────────────────────────────────────────────── */
+.v1-ui .v1-kb-tab-body { display: flex; flex-direction: column; gap: 16px; padding-top: 20px; }
+.v1-ui .v1-kb-card-flush { padding-top: 6px; padding-bottom: 6px; }
+.v1-ui .v1-kb-iconbtn--danger:hover:not(:disabled) { color: var(--v1-danger); background: var(--v1-danger-soft); }
+.v1-ui .v1-kb-iconbtn:disabled { opacity: 0.45; cursor: default; }
+.v1-ui .v1-kb-file-icon {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: var(--v1-r-sm); display: grid; place-items: center;
+  background: var(--v1-surface-2); color: var(--v1-ink-2);
+}
+.v1-ui .v1-kb-rowline { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.v1-ui .v1-kb-meta-error { color: var(--v1-danger); }
+.v1-ui .v1-kb-form-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.v1-ui .v1-kb-form-row > .v1-input { flex: 1 1 260px; }
+.v1-ui .v1-kb-card-title { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--v1-ink); }
+.v1-ui .v1-kb-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.v1-ui .v1-kb-card-stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* Zoekveld met icoon */
+.v1-ui .v1-kb-search { position: relative; flex: 1 1 240px; }
+.v1-ui .v1-kb-search > svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--v1-muted); pointer-events: none; }
+.v1-ui .v1-kb-search > .v1-input { padding-left: 38px; }
+
+/* Native vinkje in V1-kleur */
+.v1-ui .v1-kb-check { width: 16px; height: 16px; flex-shrink: 0; margin: 0; accent-color: var(--v1-accent); cursor: pointer; }
+
+/* Scrollvak voor lange paginalijsten */
+.v1-ui .v1-kb-scroll { max-height: min(56vh, 520px); overflow-y: auto; overscroll-behavior: contain; }
+
+/* ── Website-bron ────────────────────────────────────────── */
+.v1-ui .v1-kb-source { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; }
+.v1-ui .v1-kb-source-head { display: flex; align-items: center; gap: 10px; }
+.v1-ui .v1-kb-source-toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px 8px; margin: -6px -8px;
+  border: 0; border-radius: var(--v1-r-sm); background: transparent; color: inherit; font-family: var(--v1-font);
+  text-align: left; cursor: pointer; transition: background-color var(--v1-fast) ease;
+}
+.v1-ui .v1-kb-source-toggle:hover:not(:disabled) { background: var(--v1-bg); }
+.v1-ui .v1-kb-source-toggle:disabled { cursor: default; }
+.v1-ui .v1-kb-source-toggle:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-ui .v1-kb-source-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v1-ui .v1-kb-source-host { font-size: 14px; font-weight: 600; color: var(--v1-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v1-ui .v1-kb-source-meta { font-size: 12px; color: var(--v1-muted); }
+.v1-ui .v1-kb-chevron { flex-shrink: 0; color: var(--v1-muted); transition: transform var(--v1-fast) var(--v1-ease); }
+.v1-ui .v1-kb-chevron[data-open='true'] { transform: rotate(90deg); }
+.v1-ui .v1-kb-globe { flex-shrink: 0; color: var(--v1-accent-ink); }
+.v1-ui .v1-kb-pages { border-top: 1px solid var(--v1-line); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Statusregel bij een bron (crawl bezig / mislukt / leeg) */
+.v1-ui .v1-kb-status {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: var(--v1-r-md);
+  background: var(--v1-bg); font-size: 13px; line-height: 1.5; color: var(--v1-ink-2);
+}
+.v1-ui .v1-kb-status[data-tone='danger'] { background: var(--v1-danger-soft); }
+.v1-ui .v1-kb-status[data-tone='warn'] { background: var(--v1-warn-soft); }
+.v1-ui .v1-kb-status-line { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-kb-status-line > svg { flex-shrink: 0; margin-top: 2px; }
+.v1-ui .v1-kb-status[data-tone='danger'] .v1-kb-status-line { color: var(--v1-danger); }
+.v1-ui .v1-kb-status[data-tone='warn'] .v1-kb-status-line { color: var(--v1-warn); }
+.v1-ui .v1-kb-status-line .v1-spinner { width: 14px; height: 14px; margin-top: 2px; color: var(--v1-accent); }
+.v1-ui .v1-kb-status-num { margin-left: auto; font-weight: 600; color: var(--v1-ink-2); white-space: nowrap; }
+.v1-ui .v1-kb-status p { margin: 0; }
+.v1-ui .v1-kb-status .v1-hint { color: var(--v1-ink-2); }
+.v1-ui .v1-kb-status .v1-details > summary { font-size: 12px; }
+
+/* Technische details: tabel in een horizontale scrollbox */
+.v1-ui .v1-kb-scroll-x { overflow-x: auto; margin-top: 8px; }
+.v1-ui .v1-kb-events { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--v1-ink-2); }
+.v1-ui .v1-kb-events th { text-align: left; font-weight: 600; color: var(--v1-muted); white-space: nowrap; padding: 4px 8px; }
+.v1-ui .v1-kb-events td { padding: 4px 8px; vertical-align: top; border-top: 1px solid var(--v1-line); }
+
+/* Groepen in een paginalijst */
+.v1-ui .v1-kb-group + .v1-kb-group { border-top: 1px solid var(--v1-line); }
+.v1-ui .v1-kb-group-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 4px; border: 0; background: transparent;
+  color: var(--v1-ink); font: 600 13px var(--v1-font); text-align: left; cursor: pointer; border-radius: var(--v1-r-sm);
+}
+.v1-ui .v1-kb-group-head:hover { background: var(--v1-bg); }
+.v1-ui .v1-kb-group-head:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-ui .v1-kb-group-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v1-ui .v1-kb-group-count { font-weight: 500; color: var(--v1-muted); }
+.v1-ui .v1-kb-group-row { display: flex; align-items: center; gap: 10px; }
+.v1-ui .v1-kb-group-row > .v1-kb-group-head { flex: 1; min-width: 0; }
+.v1-ui .v1-kb-nested { padding-left: 28px; }
+.v1-ui .v1-kb-nested .v1-list-row { padding: 10px 0; }
+.v1-ui .v1-kb-pick { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--v1-ink); cursor: pointer; min-width: 0; }
+.v1-ui .v1-kb-pick > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v1-ui .v1-kb-count-line { font-size: 13px; color: var(--v1-muted); }
+.v1-ui .v1-kb-count-line b { color: var(--v1-ink); font-weight: 600; }
+.v1-ui .v1-kb-max { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--v1-ink); white-space: nowrap; }
+.v1-ui .v1-kb-max .v1-input { width: 76px; height: 36px; }
+.v1-ui .v1-kb-actions-end { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* ── Q&A ─────────────────────────────────────────────────── */
+.v1-ui .v1-kb-qa-row[data-inactive='true'] .v1-list-main { opacity: 0.6; }
+.v1-ui .v1-kb-qa-answer {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 13px; line-height: 1.5; color: var(--v1-muted);
+}
+.v1-ui .v1-kb-qa-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Huidig bot-antwoord (ook gebruikt op Gesprekken) */
+.v1-ui .v1-kb-bot { display: flex; flex-direction: column; gap: 8px; }
+.v1-ui .v1-kb-bot-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.v1-ui .v1-kb-thinking { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v1-muted); }
+.v1-ui .v1-kb-thinking .v1-spinner { width: 14px; height: 14px; color: var(--v1-accent); }
+.v1-ui .v1-kb-bot-answer { padding: 12px 14px; border-radius: var(--v1-r-md); background: var(--v1-surface-2); }
+.v1-ui .v1-kb-bot-label { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--v1-muted); }
+.v1-ui .v1-kb-bot-text { margin: 0; font-size: 13px; line-height: 1.6; color: var(--v1-ink-2); white-space: pre-wrap; }
+
+/* ── Bron bekijken ───────────────────────────────────────── */
+.v1-ui .v1-kb-source-text-body {
+  margin: 0; padding: 16px 18px; border-radius: var(--v1-r-md); background: var(--v1-surface); box-shadow: var(--v1-shadow-1);
+  font: 400 13px/1.65 var(--v1-font); color: var(--v1-ink-2); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.v1-ui .v1-kb-loading { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--v1-muted); }
+.v1-ui .v1-kb-loading .v1-spinner { color: var(--v1-accent); }
+
+@media (max-width: 900px) {
+  .v1-ui .v1-kb-source { padding: 14px 16px; }
+  .v1-ui .v1-kb-nested { padding-left: 12px; }
+}
+
+.v1-ui .v1-kb-linkbtn { padding: 0; border: 0; background: none; font-family: var(--v1-font); cursor: pointer; }
+.v1-ui .v1-kb-tab-body[hidden] { display: none; }

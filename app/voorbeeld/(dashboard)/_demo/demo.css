@@ -1,0 +1,23 @@
+/* Voorbeeld-dashboard: alleen de demo-strook. Prefix vb-, nooit v1-klassen herdefiniëren. */
+.vb-banner {
+  max-width: 1200px;
+  margin: -8px auto 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px 12px 16px;
+  border-radius: var(--v1-r-md);
+  background: linear-gradient(90deg, rgba(13, 148, 136, 0.1), rgba(13, 148, 136, 0.04));
+  border: 1px solid rgba(13, 148, 136, 0.22);
+  color: var(--v1-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.vb-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.vb-banner-text strong { font-weight: 700; color: var(--v1-accent-ink); }
+.vb-banner-text span { color: var(--v1-muted); }
+.vb-banner-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+@media (max-width: 760px) {
+  .vb-banner { flex-direction: column; align-items: stretch; margin-top: 0; }
+  .vb-banner-actions { justify-content: flex-end; flex-wrap: wrap; }
+}
