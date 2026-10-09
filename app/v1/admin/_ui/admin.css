@@ -128,3 +128,4 @@
   letter-spacing: 0;
 }
 .v1-ui .v1-adm-denied { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
+.v1-ui .v1-adm-empty { padding-top: 10px; }

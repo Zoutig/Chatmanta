@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/app/klantendashboard/components/ui/card';
+import { Field } from '@/app/v1/_ui/controls';
+import { Button } from '@/app/v1/_ui/button';
 import { createClientOrganization, type CreateOrgResult } from '../actions';
 
 export function NewOrgForm() {
@@ -26,55 +27,58 @@ export function NewOrgForm() {
         router.refresh(); // ververst de lijst-pagina als de admin terugnavigeert
       }
     } catch {
-      setResult({ ok: false, error: 'Er ging iets mis.' });
+      setResult({ ok: false, error: 'Er ging iets mis. Probeer het opnieuw.' });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Card>
-      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <section className="v1-card" style={{ maxWidth: 520 }}>
+      <form onSubmit={onSubmit} className="v1-form">
+        <Field label="Bedrijfsnaam">
+          {(id) => (
+            <input
+              id={id}
+              name="company_name"
+              className="v1-input"
+              required
+              minLength={2}
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label="E-mailadres eigenaar" hint="De eigenaar krijgt op dit adres een inloglink.">
+          {(id) => (
+            <input
+              id={id}
+              name="owner_email"
+              type="email"
+              className="v1-input"
+              required
+              value={ownerEmail}
+              onChange={(e) => setOwnerEmail(e.target.value)}
+            />
+          )}
+        </Field>
         <div>
-          <label className="klant-label" htmlFor="company_name">Bedrijfsnaam</label>
-          <input
-            id="company_name"
-            name="company_name"
-            className="klant-input"
-            required
-            minLength={2}
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-          />
+          <Button type="submit" loading={busy}>
+            Klant aanmaken en uitnodigen
+          </Button>
         </div>
-        <div>
-          <label className="klant-label" htmlFor="owner_email">E-mail owner</label>
-          <input
-            id="owner_email"
-            name="owner_email"
-            type="email"
-            className="klant-input"
-            required
-            value={ownerEmail}
-            onChange={(e) => setOwnerEmail(e.target.value)}
-          />
-          <p className="klant-hint">De owner krijgt een magic-link-uitnodiging op dit adres.</p>
-        </div>
-        <button type="submit" className="klant-btn" data-variant="primary" disabled={busy} style={{ justifyContent: 'center' }}>
-          {busy ? 'Bezig…' : 'Klant aanmaken + uitnodigen'}
-        </button>
-        {result?.ok && (
-          <p role="status" style={{ color: 'var(--klant-success)', fontSize: 13, margin: 0 }}>
-            Aangemaakt: org <strong>{result.slug}</strong>.{' '}
-            {result.invited ? 'Uitnodiging verstuurd.' : 'Owner bestond al — gekoppeld zonder nieuwe uitnodiging.'}
+        {result?.ok ? (
+          <p role="status" className="v1-alert v1-alert--ok">
+            Aangemaakt: <strong>{result.slug}</strong>.{' '}
+            {result.invited ? 'Uitnodiging verstuurd.' : 'De eigenaar bestond al en is gekoppeld, zonder nieuwe uitnodiging.'}
           </p>
-        )}
-        {result && !result.ok && (
-          <p role="alert" style={{ color: 'var(--klant-danger)', fontSize: 13, margin: 0 }}>
+        ) : null}
+        {result && !result.ok ? (
+          <p role="alert" className="v1-alert v1-alert--error">
             {result.error}
           </p>
-        )}
+        ) : null}
       </form>
-    </Card>
+    </section>
   );
 }

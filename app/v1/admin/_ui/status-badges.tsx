@@ -3,6 +3,7 @@
 
 import { Badge, type Tone } from '@/app/v1/_ui/feedback';
 import type { CommercialStatus, HealthStatus, TechnicalStatus } from '@/lib/controlroom/types';
+import type { WidgetStatus } from '@/lib/v0/klantendashboard/types';
 
 const COMMERCIAL: Record<CommercialStatus, { tone: Tone; label: string }> = {
   trial: { tone: 'accent', label: 'Proefperiode' },
@@ -48,4 +49,15 @@ export function HealthBadge({ status }: { status: HealthStatus }) {
       {s.label}
     </Badge>
   );
+}
+
+const WIDGET: Record<WidgetStatus, { tone: Tone; label: string }> = {
+  not_installed: { tone: 'warn', label: 'Niet geplaatst' },
+  detected: { tone: 'accent', label: 'Gevonden' },
+  active: { tone: 'ok', label: 'Actief' },
+};
+
+export function WidgetBadge({ status }: { status: WidgetStatus }) {
+  const s = WIDGET[status];
+  return <Badge tone={s.tone}>{s.label}</Badge>;
 }
