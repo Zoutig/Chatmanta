@@ -66,6 +66,7 @@
 }
 .v1-ui .v1-wg-hex { max-width: 160px; font-variant-numeric: tabular-nums; text-transform: uppercase; }
 .v1-ui .v1-wg-error { margin: 0; font-size: 12px; color: var(--v1-danger); }
+.v1-ui .v1-wg-warning { color: var(--v1-warn); }
 
 .v1-ui .v1-wg-icons { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .v1-ui .v1-wg-icon {

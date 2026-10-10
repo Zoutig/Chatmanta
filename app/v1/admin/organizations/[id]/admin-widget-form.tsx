@@ -15,6 +15,7 @@ import type { WidgetPosition, WidgetTheme } from '@/lib/v0/klantendashboard/type
 import { Button } from '@/app/v1/_ui/button';
 import { ChoiceTiles, Field, Segmented } from '@/app/v1/_ui/controls';
 import { ColorField } from '@/app/v1/_ui/color-field';
+import { ALLOWED_LOGO_TYPES, LogoError, normalizeLogoFile } from '@/lib/v1/widget/logo-normalize';
 import './org-forms.css';
 
 type LogoStyle = V1ChatbotSettings['logoStyle'];
@@ -22,16 +23,13 @@ type LogoStyle = V1ChatbotSettings['logoStyle'];
 const LOGO_OPTIONS: { value: LogoStyle; label: string; help: string }[] = [
   { value: 'brand-mark', label: 'ChatManta-mark', help: 'Merkteken, kleurt mee met de accentkleur.' },
   { value: 'chat-bubble', label: 'Chat-bubbel', help: 'Universeel pictogram.' },
-  { value: 'custom-logo', label: 'Eigen logo', help: 'PNG, JPG, WebP of SVG, maximaal 200 KB.' },
+  { value: 'custom-logo', label: 'Eigen logo', help: 'PNG, JPG, WebP of SVG. Wordt bijgesneden en passend gemaakt voor de ronde knop.' },
 ];
 
 const POSITION_OPTIONS: { value: WidgetPosition; label: string }[] = [
   { value: 'bottom-left', label: 'Linksonder' },
   { value: 'bottom-right', label: 'Rechtsonder' },
 ];
-
-const MAX_LOGO_BYTES = 200 * 1024;
-const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 
 type Appearance = Pick<
   V1ChatbotSettings,
@@ -53,6 +51,7 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
   const [baseline, setBaseline] = useState<Appearance>(a);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logoWarning, setLogoWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,23 +90,18 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
     });
   }
 
-  function handleLogoUpload(file: File) {
+  // Zelfde bijsnijden als op het klantscherm (lib/v1/widget/logo-normalize).
+  async function handleLogoUpload(file: File) {
     setError(null);
-    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
-      setError('Bestandstype niet ondersteund. Kies een PNG, JPG, WebP of SVG.');
-      return;
-    }
-    if (file.size > MAX_LOGO_BYTES) {
-      setError(`Bestand is te groot (${Math.round(file.size / 1024)} KB). Maximaal ${MAX_LOGO_BYTES / 1024} KB.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setA((prev) => ({ ...prev, logoStyle: 'custom-logo', customLogoDataUrl: String(reader.result ?? '') }));
+    setLogoWarning(null);
+    try {
+      const { dataUrl, warning } = await normalizeLogoFile(file);
+      setLogoWarning(warning);
+      setA((prev) => ({ ...prev, logoStyle: 'custom-logo', customLogoDataUrl: dataUrl }));
       setSaved(false);
-    };
-    reader.onerror = () => setError('Kon bestand niet lezen.');
-    reader.readAsDataURL(file);
+    } catch (e) {
+      setError(e instanceof LogoError ? e.message : 'Het logo kon niet worden verwerkt.');
+    }
   }
 
   return (
@@ -146,6 +140,7 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
             )}
           </div>
         )}
+        {logoWarning && a.logoStyle === 'custom-logo' ? <p className="v1-hint">{logoWarning}</p> : null}
         <input
           ref={fileInputRef}
           type="file"
@@ -153,7 +148,7 @@ export function AdminWidgetForm({ orgId, initial }: { orgId: string; initial: V1
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) handleLogoUpload(f);
+            if (f) void handleLogoUpload(f);
             e.target.value = '';
           }}
         />

@@ -17,11 +17,9 @@ import { useToast } from '@/app/v1/_ui/toast';
 import { saveChatbotSettingsAction } from '../instellingen/actions';
 import { PreviewFrame } from '../preview/preview-frame';
 import { changedFields, normalizeHex } from './format';
+import { ALLOWED_LOGO_TYPES, LogoError, normalizeLogoFile } from '@/lib/v1/widget/logo-normalize';
 import type { EditableAppearance } from './widget-form';
 
-// Max 200 KB voor de base64-data-URL (server-side cap = 300 KB incl. base64-overhead).
-const MAX_LOGO_BYTES = 200 * 1024;
-const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 const SWATCHES = ['#0c1e2e', ...COLOR_PRESETS];
 
 const POSITIONS = [
@@ -59,6 +57,7 @@ export function AppearanceStep({
   const [hexText, setHexText] = useState(() => initial.accentColor.toLowerCase());
   const [hexError, setHexError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoWarning, setLogoWarning] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
   const [saving, startSave] = useTransition();
   const [logoBusy, startLogo] = useTransition();
@@ -125,34 +124,36 @@ export function AppearanceStep({
 
   // Logo-wijzigingen slaan direct op; alleen de logo-velden van base en draft
   // worden bijgewerkt, zodat andere ongesavede wijzigingen blijven staan.
-  function saveLogo(logoPatch: Pick<EditableAppearance, 'logoStyle' | 'customLogoDataUrl'>, okText: string) {
-    startLogo(async () => {
-      const res = await saveChatbotSettingsAction(logoPatch);
-      if (res.ok) {
-        const saved = { logoStyle: res.settings.logoStyle, customLogoDataUrl: res.settings.customLogoDataUrl };
-        setBase((b) => ({ ...b, ...saved }));
-        setDraft((d) => ({ ...d, ...saved }));
-        toast.success(okText);
-      } else {
-        setLogoError(res.error || 'Opslaan van het logo lukte niet.');
-      }
-    });
+  async function persistLogo(logoPatch: Pick<EditableAppearance, 'logoStyle' | 'customLogoDataUrl'>, okText: string) {
+    const res = await saveChatbotSettingsAction(logoPatch);
+    if (res.ok) {
+      const saved = { logoStyle: res.settings.logoStyle, customLogoDataUrl: res.settings.customLogoDataUrl };
+      setBase((b) => ({ ...b, ...saved }));
+      setDraft((d) => ({ ...d, ...saved }));
+      toast.success(okText);
+    } else {
+      setLogoError(res.error || 'Opslaan van het logo lukte niet.');
+    }
   }
 
+  function saveLogo(logoPatch: Pick<EditableAppearance, 'logoStyle' | 'customLogoDataUrl'>, okText: string) {
+    startLogo(() => persistLogo(logoPatch, okText));
+  }
+
+  // Het logo wordt in de browser bijgesneden en passend gemaakt voor de ronde
+  // chatknop (lib/v1/widget/logo-normalize); alleen dat kleine PNG gaat naar de server.
   function onLogoFile(file: File) {
     setLogoError(null);
-    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
-      setLogoError('Kies een PNG, JPG, WebP of SVG.');
-      return;
-    }
-    if (file.size > MAX_LOGO_BYTES) {
-      setLogoError(`Dit bestand is ${(file.size / 1024).toFixed(0)} KB. Maximaal ${MAX_LOGO_BYTES / 1024} KB.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => saveLogo({ logoStyle: 'custom-logo', customLogoDataUrl: String(reader.result ?? '') }, 'Logo opgeslagen');
-    reader.onerror = () => setLogoError('Kon het bestand niet lezen.');
-    reader.readAsDataURL(file);
+    setLogoWarning(null);
+    startLogo(async () => {
+      try {
+        const { dataUrl, warning } = await normalizeLogoFile(file);
+        setLogoWarning(warning);
+        await persistLogo({ logoStyle: 'custom-logo', customLogoDataUrl: dataUrl }, 'Logo opgeslagen');
+      } catch (e) {
+        setLogoError(e instanceof LogoError ? e.message : 'Het logo kon niet worden verwerkt.');
+      }
+    });
   }
 
   const iconOptions = [
@@ -248,13 +249,20 @@ export function AppearanceStep({
                   variant="ghost"
                   size="sm"
                   disabled={logoBusy}
-                  onClick={() => saveLogo({ logoStyle: 'chat-bubble', customLogoDataUrl: null }, 'Logo verwijderd')}
+                  onClick={() => {
+                    setLogoWarning(null);
+                    saveLogo({ logoStyle: 'chat-bubble', customLogoDataUrl: null }, 'Logo verwijderd');
+                  }}
                 >
                   Logo verwijderen
                 </Button>
               </div>
             ) : null}
-            <p className="v1-hint">Eigen logo: PNG, JPG, WebP of SVG, maximaal 200 KB. Vierkant werkt het best.</p>
+            <p className="v1-hint">
+              Eigen logo: PNG, JPG, WebP of SVG. We snijden het bij en passen het in de ronde knop. Een vierkant
+              beeldmerk werkt het best.
+            </p>
+            {logoWarning ? <p className="v1-hint v1-wg-warning">{logoWarning}</p> : null}
             {logoError ? (
               <p className="v1-wg-error" role="alert">
                 {logoError}
