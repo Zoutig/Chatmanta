@@ -1,4 +1,121 @@
 /* Sectie how-it-works — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
    - Elke selector begint met `.site-ui .s-how` (root-klasse van deze sectie).
    - Keyframes heten `how-<naam>`.
-   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css.
+   Port van mockup-final §5 ("HOE HET WERKT"). */
+
+.site-ui .s-how .how-grid { display: grid; gap: 40px; }
+.site-ui .s-how .how-grid > * { min-width: 0; }
+@media (min-width: 900px) {
+  .site-ui .s-how .how-grid { grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+}
+
+/* ---- Sticky stage (alleen ≥900px) ---- */
+.site-ui .s-how .stage-col { display: none; }
+@media (min-width: 900px) {
+  .site-ui .s-how .stage-col { display: block; position: sticky; top: max(84px, calc(50vh - 230px)); order: -1; }
+}
+.site-ui .s-how .stage { position: relative; height: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-3); overflow: hidden; }
+.site-ui .s-how .stage-bar { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.site-ui .s-how .stage-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); }
+.site-ui .s-how .stage-bar .steps { margin-left: auto; display: flex; gap: 4px; }
+.site-ui .s-how .stage-bar .steps span { width: 22px; height: 4px; border-radius: 2px; background: var(--line-2); transition: background-color var(--base) var(--ease); }
+.site-ui .s-how .stage-bar .steps span.on { background: var(--teal); }
+.site-ui .s-how .scene { position: absolute; inset: 40px 0 0 0; padding: 28px; opacity: 0; visibility: hidden; transition: opacity var(--slow) var(--ease), visibility 0s linear var(--slow); }
+.site-ui .s-how .scene.on { opacity: 1; visibility: visible; transition: opacity var(--slow) var(--ease), visibility 0s; }
+.site-ui .s-how .scene-cap { display: block; color: var(--faint); margin-bottom: 14px; }
+
+/* scène 1: URL + documenten */
+.site-ui .s-how .urlbox { display: flex; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line-2); border-radius: 14px; background: #fff; box-shadow: var(--sh-1); }
+.site-ui .s-how .urlbox .pre { font-size: 0.92rem; color: var(--faint); padding-left: 8px; }
+.site-ui .s-how .urlbox .val { font-size: 0.98rem; font-weight: 500; color: var(--ink); flex: 1; white-space: nowrap; overflow: hidden; }
+.site-ui .s-how .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--teal); vertical-align: -3px; margin-left: 1px; animation: how-caret 1s steps(1) infinite; }
+@keyframes how-caret { 50% { opacity: 0; } }
+.site-ui .s-how .urlbox .go { padding: 9px 14px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 0.84rem; font-weight: 600; }
+.site-ui .s-how .s1-docs { margin-top: 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.site-ui .s-how .doc { border: 1px dashed var(--line-2); border-radius: 12px; padding: 12px; font-size: 0.8rem; color: var(--muted); display: flex; gap: 8px; align-items: center; background: var(--surface-2); min-width: 0; overflow-wrap: anywhere; }
+.site-ui .s-how .doc svg { width: 16px; color: var(--teal-ink); flex: none; }
+.site-ui .s-how .s1-note { margin-top: 20px; font-size: 0.84rem; color: var(--muted); }
+
+/* scène 2: crawl */
+.site-ui .s-how .crawl { position: relative; height: 300px; }
+.site-ui .s-how .tile { position: absolute; width: 11%; height: 11%; border-radius: 5px; border: 1px solid var(--line-2); background: #fff; transition: background-color var(--base) var(--ease), border-color var(--base) var(--ease); }
+.site-ui .s-how .tile::before,
+.site-ui .s-how .tile::after { content: ""; position: absolute; left: 15%; height: 2px; border-radius: 2px; background: var(--line-2); }
+.site-ui .s-how .tile::before { top: 30%; width: 60%; }
+.site-ui .s-how .tile::after { top: 58%; width: 40%; }
+.site-ui .s-how .tile.read { background: var(--teal-soft); border-color: var(--teal-line); }
+.site-ui .s-how .tile.read::before,
+.site-ui .s-how .tile.read::after { background: var(--teal); }
+.site-ui .s-how .blk { position: absolute; width: 4%; height: 3%; border-radius: 2px; background: var(--teal); opacity: 0; will-change: transform, opacity; }
+.site-ui .s-how .blk.sent { animation: how-fly 720ms var(--ease) forwards; }
+@keyframes how-fly {
+  0% { opacity: 0; transform: none; }
+  15% { opacity: 0.95; }
+  80% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.6); }
+}
+.site-ui .s-how .scan { position: absolute; left: 2%; width: 56%; top: 0; height: 2px; background: var(--teal); opacity: 0.6; transform: translateY(0); will-change: transform; }
+.site-ui .s-how .kb { position: absolute; left: 68%; top: 12%; width: 30%; height: 76%; border: 1px solid var(--teal-line); border-radius: 14px; background: linear-gradient(#fff, var(--teal-soft)); overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 10px; }
+.site-ui .s-how .kb .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: linear-gradient(rgba(13, 148, 136, 0.1), rgba(13, 148, 136, 0.22)); transform-origin: bottom; transform: scaleY(0); }
+.site-ui .s-how .kb b { position: relative; font-size: 0.74rem; color: var(--teal-ink); letter-spacing: 0.02em; }
+.site-ui .s-how .kb svg { position: absolute; top: 14px; width: 24px; color: var(--teal-ink); }
+.site-ui .s-how .crawl-count { margin-top: 16px; display: flex; align-items: center; gap: 10px; font-size: 0.92rem; color: var(--ink-2); }
+.site-ui .s-how .crawl-count .num { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--teal-ink); min-width: 2ch; display: inline-block; text-align: right; }
+.site-ui .s-how .crawl-count .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.site-ui .s-how .crawl-count .bar i { display: block; height: 100%; background: var(--teal); transform-origin: left; transform: scaleX(0); }
+
+/* scène 3 + stap 3: codefragment (Azeret Mono — alleen hier) */
+.site-ui .s-how .code { white-space: pre-wrap; margin: 0; font-family: var(--code); font-size: 0.8rem; line-height: 1.6; background: var(--ink); color: #cfe3f0; border-radius: 12px; padding: 14px 16px; overflow-wrap: anywhere; position: relative; }
+.site-ui .s-how .code code { font: inherit; }
+.site-ui .s-how .code .t { color: #7dd3c7; }
+.site-ui .s-how .code .a { color: #f5c78e; }
+.site-ui .s-how .code .s { color: #a5e3b5; }
+.site-ui .s-how .code.lit { box-shadow: 0 0 0 2px var(--teal); transition: box-shadow var(--slow) var(--ease); }
+.site-ui .s-how .minisite { margin-top: 16px; position: relative; height: 170px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); overflow: hidden; }
+.site-ui .s-how .minisite .hdr { height: 26px; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 0.7rem; font-weight: 600; color: var(--ink-2); }
+.site-ui .s-how .minisite .hdr i { width: 10px; height: 10px; border-radius: 3px; background: var(--demo-brand); }
+.site-ui .s-how .minisite .ln { height: 7px; border-radius: 4px; background: var(--line); margin: 10px 12px 0; }
+.site-ui .s-how .minisite .ln.w55 { width: 55%; }
+.site-ui .s-how .minisite .ln.w72 { width: 72%; }
+.site-ui .s-how .minisite .ln.w40 { width: 40%; }
+.site-ui .s-how .minisite .wbub { position: absolute; right: 12px; bottom: 12px; width: 40px; height: 40px; border-radius: 50%; background: var(--demo-brand); display: grid; place-items: center; box-shadow: 0 6px 16px -4px rgba(224, 102, 60, 0.6); transform: scale(0); transition: transform 420ms var(--spring); }
+.site-ui .s-how .minisite .wbub .mk { width: 24px; color: #fff; }
+.site-ui .s-how .minisite .wmsg { position: absolute; right: 60px; bottom: 18px; background: #fff; border: 1px solid var(--line); border-radius: 10px 10px 3px 10px; padding: 6px 10px; font-size: 0.72rem; box-shadow: var(--sh-1); opacity: 0; transform: translateY(6px); transition: opacity var(--base) var(--ease) 0.25s, transform var(--base) var(--ease) 0.25s; }
+/* scène 3 aan → na ±450ms (code licht eerst op) verschijnt de widgetknop, daarna het tekstballonnetje */
+.site-ui .s-how .scene.on .minisite .wbub { transform: scale(1); transition-delay: 450ms; }
+.site-ui .s-how .scene.on .minisite .wmsg { opacity: 1; transform: none; transition-delay: 700ms; }
+
+/* ---- Stappenkolom ---- */
+.site-ui .s-how .steps-col { display: flex; flex-direction: column; }
+.site-ui .s-how .step { padding: 8px 0 28px 24px; border-left: 2px solid var(--line); position: relative; }
+/* compact: genoeg scrollweg om de sticky stage te laten wisselen, geen lege meters */
+@media (min-width: 900px) {
+  .site-ui .s-how .step { min-height: clamp(260px, 40vh, 380px); display: flex; flex-direction: column; justify-content: center; padding: 24px 0 24px 28px; }
+}
+.site-ui .s-how .step::before { content: ""; position: absolute; left: -2px; top: 0; bottom: 0; width: 2px; background: var(--teal); transform-origin: top; transform: scaleY(0); transition: transform var(--slow) var(--ease); }
+/* actieve stap: gezet door HowScroller via data-active op .how-grid */
+.site-ui .s-how .how-grid[data-active="0"] .step[data-step="0"]::before,
+.site-ui .s-how .how-grid[data-active="1"] .step[data-step="1"]::before,
+.site-ui .s-how .how-grid[data-active="2"] .step[data-step="2"]::before { transform: scaleY(1); }
+.site-ui .s-how .step .no { color: var(--teal-ink); }
+.site-ui .s-how .step h3 { font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.7rem); margin: 10px 0; letter-spacing: -0.02em; }
+.site-ui .s-how .step p { color: var(--muted); max-width: 480px; }
+.site-ui .s-how .step .code { margin-top: 18px; max-width: 520px; }
+
+/* kleine statische visual per stap (<900px; de stage is daar verborgen) */
+.site-ui .s-how .mini { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 14px; box-shadow: var(--sh-1); }
+@media (min-width: 900px) { .site-ui .s-how .mini { display: none; } }
+.site-ui .s-how .mini .urlbox .val { padding-left: 8px; }
+.site-ui .s-how .mini .tiles { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+.site-ui .s-how .mini .tiles i { aspect-ratio: 1.4; border-radius: 3px; background: var(--teal-soft); border: 1px solid var(--teal-line); }
+.site-ui .s-how .mini .tiles i:nth-child(n + 17) { background: #fff; border-color: var(--line-2); }
+.site-ui .s-how .mini small { display: block; margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
+.site-ui .s-how .how-after { margin-top: 32px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .site-ui .s-how .caret { animation: none; }
+  .site-ui .s-how .blk { display: none; }
+  .site-ui .s-how .scene.on .minisite .wbub,
+  .site-ui .s-how .scene.on .minisite .wmsg { transition-delay: 0s; }
+}

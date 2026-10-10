@@ -1,4 +1,185 @@
 /* Sectie pricing — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
    - Elke selector begint met `.site-ui .s-pricing` (root-klasse van deze sectie).
    - Keyframes heten `pricing-<naam>`.
-   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css.
+   Port van mockup-final §10 (PRIJZEN). */
+
+.site-ui .s-pricing { background: linear-gradient(var(--bg), #fff 40%, var(--bg)); }
+
+.site-ui .s-pricing .compare-cost { max-width: 720px; margin: 0 auto 26px; text-align: center; font-size: 1.02rem; color: var(--ink-2); }
+.site-ui .s-pricing .compare-cost b { color: var(--teal-ink); font-variant-numeric: tabular-nums; }
+.site-ui .s-pricing .compare-cost small { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--faint); }
+
+/* ---------- Toggle jaarlijks / maandelijks ---------- */
+.site-ui .s-pricing .toggle-wrap { display: flex; justify-content: center; margin-bottom: 44px; }
+.site-ui .s-pricing .toggle {
+  position: relative; display: inline-flex; padding: 4px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-1); max-width: 100%;
+}
+.site-ui .s-pricing .toggle button {
+  white-space: nowrap; position: relative; z-index: 1; border: 0; background: none; min-height: 44px;
+  padding: 0 14px; border-radius: 10px; font: inherit; font-weight: 600; font-size: 0.92rem; color: var(--muted);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: color var(--base) var(--ease);
+}
+.site-ui .s-pricing .toggle button[aria-pressed='true'] { color: #fff; }
+.site-ui .s-pricing .toggle button .save {
+  font-size: 0.72rem; padding: 2px 7px; border-radius: 6px; background: var(--teal-soft); color: var(--teal-ink);
+  transition: background-color var(--base), color var(--base);
+}
+.site-ui .s-pricing .toggle button[aria-pressed='true'] .save { background: rgba(94, 234, 212, 0.18); color: #99f6e4; }
+.site-ui .s-pricing .toggle .pill {
+  position: absolute; top: 4px; bottom: 4px; left: 0; width: 100px; border-radius: 10px; background: var(--ink);
+  transform-origin: left; transition: transform var(--slow) cubic-bezier(0.3, 1.25, 0.5, 1);
+}
+/* Zonder JS / vóór de eerste meting: actieve knop kleurt zelf, pill verborgen */
+.site-ui .s-pricing .toggle:not(.is-ready) .pill { opacity: 0; }
+.site-ui .s-pricing .toggle:not(.is-ready) button[aria-pressed='true'] { background: var(--ink); }
+
+/* ---------- Kaarten ---------- */
+.site-ui .s-pricing .plans { display: grid; gap: 18px; align-items: stretch; max-width: 1120px; margin: 0 auto; }
+.site-ui .s-pricing .plans > * { min-width: 0; }
+@media (max-width: 979px) {
+  .site-ui .s-pricing .plans { max-width: 520px; }
+  .site-ui .s-pricing .plan.groei { order: -1; }
+}
+.site-ui .s-pricing .plan {
+  position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 26px 24px 22px; box-shadow: var(--sh-1); display: flex; flex-direction: column;
+}
+.site-ui .s-pricing .plan.groei {
+  background: var(--contours) center / cover no-repeat, linear-gradient(180deg, var(--navy-hi), #0f2639);
+  color: var(--on-dark); border-color: transparent; box-shadow: var(--sh-3);
+  --muted: #a9bccd; --faint: #8ea3b6; --line: rgba(255, 255, 255, 0.12);
+}
+.site-ui .s-pricing .plan.groei h3 { color: #fff; }
+.site-ui .s-pricing .plan.groei :focus-visible { box-shadow: var(--focus-dark); }
+@media (min-width: 980px) {
+  /* subgrid: titel, prijs, lijst en knop staan in alle drie kaarten op dezelfde hoogte */
+  .site-ui .s-pricing .plans { grid-template-columns: repeat(3, 1fr); column-gap: 20px; row-gap: 0; }
+  .site-ui .s-pricing .plan { display: grid; grid-row: span 9; grid-template-rows: subgrid; row-gap: 0; }
+}
+.site-ui .s-pricing .plan h3 { margin: 0; }
+.site-ui .s-pricing .badge-top {
+  position: absolute; top: -12px; left: 24px; background: var(--teal); color: #fff; font-size: 0.75rem;
+  font-weight: 600; letter-spacing: 0.02em; padding: 3px 10px; border-radius: 6px; white-space: nowrap; line-height: 1.4;
+}
+.site-ui .s-pricing .plan .who { font-size: 0.88rem; color: var(--muted); margin: 4px 0 0; min-height: 2.8em; }
+.site-ui .s-pricing .plan .norm {
+  margin: 18px 0 0; font-size: 0.84rem; color: var(--faint); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.site-ui .s-pricing .strike { position: relative; display: inline-flex; font-variant-numeric: tabular-nums; }
+.site-ui .s-pricing .strike::after {
+  content: ''; position: absolute; left: -2px; right: -2px; top: 52%; height: 1.5px; background: currentColor;
+  transform-origin: left; transform: scaleX(1);
+}
+.site-ui .s-pricing .strike.redraw::after { animation: pricing-strike 420ms var(--ease) both; }
+@keyframes pricing-strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.site-ui .s-pricing .price { display: flex; align-items: flex-end; gap: 6px; margin-top: 6px; }
+.site-ui .s-pricing .price .cur {
+  font-family: var(--display); font-size: 1.6rem; font-weight: 800; line-height: 1; padding-bottom: 4.3px; color: var(--ink);
+}
+.site-ui .s-pricing .plan.groei .price .cur,
+.site-ui .s-pricing .plan.groei .price .roll { color: #fff; }
+.site-ui .s-pricing .roll {
+  position: relative; display: inline-block; overflow: hidden; height: 1.05em;
+  font-family: var(--display); font-size: 3.4rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.05;
+  font-variant-numeric: tabular-nums; color: var(--ink); text-align: left;
+}
+.site-ui .s-pricing .roll > span { display: block; }
+.site-ui .s-pricing .price .per { font-size: 0.84rem; color: var(--muted); padding-bottom: 3.5px; line-height: 1.25; }
+.site-ui .s-pricing .billed { font-size: 0.8rem; color: var(--muted); min-height: 1.4em; margin: 2px 0 0; }
+.site-ui .s-pricing .perday { display: block; margin-top: 2px; font-size: 0.84rem; font-weight: 600; color: #5eead4; }
+
+.site-ui .s-pricing .feat { list-style: none; margin: 20px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.site-ui .s-pricing .feat li {
+  display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem;
+}
+.site-ui .s-pricing .feat li span { color: var(--muted); }
+.site-ui .s-pricing .feat li b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; max-width: 62%; }
+.site-ui .s-pricing .feat li b.no { color: var(--faint); font-weight: 500; }
+.site-ui .s-pricing .feat li b.yes { color: var(--teal-ink); }
+.site-ui .s-pricing .plan.groei .yes { color: #5eead4; }
+
+.site-ui .s-pricing .plan .btn { margin-top: 20px; width: 100%; }
+.site-ui .s-pricing .plan .micro { font-size: 0.78rem; color: var(--muted); text-align: center; margin: 10px 0 0; text-wrap: balance; }
+.site-ui .s-pricing .plan .rr { justify-content: center; font-size: 0.76rem; gap: 4px 10px; margin-top: 10px; }
+.site-ui .s-pricing .plan.groei .rr svg { color: #5eead4; }
+
+.site-ui .s-pricing .after-plans {
+  text-align: center; margin-top: 34px; display: grid; gap: 6px; justify-items: center; font-size: 0.92rem; color: var(--ink-2);
+}
+.site-ui .s-pricing .after-plans p { margin: 0; }
+.site-ui .s-pricing .after-plans p:nth-child(2) { color: var(--muted); }
+
+/* ---------- Vergelijkingstabel: native <details> (werkt zonder JS) ---------- */
+.site-ui .s-pricing .cmp { margin-top: 14px; }
+.site-ui .s-pricing .cmp > summary { list-style: none; display: flex; justify-content: center; cursor: pointer; border-radius: 12px; }
+.site-ui .s-pricing .cmp > summary::-webkit-details-marker { display: none; }
+.site-ui .s-pricing .cmp-toggle { pointer-events: none; }
+.site-ui .s-pricing .cmp > summary:focus-visible { box-shadow: none; }
+.site-ui .s-pricing .cmp > summary:focus-visible .cmp-toggle { box-shadow: var(--focus); }
+.site-ui .s-pricing .cmp > summary:hover .cmp-toggle { border-color: var(--ink); }
+.site-ui .s-pricing .cmp-toggle svg { width: 16px; height: 16px; flex: none; transition: transform var(--base) var(--ease); }
+.site-ui .s-pricing .cmp[open] .cmp-toggle svg { transform: rotate(180deg); }
+.site-ui .s-pricing .cmp-toggle .when-open { display: none; }
+.site-ui .s-pricing .cmp[open] .cmp-toggle .when-open { display: inline; }
+.site-ui .s-pricing .cmp[open] .cmp-toggle .when-closed { display: none; }
+.site-ui .s-pricing .cmp-inner { max-width: 1000px; margin: 28px auto 0; text-align: left; }
+@media (prefers-reduced-motion: no-preference) {
+  .site-ui .s-pricing .cmp[open] .cmp-inner { animation: pricing-cmpIn 240ms var(--ease); }
+}
+@keyframes pricing-cmpIn { from { opacity: 0; transform: translateY(-6px); } }
+
+.site-ui .s-pricing table.ct {
+  width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+}
+.site-ui .s-pricing .ct th,
+.site-ui .s-pricing .ct td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+.site-ui .s-pricing .ct tbody th { font-weight: 500; }
+.site-ui .s-pricing .ct thead th {
+  position: sticky; top: 58px; background: var(--surface); z-index: 1; font-family: var(--display); font-size: 1rem;
+}
+.site-ui .s-pricing .ct thead th:first-child { border-top-left-radius: 16px; }
+.site-ui .s-pricing .ct thead th:last-child { border-top-right-radius: 16px; }
+.site-ui .s-pricing .ct td:not(:first-child),
+.site-ui .s-pricing .ct th:not(:first-child) { text-align: center; width: 22%; }
+.site-ui .s-pricing .ct .grp td {
+  background: var(--surface-2); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); text-align: left;
+}
+.site-ui .s-pricing .ct .g { background: rgba(13, 148, 136, 0.05); }
+.site-ui .s-pricing .ct thead .g { background: #eef8f6; }
+.site-ui .s-pricing .ct tr:last-child td,
+.site-ui .s-pricing .ct tr:last-child th { border-bottom: 0; }
+
+.site-ui .s-pricing .ct-tabs { display: none; }
+@media (max-width: 759px) {
+  .site-ui .s-pricing table.ct { display: none; }
+  .site-ui .s-pricing .ct-tabs { display: block; }
+  .site-ui .s-pricing .tabbar {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 12px; position: sticky; top: 60px; z-index: 2; margin-bottom: 10px;
+  }
+  .site-ui .s-pricing .tabbar button {
+    min-height: 44px; border: 0; border-radius: 9px; background: none; font: inherit; font-weight: 600;
+    cursor: pointer; color: var(--muted);
+  }
+  .site-ui .s-pricing .tabbar button[aria-selected='true'] { background: var(--ink); color: #fff; }
+  .site-ui .s-pricing .tablist {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; margin-bottom: 10px;
+  }
+  .site-ui .s-pricing .tablist[hidden] { display: none; }
+  .site-ui .s-pricing .tablist .tp-h { font-family: var(--display); font-size: 1.05rem; font-weight: 800; padding: 12px 0 0; margin: 0; }
+  .site-ui .s-pricing .ct-tabs.is-tabs .tp-h { display: none; }
+  .site-ui .s-pricing .tablist .gh {
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 12px 0 4px;
+  }
+  .site-ui .s-pricing .tablist .rw {
+    display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem;
+  }
+  .site-ui .s-pricing .tablist .rw:last-child { border-bottom: 0; }
+  .site-ui .s-pricing .tablist .rw b { text-align: right; }
+}
+
