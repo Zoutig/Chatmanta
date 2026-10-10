@@ -10,7 +10,8 @@ import { ToastProvider } from '@/app/v1/_ui/toast';
 import type { AttentionSignals } from '@/lib/v1/dashboard/attention';
 import { V1Sidebar } from './sidebar';
 import { DemoBanner } from '../_demo/demo-banner';
-import { useDemoContactRequests, useDemoSettings } from '@/lib/voorbeeld/demo-store';
+import { useDemoContactRequests, useDemoConversations, useDemoQA, useDemoSettings } from '@/lib/voorbeeld/demo-store';
+import { ownUnanswered } from '@/lib/voorbeeld/own-activity';
 
 // Client-schil: houdt alleen de open/dicht-state van het mobiele menu bij.
 // data-klant-scope blijft staan zodat de (nog niet herontworpen) pagina's en de
@@ -34,6 +35,7 @@ export function ShellFrame({
   // Demo: de contactverzoeken-toggle en eigen ingediende verzoeken leven in de browser.
   const showContactRequests = useDemoSettings().contactRequestsEnabled;
   const ownNew = useDemoContactRequests().filter((r) => r.status === 'new').length;
+  const ownOpen = ownUnanswered(useDemoConversations(), useDemoQA()).length;
   const [navOpen, setNavOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -92,7 +94,7 @@ export function ShellFrame({
       <V1Sidebar
         orgName={orgName}
         chatbotStatus={chatbotStatus}
-        unansweredCount={unansweredCount}
+        unansweredCount={unansweredCount + ownOpen}
         showContactRequests={showContactRequests}
         contactRequestsCount={contactRequestsCount + ownNew}
         signals={signals}

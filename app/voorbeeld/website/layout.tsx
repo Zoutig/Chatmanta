@@ -3,10 +3,12 @@
 // tekst van precies deze pagina's (lib/voorbeeld/site-content.ts).
 import './site.css';
 import type { Metadata } from 'next';
+import { DEMO_SHARE_BASE, DEMO_SHARE_IMAGE } from '@/lib/voorbeeld/demo-defaults';
 import Link from 'next/link';
 import { Fraunces, Inter } from 'next/font/google';
 import { ForceLight } from '@/app/v1/_ui/force-light';
 import { DemoWidgetMount } from '@/app/voorbeeld/_widget/demo-widget-mount';
+import { DEMO_CONTACT_HREF } from '@/lib/voorbeeld/demo-defaults';
 import {
   COMPANY,
   MAIN_NAV,
@@ -37,6 +39,16 @@ export const metadata: Metadata = {
   },
   description: 'Fictieve voorbeeldwebsite van een vakantiepark in de Zeeuwse duinen, met de ChatManta-chatbot.',
   robots: { index: false, follow: false },
+  metadataBase: DEMO_SHARE_BASE,
+  openGraph: {
+    type: 'website',
+    locale: 'nl_NL',
+    siteName: 'ChatManta',
+    title: 'Voorbeeldwebsite met de ChatManta-chatbot',
+    description: 'Stel een vraag aan de chatbot rechtsonder: hij antwoordt met de tekst van deze website.',
+    images: [DEMO_SHARE_IMAGE],
+  },
+  twitter: { card: 'summary_large_image', images: [DEMO_SHARE_IMAGE.url] },
 };
 
 const FOOTER_GROUPS: SitePageGroup[] = ['verblijf', 'park', 'praktisch', 'over'];
@@ -55,9 +67,14 @@ export default function VoorbeeldWebsiteLayout({ children }: { children: React.R
         <div className="dh-demobar" role="note">
           <div className="dh-container dh-demobar-inner">
             <p>Dit is een voorbeeldwebsite van een fictief bedrijf. De chatbot rechtsonder is ChatManta.</p>
-            <Link href="/voorbeeld" className="dh-demobar-link">
-              ← Terug naar het dashboard
-            </Link>
+            <span className="dh-demobar-links">
+              <a href={DEMO_CONTACT_HREF} className="dh-demobar-link">
+                Ook voor jouw website?
+              </a>
+              <Link href="/voorbeeld" className="dh-demobar-link">
+                ← Terug naar het dashboard
+              </Link>
+            </span>
           </div>
         </div>
 

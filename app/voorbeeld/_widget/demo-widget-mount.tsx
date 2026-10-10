@@ -149,6 +149,7 @@ export function DemoWidgetMount() {
           question,
           answer: res.answer,
           kind: res.kind,
+          unanswered: res.unanswered,
           sources: res.sources,
           at: new Date().toISOString(),
         });

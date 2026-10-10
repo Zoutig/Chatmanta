@@ -49,3 +49,13 @@ export const DEMO_DEFAULT_SETTINGS: DemoSettings = {
   notificationEmail: '',
 };
 
+
+/** Contact met ChatManta vanuit de demo ("Ook voor jouw website?"). */
+export const DEMO_CONTACT_EMAIL = 'sebastiaan@chatmanta.com';
+export const DEMO_CONTACT_HREF = `mailto:${DEMO_CONTACT_EMAIL}?subject=${encodeURIComponent(
+  'ChatManta voor mijn website',
+)}&body=${encodeURIComponent('Hoi Sebastiaan,\n\nIk heb de demo op chatmanta.nl/voorbeeld bekeken en wil graag weten hoe dit er voor mijn website uitziet.\n\nMijn website: \n')}`;
+
+/** Deelvoorbeeld (WhatsApp, LinkedIn, mail): absolute basis + vaste afbeelding in public/og. */
+export const DEMO_SHARE_BASE = new URL('https://www.chatmanta.nl');
+export const DEMO_SHARE_IMAGE = { url: '/og/voorbeeld.png', width: 1200, height: 630, alt: 'ChatManta in actie op een voorbeeldwebsite' };

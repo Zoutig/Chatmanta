@@ -3,14 +3,15 @@
 // De instellingen gaan elke vraag mee: zo volgt de chatbot direct wat de bezoeker
 // in het voorbeeld-dashboard aanpast.
 
-import type { DemoSettings } from './demo-store';
+import { isRefusalForCalibration } from '@/lib/rag/hard-eval-checks';
+import { readDemoOwnQA, type DemoSettings } from './demo-store';
 
 export type DemoChatTurn = { role: 'user' | 'assistant'; content: string };
 
 export type DemoSource = { title: string; url?: string; similarity: number };
 
 export type DemoChatResult =
-  | { ok: true; answer: string; kind: string; sources: DemoSource[] }
+  | { ok: true; answer: string; kind: string; unanswered: boolean; sources: DemoSource[] }
   | { ok: false; error: 'RATE_LIMITED' | 'FAILED' | 'THROWN' };
 
 type StreamEvent = {
@@ -36,6 +37,16 @@ function toSources(list: NonNullable<StreamEvent['response']>['sources']): DemoS
   return out.slice(0, 4);
 }
 
+/**
+ * Gaf de bot geen inhoudelijk antwoord? Fallback telt altijd; een "weet ik niet"-
+ * antwoord van het model ook (zelfde weiger-herkenning als de eval). Smalltalk niet.
+ */
+function isUnanswered(kind: string, answer: string): boolean {
+  if (kind === 'smalltalk') return false;
+  if (kind !== 'answer' && kind !== 'fallback') return false;
+  return isRefusalForCalibration(answer, kind);
+}
+
 export async function streamDemoChat(input: {
   question: string;
   history: DemoChatTurn[];
@@ -53,6 +64,8 @@ export async function streamDemoChat(input: {
         history: input.history.slice(-16),
         // Het logo (base64) is niet nodig voor het antwoord: niet meesturen.
         settings: { ...input.settings, customLogoDataUrl: null },
+        // Eigen Q&A's uit de Kennisbank: zo weet de bot direct wat de bezoeker toevoegde.
+        qa: readDemoOwnQA(),
       }),
       signal: input.signal,
     });
@@ -87,10 +100,12 @@ export async function streamDemoChat(input: {
     ) {
       const answer = ev.response?.answer ?? text;
       input.onDelta?.(answer);
+      const kind = ev.response?.kind ?? ev.kind;
       final = {
         ok: true,
         answer,
-        kind: ev.response?.kind ?? ev.kind,
+        kind,
+        unanswered: isUnanswered(kind, answer),
         sources: ev.response?.kind === 'fallback' ? [] : toSources(ev.response?.sources),
       };
     } else if (ev.kind === 'error') {
@@ -112,9 +127,9 @@ export async function streamDemoChat(input: {
     }
     handle(buffer);
   } catch {
-    return text ? { ok: true, answer: text, kind: 'answer', sources: [] } : { ok: false, error: 'THROWN' };
+    return text ? { ok: true, answer: text, kind: 'answer', unanswered: isUnanswered('answer', text), sources: [] } : { ok: false, error: 'THROWN' };
   }
 
   if (final) return final;
-  return text ? { ok: true, answer: text, kind: 'answer', sources: [] } : { ok: false, error: 'FAILED' };
+  return text ? { ok: true, answer: text, kind: 'answer', unanswered: isUnanswered('answer', text), sources: [] } : { ok: false, error: 'FAILED' };
 }

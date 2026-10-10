@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUpRight, RotateCcw } from 'lucide-react';
+import { ArrowUpRight, Mail, RotateCcw } from 'lucide-react';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { useToast } from '@/app/v1/_ui/toast';
 import { DEMO_SITE_PATH, resetDemo } from '@/lib/voorbeeld/demo-store';
+import { DEMO_CONTACT_HREF } from '@/lib/voorbeeld/demo-defaults';
 
 // Vaste strook boven elke voorbeeldpagina: wat dit is + de weg naar de voorbeeldwebsite.
 export function DemoBanner() {
@@ -29,7 +30,10 @@ export function DemoBanner() {
         >
           <RotateCcw size={14} aria-hidden="true" /> Opnieuw beginnen
         </button>
-        <Link href={DEMO_SITE_PATH} className={buttonClass({ variant: 'primary', size: 'sm' })}>
+        <a id="vb-contact" href={DEMO_CONTACT_HREF} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+          <Mail size={14} aria-hidden="true" /> Ook voor jouw website?
+        </a>
+        <Link id="vb-open-site" href={DEMO_SITE_PATH} className={buttonClass({ variant: 'primary', size: 'sm' })}>
           Open de voorbeeldwebsite <ArrowUpRight size={14} aria-hidden="true" />
         </Link>
       </div>

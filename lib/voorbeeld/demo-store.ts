@@ -18,6 +18,7 @@ import { DEMO_DEFAULT_SETTINGS, type DemoSettings } from './demo-defaults';
 const SETTINGS_KEY = 'chatmanta-voorbeeld:settings';
 const CONTACT_KEY = 'chatmanta-voorbeeld:contact';
 const CONVO_KEY = 'chatmanta-voorbeeld:gesprekken';
+const QA_KEY = 'chatmanta-voorbeeld:qa';
 const CHANGE_EVENT = 'chatmanta-voorbeeld:change';
 
 // ---------------------------------------------------------------------------
@@ -185,6 +186,8 @@ export type DemoTurn = {
   answer: string;
   /** 'answer' | 'fallback' | 'smalltalk' (engine-kind) */
   kind: string;
+  /** Bot gaf geen inhoudelijk antwoord (fallback óf een "weet ik niet"-antwoord). */
+  unanswered?: boolean;
   sources: { title: string; url?: string; similarity: number }[];
   at: string;
 };
@@ -235,8 +238,49 @@ export function useDemoWidgetState(): DemoWidgetState {
   return useSyncExternalStore(subscribe, readDemoWidgetState, () => WIDGET_DEFAULT);
 }
 
+// ---------------------------------------------------------------------------
+// Q&A (Kennisbank): de hele lijst zodra de bezoeker iets wijzigt. Items die hij
+// zelf schreef of aanpaste krijgen `own: true`; alleen die gaan mee naar de
+// demo-chat (de kennis van de voorbeeld-fixtures zit al in de website-tekst).
+// ---------------------------------------------------------------------------
+
+export type DemoQAItem = {
+  id: string;
+  question: string;
+  answer: string;
+  category: string | null;
+  active: boolean;
+  ingestedDocumentId: string | null;
+  own?: boolean;
+};
+
+/** Opgeslagen lijst, of null als de bezoeker nog niets aan de Q&A veranderde. */
+export function readDemoQA(): DemoQAItem[] | null {
+  return cached(QA_KEY, () => {
+    const raw = readJson<unknown>(QA_KEY);
+    return Array.isArray(raw) ? (raw as DemoQAItem[]) : null;
+  });
+}
+
+export function writeDemoQA(list: DemoQAItem[]): void {
+  writeJson(QA_KEY, list.slice(0, 50));
+}
+
+export function useDemoQA(): DemoQAItem[] | null {
+  return useSyncExternalStore(subscribe, readDemoQA, () => null);
+}
+
+/** Wat de demo-chat meekrijgt: eigen, actieve Q&A's (begrensd; de route capt opnieuw). */
+export function readDemoOwnQA(): { question: string; answer: string }[] {
+  return (readDemoQA() ?? [])
+    .filter((q) => q.own && q.active && q.question.trim() && q.answer.trim())
+    .slice(0, 10)
+    .map((q) => ({ question: q.question.slice(0, 300), answer: q.answer.slice(0, 1500) }));
+}
+
 /** Alles terug naar de begintoestand van de demo. */
 export function resetDemo(): void {
+  writeJson(QA_KEY, null);
   writeJson(WIDGET_KEY, null);
   writeJson(SETTINGS_KEY, null);
   writeJson(CONTACT_KEY, null);

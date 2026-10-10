@@ -12,6 +12,7 @@ import '@/app/v1/_ui/ui.css';
 import '../../klantendashboard/klant.css';
 import './_demo/demo.css';
 import type { Metadata } from 'next';
+import { DEMO_SHARE_BASE, DEMO_SHARE_IMAGE } from '@/lib/voorbeeld/demo-defaults';
 import { v1Font } from '@/app/v1/_ui/fonts';
 import { ForceLight } from '@/app/v1/_ui/force-light';
 import { DEMO_SHELL } from '@/lib/voorbeeld/fixtures/shell';
@@ -21,6 +22,17 @@ export const metadata: Metadata = {
   title: 'ChatManta · Voorbeeld-dashboard',
   description: 'Zo ziet het ChatManta-klantendashboard eruit. Voorbeeld met een fictief vakantiepark.',
   robots: { index: false, follow: false },
+  metadataBase: DEMO_SHARE_BASE,
+  openGraph: {
+    type: 'website',
+    locale: 'nl_NL',
+    siteName: 'ChatManta',
+    url: '/voorbeeld',
+    title: 'Zie ChatManta in actie',
+    description: 'Een echte chatbot op een voorbeeldwebsite. Pas hem aan in het dashboard en zie het meteen gebeuren.',
+    images: [DEMO_SHARE_IMAGE],
+  },
+  twitter: { card: 'summary_large_image', title: 'Zie ChatManta in actie', images: [DEMO_SHARE_IMAGE.url] },
 };
 
 export default function VoorbeeldDashboardLayout({

@@ -8,13 +8,15 @@ import Link from 'next/link';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { EmptyState, StatusPill } from '@/app/v1/_ui/feedback';
-import { List, ListRow, SectionHead } from '@/app/v1/_ui/list';
+import { SectionHead } from '@/app/v1/_ui/list';
 import { OnboardingTour, type TourStep } from '@/app/klantendashboard/components/onboarding-tour';
 import { DEMO_SHELL } from '@/lib/voorbeeld/fixtures/shell';
 import { getFixtureOverviewMetrics } from '@/lib/voorbeeld/fixtures/overzicht';
 import { NextStep } from './_overview/next-step';
 import { TourButton } from './_overview/tour-button';
 import { DemoStats } from './_overview/demo-stats';
+import { OwnActivityCard } from './_overview/own-activity-card';
+import { UnansweredList } from './_overview/unanswered-list';
 import './_overview/overview.css';
 
 // Begroeting en datums hangen van het tijdstip af: per request renderen.
@@ -38,36 +40,50 @@ function shortDate(iso: string): string {
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: TZ });
 }
 
-const QA_HREF = '/voorbeeld/kennisbank?tab=qa&prefillQuestion=';
-
-// Rondleiding: selectors bestaan in de nieuwe schil en op dit scherm.
-// '#setup-checklist' (het volgende-stap-blok) wordt door OnboardingTour
-// weggefilterd als dat blok niet getoond wordt (setupChecklistVisible=false).
+// Rondleiding, alleen op de knop (autoStart uit): het demo-pad in plaats van
+// de algemene V1-rondleiding. Selectors bestaan in de demo-schil en op dit scherm.
 const TOUR_STEPS: TourStep[] = [
-  { selector: null, placement: 'center', title: 'Welkom bij ChatManta', body: 'In een paar stappen zie je waar alles staat.' },
   {
-    selector: '#v1-sidebar a[href="/voorbeeld/kennisbank"]',
-    placement: 'right',
-    title: 'Kennisbank',
-    body: 'Voeg je website en documenten toe. Hieruit haalt je chatbot zijn antwoorden.',
+    selector: null,
+    placement: 'center',
+    title: 'Zo werkt deze demo',
+    body: 'Dit is het dashboard van een fictief vakantiepark. Alles wat je aanpast, bewaren we alleen in jouw browser. Probeer gerust van alles uit.',
   },
   {
-    selector: '#v1-ov-preview',
+    selector: '#vb-open-site',
     placement: 'bottom',
-    title: 'Bekijk chatbot',
-    body: 'Zie je chatbot zoals bezoekers hem zien en stel zelf een paar testvragen.',
+    title: 'Stel een vraag op de website',
+    body: 'Open de voorbeeldwebsite en klik rechtsonder op de chat. De chatbot antwoordt echt, met de tekst van die website.',
+  },
+  {
+    selector: '#v1-sidebar a[href="/voorbeeld/instellingen"]',
+    placement: 'right',
+    title: 'Verander hoe hij praat',
+    body: 'Kies een andere toon, kortere antwoorden of een extra instructie. De chatbot op de website volgt het meteen.',
   },
   {
     selector: '#v1-sidebar a[href="/voorbeeld/widget"]',
     placement: 'right',
-    title: 'Widget',
-    body: 'Kies je kleuren en kopieer de code voor je website.',
+    title: 'Pas het uiterlijk aan',
+    body: 'Kleur, positie en welkomsttekst van de chatknop. Ook dat zie je direct terug op de website.',
   },
   {
-    selector: '#setup-checklist',
+    selector: '#vb-unanswered',
+    placement: 'right',
+    title: 'Leer hem iets nieuws',
+    body: 'Vraag op de website iets wat er niet staat. De vraag verschijnt hier. Klik op Antwoord geven, vul het antwoord in en vraag het opnieuw: nu weet hij het.',
+  },
+  {
+    selector: '#v1-sidebar a[href="/voorbeeld/gesprekken"]',
+    placement: 'right',
+    title: 'Lees mee',
+    body: 'Je eigen gesprekken staan bij Gesprekken, gemarkeerd met Jij. Een ingevuld contactformulier vind je bij Contactverzoeken.',
+  },
+  {
+    selector: '#vb-contact',
     placement: 'bottom',
-    title: 'Volgende stap',
-    body: 'Hier zie je wat er nog moet gebeuren voor je chatbot live staat.',
+    title: 'Ook voor jouw website?',
+    body: 'Mail ons gerust. We laten graag zien hoe dit er met jouw eigen website uitziet.',
   },
 ];
 
@@ -102,31 +118,17 @@ export default function V1OverviewPage() {
 
       <DemoStats metrics={m} contactRequestsNewCount={DEMO_SHELL.contactRequestsNewCount} />
 
+      <OwnActivityCard />
+
       <div className="v1-ov-cols">
-        <section className="v1-card v1-ov-card-list" aria-label="Hier wist je chatbot het niet">
+        <section id="vb-unanswered" className="v1-card v1-ov-card-list" aria-label="Hier wist je chatbot het niet">
           <SectionHead title="Hier wist je chatbot het niet" link={{ href: '/voorbeeld/gesprekken', label: 'Alle gesprekken' }} />
-          {unanswered.length === 0 ? (
-            <EmptyState>Alles beantwoord. Wat je chatbot niet weet, verschijnt hier.</EmptyState>
-          ) : (
-            <List label="Onbeantwoorde vragen">
-              {unanswered.map((u) => (
-                <ListRow
-                  key={u.question}
-                  wrap
-                  title={u.question}
-                  meta={[`${u.occurrences} keer gevraagd`, shortDate(u.lastSeenAt)].filter(Boolean).join(' · ')}
-                  end={
-                    <Link
-                      href={`${QA_HREF}${encodeURIComponent(u.question)}`}
-                      className={buttonClass({ variant: 'secondary', size: 'sm' })}
-                    >
-                      Antwoord geven
-                    </Link>
-                  }
-                />
-              ))}
-            </List>
-          )}
+          <UnansweredList
+            fixtureRows={unanswered.map((u) => ({
+              question: u.question,
+              meta: [`${u.occurrences} keer gevraagd`, shortDate(u.lastSeenAt)].filter(Boolean).join(' · '),
+            }))}
+          />
         </section>
 
         <section className="v1-card" aria-label="Meest gestelde vragen">
