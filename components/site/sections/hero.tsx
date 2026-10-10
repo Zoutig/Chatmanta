@@ -54,6 +54,21 @@ export default function Hero() {
 
       <div className="hero-stage">
         <div className="cutout" aria-hidden="true">
+          {/* Contourlijnen als inline SVG i.p.v. de --contours-achtergrond: een CSS-
+              achtergrondafbeelding telt als LCP-kandidaat en dit paneel is mobiel groter
+              dan de h1, waardoor LCP op een decoratie wachtte. Zelfde paden als --contours. */}
+          <svg className="cut-lines" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice" focusable="false">
+            <g fill="none" stroke="#5eead4" strokeOpacity=".10" strokeWidth="1.1">
+              <path d="M-20 40C140 0 260 90 420 52S660 -6 820 30" />
+              <path d="M-20 100C150 64 270 150 430 112S670 50 820 92" />
+              <path d="M-20 164C160 128 280 214 440 176S680 112 820 156" />
+              <path d="M-20 230C170 196 290 280 450 242S690 176 820 222" />
+              <path d="M-20 298C180 266 300 348 460 310S700 242 820 290" />
+              <path d="M-20 368C190 338 310 418 470 380S710 310 820 360" />
+              <path d="M-20 440C200 412 320 490 480 452S720 380 820 432" />
+              <path d="M-20 512C210 486 330 562 490 524S730 452 820 504" />
+            </g>
+          </svg>
           <span className="cut-label label">Fictief bedrijf · ter illustratie</span>
         </div>
         <HeroChat />
