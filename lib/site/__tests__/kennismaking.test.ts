@@ -58,7 +58,7 @@ test('toestemming moet strikt true zijn (geen "true"-string)', () => {
 });
 
 test('e-mail: ongeldige vormen worden geweigerd', () => {
-  for (const email of ['anna', 'anna@', 'anna@vandam', 'an na@vandam.nl', 'a@b.c', '<x>@y.nl']) {
+  for (const email of ['anna', 'anna@', 'anna@vandam', 'an na@vandam.nl', 'a@b.c', '<x>@y.nl', 'jan@bedrijf..nl', 'x@-foo.nl', 'x@foo-.nl', 'jan..de@vries.nl', '.jan@vries.nl']) {
     const r = validateKennismaking({ ...VALID, email });
     assert.equal(r.ok, false, email);
   }
@@ -124,6 +124,22 @@ test('notificatie escapet HTML; bevestiging bevat géén vrije tekst behalve de 
   const conf = buildLeadConfirmationEmail(r.data, { replyTo: 'info@chatmanta.com', demoUrl: 'https://www.chatmanta.nl/voorbeeld' });
   assert.ok(!conf.html.includes('spam') && !conf.text.includes('spam'));
   assert.ok(!conf.html.includes('<b>x</b>'));
+});
+
+test('bevestiging noemt een link-achtige naam niet (geen merk-phishing-relay)', () => {
+  for (const naam of ['Ga naar evil-site.nl', 'www.x.nl', 'http://x', 'a@b.nl']) {
+    const r = validateKennismaking({ ...VALID, naam });
+    assert.equal(r.ok, true, naam);
+    if (!r.ok) continue;
+    const conf = buildLeadConfirmationEmail(r.data, { replyTo: 'info@chatmanta.com', demoUrl: 'https://www.chatmanta.nl/voorbeeld' });
+    assert.ok(conf.text.startsWith('Hoi,\n'), naam);
+    assert.ok(!conf.html.includes(naam), naam);
+  }
+  const ok = validateKennismaking(VALID);
+  if (ok.ok) {
+    const conf = buildLeadConfirmationEmail(ok.data, { replyTo: 'info@chatmanta.com', demoUrl: 'https://www.chatmanta.nl/voorbeeld' });
+    assert.ok(conf.text.startsWith('Hoi Anna de Vries,'));
+  }
 });
 
 // ---------- Handler (Resend + ratelimit gemockt; er gaat nooit een echte mail uit) ----------

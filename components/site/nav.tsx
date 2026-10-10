@@ -128,6 +128,8 @@ export function Nav() {
       <header className={cx('nav', compact && 'is-compact')}>
         <div className="wrap nav-in">
           <Logo />
+          {/* display:contents → de flex-layout van .nav-in blijft ongewijzigd, wel een landmark. */}
+          <nav aria-label="Hoofdmenu" style={{ display: 'contents' }}>
           <ul className="nav-links" ref={listRef}>
             {NAV_ITEMS.map((item, i) => (
               <li key={item.key}>
@@ -144,6 +146,7 @@ export function Nav() {
             ))}
             <li className="nav-ind" ref={indRef} aria-hidden="true" />
           </ul>
+          </nav>
           <div className="nav-actions">
             <a className="nav-login" href={ROUTES.login}>
               Inloggen
@@ -192,6 +195,7 @@ export function Nav() {
               <Icon name="close" />
             </button>
           </div>
+          <nav aria-label="Menu">
           <ul>
             {NAV_ITEMS.map((item) => (
               <li key={item.key}>
@@ -204,6 +208,7 @@ export function Nav() {
               <a href={ROUTES.login}>Inloggen</a>
             </li>
           </ul>
+          </nav>
           <LinkButton href={ROUTES.kennismaking} onClick={close}>
             Plan een kennismaking
           </LinkButton>

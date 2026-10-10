@@ -22,7 +22,9 @@ export const PAKKET_OPTIONS: ReadonlyArray<{ value: PakketKeuze; label: string }
 ];
 
 /** Naam van het honeypot-veld. Niet "website": dat is hier een écht veld. */
-export const HONEYPOT_FIELD = 'company_url';
+// Bewust een naam zonder autofill-heuristiek ('company'/'url'/'name'/'email'):
+// browser-autofill mag het onzichtbare veld nooit vullen (anders stil verloren lead).
+export const HONEYPOT_FIELD = 'hp_kn7';
 
 export const LIMITS = {
   naam: 100,
@@ -139,7 +141,23 @@ export function normalizeWebsite(raw: string): string | null {
 
 export function isValidEmail(raw: string): boolean {
   const v = raw.trim();
-  return v.length > 0 && v.length <= LIMITS.email && EMAIL_RE.test(v);
+  if (!(v.length > 0 && v.length <= LIMITS.email && EMAIL_RE.test(v))) return false;
+  // Strenger dan EMAIL_RE: Resend weigert o.a. 'a@b..nl' en 'x@-foo.nl' (422 op
+  // reply_to → notificatie faalt → lead verloren). Domein-labels: niet leeg, niet
+  // beginnend/eindigend met '-'; local-part zonder '..' of punt aan de rand.
+  const at = v.lastIndexOf('@');
+  const local = v.slice(0, at);
+  const domain = v.slice(at + 1);
+  if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+  return domain.split('.').every((l) => l.length > 0 && !l.startsWith('-') && !l.endsWith('-'));
+}
+
+/**
+ * Lijkt de naam op een link/domein? Dan noemen we hem NIET in de bevestigingsmail
+ * (die gaat naar een vrij ingevuld adres → geen merk-phishing-relay via "Hoi <url>,").
+ */
+export function nameLooksLikeLink(naam: string): boolean {
+  return /:\/\/|www\.|@|[a-z0-9-]\.[a-z]{2,}\b/i.test(naam);
 }
 
 function isValidPhone(raw: string): boolean {
@@ -325,8 +343,9 @@ export function buildLeadNotificationEmail(d: KennismakingData): BuiltEmail {
  */
 export function buildLeadConfirmationEmail(d: KennismakingData, opts: { replyTo: string; demoUrl: string }): BuiltEmail {
   const subject = 'Je kennismaking met ChatManta';
+  const greet = nameLooksLikeLink(d.naam) ? 'Hoi,' : `Hoi ${d.naam},`;
   const lines = [
-    `Hoi ${d.naam},`,
+    greet,
     '',
     'Bedankt voor je aanvraag. We nemen binnen 1 werkdag contact op om een moment voor de kennismaking te plannen.',
     'In 20 minuten kijken we samen naar je site en wat ChatManta voor je kan doen. Geen verplichtingen.',
@@ -341,7 +360,7 @@ export function buildLeadConfirmationEmail(d: KennismakingData, opts: { replyTo:
   ];
   const html = `
     <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#0c1e2e;max-width:560px">
-      <p style="margin:0 0 12px">Hoi ${esc(d.naam)},</p>
+      <p style="margin:0 0 12px">${esc(greet)}</p>
       <p style="margin:0 0 12px">Bedankt voor je aanvraag. We nemen binnen 1 werkdag contact op om een moment voor de kennismaking te plannen.</p>
       <p style="margin:0 0 18px">In 20 minuten kijken we samen naar je site en wat ChatManta voor je kan doen. Geen verplichtingen.</p>
       <p style="margin:0 0 18px"><a href="${esc(opts.demoUrl)}" style="display:inline-block;background:#0c1e2e;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px">Open de live demo →</a></p>
