@@ -1,0 +1,9 @@
+/* Sectie final-cta — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-final` (root-klasse van deze sectie).
+   - Keyframes heten `final-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */
+
+/* Placeholder-basis; sectie-agent bouwt de navy final-card uit mockup-final §13. */
+.site-ui .s-final .lede { margin-top: 16px; max-width: 560px; }
+.site-ui .s-final-ctas { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; margin-top: 28px; }
+.site-ui .s-final-mail { margin-top: 18px; font-size: 0.9rem; color: var(--muted); }

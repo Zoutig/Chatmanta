@@ -1,0 +1,4 @@
+/* Sectie features — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-features` (root-klasse van deze sectie).
+   - Keyframes heten `features-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */

@@ -1,0 +1,4 @@
+/* Sectie live-demo — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-demo` (root-klasse van deze sectie).
+   - Keyframes heten `demo-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */

@@ -1,0 +1,4 @@
+/* Sectie dashboard-showcase — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-dashboard` (root-klasse van deze sectie).
+   - Keyframes heten `dashboard-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */
