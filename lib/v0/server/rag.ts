@@ -136,6 +136,7 @@ export async function* runRagQueryStreaming(input: {
   organizationId: string;
   disableCache?: boolean;
   includeFullParentContent?: boolean;
+  debugTimeline?: boolean;
   hydeModeOverride?: HydeModeRequest;
   enableGeneralKnowledge?: boolean;
   manualQAItems?: ManualQA[];

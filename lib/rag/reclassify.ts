@@ -71,7 +71,7 @@ export async function reclassifyAfterZeroHits(
   try {
     const resp = await openai().chat.completions.create({
       model: auxModelOf(bot),
-      ...openaiChatParams(auxModelOf(bot), { temperature: 0.0, maxTokens: 10 }),
+      ...openaiChatParams(auxModelOf(bot), { temperature: 0.0, maxTokens: 10 }, bot.auxServiceTier),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
@@ -81,7 +81,7 @@ export async function reclassifyAfterZeroHits(
     const inputTokens = resp.usage?.prompt_tokens ?? 0;
     const outputTokens = resp.usage?.completion_tokens ?? 0;
 
-    const costUsd = costForModelUsd(auxModelOf(bot), inputTokens, outputTokens);
+    const costUsd = costForModelUsd(auxModelOf(bot), inputTokens, outputTokens, resp.service_tier);
 
     const parsed = parseReclassifyOutput(text);
     if (!parsed) {

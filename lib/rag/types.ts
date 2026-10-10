@@ -30,6 +30,28 @@ export type RagConfig = {
   chatModel: string;
   /** Optioneel model voor de HULPSTAPPEN (pre-process, rewrite/multi-query, HyDE, decompose, rerank, follow-ups, reclassify). Default = chatModel. Antwoord-generatie/regenerate/cascade blijven chatModel. */
   auxModel?: string;
+  /** v0.14: OpenAI Fast mode (`service_tier: 'priority'`, 2× tarief) voor de chatModel-calls (antwoord, regenerate). Default undefined = standaard. */
+  chatServiceTier?: 'priority';
+  /** v0.14: Fast mode voor de hulpstap-calls (auxModel). Default undefined = standaard. */
+  auxServiceTier?: 'priority';
+  /** v0.14: pre-processor mag 0-2 `SUB:`-deelvragen teruggeven bij meervoudige vragen; die worden
+      parallel mee-opgehaald en round-robin met de hoofdzoekvraag gemerged. Default uit. */
+  preProcessSubQueries?: boolean;
+  /** v0.14: eerste vraag zonder history → zoeken op de originele vraag start meteen, parallel aan
+      de pre-processor (die dan alleen nog route + deelvragen levert). Default uit. */
+  speculativeRetrieval?: boolean;
+  /** v0.14: (vereist speculativeRetrieval, alleen eerste vraag) wacht ook met de ANTWOORD-call niet op de
+      pre-processor: de Luna-stream start zodra de context klaar is; pas vóór het eerste token wordt de
+      route gecheckt (smalltalk → stream afbreken). Deelvragen worden in dit pad niet gebruikt. Default uit. */
+  deferPreprocess?: boolean;
+  /** v0.14d2: (vereist speculativeRetrieval) vindt de zoekopdracht op de originele vraag niets boven
+      de drempel, wacht dan op de pre-processor en zoek één keer opnieuw met de herschreven vraag.
+      Nodig zonder hybrid search (V1). Default uit. */
+  speculativeRetryOnEmpty?: boolean;
+  /** v0.14: compacte router-prompt (alleen route + smalltalk-reply, geen herschrijving) voor het
+      deferPreprocess-pad — daar zoekt de engine al op de originele vraag, dus de rewrite is overbodig
+      en een kortere prompt is sneller. Persona-tokens zoals preProcessSystem. Default: volle prompt. */
+  preProcessRouterSystem?: string;
   /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */

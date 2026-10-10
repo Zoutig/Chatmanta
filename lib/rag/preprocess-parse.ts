@@ -43,3 +43,22 @@ export function parsePreProcessOutput(
   if (!query) return null;
   return { kind: 'search', query };
 }
+
+/**
+ * v0.14 (preProcessSubQueries): extra deelvragen uit de pre-processor-output —
+ * regels `SUB: <deelvraag>`. Max 2, ontdubbeld, nooit gelijk aan de hoofdzoekvraag.
+ * Ontbreken ze (enkelvoudige vraag) → lege lijst.
+ */
+export function parseSubQueries(raw: string, mainQuery: string): string[] {
+  const norm = (t: string) => t.toLowerCase().replace(/\s+/g, ' ').trim();
+  const seen = new Set<string>([norm(mainQuery)]);
+  const out: string[] = [];
+  for (const m of raw.matchAll(/^SUB:\s*(.+)$/gim)) {
+    const q = stripQuotes(m[1]).slice(0, 500);
+    if (!q || seen.has(norm(q))) continue;
+    seen.add(norm(q));
+    out.push(q);
+    if (out.length === 2) break;
+  }
+  return out;
+}

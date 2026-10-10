@@ -26,7 +26,7 @@ import type {
 } from '@/lib/rag/types';
 import { embedTexts } from '@/lib/rag/embeddings';
 import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
-import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
+import { stripQuotes, parsePreProcessOutput, parseSubQueries } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
 import { auxModelOf, costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
@@ -119,16 +119,18 @@ async function chatComplete({
   user,
   temperature,
   maxTokens = RAG_DEFAULTS.CHAT_MAX_TOKENS,
+  serviceTier,
 }: {
   model: string;
   system: string;
   user: string;
   temperature: number;
   maxTokens?: number;
+  serviceTier?: 'priority';
 }): Promise<ChatCompleteResult> {
   const resp = await openai().chat.completions.create({
     model,
-    ...openaiChatParams(model, { temperature, maxTokens }),
+    ...openaiChatParams(model, { temperature, maxTokens }, serviceTier),
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -137,7 +139,7 @@ async function chatComplete({
   const text = resp.choices[0]?.message?.content ?? '';
   const inputTokens = resp.usage?.prompt_tokens ?? 0;
   const outputTokens = resp.usage?.completion_tokens ?? 0;
-  const costUsd = costForModelUsd(model, inputTokens, outputTokens);
+  const costUsd = costForModelUsd(model, inputTokens, outputTokens, resp.service_tier);
   return { text, inputTokens, outputTokens, costUsd };
 }
 
@@ -155,7 +157,7 @@ type PreProcessTokens = {
 
 type PreProcessResult =
   | ({ kind: 'smalltalk'; reply: string } & PreProcessTokens)
-  | ({ kind: 'search'; query: string } & PreProcessTokens)
+  | ({ kind: 'search'; query: string; subQueries?: string[] } & PreProcessTokens)
   | ({ kind: 'off_topic' } & PreProcessTokens);
 
 // Beperk hoeveel turns we meegeven aan de LLM-calls. Meer = duurder en
@@ -184,6 +186,7 @@ async function preProcessInput(
   persona: RagPersona,
   history: ChatHistoryTurn[] = [],
   tone: Tone = DEFAULT_TONE,
+  routeOnly = false,
 ): Promise<PreProcessResult> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS);
   const hasHistory = trimmed.length > 0;
@@ -214,7 +217,9 @@ async function preProcessInput(
   // pre-trained naam ("ChatManta") door als invul-default. Multi-turn addon
   // wordt apart gerendered want hij wordt geprepend, niet ingelezen.
   const rendered = composeBotPrompts(bot, persona);
-  const basePreProcess = useMultiTurnAddon
+  const basePreProcess = routeOnly && bot.preProcessRouterSystem
+    ? renderPersonaTemplate(bot.preProcessRouterSystem, persona)
+    : useMultiTurnAddon
     ? `${rendered.preProcessMultiTurnAddon}\n\n${rendered.preProcessSystem}`
     : rendered.preProcessSystem;
   // v0.13x7: de smalltalk-reply passeert de STIJL-suffix van de antwoord-prompt
@@ -225,6 +230,7 @@ async function preProcessInput(
       : basePreProcess;
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: systemPrompt,
     user: userMessage,
     temperature: RAG_DEFAULTS.REWRITE_TEMPERATURE,
@@ -235,11 +241,17 @@ async function preProcessInput(
     outputTokens: result.outputTokens,
     costUsd: result.costUsd,
   };
+  if (process.env.RAG_DEBUG_PREPROCESS === '1') {
+    console.log('[preprocess-debug]', JSON.stringify({ q: original, out: result.text }));
+  }
   const parsed = parsePreProcessOutput(result.text);
   if (!parsed) {
     // Defensive: malformed output → assume search with the original query so
     // we still produce a useful response.
     return { kind: 'search', query: original, ...tokens };
+  }
+  if (parsed.kind === 'search' && bot.preProcessSubQueries === true) {
+    return { ...parsed, subQueries: parseSubQueries(result.text, parsed.query), ...tokens };
   }
   return { ...parsed, ...tokens };
 }
@@ -290,6 +302,7 @@ async function generateHydeDocument(
 ): Promise<{ hypothetical: string; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: HYDE_SYSTEM,
     user: query,
     temperature: 0.5,
@@ -331,6 +344,7 @@ async function decomposeQuery(
 ): Promise<{ subQueries: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: DECOMP_SYSTEM,
     user: query,
     temperature: 0.2,
@@ -547,6 +561,7 @@ async function generateMultiQueries(
   }
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: MULTI_QUERY_SYSTEM,
     user: `Geef ${count - 1} alternatieve formuleringen van deze zoekvraag (één per regel):\n\n${baseQuery}`,
     temperature: 0.5,
@@ -640,6 +655,7 @@ async function generateFollowUps(
 ): Promise<{ followUps: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: FOLLOWUP_SYSTEM,
     user: `Vraag: ${question}\n\nAntwoord: ${answer}\n\nVervolgvragen:`,
     temperature: 0.6,
@@ -680,6 +696,7 @@ async function rerankChunks(
 
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: RERANK_SYSTEM,
     user: `Vraag: ${question}\n\nFragmenten:\n${numbered}\n\nGeef de top ${topN} fragmenten op relevantie:`,
     temperature: 0.0,
@@ -1055,6 +1072,13 @@ export type PhaseTimings = {
       ge-set. Op streaming-paden = tijd tot eerste answer-delta; op
       smalltalk/fallback = tijd tot het terminal event (geen streaming). */
   first_token_ms?: number;
+  /** v0.14: tijd tot het eerste ZICHTBARE antwoordteken (na een eventueel
+      <thinking>-blok, dat de widget verbergt). Gelijk aan first_token_ms bij
+      bots zonder chainOfThought. Gevoelde TTFT voor de bezoeker. */
+  first_answer_token_ms?: number;
+  /** v0.14 EVAL-ONLY (input.debugTimeline): per stap de [start, eind]-offsets in
+      ms vanaf pipeline-start, voor een tijdlijn-weergave. Niet op productie. */
+  timeline_ms?: Record<string, [number, number][]>;
 };
 
 export type ChatResponse =
@@ -1253,6 +1277,8 @@ export async function* runRagQuery(
      * aan zodat hij ALTIJD het huidige bot-gedrag test, niet een gecachte run.
      */
     disableCache?: boolean;
+    /** EVAL-ONLY (v0.14): verzamel per stap start/eind-offsets in phaseTimingsMs.timeline_ms. */
+    debugTimeline?: boolean;
     /**
      * EVAL-ONLY: voeg op elke ChatSource het ongetrunceerde `parentContentFull`
      * toe (de volledige SURROUNDING_CONTEXT die de answer-LLM kreeg). De
@@ -1362,11 +1388,22 @@ export async function* runRagQuery(
   // hieronder gecapture-d via tMark() helper en opgeteld in `timings`.
   const tPipelineStart = performance.now();
   const timings: Partial<PhaseTimings> = {};
-  const tMark = (key: keyof PhaseTimings) => {
+  // v0.14 eval-tijdlijn: alleen gevuld bij input.debugTimeline.
+  const timeline: Record<string, [number, number][]> | null = input.debugTimeline ? {} : null;
+  const markSpan = (key: string, start: number, end: number) => {
+    if (!timeline) return;
+    (timeline[key] ??= []).push([
+      Math.round(start - tPipelineStart),
+      Math.round(end - tPipelineStart),
+    ]);
+  };
+  const tMark = (key: Exclude<keyof PhaseTimings, 'timeline_ms'>) => {
     const start = performance.now();
     return () => {
-      const dt = Math.round(performance.now() - start);
+      const end = performance.now();
+      const dt = Math.round(end - start);
       timings[key] = ((timings[key] as number | undefined) ?? 0) + dt;
+      markSpan(key, start, end);
     };
   };
   // V0 TTFT (time-to-first-token): tijd vanaf pipeline-start tot de eerste
@@ -1381,6 +1418,21 @@ export async function* runRagQuery(
     if (firstTokenAtMs === null) {
       firstTokenAtMs = Math.round(performance.now() - tPipelineStart);
     }
+  };
+  // v0.14: eerste zichtbare antwoordteken. Bij chainOfThought streamt het model
+  // eerst <thinking>…</thinking>; de widget verbergt dat, dus de bezoeker ziet
+  // pas iets zodra er tekst ná het denkblok staat.
+  let firstAnswerAtMs: number | null = null;
+  const markFirstAnswerToken = (acc: string) => {
+    if (firstAnswerAtMs !== null) return;
+    let visible = acc;
+    if (/<thinking>/i.test(acc)) {
+      const close = acc.search(/<\/thinking>/i);
+      if (close === -1) return;
+      visible = acc.slice(close + '</thinking>'.length);
+    }
+    if (visible.replace(/<\/?answer>?/gi, '').replace(/<[^>]*$/, '').trim().length === 0) return;
+    firstAnswerAtMs = Math.round(performance.now() - tPipelineStart);
   };
   // V0.5 latency-budgeting: bij bot.latencyBudgetEnabled wordt elke optionele
   // fase pas uitgevoerd als de cumulative elapsed onder bot.latencyBudgetMs
@@ -1484,7 +1536,13 @@ export async function* runRagQuery(
   let preCacheEmbedCost = 0;
   let offTopicSuspected = false;
 
-  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history, tone) : null;
+  // v0.14 deferPreprocess (eerste vraag): de pre-processor hoeft alleen nog te
+  // routeren → compacte router-prompt als de bot die heeft.
+  const routeOnlyPreprocess =
+    bot.deferPreprocess === true && bot.speculativeRetrieval === true && history.length === 0;
+  const preProcessPromise = enableRewrite
+    ? preProcessInput(original, bot, persona, history, tone, routeOnlyPreprocess)
+    : null;
   // cacheActive: alleen embedden als de cache écht gebruikt wordt. Zónder de
   // disableCache-gate hier zou een eval/script (disableCache:true) op een
   // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
@@ -1502,7 +1560,101 @@ export async function* runRagQuery(
   // dus geen discard-catch nodig op het smalltalk-pad.
   const cacheEpochPromise = cacheActive ? readCacheEpoch(cacheWriteClient, orgId) : null;
 
-  if (preProcessPromise) {
+  // v0.14 speculatieve retrieval: bij een eerste vraag (geen history) hangt de
+  // zoekopdracht niet van de pre-processor af — we zoeken meteen op de originele
+  // vraag, parallel aan de pre-processor. Die levert dan alleen nog route
+  // (smalltalk/off_topic/search) en eventuele deelvragen. Hergebruikt de
+  // cache-embed als die al loopt (zelfde tekst). Default uit.
+  type SpecResult = { hits: RetrievedChunk[]; embedTokens: number; embedCost: number };
+  const specPromise: Promise<SpecResult> | null =
+    bot.speculativeRetrieval === true && preProcessPromise && history.length === 0
+      ? (async () => {
+          const tEmbed = performance.now();
+          const ownEmbed = cacheEmbedPromise === null;
+          const emb = await (cacheEmbedPromise ?? embedTexts([original]));
+          const tRetrieve = performance.now();
+          markSpan('spec_embedding_ms', tEmbed, tRetrieve);
+          const hits = bot.hybridSearch
+            ? await retrieveChunksHybrid(
+                client,
+                emb.vectors[0],
+                original,
+                retrievalTopK,
+                bot.parentDocumentRetrieval,
+                orgId,
+                chatbotId,
+                chatbotScoped,
+              )
+            : await retrieveChunks(
+                client,
+                emb.vectors[0],
+                retrievalTopK,
+                bot.parentDocumentRetrieval,
+                orgId,
+                chatbotId,
+                chatbotScoped,
+              );
+          markSpan('spec_retrieval_ms', tRetrieve, performance.now());
+          return {
+            hits,
+            embedTokens: ownEmbed ? emb.tokens : 0,
+            embedCost: ownEmbed ? emb.costUsd : 0,
+          };
+        })()
+      : null;
+  // Geen unhandled rejection als het smalltalk-pad de speculatie negeert.
+  if (specPromise) void specPromise.catch(() => undefined);
+  let ppSubQueries: string[] = [];
+
+  // v0.14 deferPreprocess: de pre-processor loopt door op de achtergrond; de
+  // route (smalltalk/off_topic) wordt pas gecheckt waar hij ertoe doet (cache-
+  // hit, nul-treffers, vlak vóór het eerste antwoordtoken).
+  const deferPreprocess =
+    bot.deferPreprocess === true && specPromise !== null && preProcessPromise !== null;
+  const ppStartedAt = performance.now();
+  // Paden die eindigen zonder de route nodig te hebben (bv. general-knowledge)
+  // awaiten de pre-processor nooit: voorkom een unhandled rejection.
+  if (deferPreprocess && preProcessPromise) void preProcessPromise.catch(() => undefined);
+  let deferredSettled = false;
+  const settleDeferredPreprocess = async (): Promise<PreProcessResult | null> => {
+    if (!deferPreprocess || deferredSettled || !preProcessPromise) return null;
+    deferredSettled = true;
+    const pp = await preProcessPromise;
+    const end = performance.now();
+    timings.preprocess_ms = Math.round(end - ppStartedAt);
+    markSpan('preprocess_ms', ppStartedAt, end);
+    if (pp.kind !== 'smalltalk') {
+      if (pp.kind === 'off_topic') {
+        offTopicSuspected = bot.preProcessOffTopicDetection === true;
+      }
+      rewriteInfo = {
+        original,
+        rewritten: pp.kind === 'search' ? pp.query : original,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      rewriteCost = pp.costUsd;
+    }
+    return pp;
+  };
+  const smalltalkEvent = (
+    pp: Extract<PreProcessResult, { kind: 'smalltalk' }>,
+  ): StreamEvent => ({
+    kind: 'smalltalk',
+    response: {
+      botVersion: bot.version,
+      tone,
+      length,
+      generalKnowledgeActual: null,
+      kind: 'smalltalk',
+      answer: pp.reply,
+      preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
+      totalCostUsd: pp.costUsd,
+    },
+  });
+
+  if (preProcessPromise && !deferPreprocess) {
     yield { kind: 'status', phase: 'preprocess' };
     const stopPp = tMark('preprocess_ms');
     const pp = await preProcessPromise;
@@ -1548,9 +1700,10 @@ export async function* runRagQuery(
         costUsd: pp.costUsd,
       };
       queryForEmbed = pp.query;
+      ppSubQueries = pp.subQueries ?? [];
     }
   }
-  const rewriteCost = rewriteInfo?.costUsd ?? 0;
+  let rewriteCost = rewriteInfo?.costUsd ?? 0;
 
   // Cache lookup — embed liep al parallel met preprocess; we awaiten alleen
   // het resultaat (in de best case is hij al klaar). disableCache (eval) slaat
@@ -1574,6 +1727,11 @@ export async function* runRagQuery(
       orgId,
     );
     stopCache();
+    const ppAtCacheHit = cached ? await settleDeferredPreprocess() : null;
+    if (ppAtCacheHit?.kind === 'smalltalk') {
+      yield smalltalkEvent(ppAtCacheHit);
+      return;
+    }
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
       // Tone/length: de gecachte rij is mogelijk geschreven onder andere stijl-
@@ -1712,11 +1870,32 @@ export async function* runRagQuery(
   }
   const expansionCost = mq.costUsd;
 
+  // v0.14: pre-processor-deelvragen (preProcessSubQueries) gaan mee in dezelfde
+  // batch-embed + parallelle retrieve. Bij speculatieve retrieval is de originele
+  // vraag al opgehaald: dan zoeken we alleen nog de deelvragen (de herschreven
+  // hoofdvraag vervalt — die zou de wachttijd terugbrengen).
+  let specHits: RetrievedChunk[] | null = null;
+  let specEmbedTokens = 0;
+  let specEmbedCost = 0;
+  if (specPromise) {
+    const stopSpecWait = tMark('retrieval_ms');
+    const spec = await specPromise;
+    stopSpecWait();
+    specHits = spec.hits;
+    specEmbedTokens = spec.embedTokens;
+    specEmbedCost = spec.embedCost;
+    querySet.length = 0;
+  }
+  for (const q of ppSubQueries) querySet.push({ text: q, isHyde: false });
+
   // 4. Embed all queries (batched).
   yield { kind: 'status', phase: 'embed' };
   const stopEmbed = tMark('embedding_ms');
   const queryTexts = querySet.map((q) => q.text);
-  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(queryTexts);
+  const embedded = await embedTexts(queryTexts);
+  const { vectors } = embedded;
+  const embedTokens = embedded.tokens + specEmbedTokens;
+  const embedCost = embedded.costUsd + specEmbedCost;
   stopEmbed();
   // Selective-HyDE embed wordt later optioneel toegevoegd (v0.4). Zelfde
   // vorm als de hoofd-embed; we splitsen voor logging-helderheid.
@@ -1756,6 +1935,11 @@ export async function* runRagQuery(
     }),
   );
   stopRetrieve();
+  if (specHits) allHits.unshift(specHits);
+  // v0.14: per-query hitlijsten bewaren voor round-robin-contextselectie, zodat
+  // elke deelvraag zijn beste bron in de context krijgt (anders duwt de
+  // sterkste deelvraag de rest eruit op similarity).
+  const perQueryHits = bot.preProcessSubQueries === true && allHits.length > 1 ? allHits : null;
   const bestById = new Map<string, RetrievedChunk>();
   for (const hits of allHits) {
     for (const h of hits) {
@@ -1831,11 +2015,70 @@ export async function* runRagQuery(
     selectiveHyDEEmbedTokens = hydeEmbed.tokens;
     selectiveHyDEEmbedCost = hydeEmbed.costUsd;
   }
+  // v0.14d2 speculativeRetryOnEmpty: de speculatieve zoekopdracht op de ruwe vraag
+  // vond niets boven de drempel (V1: geen hybrid/trefwoord-zoeken, dus korte vragen
+  // als "Wat is jullie adres?" missen). Wacht dan alsnog op de pre-processor en zoek
+  // één keer opnieuw met diens herschreven vraag. Kost alleen latency in het nul-
+  // treffers-pad; off_topic levert de originele vraag terug → geen retry.
+  if (
+    bot.speculativeRetryOnEmpty === true &&
+    specHits !== null &&
+    !merged.some((c) => c.similarity >= threshold)
+  ) {
+    const ppRetry = await settleDeferredPreprocess();
+    if (ppRetry?.kind === 'smalltalk') {
+      yield smalltalkEvent(ppRetry);
+      return;
+    }
+    const rewritten = (rewriteInfo as ChatRewriteInfo | null)?.rewritten?.trim();
+    if (rewritten && rewritten.toLowerCase() !== original.trim().toLowerCase()) {
+      const stopRetryEmbed = tMark('embedding_ms');
+      const retryEmbed = await embedTexts([rewritten]);
+      stopRetryEmbed();
+      const stopRetryRetrieve = tMark('retrieval_ms');
+      const retryHits = bot.hybridSearch
+        ? await retrieveChunksHybrid(
+            client,
+            retryEmbed.vectors[0],
+            rewritten,
+            retrievalTopK,
+            withParents,
+            orgId,
+            chatbotId,
+            chatbotScoped,
+          )
+        : await retrieveChunks(
+            client,
+            retryEmbed.vectors[0],
+            retrievalTopK,
+            withParents,
+            orgId,
+            chatbotId,
+            chatbotScoped,
+          );
+      stopRetryRetrieve();
+      for (const h of retryHits) {
+        const prev = bestById.get(h.id);
+        if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
+      }
+      merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+      topSim = merged[0]?.similarity ?? null;
+      queryForEmbed = rewritten;
+      // Meegeteld bij de extra-embed-totalen (zelfde plek als selective HyDE).
+      selectiveHyDEEmbedTokens += retryEmbed.tokens;
+      selectiveHyDEEmbedCost += retryEmbed.costUsd;
+    }
+  }
   const allSources = merged.map((c) => toSource(c));
 
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   if (aboveThreshold.length === 0) {
+    const ppAtZeroHits = await settleDeferredPreprocess();
+    if (ppAtZeroHits?.kind === 'smalltalk') {
+      yield smalltalkEvent(ppAtZeroHits);
+      return;
+    }
     // V0.5: tweede-stage re-classifier wanneer bot.generalKnowledgeEnabled
     // EN de UI-toggle aan staat. We weten nu dat retrieval géén relevante
     // chunks gaf — de vraag is dus ofwel algemene kennis binnen het domein
@@ -1896,7 +2139,11 @@ KRITISCHE FORMAT-REGELS:
         try {
           const resp = await openai().chat.completions.create({
             model: bot.chatModel,
-            ...openaiChatParams(bot.chatModel, { temperature: bot.chatTemperature, maxTokens: 200 }),
+            ...openaiChatParams(
+              bot.chatModel,
+              { temperature: bot.chatTemperature, maxTokens: 200 },
+              bot.chatServiceTier,
+            ),
             messages: [
               { role: 'system', content: generalSystem },
               { role: 'user', content: original },
@@ -1905,7 +2152,12 @@ KRITISCHE FORMAT-REGELS:
           modelText = resp.choices[0]?.message?.content ?? '';
           genChatInputTokens = resp.usage?.prompt_tokens ?? 0;
           genChatOutputTokens = resp.usage?.completion_tokens ?? 0;
-          genChatCostUsd = costForModelUsd(bot.chatModel, genChatInputTokens, genChatOutputTokens);
+          genChatCostUsd = costForModelUsd(
+            bot.chatModel,
+            genChatInputTokens,
+            genChatOutputTokens,
+            resp.service_tier,
+          );
         } catch (err) {
           stopGenerationGen();
           const code = classifyLlmError(err);
@@ -2118,6 +2370,23 @@ KRITISCHE FORMAT-REGELS:
   });
 
   let final: RetrievedChunk[] = aboveThreshold.slice(0, finalContextMax);
+  if (perQueryHits) {
+    const lists = perQueryHits.map((l) =>
+      [...l].filter((c) => c.similarity >= threshold).sort((a, b) => b.similarity - a.similarity),
+    );
+    const seen = new Set<string>();
+    const rr: RetrievedChunk[] = [];
+    for (let r = 0; rr.length < finalContextMax && lists.some((l) => r < l.length); r++) {
+      for (const l of lists) {
+        const c = l[r];
+        if (!c || seen.has(c.id)) continue;
+        seen.add(c.id);
+        rr.push(bestById.get(c.id) ?? c);
+        if (rr.length >= finalContextMax) break;
+      }
+    }
+    final = rr;
+  }
   if (
     bot.rerank === 'llm' &&
     aboveThreshold.length > 1 &&
@@ -2289,6 +2558,51 @@ KRITISCHE FORMAT-REGELS:
       : '';
   const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${complaintDirective}${languageDirective}`;
 
+  // Sliding window: alléén de laatste N turns gaan mee naar de answer-LLM.
+  // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
+  // ongewijzigd; alleen het LLM-payload-venster is begrensd.
+  const answerHistory = history.slice(-RAG_CHAT_HISTORY_TURNS);
+  const createAnswerStream = (signal?: AbortSignal) =>
+    openai().chat.completions.create(
+      {
+        model: bot.chatModel,
+        ...openaiChatParams(
+          bot.chatModel,
+          {
+            temperature: bot.chatTemperature,
+            maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+          },
+          bot.chatServiceTier,
+        ),
+        stream: true,
+        stream_options: { include_usage: true },
+        messages: [
+          { role: 'system', content: styledSystemPrompt },
+          ...answerHistory.map((t) => ({ role: t.role, content: t.content })),
+          { role: 'user', content: userPrompt },
+        ],
+      },
+      signal ? { signal } : undefined,
+    );
+  // v0.14 deferPreprocess: start de antwoord-stream nu al (de context hangt niet
+  // van de pre-processor af) en wacht pas daarna op de route. Smalltalk → stream
+  // afbreken (alleen de al gegenereerde tokens kosten geld).
+  let earlyStream: ReturnType<typeof createAnswerStream> | null = null;
+  let stopEarlyGeneration: (() => void) | null = null;
+  if (deferPreprocess && !deferredSettled) {
+    const abortCtl = new AbortController();
+    stopEarlyGeneration = tMark('generation_ms');
+    earlyStream = createAnswerStream(abortCtl.signal);
+    void earlyStream.catch(() => undefined);
+    const ppBeforeAnswer = await settleDeferredPreprocess();
+    if (ppBeforeAnswer?.kind === 'smalltalk') {
+      abortCtl.abort();
+      stopEarlyGeneration();
+      yield smalltalkEvent(ppBeforeAnswer);
+      return;
+    }
+  }
+
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
   yield { kind: 'status', phase: 'answer' };
@@ -2306,39 +2620,25 @@ KRITISCHE FORMAT-REGELS:
   let chatInputTokens = 0;
   let chatOutputTokens = 0;
   let chatCostUsd = 0;
-  const stopGeneration = tMark('generation_ms');
-  // Sliding window: alléén de laatste N turns gaan mee naar de answer-LLM.
-  // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
-  // ongewijzigd; alleen het LLM-payload-venster is begrensd.
-  const answerHistory = history.slice(-RAG_CHAT_HISTORY_TURNS);
+  const stopGeneration = stopEarlyGeneration ?? tMark('generation_ms');
+  let servedChatTier: string | null | undefined;
   try {
-    const stream = await openai().chat.completions.create({
-      model: bot.chatModel,
-      ...openaiChatParams(bot.chatModel, {
-        temperature: bot.chatTemperature,
-        maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
-      }),
-      stream: true,
-      stream_options: { include_usage: true },
-      messages: [
-        { role: 'system', content: styledSystemPrompt },
-        ...answerHistory.map((t) => ({ role: t.role, content: t.content })),
-        { role: 'user', content: userPrompt },
-      ],
-    });
+    const stream = await (earlyStream ?? createAnswerStream());
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {
         markFirstToken();
         accText += delta;
+        markFirstAnswerToken(accText);
         yield { kind: 'answer-delta', text: delta };
       }
       // Last chunk in OpenAI stream carries the usage when stream_options
       // include_usage:true is set.
+      if (chunk.service_tier) servedChatTier = chunk.service_tier;
       if (chunk.usage) {
         chatInputTokens = chunk.usage.prompt_tokens ?? 0;
         chatOutputTokens = chunk.usage.completion_tokens ?? 0;
-        chatCostUsd = costForModelUsd(bot.chatModel, chatInputTokens, chatOutputTokens);
+        chatCostUsd = costForModelUsd(bot.chatModel, chatInputTokens, chatOutputTokens, servedChatTier);
       }
     }
   } catch (err) {
@@ -2560,6 +2860,7 @@ KRITISCHE FORMAT-REGELS:
     generation_ms: timings.generation_ms ?? 0,
     total_ms: Math.round(performance.now() - tPipelineStart),
     ...(firstTokenAtMs !== null ? { first_token_ms: firstTokenAtMs } : {}),
+    ...(firstAnswerAtMs !== null ? { first_answer_token_ms: firstAnswerAtMs } : {}),
     ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
     ...(timings.cache_lookup_ms !== undefined
       ? { cache_lookup_ms: timings.cache_lookup_ms }
@@ -2818,6 +3119,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
     try {
       const stricter = await chatComplete({
         model: bot.chatModel,
+        serviceTier: bot.chatServiceTier,
         system: styledSystemPrompt + REGENERATE_SYSTEM_ADDON,
         user: userPrompt,
         temperature: Math.max(0.0, bot.chatTemperature - 0.2),
@@ -3021,6 +3323,9 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   const phaseTimingsFinal: PhaseTimings = {
     ...phaseTimingsAtAnswer,
     ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
+    ...(timeline
+      ? { timeline_ms: { ...timeline, answer_done: [[0, phaseTimingsAtAnswer.total_ms]] } }
+      : {}),
   };
   yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsFinal };
 
