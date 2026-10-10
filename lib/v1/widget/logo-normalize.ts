@@ -35,6 +35,10 @@ const COLOR_TOLERANCE = 36;
 const MAX_ASPECT = 2.2;
 /** Werkformaat voor de analyse; grote foto's worden eerst hiernaar verkleind. */
 const WORK_PX = 512;
+/** Eerste stap vanaf de bron: nooit een tussencanvas groter dan dit (geheugen). */
+const FIRST_STEP_MAX_PX = 2048;
+/** Boven dit aantal pixels weigeren: decoderen alleen al kost dan honderden MB. */
+const MAX_SOURCE_PIXELS = 100_000_000;
 
 export const LIGHT_BG = '#FFFFFF';
 export const DARK_BG = '#1B232B';
@@ -222,9 +226,19 @@ export async function normalizeLogoFile(file: File): Promise<NormalizedLogo> {
   // SVG's zonder width/height melden soms 0×0: teken die op het werkformaat.
   const nw = img.naturalWidth || WORK_PX;
   const nh = img.naturalHeight || WORK_PX;
+  if (nw * nh > MAX_SOURCE_PIXELS) {
+    throw new LogoError(
+      `Deze afbeelding is ${Math.round((nw * nh) / 1e6)} megapixel. Verklein hem eerst tot maximaal ${MAX_SOURCE_PIXELS / 1e6} megapixel.`,
+    );
+  }
   const scale = Math.min(1, WORK_PX / Math.max(nw, nh));
   try {
-    const work = downscale(img, nw, nh, nw * scale, nh * scale);
+    // Eerst één sprong naar max 2048 px, zodat er geen tussencanvas op de volle
+    // bronmaat ontstaat; daarna in nette halveringsstappen naar het werkformaat.
+    const s1 = Math.min(1, FIRST_STEP_MAX_PX / Math.max(nw, nh));
+    const [first, firstG] = canvas(nw * s1, nh * s1);
+    firstG.drawImage(img, 0, 0, first.width, first.height);
+    const work = downscale(first, first.width, first.height, nw * scale, nh * scale);
     let analysis: LogoAnalysis;
     try {
       const d = work.getContext('2d')!.getImageData(0, 0, work.width, work.height).data;
