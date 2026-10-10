@@ -47,7 +47,7 @@ export default async function KennismakingPage({
             <KennismakingForm defaultPakket={defaultPakket} bron={bron} />
           </div>
 
-          <aside className="kn-aside" aria-labelledby="h-kennis-topics">
+          <section className="kn-aside" aria-labelledby="h-kennis-topics">
             <div className="kn-contour" aria-hidden="true" />
             <h2 id="h-kennis-topics">Wat bespreken we</h2>
             <ol className="kn-topics">
@@ -69,7 +69,7 @@ export default async function KennismakingPage({
               ))}
             </ul>
             <p className="kn-founders">Je spreekt met een van de oprichters: Sebastiaan of Niels.</p>
-          </aside>
+          </section>
         </div>
       </Container>
     </section>

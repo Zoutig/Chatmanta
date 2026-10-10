@@ -83,7 +83,8 @@ export function Nav() {
     };
   }, [placeIndicator]);
 
-  // Sheet: focus naar eerste link bij openen; Escape sluit en geeft focus terug.
+  // Sheet: focus naar eerste link bij openen; Escape sluit en geeft focus terug;
+  // Tab blijft binnen het paneel (aria-modal belooft dat de pagina erachter inert is).
   useEffect(() => {
     if (!open) return;
     sheetRef.current?.querySelector<HTMLElement>('.sheet-panel a')?.focus();
@@ -91,6 +92,20 @@ export function Nav() {
       if (e.key === 'Escape') {
         setOpen(false);
         burgerRef.current?.focus();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = sheetRef.current?.querySelectorAll<HTMLElement>('.sheet-panel a, .sheet-panel button');
+      if (!items || items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const inside = sheetRef.current?.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
       }
     };
     window.addEventListener('keydown', onKey);

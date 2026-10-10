@@ -32,6 +32,7 @@
 
 /* bel-me-terug-knop (outline, op navy) */
 .site-ui .s-honest .callback { align-self: flex-start; margin-top: 10px; --h: 44px; font-size: 0.88rem; background: transparent; color: var(--aqua-pale); border-color: rgba(94, 234, 212, 0.55); box-shadow: none; transition: opacity var(--base) var(--ease), transform 420ms var(--spring), border-color var(--fast) var(--ease), color var(--fast) var(--ease); }
+.site-ui .s-honest .callback:focus-visible { box-shadow: var(--focus-dark); }
 .site-ui .s-honest .callback:hover { border-color: var(--aqua-hi); color: #fff; }
 .site-ui .s-honest .callback .ok { display: none; align-items: center; gap: 6px; }
 .site-ui .s-honest .callback.done .ok { display: inline-flex; }
