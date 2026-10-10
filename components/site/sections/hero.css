@@ -1,17 +1,56 @@
-/* Sectie hero — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+/* Sectie hero — port van mockup-final §2. Contract: docs/site/CONTRACT.md.
    - Elke selector begint met `.site-ui .s-hero` (root-klasse van deze sectie).
    - Keyframes heten `hero-<naam>`.
-   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */
+   - Basis-chatvenster (.chat, .msg, .bubble, .chip, .typing.on, …) staat in app/(site)/site.css;
+     hier alleen de hero-layout, het cut-out-paneel en de typ-engine-staten. */
 
-/* Placeholder-basis (uit mockup-final §2); sectie-agent breidt uit met hero-grid/cut-out/chat. */
 .site-ui .s-hero { position: relative; padding: clamp(28px, 5vw, 72px) 0 clamp(64px, 7vw, 104px); overflow: hidden; isolation: isolate; }
+.site-ui .s-hero .hero-grid { display: grid; gap: 28px; align-items: center; }
+.site-ui .s-hero .hero-grid > * { min-width: 0; }
+@media (min-width: 1024px) { .site-ui .s-hero .hero-grid { grid-template-columns: 1.12fr 0.88fr; gap: 48px; } }
+
 .site-ui .s-hero h1 .soft { color: var(--teal-ink); }
 .site-ui .s-hero .lede { margin-top: 20px; max-width: 560px; }
-.site-ui .s-hero-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 28px; }
+.site-ui .s-hero .hero-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 28px; }
+
+/* Hero-cut-out: navy paneel loopt rechts door tot de schermrand */
+.site-ui .s-hero .hero-stage { position: relative; padding: 28px 0 44px; }
+.site-ui .s-hero .cutout {
+  position: absolute; top: 0; bottom: 0; left: 9%;
+  right: calc(-1 * (var(--gutter) + max(0px, (100vw - var(--maxw)) / 2)));
+  background: var(--contours) center / cover no-repeat, linear-gradient(160deg, var(--navy-hi), var(--ink) 55%);
+  border-radius: var(--r-xl) 0 0 var(--r-xl);
+  overflow: hidden; z-index: 0;
+}
+.site-ui .s-hero .cut-label {
+  position: absolute; bottom: 14px; z-index: 1; color: var(--on-dark-2);
+  right: max(16px, calc(var(--gutter) + max(0px, (100vw - var(--maxw)) / 2)));
+}
+@media (min-width: 1024px) {
+  .site-ui .s-hero .hero-stage { padding: 56px 0; }
+  .site-ui .s-hero .cutout { left: 14%; }
+}
+
+/* Chat op het paneel */
+.site-ui .s-hero .hero-chat-wrap { position: relative; z-index: 1; max-width: 500px; width: 100%; margin-left: 0; }
+.site-ui .s-hero .hero-chat-wrap .chat { box-shadow: 0 2px 4px rgba(8, 21, 31, 0.2), 0 30px 70px -20px rgba(8, 21, 31, 0.65); }
+@media (min-width: 640px) and (max-width: 1023px) { .site-ui .s-hero .hero-chat-wrap { margin: 0 auto; } }
+
+/* Typ-engine-staten (alleen actief na hydratie + zonder reduced motion; zie hero/hero-chat.tsx).
+   Zonder JS / bij reduced motion ontbreken .prep/.streaming ⇒ volledige eindstand zichtbaar. */
+.site-ui .s-hero .prep .msg,
+.site-ui .s-hero .prep .chip { opacity: 0; transform: translateY(8px); }
+.site-ui .s-hero .prep .chip { transform: translateY(6px) scale(0.92); }
+.site-ui .s-hero .prep .msg.in,
+.site-ui .s-hero .prep .chip.in { opacity: 1; transform: none; }
+.site-ui .s-hero .w { transition: opacity 140ms linear; }
+.site-ui .s-hero .streaming .w { opacity: 0; }
+.site-ui .s-hero .streaming .w.on { opacity: 1; }
+
 @media (max-width: 639px) {
   .site-ui .s-hero { padding-top: 20px; }
   .site-ui .s-hero h1 { font-size: 2.3rem; }
   .site-ui .s-hero .lede { font-size: 1rem; margin-top: 14px; }
-  .site-ui .s-hero-ctas { margin-top: 20px; }
-  .site-ui .s-hero-ctas .btn-primary { width: 100%; }
+  .site-ui .s-hero .hero-ctas { margin-top: 20px; }
+  .site-ui .s-hero .hero-ctas .btn-primary { width: 100%; }
 }
