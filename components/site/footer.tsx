@@ -10,7 +10,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="wrap">
         <div className="foot">
-          <div className="brand">
+          <div className="foot-brand">
             <Logo ariaLabel="ChatManta, naar de startpagina" />
             <p>De Nederlandse website-chatbot die alleen antwoordt uit jouw eigen website en documenten.</p>
           </div>

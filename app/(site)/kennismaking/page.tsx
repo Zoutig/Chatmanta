@@ -23,7 +23,7 @@ const TOPICS = [
   'Welk pakket past, en wanneer je live kunt',
 ];
 
-const PROMISES = ['Reactie binnen 1 werkdag', 'Geen verplichtingen', 'Je gegevens blijven in Europa'];
+const PROMISES = ['Reactie binnen 1 werkdag', 'Geen verplichtingen', 'Gegevens opgeslagen in Europa'];
 
 export default async function KennismakingPage({
   searchParams,
