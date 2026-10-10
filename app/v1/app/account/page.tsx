@@ -1,5 +1,5 @@
 // V1 Account: e-mail/wachtwoord (Supabase Auth) + organisatienaam (owner-only)
-// + verbruiksmetrics (gesprekken deze maand + documenten) via session-client RLS.
+// + verbruiksmetrics (vragen vandaag/deze maand + documenten) via session-client RLS.
 //
 // E-mail komt uit de SESSIE (user.email), niet uit public.users — die mirror kan
 // driften na een e-mailwijziging (geen sync-trigger). Org-naam + rol onder de
@@ -9,7 +9,12 @@
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import { checkOrgMonthlyLimit, checkOrgDailyBudget } from '@/lib/v1/limits/usage-limits';
+import {
+  checkOrgDailyBudget,
+  checkOrgDailyQuestions,
+  checkOrgMonthlyQuestions,
+  getOrgQuestionLimits,
+} from '@/lib/v1/limits/usage-limits';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { AccountForm } from './account-form';
 
@@ -33,7 +38,10 @@ export default async function V1AccountPage() {
   // de chat-gates) — geen nieuwe berekening. Beide accepteren elke SupabaseClient;
   // de RLS-policies op organizations/query_log staan een org-lid dit al toe
   // (zie ook de org-naam-select hieronder, die dezelfde policy gebruikt).
-  const [{ data: org }, { data: membership }, monthly, dailyBudget, { count: docCount }] =
+  // De klant ziet alleen vragen; het EUR-vangnet telt mee in "daglimiet bereikt" maar
+  // het bedrag zelf komt nooit in beeld.
+  const limits = await getOrgQuestionLimits(supabase, orgId);
+  const [{ data: org }, { data: membership }, daily, monthly, budget, { count: docCount }] =
     await Promise.all([
       supabase.from('organizations').select('name').eq('id', orgId).maybeSingle(),
       supabase
@@ -42,7 +50,8 @@ export default async function V1AccountPage() {
         .eq('organization_id', orgId)
         .eq('user_id', user.id)
         .maybeSingle(),
-      checkOrgMonthlyLimit(supabase, orgId),
+      checkOrgDailyQuestions(supabase, orgId, limits.daily),
+      checkOrgMonthlyQuestions(supabase, orgId, limits.monthly),
       checkOrgDailyBudget(supabase, orgId),
       supabase
         .from('documents')
@@ -62,8 +71,9 @@ export default async function V1AccountPage() {
         orgName={(org?.name as string | undefined) ?? ''}
         isOwner={membership?.role === 'owner'}
         orgId={orgId}
+        daily={daily}
         monthly={monthly}
-        dailyBudget={dailyBudget}
+        pausedToday={budget.over}
         documentsCount={docCount ?? 0}
       />
     </div>

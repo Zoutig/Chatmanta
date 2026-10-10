@@ -4,7 +4,7 @@
 // owner-gated server-action. Verbruik komt uit de bestaande limiet-checks.
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/v1/client';
-import type { MonthlyVerdict, BudgetVerdict } from '@/lib/v1/limits/usage-limits';
+import type { QuestionVerdict } from '@/lib/v1/limits/usage-limits';
 import { Button } from '@/app/v1/_ui/button';
 import { Field } from '@/app/v1/_ui/controls';
 import { EditableRow, useEditable } from '@/app/v1/_ui/editable';
@@ -12,23 +12,26 @@ import { Panel, Row, Rows } from '@/app/v1/_ui/panel';
 import { authErrorMessage } from '@/app/v1/_ui/auth-messages';
 import { updateOrgNameAction } from './actions';
 
-const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
+const num = new Intl.NumberFormat('nl-NL');
 
 export function AccountForm({
   email,
   orgName,
   isOwner,
   orgId,
+  daily,
   monthly,
-  dailyBudget,
+  pausedToday = false,
   documentsCount,
 }: {
   email: string;
   orgName: string;
   isOwner: boolean;
   orgId: string;
-  monthly: MonthlyVerdict;
-  dailyBudget: BudgetVerdict;
+  daily: QuestionVerdict;
+  monthly: QuestionVerdict;
+  /** Het interne kosten-vangnet is vandaag dicht (bedrag blijft onzichtbaar). */
+  pausedToday?: boolean;
   documentsCount: number;
 }) {
   return (
@@ -51,24 +54,24 @@ export function AccountForm({
       <Panel title="Verbruik">
         <div className="v1-metrics">
           <Metric
-            label="Gesprekken deze maand"
-            value={String(monthly.count)}
-            of={`van ${monthly.limit}`}
-            ratio={monthly.count / monthly.limit}
-            over={monthly.over}
+            label="Vragen vandaag"
+            value={num.format(daily.count)}
+            of={`van ${num.format(daily.limit)}`}
+            ratio={daily.limit > 0 ? daily.count / daily.limit : 1}
+            over={daily.over}
           />
           <Metric
-            label="Dagbudget vandaag"
-            value={eur.format(dailyBudget.spentEur)}
-            of={`van ${eur.format(dailyBudget.capEur)}`}
-            ratio={dailyBudget.capEur > 0 ? dailyBudget.spentEur / dailyBudget.capEur : 0}
-            over={dailyBudget.over}
+            label="Vragen deze maand"
+            value={num.format(monthly.count)}
+            of={`van ${num.format(monthly.limit)}`}
+            ratio={monthly.limit > 0 ? monthly.count / monthly.limit : 1}
+            over={monthly.over}
           />
           <Metric label="Documenten" value={String(documentsCount)} of="in je kennisbank" />
         </div>
         <p className="v1-note">
-          {monthly.over || dailyBudget.over
-            ? 'Een limiet is bereikt, dus je chatbot pauzeert tot morgen (dagbudget) of tot de 1e van de maand (gesprekken). Neem contact op als je meer nodig hebt.'
+          {monthly.over || daily.over || pausedToday
+            ? 'Een limiet is bereikt, dus je chatbot pauzeert tot morgen (daglimiet) of tot de 1e van de maand (maandlimiet). Neem contact op als je meer nodig hebt.'
             : 'Is een limiet bereikt, dan pauzeert je chatbot tot morgen of tot de 1e van de maand.'}
         </p>
       </Panel>

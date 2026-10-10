@@ -16,7 +16,12 @@ import { notFound } from 'next/navigation';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { isAppError } from '@/lib/errors/app-error';
 import { getProfile } from '@/lib/v1/admin/profile';
-import { resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
+import {
+  DEFAULT_DAILY_QUESTION_LIMIT,
+  DEFAULT_MONTHLY_QUESTION_LIMIT,
+  resolveDailyBudgetEur,
+  resolveQuestionLimit,
+} from '@/lib/v1/limits/usage-limits';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { Panel, Rows, Row, EmptyValue } from '@/app/v1/_ui/panel';
 import { LinkTabs } from '@/app/v1/_ui/tabs';
@@ -54,6 +59,8 @@ type OrgRow = {
   slug: string;
   created_at: string;
   daily_budget_eur: number | string | null;
+  daily_question_limit: number | null;
+  monthly_question_limit: number | null;
   suspended_at: string | null;
   organization_members: { count: number }[] | null;
 };
@@ -79,7 +86,7 @@ export default async function OrgDeepDivePage({
 
   const { data: orgData } = await admin
     .from('organizations')
-    .select('id, name, slug, created_at, daily_budget_eur, suspended_at, organization_members(count)')
+    .select('id, name, slug, created_at, daily_budget_eur, daily_question_limit, monthly_question_limit, suspended_at, organization_members(count)')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle();
@@ -101,7 +108,11 @@ export default async function OrgDeepDivePage({
 
   const tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as string) : 'overzicht';
   const basePath = `/v1/admin/organizations/${id}`;
-  const budgetEur = resolveDailyBudgetEur(org.daily_budget_eur);
+  const limits = {
+    dailyQuestions: resolveQuestionLimit(org.daily_question_limit, DEFAULT_DAILY_QUESTION_LIMIT),
+    monthlyQuestions: resolveQuestionLimit(org.monthly_question_limit, DEFAULT_MONTHLY_QUESTION_LIMIT),
+    dailyBudgetEur: resolveDailyBudgetEur(org.daily_budget_eur),
+  };
 
   return (
     <div className="v1-page">
@@ -126,7 +137,10 @@ export default async function OrgDeepDivePage({
           <Row label="Technisch eigenaar">{profile.technicalOwner}</Row>
           <Row label="Contact">{profile.contactName ?? <EmptyValue>Geen</EmptyValue>}</Row>
           <Row label="Leden">{org.organization_members?.[0]?.count ?? 0}</Row>
-          <Row label="Dagbudget">{budgetEur === 0 ? 'Uit' : `${formatEur(budgetEur)} per dag`}</Row>
+          <Row label="Limieten">
+            {limits.dailyQuestions} vragen per dag, {limits.monthlyQuestions} per maand (plafond{' '}
+            {formatEur(limits.dailyBudgetEur)} per dag)
+          </Row>
           {profile.nextAction && (
             <Row label="Volgende actie">
               {profile.nextAction}
@@ -152,7 +166,7 @@ export default async function OrgDeepDivePage({
       {tab === 'widget' && <WidgetTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'usage' && <UsageTab orgId={id} />}
       {tab === 'beheer' && (
-        <BeheerTab orgId={id} slug={org.slug} dailyBudgetRaw={org.daily_budget_eur} suspendedAt={org.suspended_at} />
+        <BeheerTab orgId={id} slug={org.slug} limits={limits} suspendedAt={org.suspended_at} />
       )}
     </div>
   );

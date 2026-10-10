@@ -16,7 +16,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   NO_CHATBOT: 'Er is nog geen chatbot ingesteld.',
   FORBIDDEN: 'Geen toegang.',
   RATE_LIMITED: 'Te veel verzoeken. Probeer het zo opnieuw.',
-  BUDGET_EXHAUSTED: 'Dagbudget bereikt. Probeer het morgen opnieuw.',
+  BUDGET_EXHAUSTED: 'Daglimiet bereikt. Probeer het morgen opnieuw.',
   MONTHLY_LIMIT: 'Maandlimiet bereikt.',
   FAILED: 'De bot kon geen antwoord geven.',
 };

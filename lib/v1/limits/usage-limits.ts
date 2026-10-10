@@ -1,6 +1,9 @@
-// M-C — per-org usage-limits voor V1. Port van lib/v0/server/budget.ts naar EUR +
-// een per-org kolom (organizations.daily_budget_eur, migr 0009) + een maand-cap op
-// het aantal query_log-rijen.
+// M-C — per-org usage-limits voor V1. Drie limieten, alle drie per org instelbaar
+// in het admin-dashboard (organizations-kolommen):
+//  * vragen per dag   (daily_question_limit,   migr 0027) — zichtbaar voor de klant
+//  * vragen per maand (monthly_question_limit, migr 0027) — zichtbaar voor de klant
+//  * EUR per dag      (daily_budget_eur,       migr 0009) — onzichtbaar kosten-vangnet
+// Een "vraag" = één query_log-rij (V1 heeft geen gesprek-entiteit).
 //
 // Bewuste correctheids-grenzen (zie ook V0 budget.ts):
 //  * BACKSTOP, geen exacte meter: logRagQuery is best-effort/never-throws en draait
@@ -17,13 +20,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-// Fallback-cap als de kolom null/onleesbaar is — spiegelt de migratie-default (€1/dag).
-const DEFAULT_DAILY_BUDGET_EUR = 1.0;
-
-// V1 heeft GEEN conversatie/thread-entiteit → we tellen query_log-rijen (= turns) per
-// org per kalendermaand. Dit is dus effectief een maandelijkse turn/message-cap, niet
-// distinct-conversations. Constant makkelijk te verhogen (admin-editor = later).
-export const MONTHLY_CONVERSATION_LIMIT = 300;
+// Fallbacks als een kolom null/onleesbaar is — spiegelen de migratie-defaults (0027).
+export const DEFAULT_DAILY_BUDGET_EUR = 2.0;
+export const DEFAULT_DAILY_QUESTION_LIMIT = 250;
+export const DEFAULT_MONTHLY_QUESTION_LIMIT = 2000;
 
 // PostgREST levert per request max ~1000 rijen (db-max-rows). Een plat .select()+JS-sum
 // zou de dag-som rond 1000 rijen afkappen → bij goedkope vragen blijft de som ver onder
@@ -51,7 +51,7 @@ export function isOverBudget(spentEur: number, capEur: number): boolean {
   return spentEur >= capEur;
 }
 
-/** Pure: ruwe kolomwaarde → geldige cap. null/undefined/NaN/negatief → default (€1);
+/** Pure: ruwe kolomwaarde → geldige cap. null/undefined/NaN/negatief → default (€2);
  *  0 blijft 0 (geldige "uit"-waarde die over-budget forceert). LET OP: `Number(null) === 0`,
  *  dus een kale `Number()` zou null naar €0 mappen (= bot offline) — vandaar de expliciete
  *  null-check vóór de coercion (fail-open op een ontbrekende waarde, niet fail-closed). */
@@ -61,7 +61,15 @@ export function resolveDailyBudgetEur(raw: unknown): number {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_DAILY_BUDGET_EUR;
 }
 
-/** Lees organizations.daily_budget_eur. Fallback → €1/dag bij null/NaN/lees-fout
+/** Pure: ruwe kolomwaarde → geldige vragen-limiet (geheel getal). Zelfde fail-open-
+ *  regel als resolveDailyBudgetEur: null/NaN/negatief → `fallback`, 0 blijft 0 (= dicht). */
+export function resolveQuestionLimit(raw: unknown, fallback: number): number {
+  if (raw == null) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
+/** Lees organizations.daily_budget_eur. Fallback → €2/dag bij null/NaN/lees-fout
  *  (een hapering mag de bot niet platleggen). */
 export async function getOrgDailyBudgetEur(
   serviceClient: SupabaseClient,
@@ -78,7 +86,7 @@ export async function getOrgDailyBudgetEur(
     return resolveDailyBudgetEur(val);
   } catch (err) {
     console.error(
-      '[limits] getOrgDailyBudgetEur faalde (fallback → €1):',
+      '[limits] getOrgDailyBudgetEur faalde (fallback → €2):',
       err instanceof Error ? err.message : err,
     );
     return DEFAULT_DAILY_BUDGET_EUR;
@@ -157,14 +165,44 @@ export async function checkOrgDailyBudget(
   return { over: isOverBudget(spentEur, capEur), spentEur, capEur };
 }
 
-/** Head-count van query_log-rijen (= turns) voor `orgId` deze kalendermaand.
- *  Fail-open → 0 bij lees-/DB-fout. */
-export async function getOrgConversationsThisMonth(
+export type QuestionLimits = { daily: number; monthly: number };
+
+/** Lees de vragen-limieten van een org (één select). Fallback → defaults bij lees-fout
+ *  (een hapering mag de bot niet platleggen). */
+export async function getOrgQuestionLimits(
   serviceClient: SupabaseClient,
   orgId: string,
+): Promise<QuestionLimits> {
+  try {
+    const { data, error } = await serviceClient
+      .from('organizations')
+      .select('daily_question_limit, monthly_question_limit')
+      .eq('id', orgId)
+      .maybeSingle();
+    if (error) throw error;
+    const row = data as { daily_question_limit: unknown; monthly_question_limit: unknown } | null;
+    return {
+      daily: resolveQuestionLimit(row?.daily_question_limit, DEFAULT_DAILY_QUESTION_LIMIT),
+      monthly: resolveQuestionLimit(row?.monthly_question_limit, DEFAULT_MONTHLY_QUESTION_LIMIT),
+    };
+  } catch (err) {
+    console.error(
+      '[limits] getOrgQuestionLimits faalde (fallback → defaults):',
+      err instanceof Error ? err.message : err,
+    );
+    return { daily: DEFAULT_DAILY_QUESTION_LIMIT, monthly: DEFAULT_MONTHLY_QUESTION_LIMIT };
+  }
+}
+
+/** Head-count van query_log-rijen (= vragen) voor `orgId` vanaf `sinceIso`.
+ *  Fail-open → 0 bij lees-/DB-fout. */
+async function countQuestionsSince(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  sinceIso: string,
+  label: string,
 ): Promise<number> {
   try {
-    const sinceIso = startOfUtcMonthIso(new Date());
     const { count, error } = await serviceClient
       .from('query_log')
       .select('id', { count: 'exact', head: true })
@@ -174,20 +212,46 @@ export async function getOrgConversationsThisMonth(
     return count ?? 0;
   } catch (err) {
     console.error(
-      '[limits] getOrgConversationsThisMonth faalde (fail-open → 0):',
+      `[limits] ${label} faalde (fail-open → 0):`,
       err instanceof Error ? err.message : err,
     );
     return 0;
   }
 }
 
-export type MonthlyVerdict = { over: boolean; count: number; limit: number };
+/** Aantal vragen van `orgId` sinds UTC-middernacht. */
+export function getOrgQuestionsToday(serviceClient: SupabaseClient, orgId: string): Promise<number> {
+  return countQuestionsSince(serviceClient, orgId, startOfUtcDayIso(new Date()), 'getOrgQuestionsToday');
+}
 
-/** Maand-cap-oordeel: `over` zodra de turn-count de limiet bereikt. */
-export async function checkOrgMonthlyLimit(
+/** Aantal vragen van `orgId` deze kalendermaand (UTC). */
+export function getOrgQuestionsThisMonth(serviceClient: SupabaseClient, orgId: string): Promise<number> {
+  return countQuestionsSince(serviceClient, orgId, startOfUtcMonthIso(new Date()), 'getOrgQuestionsThisMonth');
+}
+
+export type QuestionVerdict = { over: boolean; count: number; limit: number };
+
+/** Pure: vragen-oordeel. `>=` zodat een exact bereikte limiet dichtklapt (0 = altijd dicht). */
+export function questionVerdict(count: number, limit: number): QuestionVerdict {
+  return { over: count >= limit, count, limit };
+}
+
+/** Dag-oordeel. `limit` meegeven als de caller de org-rij al gelezen heeft. */
+export async function checkOrgDailyQuestions(
   serviceClient: SupabaseClient,
   orgId: string,
-): Promise<MonthlyVerdict> {
-  const count = await getOrgConversationsThisMonth(serviceClient, orgId);
-  return { over: count >= MONTHLY_CONVERSATION_LIMIT, count, limit: MONTHLY_CONVERSATION_LIMIT };
+  limit?: number,
+): Promise<QuestionVerdict> {
+  const cap = limit ?? (await getOrgQuestionLimits(serviceClient, orgId)).daily;
+  return questionVerdict(await getOrgQuestionsToday(serviceClient, orgId), cap);
+}
+
+/** Maand-oordeel. `limit` meegeven als de caller de org-rij al gelezen heeft. */
+export async function checkOrgMonthlyQuestions(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  limit?: number,
+): Promise<QuestionVerdict> {
+  const cap = limit ?? (await getOrgQuestionLimits(serviceClient, orgId)).monthly;
+  return questionVerdict(await getOrgQuestionsThisMonth(serviceClient, orgId), cap);
 }

@@ -44,15 +44,21 @@ const MEMBER_ROLES = ['owner', 'admin', 'member'] as const;
 type MemberRole = (typeof MEMBER_ROLES)[number];
 const MEMBER_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Redelijk plafond voor een dagbudget — voorkomt een typefout van €100.000.
- *  0 = effectief uit (checkOrgDailyBudget → altijd over-budget). */
+/** Redelijke plafonds — voorkomen een typefout van €100.000 of 10 miljoen vragen.
+ *  Spiegelen de CHECK-constraints van migr 0027 (vragen) en het oude €1000-plafond. */
 const MAX_DAILY_BUDGET_EUR = 1000;
+const MAX_DAILY_QUESTIONS = 100_000;
+const MAX_MONTHLY_QUESTIONS = 1_000_000;
 
-/** Zet organizations.daily_budget_eur (M-C-kolom). ≥0, ≤€1000, afgerond op centen. */
-export async function setOrgDailyBudgetAction(
-  orgId: string,
-  dailyBudgetEur: number,
-): Promise<ActionResult> {
+export type OrgLimitsInput = {
+  dailyQuestions: number;
+  monthlyQuestions: number;
+  dailyBudgetEur: number;
+};
+
+/** Zet de drie limieten van een org in één update: vragen per dag/maand (klant ziet
+ *  ze) + het EUR-kostenvangnet (alleen intern). 0 = dicht. */
+export async function setOrgLimitsAction(orgId: string, input: OrgLimitsInput): Promise<ActionResult> {
   let admin;
   try {
     admin = await getJorionAdminClient(); // gate't intern via requireJorionAdmin
@@ -64,15 +70,27 @@ export async function setOrgDailyBudgetAction(
   }
   return actionTry(async () => {
     if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
-    if (!Number.isFinite(dailyBudgetEur) || dailyBudgetEur < 0 || dailyBudgetEur > MAX_DAILY_BUDGET_EUR) {
-      fail('INPUT_INVALID', `Budget moet tussen €0 en €${MAX_DAILY_BUDGET_EUR} liggen.`);
+    const { dailyQuestions, monthlyQuestions, dailyBudgetEur } = input ?? ({} as OrgLimitsInput);
+    if (!Number.isInteger(dailyQuestions) || dailyQuestions < 0 || dailyQuestions > MAX_DAILY_QUESTIONS) {
+      fail('INPUT_INVALID', `Vragen per dag moet een heel getal tussen 0 en ${MAX_DAILY_QUESTIONS} zijn.`);
     }
-    const value = Math.round(dailyBudgetEur * 100) / 100;
-    const { error } = await admin
+    if (!Number.isInteger(monthlyQuestions) || monthlyQuestions < 0 || monthlyQuestions > MAX_MONTHLY_QUESTIONS) {
+      fail('INPUT_INVALID', `Vragen per maand moet een heel getal tussen 0 en ${MAX_MONTHLY_QUESTIONS} zijn.`);
+    }
+    if (!Number.isFinite(dailyBudgetEur) || dailyBudgetEur < 0 || dailyBudgetEur > MAX_DAILY_BUDGET_EUR) {
+      fail('INPUT_INVALID', `Kostenplafond moet tussen €0 en €${MAX_DAILY_BUDGET_EUR} liggen.`);
+    }
+    const { data, error } = await admin
       .from('organizations')
-      .update({ daily_budget_eur: value })
-      .eq('id', orgId);
+      .update({
+        daily_question_limit: dailyQuestions,
+        monthly_question_limit: monthlyQuestions,
+        daily_budget_eur: Math.round(dailyBudgetEur * 100) / 100,
+      })
+      .eq('id', orgId)
+      .select('id');
     if (error) throw new Error(`organizations update: ${error.message}`);
+    if (!data?.length) fail('NOT_FOUND', 'Organisatie niet gevonden.');
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
   });

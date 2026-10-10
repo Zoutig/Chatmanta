@@ -2,7 +2,7 @@
 // V1-seed-org:
 //   (a) zet daily_budget_eur=0 → checkOrgDailyBudget → over:true (forceer-over-budget)
 //   (b) zet daily_budget_eur=999999 → checkOrgDailyBudget → over:false (sanity)
-//   (c) checkOrgMonthlyLimit met de huidige rij-count (informatief)
+//   (c) vragen vandaag / deze maand vs de org-limieten (informatief)
 //   (d) reset daily_budget_eur terug naar de oorspronkelijke waarde (finally)
 //
 // Vereist: migratie 0009 toegepast op V1-prod + V1_SEED_ORG_ID gezet.
@@ -11,7 +11,8 @@
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import {
   checkOrgDailyBudget,
-  checkOrgMonthlyLimit,
+  checkOrgDailyQuestions,
+  checkOrgMonthlyQuestions,
   getOrgDailyBudgetEur,
 } from '../lib/v1/limits/usage-limits';
 
@@ -44,9 +45,10 @@ async function main() {
     if (under.over) throw new Error(`(b) cap=999999 gaf over:true (spent=${under.spentEur})`);
     console.log(`✅ (b) cap=999999 → over:false (spentEur=${under.spentEur.toFixed(6)})`);
 
-    // (c) maand-cap (informatief; turn-count deze kalendermaand).
-    const month = await checkOrgMonthlyLimit(svc, ORG as string);
-    console.log(`ℹ️ (c) maand-count=${month.count} / limit=${month.limit} → over:${month.over}`);
+    // (c) vragen-limieten (informatief; query_log-rijen vandaag / deze maand).
+    const day = await checkOrgDailyQuestions(svc, ORG as string);
+    const month = await checkOrgMonthlyQuestions(svc, ORG as string);
+    console.log(`ℹ️ (c) vandaag=${day.count}/${day.limit} (over:${day.over}), maand=${month.count}/${month.limit} (over:${month.over})`);
 
     console.log('\n✅ M-C limits BEWEZEN: dag-budget-cap sluit op cap=0 en opent op een ruime cap.');
   } finally {
