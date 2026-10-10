@@ -134,3 +134,31 @@ scope-case $0,006 → **≈ $1,24** (grens $2).
 4. **Afgebroken streams**: bij smalltalk betaalt v0.14d de al gegenereerde tokens van een
    afgebroken antwoordstream (centen per 1000 smalltalk-vragen).
 5. **n = 40 vragen, één tijdvak** (nacht 10 okt). Richting robuust (39/40 sneller), procenten indicatief.
+
+## Promotie: v0.14d2 als LATEST + V1 (2026-10-10)
+
+**V1-bevinding.** `npm run v1:eval` (15 cases, seed-org Manta Demo) met de v0.14d-instellingen
+gaf één regressie: g2 "Wat is jullie adres?" werd een fallback ("Daar heb ik geen informatie
+over"), en h2-h4 kregen de kale fallback-tekst in plaats van een eerlijke "weet ik niet, bel
+020-…". Oorzaak: V1 heeft geen hybrid search (geen trefwoord-RPC); het speculatieve zoeken op
+de ruwe, korte vraag haalt dan niets boven de drempel 0,4. Met dezelfde Luna-hulpstappen maar
+zónder speculatief zoeken (v0.13x7-vlaggen) antwoordde g2 wel. In V0 (hybrid aan) speelde dit
+niet.
+
+**Fix: v0.14d2** = v0.14d + `speculativeRetryOnEmpty`. Vindt het speculatieve zoeken niets
+boven de drempel, dan wacht de engine alsnog op de voorbewerking en zoekt één keer opnieuw met
+de herschreven vraag. Alleen het nul-treffers-pad verandert (een paar honderd ms extra daar);
+alle andere vragen zijn byte-identiek aan v0.14d. off_topic geeft de originele vraag terug →
+geen retry, dus de off-topic-fallback blijft.
+
+| V1-eval (15 cases) | g grounded | h refuse | iso | ot | inj | canary-leaks | kosten |
+|---|---|---|---|---|---|---|---|
+| v0.14d-vlaggen | 5/6 (g2 fallback) | 4/4 veilig, h2-h4 kale fallback | 2/2 | 1/1 | 2/2 | 0 | $0,0079 |
+| **v0.14d2-vlaggen** | **6/6** | **4/4 eerlijk "weet ik niet" + contact** | 2/2 | 1/1 | 2/2 | 0 | $0,0113 |
+
+**Cache-pad V1** (los script, eigen versie-tag, opgeruimd): eerste vraag → write; zelfde vraag →
+cache-hit (0,8 s; wacht op de route-check van de voorbewerking); "Hoi!" en "Bedankt voor de hulp!"
+→ smalltalk, nooit uit de cache. Werkt zoals bedoeld.
+
+**Na merge:** V1-answer_cache purgen (key `v1.0` verandert niet bij een config-wijziging) via
+`bump_cache_epoch` per org + delete van de `v1.0`-rijen, zoals bij #263/#266/#268.

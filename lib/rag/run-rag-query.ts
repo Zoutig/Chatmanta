@@ -2015,6 +2015,60 @@ export async function* runRagQuery(
     selectiveHyDEEmbedTokens = hydeEmbed.tokens;
     selectiveHyDEEmbedCost = hydeEmbed.costUsd;
   }
+  // v0.14d2 speculativeRetryOnEmpty: de speculatieve zoekopdracht op de ruwe vraag
+  // vond niets boven de drempel (V1: geen hybrid/trefwoord-zoeken, dus korte vragen
+  // als "Wat is jullie adres?" missen). Wacht dan alsnog op de pre-processor en zoek
+  // één keer opnieuw met diens herschreven vraag. Kost alleen latency in het nul-
+  // treffers-pad; off_topic levert de originele vraag terug → geen retry.
+  if (
+    bot.speculativeRetryOnEmpty === true &&
+    specHits !== null &&
+    !merged.some((c) => c.similarity >= threshold)
+  ) {
+    const ppRetry = await settleDeferredPreprocess();
+    if (ppRetry?.kind === 'smalltalk') {
+      yield smalltalkEvent(ppRetry);
+      return;
+    }
+    const rewritten = (rewriteInfo as ChatRewriteInfo | null)?.rewritten?.trim();
+    if (rewritten && rewritten.toLowerCase() !== original.trim().toLowerCase()) {
+      const stopRetryEmbed = tMark('embedding_ms');
+      const retryEmbed = await embedTexts([rewritten]);
+      stopRetryEmbed();
+      const stopRetryRetrieve = tMark('retrieval_ms');
+      const retryHits = bot.hybridSearch
+        ? await retrieveChunksHybrid(
+            client,
+            retryEmbed.vectors[0],
+            rewritten,
+            retrievalTopK,
+            withParents,
+            orgId,
+            chatbotId,
+            chatbotScoped,
+          )
+        : await retrieveChunks(
+            client,
+            retryEmbed.vectors[0],
+            retrievalTopK,
+            withParents,
+            orgId,
+            chatbotId,
+            chatbotScoped,
+          );
+      stopRetryRetrieve();
+      for (const h of retryHits) {
+        const prev = bestById.get(h.id);
+        if (!prev || h.similarity > prev.similarity) bestById.set(h.id, h);
+      }
+      merged = [...bestById.values()].sort((a, b) => b.similarity - a.similarity);
+      topSim = merged[0]?.similarity ?? null;
+      queryForEmbed = rewritten;
+      // Meegeteld bij de extra-embed-totalen (zelfde plek als selective HyDE).
+      selectiveHyDEEmbedTokens += retryEmbed.tokens;
+      selectiveHyDEEmbedCost += retryEmbed.costUsd;
+    }
+  }
   const allSources = merged.map((c) => toSource(c));
 
   // 5. Threshold filter.

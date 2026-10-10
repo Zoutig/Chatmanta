@@ -1691,6 +1691,19 @@ const V0_14E: BotConfig = {
     'v0.14d; in het eerste-vraag-pad gebruikt de pre-processor een korte router-prompt (alleen route + smalltalk-antwoord), want de herschreven zoekvraag wordt daar niet gebruikt. Experiment.',
   preProcessRouterSystem: V0_14_ROUTER_SYSTEM,
 };
+// v0.14d2 — v0.14d + één retry bij nul treffers: vindt het speculatieve zoeken op de
+// ruwe vraag niets boven de drempel, dan wacht de engine alsnog op de voorbewerking en
+// zoekt opnieuw met de herschreven vraag. Gevonden op het V1-pad (geen hybrid search):
+// "Wat is jullie adres?" gaf onder v0.14d een fallback, met herschrijving wel antwoord.
+// Raakt alleen het nul-treffers-pad; elders byte-identiek aan v0.14d.
+const V0_14D2: BotConfig = {
+  ...V0_14D,
+  version: 'v0.14d2',
+  label: 'v0.14d2 — v0.14d + opnieuw zoeken met de herschreven vraag bij nul treffers',
+  description:
+    'v0.14d; vindt het speculatieve zoeken op de originele vraag niets boven de drempel, dan wordt alsnog op de voorbewerking gewacht en één keer opnieuw gezocht met de herschreven vraag (vangnet voor V1 zonder hybrid search).',
+  speculativeRetryOnEmpty: true,
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1779,6 +1792,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_14C.version]: V0_14C,
   [V0_14D.version]: V0_14D,
   [V0_14E.version]: V0_14E,
+  [V0_14D2.version]: V0_14D2,
 };
 
 /**
@@ -1851,7 +1865,14 @@ export const BOTS: Record<string, BotConfig> = {
 // (40 faalwijze-vragen ×4, jury): x7v 43,4 vs x6v 60,5 /100, gepaard 35/11 (p=0,001);
 // verse holdout2 (120 vragen ×2): gelijk (geen regressie); hard-eval gate JA (AQ 100%).
 // v0.13x6 blijft append-only behouden.
-export const LATEST_BOT_VERSION = V0_13X7.version;
+// 2026-10-10: v0.14d2 gepromoveerd (= v0.14d + retry bij nul treffers; latency-ronde,
+// docs/LUNA_V014_RESULTATEN.md). Metingen v0.14d:
+// Dev-set 40×2 interleaved: zichtbare TTFT p50 4,21 → 2,01 s (39/40 vragen sneller),
+// totaal p50 4,96 → 2,53 s; Claude-judge gepaard 2/2/36 (gelijk); hard-eval 62/63,
+// 0 catastrofaal, enige veto (ot-acme-ander-bedrijf-01) = refusal-regex-false-positive
+// (3× handmatig nette weigering; bij v0.13x7 op 2026-10-08 idem herscoord). Prijs: ~2×
+// LLM-kosten per vraag (Luna-hulpstappen + Fast mode). v0.13x7 blijft append-only behouden.
+export const LATEST_BOT_VERSION = V0_14D2.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [

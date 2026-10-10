@@ -16,11 +16,20 @@ import { resolveBot, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 const V1_OVERRIDES = {
   version: 'v1.0',
   label: 'V1',
-  // Luna voor de antwoord-generatie, hulpstappen op gpt-4o-mini (= v0.11b-instelling;
-  // eval 2026-10-05: grounding G 3,76→4,16, botkosten −29%, TTFT ≈ gelijk). Zie
-  // docs/superpowers/specs/2026-10-05-luna-pipeline-onderzoek-design.md.
+  // Luna voor antwoord én hulpstappen, beide op Fast mode, en bij een eerste vraag
+  // zoeken + antwoord-stream starten zonder op de voorbewerking te wachten (= v0.14d2;
+  // dev-set 2026-10-10: zichtbare TTFT p50 4,2 → 2,0 s bij gelijke kwaliteit, ~2×
+  // LLM-kosten). Zie docs/LUNA_V014_RESULTATEN.md. De Fast-mode-tiers zijn hier de
+  // default; per org overschrijfbaar (organizations.fast_mode_enabled, V1-admin).
   chatModel: 'gpt-6-luna',
-  auxModel: 'gpt-4o-mini',
+  auxModel: 'gpt-6-luna',
+  chatServiceTier: 'priority',
+  auxServiceTier: 'priority',
+  speculativeRetrieval: true,
+  deferPreprocess: true,
+  // Vangnet: V1 heeft geen hybrid search, dus zoeken op de ruwe vraag mist soms
+  // ("Wat is jullie adres?"). Bij nul treffers alsnog met de herschreven vraag zoeken.
+  speculativeRetryOnEmpty: true,
   description: 'V1 RAG document-only chatbot-scoped (PR-1b)',
   similarityThreshold: 0.4,
   chatbotScoped: true,

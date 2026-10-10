@@ -44,6 +44,10 @@ export type RagConfig = {
       pre-processor: de Luna-stream start zodra de context klaar is; pas vóór het eerste token wordt de
       route gecheckt (smalltalk → stream afbreken). Deelvragen worden in dit pad niet gebruikt. Default uit. */
   deferPreprocess?: boolean;
+  /** v0.14d2: (vereist speculativeRetrieval) vindt de zoekopdracht op de originele vraag niets boven
+      de drempel, wacht dan op de pre-processor en zoek één keer opnieuw met de herschreven vraag.
+      Nodig zonder hybrid search (V1). Default uit. */
+  speculativeRetryOnEmpty?: boolean;
   /** v0.14: compacte router-prompt (alleen route + smalltalk-reply, geen herschrijving) voor het
       deferPreprocess-pad — daar zoekt de engine al op de originele vraag, dus de rewrite is overbodig
       en een kortere prompt is sneller. Persona-tokens zoals preProcessSystem. Default: volle prompt. */
