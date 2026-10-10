@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { notFound } from 'next/navigation';
 
-import { findPage } from '@/app/widget/org-skins';
+import { findPage } from '@/app/v0/widget/org-skins';
 
 // Server-side loader voor de fake-website pagina's in /widget.
 //

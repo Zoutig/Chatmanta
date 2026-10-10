@@ -9,7 +9,7 @@ import { PageHeader } from '@/app/v1/_ui/page-header';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { EmptyState, StatusPill } from '@/app/v1/_ui/feedback';
 import { SectionHead } from '@/app/v1/_ui/list';
-import { OnboardingTour, type TourStep } from '@/app/klantendashboard/components/onboarding-tour';
+import { OnboardingTour, type TourStep } from '@/app/v0/klantendashboard/components/onboarding-tour';
 import { DEMO_SHELL } from '@/lib/voorbeeld/fixtures/shell';
 import { getFixtureOverviewMetrics } from '@/lib/voorbeeld/fixtures/overzicht';
 import { NextStep } from './_overview/next-step';
