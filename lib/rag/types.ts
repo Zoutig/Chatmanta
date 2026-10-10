@@ -40,6 +40,14 @@ export type RagConfig = {
   /** v0.14: eerste vraag zonder history → zoeken op de originele vraag start meteen, parallel aan
       de pre-processor (die dan alleen nog route + deelvragen levert). Default uit. */
   speculativeRetrieval?: boolean;
+  /** v0.14: (vereist speculativeRetrieval, alleen eerste vraag) wacht ook met de ANTWOORD-call niet op de
+      pre-processor: de Luna-stream start zodra de context klaar is; pas vóór het eerste token wordt de
+      route gecheckt (smalltalk → stream afbreken). Deelvragen worden in dit pad niet gebruikt. Default uit. */
+  deferPreprocess?: boolean;
+  /** v0.14: compacte router-prompt (alleen route + smalltalk-reply, geen herschrijving) voor het
+      deferPreprocess-pad — daar zoekt de engine al op de originele vraag, dus de rewrite is overbodig
+      en een kortere prompt is sneller. Persona-tokens zoals preProcessSystem. Default: volle prompt. */
+  preProcessRouterSystem?: string;
   /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */

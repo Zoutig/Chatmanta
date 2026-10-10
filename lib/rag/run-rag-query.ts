@@ -186,6 +186,7 @@ async function preProcessInput(
   persona: RagPersona,
   history: ChatHistoryTurn[] = [],
   tone: Tone = DEFAULT_TONE,
+  routeOnly = false,
 ): Promise<PreProcessResult> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS);
   const hasHistory = trimmed.length > 0;
@@ -216,7 +217,9 @@ async function preProcessInput(
   // pre-trained naam ("ChatManta") door als invul-default. Multi-turn addon
   // wordt apart gerendered want hij wordt geprepend, niet ingelezen.
   const rendered = composeBotPrompts(bot, persona);
-  const basePreProcess = useMultiTurnAddon
+  const basePreProcess = routeOnly && bot.preProcessRouterSystem
+    ? renderPersonaTemplate(bot.preProcessRouterSystem, persona)
+    : useMultiTurnAddon
     ? `${rendered.preProcessMultiTurnAddon}\n\n${rendered.preProcessSystem}`
     : rendered.preProcessSystem;
   // v0.13x7: de smalltalk-reply passeert de STIJL-suffix van de antwoord-prompt
@@ -238,6 +241,9 @@ async function preProcessInput(
     outputTokens: result.outputTokens,
     costUsd: result.costUsd,
   };
+  if (process.env.RAG_DEBUG_PREPROCESS === '1') {
+    console.log('[preprocess-debug]', JSON.stringify({ q: original, out: result.text }));
+  }
   const parsed = parsePreProcessOutput(result.text);
   if (!parsed) {
     // Defensive: malformed output → assume search with the original query so
@@ -1530,7 +1536,13 @@ export async function* runRagQuery(
   let preCacheEmbedCost = 0;
   let offTopicSuspected = false;
 
-  const preProcessPromise = enableRewrite ? preProcessInput(original, bot, persona, history, tone) : null;
+  // v0.14 deferPreprocess (eerste vraag): de pre-processor hoeft alleen nog te
+  // routeren → compacte router-prompt als de bot die heeft.
+  const routeOnlyPreprocess =
+    bot.deferPreprocess === true && bot.speculativeRetrieval === true && history.length === 0;
+  const preProcessPromise = enableRewrite
+    ? preProcessInput(original, bot, persona, history, tone, routeOnlyPreprocess)
+    : null;
   // cacheActive: alleen embedden als de cache écht gebruikt wordt. Zónder de
   // disableCache-gate hier zou een eval/script (disableCache:true) op een
   // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
@@ -1594,7 +1606,55 @@ export async function* runRagQuery(
   if (specPromise) void specPromise.catch(() => undefined);
   let ppSubQueries: string[] = [];
 
-  if (preProcessPromise) {
+  // v0.14 deferPreprocess: de pre-processor loopt door op de achtergrond; de
+  // route (smalltalk/off_topic) wordt pas gecheckt waar hij ertoe doet (cache-
+  // hit, nul-treffers, vlak vóór het eerste antwoordtoken).
+  const deferPreprocess =
+    bot.deferPreprocess === true && specPromise !== null && preProcessPromise !== null;
+  const ppStartedAt = performance.now();
+  // Paden die eindigen zonder de route nodig te hebben (bv. general-knowledge)
+  // awaiten de pre-processor nooit: voorkom een unhandled rejection.
+  if (deferPreprocess && preProcessPromise) void preProcessPromise.catch(() => undefined);
+  let deferredSettled = false;
+  const settleDeferredPreprocess = async (): Promise<PreProcessResult | null> => {
+    if (!deferPreprocess || deferredSettled || !preProcessPromise) return null;
+    deferredSettled = true;
+    const pp = await preProcessPromise;
+    const end = performance.now();
+    timings.preprocess_ms = Math.round(end - ppStartedAt);
+    markSpan('preprocess_ms', ppStartedAt, end);
+    if (pp.kind !== 'smalltalk') {
+      if (pp.kind === 'off_topic') {
+        offTopicSuspected = bot.preProcessOffTopicDetection === true;
+      }
+      rewriteInfo = {
+        original,
+        rewritten: pp.kind === 'search' ? pp.query : original,
+        inputTokens: pp.inputTokens,
+        outputTokens: pp.outputTokens,
+        costUsd: pp.costUsd,
+      };
+      rewriteCost = pp.costUsd;
+    }
+    return pp;
+  };
+  const smalltalkEvent = (
+    pp: Extract<PreProcessResult, { kind: 'smalltalk' }>,
+  ): StreamEvent => ({
+    kind: 'smalltalk',
+    response: {
+      botVersion: bot.version,
+      tone,
+      length,
+      generalKnowledgeActual: null,
+      kind: 'smalltalk',
+      answer: pp.reply,
+      preProcessTokens: { in: pp.inputTokens, out: pp.outputTokens },
+      totalCostUsd: pp.costUsd,
+    },
+  });
+
+  if (preProcessPromise && !deferPreprocess) {
     yield { kind: 'status', phase: 'preprocess' };
     const stopPp = tMark('preprocess_ms');
     const pp = await preProcessPromise;
@@ -1643,7 +1703,7 @@ export async function* runRagQuery(
       ppSubQueries = pp.subQueries ?? [];
     }
   }
-  const rewriteCost = rewriteInfo?.costUsd ?? 0;
+  let rewriteCost = rewriteInfo?.costUsd ?? 0;
 
   // Cache lookup — embed liep al parallel met preprocess; we awaiten alleen
   // het resultaat (in de best case is hij al klaar). disableCache (eval) slaat
@@ -1667,6 +1727,11 @@ export async function* runRagQuery(
       orgId,
     );
     stopCache();
+    const ppAtCacheHit = cached ? await settleDeferredPreprocess() : null;
+    if (ppAtCacheHit?.kind === 'smalltalk') {
+      yield smalltalkEvent(ppAtCacheHit);
+      return;
+    }
     if (cached) {
       // Mark cache hit + return. Sources/threshold copy uit gecachte response.
       // Tone/length: de gecachte rij is mogelijk geschreven onder andere stijl-
@@ -1955,6 +2020,11 @@ export async function* runRagQuery(
   // 5. Threshold filter.
   const aboveThreshold = merged.filter((c) => c.similarity >= threshold);
   if (aboveThreshold.length === 0) {
+    const ppAtZeroHits = await settleDeferredPreprocess();
+    if (ppAtZeroHits?.kind === 'smalltalk') {
+      yield smalltalkEvent(ppAtZeroHits);
+      return;
+    }
     // V0.5: tweede-stage re-classifier wanneer bot.generalKnowledgeEnabled
     // EN de UI-toggle aan staat. We weten nu dat retrieval géén relevante
     // chunks gaf — de vraag is dus ofwel algemene kennis binnen het domein
@@ -2434,6 +2504,51 @@ KRITISCHE FORMAT-REGELS:
       : '';
   const userPrompt = `${manualQAAuthorityIntro}${sourceLinksIntro}${matchedSpanIntro}CONTEXT:\n${context.trim()}\n\nVRAAG: ${original}${premiseDirective}${complaintDirective}${languageDirective}`;
 
+  // Sliding window: alléén de laatste N turns gaan mee naar de answer-LLM.
+  // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
+  // ongewijzigd; alleen het LLM-payload-venster is begrensd.
+  const answerHistory = history.slice(-RAG_CHAT_HISTORY_TURNS);
+  const createAnswerStream = (signal?: AbortSignal) =>
+    openai().chat.completions.create(
+      {
+        model: bot.chatModel,
+        ...openaiChatParams(
+          bot.chatModel,
+          {
+            temperature: bot.chatTemperature,
+            maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+          },
+          bot.chatServiceTier,
+        ),
+        stream: true,
+        stream_options: { include_usage: true },
+        messages: [
+          { role: 'system', content: styledSystemPrompt },
+          ...answerHistory.map((t) => ({ role: t.role, content: t.content })),
+          { role: 'user', content: userPrompt },
+        ],
+      },
+      signal ? { signal } : undefined,
+    );
+  // v0.14 deferPreprocess: start de antwoord-stream nu al (de context hangt niet
+  // van de pre-processor af) en wacht pas daarna op de route. Smalltalk → stream
+  // afbreken (alleen de al gegenereerde tokens kosten geld).
+  let earlyStream: ReturnType<typeof createAnswerStream> | null = null;
+  let stopEarlyGeneration: (() => void) | null = null;
+  if (deferPreprocess && !deferredSettled) {
+    const abortCtl = new AbortController();
+    stopEarlyGeneration = tMark('generation_ms');
+    earlyStream = createAnswerStream(abortCtl.signal);
+    void earlyStream.catch(() => undefined);
+    const ppBeforeAnswer = await settleDeferredPreprocess();
+    if (ppBeforeAnswer?.kind === 'smalltalk') {
+      abortCtl.abort();
+      stopEarlyGeneration();
+      yield smalltalkEvent(ppBeforeAnswer);
+      return;
+    }
+  }
+
   // 8. Emit start event with metadata so UI can show sources panel before
   //    tokens arrive.
   yield { kind: 'status', phase: 'answer' };
@@ -2451,31 +2566,10 @@ KRITISCHE FORMAT-REGELS:
   let chatInputTokens = 0;
   let chatOutputTokens = 0;
   let chatCostUsd = 0;
-  const stopGeneration = tMark('generation_ms');
-  // Sliding window: alléén de laatste N turns gaan mee naar de answer-LLM.
-  // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
-  // ongewijzigd; alleen het LLM-payload-venster is begrensd.
-  const answerHistory = history.slice(-RAG_CHAT_HISTORY_TURNS);
+  const stopGeneration = stopEarlyGeneration ?? tMark('generation_ms');
   let servedChatTier: string | null | undefined;
   try {
-    const stream = await openai().chat.completions.create({
-      model: bot.chatModel,
-      ...openaiChatParams(
-        bot.chatModel,
-        {
-          temperature: bot.chatTemperature,
-          maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
-        },
-        bot.chatServiceTier,
-      ),
-      stream: true,
-      stream_options: { include_usage: true },
-      messages: [
-        { role: 'system', content: styledSystemPrompt },
-        ...answerHistory.map((t) => ({ role: t.role, content: t.content })),
-        { role: 'user', content: userPrompt },
-      ],
-    });
+    const stream = await (earlyStream ?? createAnswerStream());
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {

@@ -1609,13 +1609,20 @@ const V0_14A: BotConfig = {
 const V0_14_PREPROCESS_SYSTEM = V0_10_PREPROCESS_SYSTEM.replace(
   `→ Geef GEEN antwoord — alleen de herschreven zoekvraag.`,
   `→ Geef GEEN antwoord — alleen de herschreven zoekvraag.
-   → Bevat de input MEERDERE losse vragen of onderwerpen (bv. "wat kost X en hoe lang duurt Y?", "verschil tussen A en B"), geef dan per extra onderwerp een korte zelfstandige deelvraag op een eigen SUB-regel (maximaal 2). Eén onderwerp = geen SUB-regels.`,
+   → DEELVRAGEN: vraagt de input naar TWEE OF MEER verschillende dingen (verbonden met "en", "of", "ook", "verschil tussen", "naast", of meerdere vraagtekens), zet dan na de QUERY-regel per onderdeel een zelfstandige deelvraag op een eigen SUB-regel (maximaal 2). De QUERY blijft de hele vraag. Gaat de input over één ding, dan géén SUB-regels.`,
 ).replace(
   `ACTION: search
 QUERY: <herschreven zoekvraag>`,
   `ACTION: search
 QUERY: <herschreven zoekvraag>
-SUB: <deelvraag> (optioneel, 0-2 regels)`,
+SUB: <deelvraag 1> (alleen bij een vraag over meerdere dingen)
+SUB: <deelvraag 2> (alleen bij een vraag over meerdere dingen)
+
+Voorbeeld van een vraag over twee dingen — "welk model gebruiken jullie en waar staat de database?":
+ACTION: search
+QUERY: Welk taalmodel gebruikt {{COMPANY}} en in welke regio staat de database?
+SUB: Welk taalmodel gebruikt {{COMPANY}}?
+SUB: In welke regio staat de database van {{COMPANY}}?`,
 );
 const V0_14B: BotConfig = {
   ...V0_14A,
@@ -1637,6 +1644,52 @@ const V0_14C: BotConfig = {
   description:
     'v0.14b; eerste vraag zonder history: retrieval op de originele vraag start parallel aan de pre-processor (die levert dan alleen route + deelvragen). Experiment.',
   speculativeRetrieval: true,
+};
+// v0.14d — v0.14a + speculatief zoeken én speculatief antwoorden bij de eerste vraag:
+// zoeken op de originele vraag en de Luna-antwoordstream starten zonder op de
+// voorbewerking te wachten; de route (smalltalk) wordt vlak vóór het eerste token
+// gecheckt. Zonder deelvragen (die passen niet in dit pad).
+const V0_14D: BotConfig = {
+  ...V0_14A,
+  version: 'v0.14d',
+  label: 'v0.14d — v0.14a + niet wachten op de voorbewerking bij de eerste vraag (experiment)',
+  description:
+    'v0.14a; eerste vraag zonder history: retrieval op de originele vraag én de antwoord-stream starten parallel aan de pre-processor; smalltalk breekt de stream af. Vervolgvragen: v0.14a-pad. Experiment.',
+  speculativeRetrieval: true,
+  deferPreprocess: true,
+};
+// v0.14e — v0.14d met een compacte router-prompt voor de eerste vraag: in dat pad
+// zoekt de engine al op de originele vraag, dus de pre-processor hoeft alleen nog
+// te routeren (smalltalk/off_topic/search). Korter = sneller (gemeten: Luna Fast
+// ~1,1 s i.p.v. ~1,6 s). Vervolgvragen houden de volle prompt (herschrijven nodig).
+const V0_14_ROUTER_SYSTEM = `Je bent de router voor de klantcontact-assistent van {{COMPANY}}{{COMPANY_SUFFIX}}. Je gesprekspartners zijn {{AUDIENCE}}. Kies EXACT één actie.
+
+SMALLTALK — alleen voor: korte conversatie-tokens (begroeting, dank, afscheid, "ok", "leuk"), vragen over jou als assistent ("wat kan je?", "wie ben je?", "hoe werk je?"), of assistentie-meta zonder kennisvraag ("kan je me helpen?", "ik heb een vraag", "ben je er nog?"). NOOIT als de gebruiker een feit beweert of een aanname doet ("de prijs is €50 per maand", "hij heet Richard", "ik dacht dat optie X werkte") — dat is altijd SEARCH.
+→ Geef zelf een kort antwoord (1-3 zinnen) als persoonlijke assistent, vanuit "ik" (geen "wij/ons team"); verwijs naar {{COMPANY}} in derde persoon. Voorbeelden: "hey" → "{{SMALLTALK_GREETING}}"; "wat kan je?" → "Ik help je graag met {{SMALLTALK_HELP_SCOPE}}."
+
+OFF_TOPIC — alleen als de vraag overduidelijk NIETS met {{COMPANY}} of zijn vakgebied te maken heeft: rekensommen, weer, sport, algemene trivia, code schrijven, vertalen, gedichten/verhalen, of een vraag over een ANDER met naam genoemd bedrijf. Bij twijfel: SEARCH.
+
+SEARCH — al het andere.
+
+Antwoord in EXACT één van deze formaten (geen extra tekst):
+
+ACTION: smalltalk
+REPLY: <je antwoord>
+
+OF
+
+ACTION: off_topic
+
+OF
+
+ACTION: search`;
+const V0_14E: BotConfig = {
+  ...V0_14D,
+  version: 'v0.14e',
+  label: 'v0.14e — v0.14d + compacte router-prompt bij de eerste vraag (experiment)',
+  description:
+    'v0.14d; in het eerste-vraag-pad gebruikt de pre-processor een korte router-prompt (alleen route + smalltalk-antwoord), want de herschreven zoekvraag wordt daar niet gebruikt. Experiment.',
+  preProcessRouterSystem: V0_14_ROUTER_SYSTEM,
 };
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
@@ -1724,6 +1777,8 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_14A.version]: V0_14A,
   [V0_14B.version]: V0_14B,
   [V0_14C.version]: V0_14C,
+  [V0_14D.version]: V0_14D,
+  [V0_14E.version]: V0_14E,
 };
 
 /**
