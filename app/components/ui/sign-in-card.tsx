@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { login, type LoginState } from '../../login/actions';
+import { login, type LoginState } from '@/app/v0/login/actions';
 import { cn } from '@/lib/utils';
 import { LoginBackground } from './login-background';
 

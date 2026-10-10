@@ -20,7 +20,7 @@ export function isValidFeedbackEmail(email: string | null | undefined): email is
  *  (fallback = productie-domein). */
 export function feedbackAdminUrl(id: string): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.chatmanta.nl').replace(/\/+$/, '');
-  return `${base}/admindashboard/feedback/${id}`;
+  return `${base}/v0/admindashboard/feedback/${id}`;
 }
 
 function esc(s: string): string {

@@ -1,0 +1,251 @@
+'use client';
+
+// Command Center shell — sidebar + topbar wrapper.
+// Wordt door layout.tsx als children-container gebruikt. Client-side voor
+// active-route highlighting via usePathname.
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { AnimatedThemeToggler } from '@/app/components/ui/animated-theme-toggler';
+import { Icon } from '@/app/components/svg-icons';
+import { AssistantPanel } from './assistant-panel';
+
+type IconName = Parameters<typeof Icon>[0]['name'];
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: IconName;
+  status?: 'live' | 'soon';
+};
+
+const NAV: NavItem[] = [
+  { href: '/v0/commandcenter', label: 'Dashboard', icon: 'command', status: 'live' },
+  { href: '/v0/commandcenter/tasks', label: 'Taken', icon: 'list', status: 'live' },
+  { href: '/v0/commandcenter/completed', label: 'Voltooid', icon: 'check', status: 'live' },
+  { href: '/v0/commandcenter/milestones', label: 'Milestones', icon: 'flag', status: 'live' },
+  { href: '/v0/commandcenter/roadmap', label: 'Roadmap', icon: 'sparkle', status: 'live' },
+  { href: '/v0/commandcenter/checkins', label: 'Check-ins', icon: 'refresh', status: 'live' },
+  { href: '/v0/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'live' },
+  { href: '/v0/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'live' },
+  { href: '/v0/commandcenter/projects', label: 'Projectgebieden', icon: 'folder', status: 'live' },
+  { href: '/v0/commandcenter/crawl-health', label: 'Crawl-health', icon: 'globe', status: 'live' },
+];
+
+// Accent met fallback: --manta-accent is opt-in (alleen actief onder data-style="glass"),
+// dus binnen Command Center pakken we --accent als die niet gezet is.
+const ACCENT = 'var(--manta-accent, var(--accent))';
+
+export function CommandShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Mobile-drawer (<= 880px). data-cc-drawer-open op de shell-wrapper
+  // triggert de drawer-CSS in globals.css. Hamburger zit in main-topbar.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  return (
+    <div
+      className="commandcenter-shell"
+      data-cc-drawer-open={drawerOpen ? 'true' : 'false'}
+      style={{
+        minHeight: '100vh',
+        background: 'var(--bg)',
+        color: 'var(--fg)',
+        display: 'grid',
+        gridTemplateColumns: 'minmax(220px, 240px) minmax(0, 1fr) auto',
+      }}
+    >
+      {/* Sidebar */}
+      <aside
+        className="commandcenter-sidebar"
+        style={{
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'start',
+          height: '100vh',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--border)',
+          paddingTop: 'calc(22px + var(--safe-top, 0px))',
+          paddingRight: '16px',
+          paddingBottom: '22px',
+          paddingLeft: '16px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <Link
+          href="/v0/home"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 26,
+            textDecoration: 'none',
+            color: 'var(--fg)',
+          }}
+        >
+          <div
+            role="img"
+            aria-label="ChatManta logo"
+            style={{
+              width: 28,
+              height: 18,
+              backgroundColor: ACCENT,
+              WebkitMaskImage: "url('/logo/mono-mark.png')",
+              maskImage: "url('/logo/mono-mark.png')",
+              WebkitMaskSize: 'contain',
+              maskSize: 'contain',
+              WebkitMaskRepeat: 'no-repeat',
+              maskRepeat: 'no-repeat',
+              WebkitMaskPosition: 'center',
+              maskPosition: 'center',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+              fontWeight: 700,
+              fontSize: 15,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Command Center
+          </span>
+        </Link>
+
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {NAV.map((item) => {
+            const active =
+              item.status === 'live' &&
+              (pathname === item.href ||
+                (item.href !== '/v0/commandcenter' && pathname.startsWith(item.href)));
+            const disabled = item.status === 'soon';
+            const inner = (
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  fontSize: 13.5,
+                  fontWeight: 500,
+                  color: active
+                    ? 'var(--fg)'
+                    : disabled
+                      ? 'var(--fg-faint)'
+                      : 'var(--fg-muted)',
+                  background: active
+                    ? `color-mix(in oklab, ${ACCENT} 14%, transparent)`
+                    : 'transparent',
+                  border: active
+                    ? `1px solid color-mix(in oklab, ${ACCENT} 30%, transparent)`
+                    : '1px solid transparent',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Icon name={item.icon} size={15} />
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {disabled && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      color: 'var(--fg-faint)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 999,
+                      padding: '2px 6px',
+                    }}
+                  >
+                    Soon
+                  </span>
+                )}
+              </span>
+            );
+            if (disabled) {
+              return (
+                <div key={item.href} aria-disabled="true">
+                  {inner}
+                </div>
+              );
+            }
+            return (
+              <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+                {inner}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div
+          style={{
+            marginTop: 'auto',
+            paddingTop: 18,
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Link
+            href="/v0/home"
+            style={{
+              color: 'var(--fg-muted)',
+              fontSize: 12,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <Icon name="caret" size={12} className="rotate-90" />
+            Terug naar hub
+          </Link>
+          <AnimatedThemeToggler />
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main
+        className="commandcenter-main"
+        style={{
+          paddingTop: 'calc(clamp(16px, 4vw, 28px) + var(--safe-top, 0px))',
+          paddingRight: 'calc(clamp(16px, 4vw, 36px) + var(--safe-right, 0px))',
+          paddingBottom: '64px',
+          paddingLeft: 'calc(clamp(16px, 4vw, 36px) + var(--safe-left, 0px))',
+          maxWidth: 1280,
+          width: '100%',
+        }}
+      >
+        {/* Mobile hamburger — visible only via globals.css under 880px. */}
+        <button
+          type="button"
+          aria-label="Menu openen"
+          title="Menu"
+          className="commandcenter-hamburger topbar-hamburger"
+          onClick={() => setDrawerOpen(true)}
+          style={{ marginBottom: 12 }}
+        >
+          <Icon name="menu" size={18} />
+        </button>
+        {children}
+      </main>
+
+      {/* Right-side assistant panel */}
+      <AssistantPanel />
+
+      {/* Drawer-backdrop — gerenderd op mobiel als de drawer open is. */}
+      {drawerOpen ? (
+        <button
+          type="button"
+          aria-label="Sluit menu"
+          className="drawer-backdrop"
+          onClick={() => setDrawerOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}

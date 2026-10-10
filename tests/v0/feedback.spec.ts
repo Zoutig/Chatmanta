@@ -18,7 +18,7 @@ test('klant dient feedback in en operator wijzigt de status', async ({ page }) =
   const description = `${token} — testmelding: de chatbot gaf een verkeerd antwoord op de openingstijden.`;
 
   // ── Klant: melding indienen ──────────────────────────────────────────────
-  await page.goto('/klantendashboard/feedback');
+  await page.goto('/v0/klantendashboard/feedback');
   await expect(page.getByRole('heading', { name: /Feedback/i })).toBeVisible();
 
   await page.selectOption('select[name="type"]', 'bug');
@@ -38,7 +38,7 @@ test('klant dient feedback in en operator wijzigt de status', async ({ page }) =
   await expect(page.getByText('Bedankt voor je melding.')).toBeVisible({ timeout: 15_000 });
 
   // ── Operator: melding terugvinden in de inbox ────────────────────────────
-  await page.goto('/admindashboard/feedback');
+  await page.goto('/v0/admindashboard/feedback');
   const row = page.locator('a', { hasText: token }).first();
   await expect(row).toBeVisible({ timeout: 10_000 });
   await row.click();
@@ -65,7 +65,7 @@ test('klant dient feedback in en operator wijzigt de status', async ({ page }) =
   await expect(page.getByText(noteText)).toBeVisible({ timeout: 10_000 });
 
   // ── Fase 2: zoeken in de inbox ──────────────────────────────────────────────
-  await page.goto('/admindashboard/feedback');
+  await page.goto('/v0/admindashboard/feedback');
   await page.fill('input[name="q"]', token);
   await page.getByRole('button', { name: 'Zoek' }).click();
   await expect(page.locator('a', { hasText: token }).first()).toBeVisible({ timeout: 10_000 });
