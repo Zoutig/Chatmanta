@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation';
 
 /**
- * Root `/` is geen primary scherm meer — admin-tool zit nu op
- * `/admintool` en de centrale hub op `/home`. Oude bookmarks of
- * directe URL-hits worden zachtjes doorgestuurd naar de hub.
+ * Root `/` is (nog) geen primary scherm — de V0-hub staat op `/v0/home`.
+ * Tijdelijk: de marketingsite (M2) vervangt deze redirect.
  */
 export default function RootRedirect(): never {
-  redirect('/home');
+  redirect('/v0/home');
 }
