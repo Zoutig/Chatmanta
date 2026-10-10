@@ -52,6 +52,26 @@ export function safeLogoDataUrl(value: unknown): string | null {
   return LOGO_DATA_URL_RE.test(value) ? value : null;
 }
 
+/**
+ * Is dit een logo dat al door de upload-stap (logo-normalize) bijgesneden is?
+ * Herkenbaar aan een PNG van precies 112×112: breedte en hoogte staan in de
+ * IHDR-header (bytes 16-23), dus de eerste 32 base64-tekens volstaan. Oudere,
+ * ruwe logo's krijgen in de widget een witte cirkel met wat ruimte eromheen.
+ */
+export function isFittedLogo(dataUrl: string | null): boolean {
+  const prefix = 'data:image/png;base64,';
+  if (!dataUrl || !dataUrl.startsWith(prefix)) return false;
+  try {
+    const head = atob(dataUrl.slice(prefix.length, prefix.length + 32));
+    if (head.length < 24 || head.slice(12, 16) !== 'IHDR') return false;
+    const u32 = (o: number) =>
+      ((head.charCodeAt(o) << 24) | (head.charCodeAt(o + 1) << 16) | (head.charCodeAt(o + 2) << 8) | head.charCodeAt(o + 3)) >>> 0;
+    return u32(16) === 112 && u32(20) === 112;
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeStarters(list: unknown, show: boolean | undefined): string[] {
   if (show === false || !Array.isArray(list)) return [];
   const out: string[] = [];

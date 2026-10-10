@@ -14,7 +14,7 @@ import './widget.css';
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { bestForegroundOn } from '@/lib/widget/contrast';
-import type { WidgetAppearance } from '@/lib/v1/widget/appearance';
+import { isFittedLogo, type WidgetAppearance } from '@/lib/v1/widget/appearance';
 
 export type WidgetMessage = {
   id: string;
@@ -295,8 +295,7 @@ function Avatar({ appearance: a, fg }: { appearance: WidgetAppearance; fg: strin
   return (
     <span className="cmw-avatar" aria-hidden="true">
       {a.logoStyle === 'custom-logo' && a.customLogoDataUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={a.customLogoDataUrl} alt="" className="cmw-avatar-img" />
+        <CustomLogo src={a.customLogoDataUrl} />
       ) : a.logoStyle === 'brand-mark' ? (
         <BrandMark color={fg} size={16} />
       ) : (
@@ -307,12 +306,21 @@ function Avatar({ appearance: a, fg }: { appearance: WidgetAppearance; fg: strin
 }
 
 function LauncherIcon({ appearance: a, fg }: { appearance: WidgetAppearance; fg: string }) {
-  if (a.logoStyle === 'custom-logo' && a.customLogoDataUrl) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={a.customLogoDataUrl} alt="" className="cmw-launcher-img" />;
-  }
+  if (a.logoStyle === 'custom-logo' && a.customLogoDataUrl) return <CustomLogo src={a.customLogoDataUrl} />;
   if (a.logoStyle === 'brand-mark') return <BrandMark color={fg} size={20} />;
   return <BubbleIcon size={24} />;
+}
+
+/** Eigen logo als volle cirkel. Een bijgesneden logo (112×112 PNG uit de upload-stap)
+ *  vult de cirkel; een ouder ruw logo staat met ruimte eromheen op een witte cirkel. */
+function CustomLogo({ src }: { src: string }) {
+  const fitted = isFittedLogo(src);
+  return (
+    <span className="cmw-logo" data-fitted={fitted || undefined}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" />
+    </span>
+  );
 }
 
 function BrandMark({ color, size }: { color: string; size: number }) {

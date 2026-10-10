@@ -7,6 +7,7 @@ import {
   safeAccent,
   safeLogoDataUrl,
   toWidgetAppearance,
+  isFittedLogo,
 } from '../appearance';
 import { V1_DEFAULT_CHATBOT_SETTINGS } from '@/app/v1/app/instellingen/settings-config';
 
@@ -91,4 +92,22 @@ test('toWidgetAppearance: titel-fallback en logo alleen bij custom-logo', () => 
   assert.equal(badLogo.customLogoDataUrl, null);
 
   assert.equal(toWidgetAppearance({ ...base, accentColor: 'oops' }).accentColor, DEFAULT_ACCENT);
+});
+
+test('isFittedLogo: alleen een PNG van precies 112×112', () => {
+  const png = (w: number, h: number) => {
+    const b = Buffer.alloc(33);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
+    b.writeUInt32BE(13, 8);
+    b.write('IHDR', 12, 'ascii');
+    b.writeUInt32BE(w, 16);
+    b.writeUInt32BE(h, 20);
+    return `data:image/png;base64,${b.toString('base64')}`;
+  };
+  assert.equal(isFittedLogo(png(112, 112)), true);
+  assert.equal(isFittedLogo(png(200, 200)), false);
+  assert.equal(isFittedLogo(png(112, 56)), false);
+  assert.equal(isFittedLogo('data:image/jpeg;base64,/9j/4AAQSkZJRg=='), false);
+  assert.equal(isFittedLogo('data:image/png;base64,!!!'), false);
+  assert.equal(isFittedLogo(null), false);
 });
