@@ -6,7 +6,12 @@
 // hand" (nooit een valse rode stip door een DB-fout).
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { checkOrgDailyBudget, checkOrgMonthlyLimit } from '@/lib/v1/limits/usage-limits';
+import {
+  checkOrgDailyBudget,
+  checkOrgDailyQuestions,
+  checkOrgMonthlyQuestions,
+  getOrgQuestionLimits,
+} from '@/lib/v1/limits/usage-limits';
 import { getActiveQuizForOrg } from '@/lib/v1/quiz/data';
 
 /** Hoe lang de widget weg mag zijn (na eerder gezien te zijn) voor het een kritiek signaal wordt. */
@@ -40,7 +45,8 @@ export async function getAttentionSignals(
   chatbotId: string,
   now: number = Date.now(),
 ): Promise<AttentionSignals> {
-  const [quiz, crawlFailed, bot, monthly, daily] = await Promise.all([
+  const limits = await getOrgQuestionLimits(client, orgId);
+  const [quiz, crawlFailed, bot, monthly, daily, budget] = await Promise.all([
     getActiveQuizForOrg(client, orgId).catch(() => null),
     countFailedCrawls(client, orgId, chatbotId).catch(() => 0),
     client
@@ -54,7 +60,8 @@ export async function getAttentionSignals(
         (d) => d,
         () => null,
       ),
-    checkOrgMonthlyLimit(client, orgId).catch(() => null),
+    checkOrgMonthlyQuestions(client, orgId, limits.monthly).catch(() => null),
+    checkOrgDailyQuestions(client, orgId, limits.daily).catch(() => null),
     checkOrgDailyBudget(client, orgId).catch(() => null),
   ]);
 
@@ -71,7 +78,7 @@ export async function getAttentionSignals(
     widgetPaused,
     widgetMissing,
     monthlyLimitReached: monthly?.over === true,
-    dailyBudgetReached: daily?.over === true,
+    dailyBudgetReached: daily?.over === true || budget?.over === true,
   };
 }
 
@@ -110,9 +117,9 @@ async function countFailedCrawls(client: SupabaseClient, orgId: string, chatbotI
 export function criticalItems(s: AttentionSignals): { text: string; href: string; action: string }[] {
   const out: { text: string; href: string; action: string }[] = [];
   if (s.monthlyLimitReached) {
-    out.push({ text: 'De maandlimiet voor gesprekken is bereikt. Je chatbot pauzeert tot de 1e van de maand.', href: '/v1/app/account', action: 'Bekijk verbruik' });
+    out.push({ text: 'De maandlimiet voor vragen is bereikt. Je chatbot pauzeert tot de 1e van de maand.', href: '/v1/app/account', action: 'Bekijk verbruik' });
   } else if (s.dailyBudgetReached) {
-    out.push({ text: 'Het dagbudget is op. Je chatbot pauzeert tot morgen.', href: '/v1/app/account', action: 'Bekijk verbruik' });
+    out.push({ text: 'De daglimiet voor vragen is bereikt. Je chatbot pauzeert tot morgen.', href: '/v1/app/account', action: 'Bekijk verbruik' });
   }
   if (s.widgetPaused) {
     out.push({ text: 'Je chatbot staat op pauze. Bezoekers zien hem niet.', href: '/v1/app/widget', action: 'Naar Widget' });

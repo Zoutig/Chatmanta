@@ -1,14 +1,12 @@
 // V1 admin — Beheer tab (server RSC).
-// Wraps de bestaande BudgetEditor + DeleteOrgForm + export-link uit [id]/ en voegt
+// Wraps de LimitsEditor + DeleteOrgForm + export-link uit [id]/ en voegt
 // ledenbeheer toe (uitnodigen / invite opnieuw / verwijderen — MembersManager).
 
-import { resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { listOrgMembers } from '@/lib/v1/admin/members';
 import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
 import { buttonClass } from '@/app/v1/_ui/button';
-import { formatEur } from '@/app/v1/admin/_ui/format';
-import { BudgetEditor } from '../budget-editor';
+import { LimitsEditor } from '../limits-editor';
 import { DeleteOrgForm } from '../delete-org-form';
 import { MembersManager } from '../members-manager';
 import { SuspendOrgForm } from '../suspend-org-form';
@@ -16,12 +14,11 @@ import { SuspendOrgForm } from '../suspend-org-form';
 type Props = {
   orgId: string;
   slug: string;
-  dailyBudgetRaw: number | string | null;
+  limits: { dailyQuestions: number; monthlyQuestions: number; dailyBudgetEur: number };
   suspendedAt: string | null;
 };
 
-export async function BeheerTab({ orgId, slug, dailyBudgetRaw, suspendedAt }: Props) {
-  const capEur = resolveDailyBudgetEur(dailyBudgetRaw);
+export async function BeheerTab({ orgId, slug, limits, suspendedAt }: Props) {
   const suspended = Boolean(suspendedAt);
   const admin = await getJorionAdminClient();
   const members = await listOrgMembers(admin, orgId);
@@ -57,18 +54,24 @@ export async function BeheerTab({ orgId, slug, dailyBudgetRaw, suspendedAt }: Pr
         <MembersManager orgId={orgId} members={members} />
       </section>
 
-      {/* Dagbudget */}
+      {/* Limieten */}
       <section className="v1-card">
         <div className="v1-adm-card-head">
           <h2 className="v1-section-title v1-adm-title-row">
-            Dagbudget
-            <InfoTip text="0 betekent budget uit. Bij overschrijding weigert de bot verdere vragen. De bovengrens is 1000 euro per dag." />
+            Limieten
+            <InfoTip text="0 betekent dicht. Is een limiet bereikt, dan weigert de bot verdere vragen tot morgen of tot de 1e van de maand." />
           </h2>
         </div>
         <p className="v1-adm-muted" style={{ margin: '0 0 12px' }}>
-          Huidig: {capEur === 0 ? 'Uit' : `${formatEur(capEur)} per dag`}
+          De klant ziet alleen de vragen. Het kostenplafond is een intern vangnet: raakt dat op, dan ziet de klant
+          &quot;daglimiet bereikt&quot;, zonder bedrag.
         </p>
-        <BudgetEditor orgId={orgId} currentEur={capEur} />
+        <LimitsEditor
+          orgId={orgId}
+          dailyQuestions={limits.dailyQuestions}
+          monthlyQuestions={limits.monthlyQuestions}
+          dailyBudgetEur={limits.dailyBudgetEur}
+        />
       </section>
 
       {/* Data-export */}

@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  getOrgConversationsThisMonth,
+  getOrgQuestionsThisMonth,
   getOrgSpendThisMonthEur,
   startOfUtcMonthIso,
 } from '@/lib/v1/limits/usage-limits';
@@ -109,8 +109,8 @@ export async function getV1OverviewMetrics(
     botLifecycleRes,
     uploadsRes,
   ] = await Promise.all([
-    // Maand-turns (= messages) — getOrgConversationsThisMonth telt query_log-rijen.
-    getOrgConversationsThisMonth(client, orgId),
+    // Maand-turns (= messages) — getOrgQuestionsThisMonth telt query_log-rijen.
+    getOrgQuestionsThisMonth(client, orgId),
     getOrgSpendThisMonthEur(client, orgId),
     // Maand-scan: kind/question/category/latency voor ratio, top-vragen, onbeantwoord.
     client

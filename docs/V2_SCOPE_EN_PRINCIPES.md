@@ -52,7 +52,7 @@ Blueprint §1.5 had een bindende lijst "Expliciet NIET in V1". Via V0-pariteit (
 - Admin-cockpit: overlay/onboarding/privacy (`0017`), operator-config (`0018`), Issues-foutstore (`0019`), maandelijkse recap + PDF (`0020`)
 - Widget-levenscyclus (klant kan pauzeren + heartbeat): migr `0023`
 - Operator-suspend van een org: migr `0025`
-- Per-org dag-budget in EUR: migr `0009` (zie §9)
+- Per-org limieten: vragen per dag/maand (migr `0027`, klant ziet ze) + EUR-kostenvangnet (migr `0009`, alleen intern) — zie §9
 
 ### 2b. Nog steeds buiten V1 → V2/V3-backlog
 
@@ -62,7 +62,7 @@ Blueprint §1.5 had een bindende lijst "Expliciet NIET in V1". Via V0-pariteit (
 | `/api/widget/history`-endpoint / 30-dagen-history | Geschiedenis reist mee in de chat-body binnen één sessie; geen server-endpoint | V2 |
 | Klant beheert eigen `allowed_domains` | Read-only in de klant-UI, Jorion beheert (migr `0008`) | V2 |
 | Klant kiest AI-provider/model | Eén model (gpt-4o-mini) | V2 |
-| Klant stelt eigen gesprekken-cap in / `limits_override` | Cap is een constante (`MONTHLY_CONVERSATION_LIMIT`), budget is admin-instelbaar | V2 |
+| Klant stelt eigen gesprekken-cap in / `limits_override` | Limieten (vragen/dag, vragen/maand, EUR-vangnet) zijn per org admin-instelbaar; klant kan ze niet zelf wijzigen | V2 |
 | Pay-as-you-go + tiers (trial/starter/pro/business) | Geen tier-code; handmatige facturatie | V2 (§4) |
 | Usage-warning e-mails (80% / 100%) | Niet gevonden in `lib/v1/limits` of `lib/notifications` | V2 |
 | Self-service AVG export/delete door de klant | Bestaat alleen als admin-actie (`app/v1/admin/organizations/[id]/export`, delete-org-form) | V2 |
@@ -120,8 +120,9 @@ Dit komt uit blueprint §2, met wat al in V1 zit (§2a) weggestreept. Dit is **b
 - Geen tier-code en geen `subscriptions`-tabel. Facturatie gaat handmatig door Jorion Solutions.
 - Kostenbeheersing gebeurt met drie runtime-poorten in `lib/v1/limits/chat-gates.ts`:
   1. operator-suspend (`organizations.suspended_at`, migr `0025`)
-  2. maand-cap van 300 **turns** (query_log-rijen per org per kalendermaand; let op: niet het aantal unieke gesprekken)
-  3. per-org dag-budget in EUR (`organizations.daily_budget_eur`, migr `0009`; som van `query_log.cost_eur`, migr `0007`)
+  2. maand-limiet in **vragen** (`organizations.monthly_question_limit`, default 2000, migr `0027`; query_log-rijen per kalendermaand, niet unieke gesprekken)
+  3. dag-limiet in vragen (`organizations.daily_question_limit`, default 250, migr `0027`)
+  4. per-org EUR-kostenvangnet (`organizations.daily_budget_eur`, default €2, migr `0009`/`0027`; som van `query_log.cost_eur`). **Nooit zichtbaar voor de klant**: raakt het op, dan ziet de klant "daglimiet bereikt"
 - Een klant betaalt niet? Dan gebruik je **suspend** (eerlijke "tijdelijk niet beschikbaar"-melding), niet budget=0.
 
 **Principes voor V2:**
@@ -245,7 +246,7 @@ SA-1..SA-5 (object-level authorisatie, SSRF, upload-hardening, LLM-grenzen, serv
 | Similarity threshold | 0.7 | **0.4** | Empirisch: 0.7 is te streng voor `text-embedding-3-small` + NL. `similarityThreshold: 0.4` in `app/v1/app/rag-config.ts` |
 | Chat-LLM | Claude Haiku 4.5 via `callLLM()`, OpenAI als fallback | **gpt-4o-mini direct** (`openai()`), géén fallback. Provider-abstractie = V2 | Pipeline is op gpt-4o-mini getuned en geëvalueerd. `callLLM` gooit nog "not implemented" (`lib/ai/llm.ts`). Besliste keuze 2026-06-29 |
 | Usage-tracking | `usage_logs`-tabel per event | **`query_log`** met `cost_usd` + `cost_eur` + `ip_hash` | Geen duplicatie. Migr `0002` + `0007` |
-| Kosten-cap | `subscriptions` + tier `conversations_per_month: 300` (unieke gesprekken) | **Maand-cap van 300 turns** + **per-org EUR-dagbudget** + **suspend**. Geen `subscriptions`-tabel | `lib/v1/limits/usage-limits.ts`, `chat-gates.ts`; migr `0009`, `0025` |
+| Kosten-cap | `subscriptions` + tier `conversations_per_month: 300` (unieke gesprekken) | **Vragen per dag/maand (per org instelbaar)** + **onzichtbaar EUR-vangnet** + **suspend**. Geen `subscriptions`-tabel | `lib/v1/limits/usage-limits.ts`, `chat-gates.ts`; migr `0009`, `0025` |
 | RAG-pipeline | Chunk 500/50 → top-K 5 → één prompt | **v0.10-config geërfd**: parent-child-chunks, (selectieve) HyDE, query-decompositie, adaptieve LLM-rerank, claim-verificatie + regeneratie, deterministische hard-fact-weigering, low-confidence-cascade naar gpt-4o, answer_cache, latency-budget. Retrieval top-K 8 → max 5 contextchunks | `V1_RAG_DEFAULTS = {...resolveBot('v0.10'), ...V1_OVERRIDES}`. In V1 uit: hybrid search, algemene kennis, bronlinks |
 | Answer cache | Niet voorzien | **`answer_cache`** (chatbot-scoped) + epoch tegen een stale-write-race | Migr `0003`, `0021`. Let op: de cache is ook de opslag voor FAQ-pre-cache (zie `AGENT_LANDMIJNEN`) |
 | Achtergrondverwerking | `processing_jobs` voor document, crawl, reprocess en delete, gestart met `waitUntil()` | `processing_jobs` **alleen voor crawls** (`job_type in ('crawl_website')`), verwerkt door een cron-route + externe pinger. Uploads worden **synchroon** geïngest in de server-action | Migr `0003` CHECK; `app/v1/app/kennisbank/actions.ts`; `V1_LAUNCH_TODO` #7 |

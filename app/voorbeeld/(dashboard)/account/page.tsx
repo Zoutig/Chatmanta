@@ -17,7 +17,7 @@ export default function VoorbeeldAccountPage() {
         isOwner={DEMO_ACCOUNT.isOwner}
         orgId={DEMO_ACCOUNT.orgId}
         monthly={DEMO_ACCOUNT.monthly}
-        dailyBudget={DEMO_ACCOUNT.dailyBudget}
+        daily={DEMO_ACCOUNT.daily}
         documentsCount={DEMO_ACCOUNT.documentsCount}
       />
     </div>

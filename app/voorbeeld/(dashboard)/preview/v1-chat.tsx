@@ -39,7 +39,7 @@ function errorLabel(code: ErrorCode): string {
     case 'NO_CHATBOT':       return 'Er is nog geen chatbot ingesteld.';
     case 'FORBIDDEN':        return 'Je hebt geen toegang tot deze chatbot.';
     case 'RATE_LIMITED':     return 'Het is nu erg druk. Probeer het zo opnieuw.';
-    case 'MONTHLY_LIMIT':    return 'De maandelijkse gesprekslimiet is bereikt.';
+    case 'MONTHLY_LIMIT':    return 'De maandlimiet van deze chatbot is bereikt.';
     case 'BUDGET_EXHAUSTED': return 'De daglimiet van deze chatbot is bereikt.';
     case 'ORG_SUSPENDED':    return 'Deze chatbot is momenteel niet beschikbaar.';
     case 'THROWN':           return 'De verbinding viel weg.';

@@ -2,8 +2,8 @@
 //
 //   - Key-checks op V1-namen (NEXT_PUBLIC_V1_SUPABASE_URL, V1_SUPABASE_SERVICE_ROLE_KEY).
 //   - getFaqRefreshCadence() leest uit lib/v1/admin/config (V1 admin_config-tabel).
-//   - Geen globale gesprekslimieten: V1 gebruikt een per-org EUR-dagbudget
-//     (instelbaar op de klantpagina).
+//   - Limieten zijn per org (vragen per dag/maand + EUR-kostenvangnet, instelbaar
+//     op de klantpagina); hier staan alleen de defaults.
 //   - PRIVACY_DEFAULTS hergebruikt uit lib/controlroom/types.
 
 import { PRIVACY_DEFAULTS } from '@/lib/controlroom/types';
@@ -15,6 +15,11 @@ import { Panel, Row, Rows } from '@/app/v1/_ui/panel';
 import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
 import { ReloadButton } from '../_ui/reload-button';
 import { formatEur } from '../_ui/format';
+import {
+  DEFAULT_DAILY_BUDGET_EUR,
+  DEFAULT_DAILY_QUESTION_LIMIT,
+  DEFAULT_MONTHLY_QUESTION_LIMIT,
+} from '@/lib/v1/limits/usage-limits';
 import { FaqCadenceControl } from './faq-cadence-control';
 
 export const dynamic = 'force-dynamic';
@@ -97,9 +102,11 @@ export default async function V1InstellingenPage() {
         </Rows>
       </Panel>
 
-      <Panel title="Budget">
+      <Panel title="Limieten">
         <Rows>
-          <Row label="Standaard dagbudget per klant">{formatEur(1)} per dag</Row>
+          <Row label="Standaard vragen per dag">{DEFAULT_DAILY_QUESTION_LIMIT}</Row>
+          <Row label="Standaard vragen per maand">{DEFAULT_MONTHLY_QUESTION_LIMIT}</Row>
+          <Row label="Standaard kostenplafond (intern)">{formatEur(DEFAULT_DAILY_BUDGET_EUR)} per dag</Row>
           <Row label="Aanpassen">Per klant, op de klantpagina</Row>
         </Rows>
       </Panel>

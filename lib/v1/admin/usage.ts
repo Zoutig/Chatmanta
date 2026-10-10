@@ -10,7 +10,7 @@
 import 'server-only';
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
-import { getOrgSpendTodayEur, isOverBudget } from '@/lib/v1/limits/usage-limits';
+import { DEFAULT_DAILY_BUDGET_EUR, getOrgSpendTodayEur, isOverBudget, resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
 import { getControlRoomKlanten, type ControlRoomKlant } from './overview';
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ export async function getKlantenWithBudgets(): Promise<KlantWithBudget[]> {
 
   const budgetByOrg = new Map<string, number>();
   for (const r of (data ?? []) as { id: string; daily_budget_eur: number | null }[]) {
-    budgetByOrg.set(r.id, Number(r.daily_budget_eur) || 1.0);
+    budgetByOrg.set(r.id, resolveDailyBudgetEur(r.daily_budget_eur));
   }
 
   // ponytail: per-org som-query (N+1) — huidige klantenaantal (<10) acceptabel.
@@ -104,7 +104,7 @@ export async function getKlantenWithBudgets(): Promise<KlantWithBudget[]> {
   const spentByOrg = new Map(withSpend.map((k, i) => [k.orgId, spentTodayEur[i]]));
 
   return klanten.map((k) => {
-    const dailyBudgetEur = budgetByOrg.get(k.orgId) ?? 1.0;
+    const dailyBudgetEur = budgetByOrg.get(k.orgId) ?? DEFAULT_DAILY_BUDGET_EUR;
     const spentToday = spentByOrg.get(k.orgId) ?? 0;
     return {
       ...k,
