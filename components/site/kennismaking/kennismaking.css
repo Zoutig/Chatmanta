@@ -53,7 +53,7 @@
 .site-ui .s-kennis .kn-input::placeholder { color: var(--faint); opacity: 1; }
 .site-ui .s-kennis .kn-input:hover { border-color: #b9c6d3; }
 .site-ui .s-kennis .kn-input:focus,
-.site-ui .s-kennis .kn-input:focus-visible { outline: none; border-color: var(--teal); box-shadow: var(--focus); border-radius: var(--r); }
+.site-ui .s-kennis .kn-input:focus-visible { outline: 2px solid transparent; outline-offset: 2px; border-color: var(--teal); box-shadow: var(--focus); border-radius: var(--r); }
 .site-ui .s-kennis .kn-textarea { min-height: 116px; resize: vertical; line-height: 1.5; }
 
 .site-ui .s-kennis .is-invalid .kn-input { border-color: var(--warn); }
@@ -171,3 +171,9 @@
 .site-ui .s-kennis .kn-promises svg { flex: none; color: var(--aqua); }
 .site-ui .s-kennis .kn-founders { margin-top: 20px; font-size: 0.92rem; color: var(--on-dark-2); }
 .site-ui .s-kennis .kn-aside :focus-visible { box-shadow: var(--focus-dark); }
+
+/* Windows Contrast / forced-colors laat box-shadow weg → echte outline als focusindicator. */
+@media (forced-colors: active) {
+  .site-ui .s-kennis .kn-seg-opt input:focus-visible + span,
+  .site-ui .s-kennis .kn-check input:focus-visible + .kn-box { outline: 2px solid CanvasText; outline-offset: 2px; }
+}

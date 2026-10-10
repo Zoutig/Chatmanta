@@ -222,6 +222,9 @@ export function HonestSplit({
           <button
             type="button"
             className={cx('btn btn-outline callback', s.extra && 'in', done && 'done')}
+            // Nog onzichtbaar (prep, vóór de animatie)? Dan ook niet focusbaar/voorgelezen.
+            tabIndex={s.prep && !s.extra ? -1 : undefined}
+            aria-hidden={s.prep && !s.extra ? true : undefined}
             onClick={() => setDone(true)}
           >
             <span className="lbl">{callback}</span>

@@ -94,6 +94,8 @@ export async function handleKennismaking(req: KennismakingRequest, deps: Kennism
 
   // Honeypot: bot → stil "gelukt", geen mail, geen hint.
   if (isHoneypotFilled(body as Record<string, unknown>)) {
+    // PII-vrij signaal, zodat valse positieven (bv. browser-autofill) zichtbaar worden.
+    deps.reportError('SITE_LEAD_HONEYPOT');
     return { status: 200, body: { ok: true, confirmationSent: true } };
   }
 

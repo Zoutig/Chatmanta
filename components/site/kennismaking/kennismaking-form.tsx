@@ -10,6 +10,7 @@ import { motion, useReducedMotion } from 'motion/react';
 
 import { Button, LinkButton } from '@/components/site/ui/button';
 import { Icon } from '@/components/site/ui/icon';
+import { useHydrated } from '@/components/site/ui/use-hydrated';
 import { ROUTES } from '@/lib/site/navigation';
 import {
   HONEYPOT_FIELD,
@@ -32,6 +33,9 @@ export function KennismakingForm({ defaultPakket, bron }: { defaultPakket: Pakke
   const uid = useId();
   const id = (f: string) => `${uid}-${f}`;
   const reduce = useReducedMotion();
+  // Vóór hydratie is onSubmit nog niet gekoppeld: dan niet laten versturen
+  // (zou een native submit zijn). method="post" houdt PII sowieso uit de URL.
+  const hydrated = useHydrated();
 
   const [values, setValues] = useState<KennismakingInput>({
     naam: '',
@@ -173,7 +177,7 @@ export function KennismakingForm({ defaultPakket, bron }: { defaultPakket: Pakke
     [hint ? id(`${f}-hint`) : null, err(f) ? id(`${f}-err`) : null].filter(Boolean).join(' ') || undefined;
 
   return (
-    <form ref={formRef} className="kn-form" noValidate onSubmit={onSubmit} aria-busy={busy}>
+    <form ref={formRef} className="kn-form" method="post" noValidate onSubmit={onSubmit} aria-busy={busy}>
       {status === 'error' ? (
         <div ref={errorRef} className="kn-alert" role="alert" tabIndex={-1}>
           <Icon name="warn" size={18} />
@@ -308,7 +312,7 @@ export function KennismakingForm({ defaultPakket, bron }: { defaultPakket: Pakke
       </div>
 
       {/* Honeypot: onzichtbaar voor mensen en hulpsoftware; bots vullen het. */}
-      <div className="kn-hp" aria-hidden="true">
+      <div className="kn-hp" aria-hidden="true" inert>
         <label htmlFor={id('hp')}>Laat dit veld leeg</label>
         <input ref={honeypotRef} id={id('hp')} type="text" name={HONEYPOT_FIELD} tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
@@ -343,7 +347,7 @@ export function KennismakingForm({ defaultPakket, bron }: { defaultPakket: Pakke
       </div>
 
       <div className="kn-actions">
-        <Button type="submit" variant="primary" arrow={!busy} disabled={busy} className="kn-submit">
+        <Button type="submit" variant="primary" arrow={!busy} disabled={busy || !hydrated} className="kn-submit">
           {busy ? <span className="kn-spin" aria-hidden="true" /> : null}
           Plan mijn kennismaking
         </Button>
