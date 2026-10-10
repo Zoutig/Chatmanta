@@ -1,0 +1,80 @@
+/* Gesprekken (lijst, zijpaneel en detailpagina). Lokaal bij het scherm; alles
+ * onder .v1-ui met prefix v1-gs-, op de tokens van app/v1/_ui/ui.css. */
+
+/* Lijstkaart: rijen lopen tot de rand, kaart iets minder verticale padding. */
+.v1-ui .v1-gs-listcard { padding: 6px 24px; }
+
+/* Schakelaar "Alleen onbeantwoord" inline in de filterregel. */
+.v1-ui .v1-gs-switch { display: inline-flex; align-items: center; gap: 10px; }
+.v1-ui .v1-gs-switch label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 500; color: var(--v1-ink); cursor: pointer;
+}
+
+/* ── Gesprek (gedeeld door Drawer en pagina) ─────────────── */
+.v1-ui .v1-gs-convo { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.v1-ui .v1-gs-meta { margin: 0; font-size: 13px; color: var(--v1-muted); }
+
+.v1-ui .v1-gs-chat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.v1-ui .v1-gs-msg { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 85%; align-self: flex-start; min-width: 0; }
+.v1-ui .v1-gs-msg[data-role='user'] { align-items: flex-end; align-self: flex-end; }
+
+.v1-ui .v1-gs-bubble {
+  padding: 10px 14px; border-radius: 16px; border-top-left-radius: 6px;
+  background: var(--v1-surface); color: var(--v1-ink); box-shadow: var(--v1-shadow-1);
+  font-size: 14px; line-height: 1.55; overflow-wrap: anywhere;
+}
+.v1-ui .v1-gs-msg[data-role='user'] .v1-gs-bubble {
+  background: var(--v1-navy); color: var(--v1-on-navy); box-shadow: none;
+  border-radius: 16px; border-top-right-radius: 6px; white-space: pre-wrap;
+}
+/* Fallback-antwoord: zachte oranje rand, geen extra blok. */
+.v1-ui .v1-gs-bubble[data-flagged] { box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.4), var(--v1-shadow-1); }
+.v1-ui .v1-gs-bubble p { margin: 0; }
+.v1-ui .v1-gs-bubble p + p, .v1-ui .v1-gs-bubble p + ul, .v1-ui .v1-gs-bubble ul + p { margin-top: 8px; }
+.v1-ui .v1-gs-bubble ul, .v1-ui .v1-gs-bubble ol { margin: 6px 0 0; padding-left: 18px; }
+.v1-ui .v1-gs-bubble a { color: var(--v1-accent-ink); text-underline-offset: 2px; }
+
+/* Kleine tekstknop (bronnen openklappen, ID kopiëren). */
+.v1-ui .v1-gs-textbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 0 -6px; padding: 4px 6px; border: 0; border-radius: 8px; background: none;
+  font: 500 12px/1.2 var(--v1-font); color: var(--v1-muted); cursor: pointer;
+  transition: color var(--v1-fast) ease, background-color var(--v1-fast) ease;
+}
+.v1-ui .v1-gs-textbtn:hover { color: var(--v1-ink); background: var(--v1-surface-2); }
+.v1-ui .v1-gs-textbtn:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-ui .v1-gs-chev { transition: transform var(--v1-fast) var(--v1-ease); }
+.v1-ui .v1-gs-textbtn[aria-expanded='true'] .v1-gs-chev { transform: rotate(180deg); }
+
+/* Bronnen onder een bot-antwoord. */
+.v1-ui .v1-gs-src-wrap { width: 100%; min-width: 0; }
+.v1-ui .v1-gs-src-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; animation: v1-fade var(--v1-base) ease both; }
+.v1-ui .v1-gs-src {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 8px 12px; border-radius: var(--v1-r-sm); background: var(--v1-surface-2); font-size: 12px;
+}
+.v1-ui .v1-gs-src-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.v1-ui .v1-gs-src-title { font-weight: 600; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-ui .v1-gs-src-score { flex-shrink: 0; color: var(--v1-muted); }
+.v1-ui .v1-gs-src a { color: var(--v1-accent-ink); text-decoration: none; overflow-wrap: anywhere; }
+.v1-ui .v1-gs-src a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Gesprek-ID onderaan, klein. */
+.v1-ui .v1-gs-id {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 0;
+  font-size: 12px; color: var(--v1-muted);
+}
+.v1-ui .v1-gs-id code { font-family: inherit; color: var(--v1-ink-2); overflow-wrap: anywhere; }
+
+/* Laadskelet in het zijpaneel. */
+.v1-ui .v1-gs-skel-row { display: flex; }
+.v1-ui .v1-gs-skel-row[data-side='end'] { justify-content: flex-end; }
+
+/* Meest gestelde vragen: acties onder de vraag op smalle schermen. */
+@media (max-width: 900px) {
+  .v1-ui .v1-gs-faq .v1-list-row { flex-wrap: wrap; }
+  .v1-ui .v1-gs-faq .v1-list-end { width: 100%; flex-wrap: wrap; gap: 8px; }
+  .v1-ui .v1-gs-listcard { padding: 4px 16px; }
+  .v1-ui .v1-gs-msg { max-width: 92%; }
+}

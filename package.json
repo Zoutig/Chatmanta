@@ -61,6 +61,7 @@
     "v1:seed": "node --env-file=.env.local scripts/v1-seed.mjs",
     "v1:seed:chunks": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-seed-chunks.ts",
     "v1:test-org-isolation": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-org-isolation.ts",
+    "voorbeeld:seed": "node --env-file=.env.local --conditions=react-server --import tsx scripts/voorbeeld-seed.ts",
     "v1:ingest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-ingest.ts",
     "v1:test-ingest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-ingest.ts",
     "v1:test-cache": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-cache.ts",

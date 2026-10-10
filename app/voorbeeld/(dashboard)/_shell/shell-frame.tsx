@@ -1,0 +1,110 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Menu } from 'lucide-react';
+import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
+import { BrandMark } from '@/app/v1/_ui/brand-mark';
+import { ToastProvider } from '@/app/v1/_ui/toast';
+import type { AttentionSignals } from '@/lib/v1/dashboard/attention';
+import { V1Sidebar } from './sidebar';
+import { DemoBanner } from '../_demo/demo-banner';
+import { useDemoContactRequests, useDemoSettings } from '@/lib/voorbeeld/demo-store';
+
+// Client-schil: houdt alleen de open/dicht-state van het mobiele menu bij.
+// data-klant-scope blijft staan zodat de (nog niet herontworpen) pagina's en de
+// zoek-palette hun --klant-*-tokens houden tot golf 3.
+export function ShellFrame({
+  orgName,
+  chatbotStatus,
+  unansweredCount,
+  contactRequestsCount,
+  signals,
+  children,
+}: {
+  orgName: string;
+  chatbotStatus: ChatbotStatus;
+  unansweredCount: number;
+  contactRequestsCount: number;
+  signals: AttentionSignals;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  // Demo: de contactverzoeken-toggle en eigen ingediende verzoeken leven in de browser.
+  const showContactRequests = useDemoSettings().contactRequestsEnabled;
+  const ownNew = useDemoContactRequests().filter((r) => r.status === 'new').length;
+  const [navOpen, setNavOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Sluit het menu bij elke navigatie, ook die niet via de zijbalk loopt
+  // (zoek-palette, terugknop). Aanpassen-tijdens-render i.p.v. een effect.
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    setSeenPath(pathname);
+    setNavOpen(false);
+  }
+
+  const openNav = () => {
+    setNavOpen(true);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('#v1-sidebar a')?.focus());
+  };
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setNavOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
+
+  return (
+    <div className="v1-shell" data-klant-scope data-nav-open={navOpen ? 'true' : 'false'}>
+      <header className="v1-mobilebar">
+        <button
+          ref={menuButtonRef}
+          type="button"
+          className="v1-iconbtn"
+          aria-label="Menu openen"
+          aria-controls="v1-sidebar"
+          aria-expanded={navOpen}
+          onClick={openNav}
+        >
+          <Menu size={20} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+        <Link href="/voorbeeld" className="v1-brand" style={{ padding: 0 }}>
+          <BrandMark />
+          ChatManta
+        </Link>
+      </header>
+
+      <button
+        type="button"
+        className="v1-backdrop"
+        aria-label="Menu sluiten"
+        tabIndex={navOpen ? 0 : -1}
+        onClick={() => setNavOpen(false)}
+      />
+
+      <V1Sidebar
+        orgName={orgName}
+        chatbotStatus={chatbotStatus}
+        unansweredCount={unansweredCount}
+        showContactRequests={showContactRequests}
+        contactRequestsCount={contactRequestsCount + ownNew}
+        signals={signals}
+        onNavigate={() => setNavOpen(false)}
+      />
+
+      <main className="v1-main">
+        <ToastProvider>
+          <DemoBanner />
+          <div className="v1-main-inner">{children}</div>
+        </ToastProvider>
+      </main>
+    </div>
+  );
+}

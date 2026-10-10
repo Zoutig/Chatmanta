@@ -101,7 +101,9 @@ test('alleen de V1-allowlist mag lib/supabase/v1/* importeren', () => {
     rel.startsWith(join('lib', 'supabase', 'v1') + sep) ||
     rel.startsWith(join('lib', 'v1') + sep) || // V1 lib-namespace (crawler etc.) = legit V1-oppervlak
     rel.startsWith(join('app', 'v1') + sep) ||
-    rel.startsWith(join('app', 'api', 'v1') + sep); // V1 API-routes (cron etc.) = legit V1-oppervlak
+    rel.startsWith(join('app', 'api', 'v1') + sep) || // V1 API-routes (cron etc.) = legit V1-oppervlak
+    // Publieke demo-chat: V1-engine tegen één vaste demo-org (exact dit bestand, niet de map).
+    rel === join('app', 'api', 'voorbeeld', 'chat', 'route.ts');
   const offenders = allFiles()
     .filter((f) => v1Import.test(f.src) && !V1_IMPORT_ALLOWED(f.rel))
     .map((f) => f.rel);

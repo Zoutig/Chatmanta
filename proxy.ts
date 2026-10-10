@@ -69,8 +69,12 @@ export const config = {
   //   - api/v0/contact-request, api/v1/contact-request: embed-token + origin-lock
   //   - api/v1/client-error: embed-token (widget) of untrusted-pad met rate-limit
   //   - api/v1/pdf (maandrecap): requireJorionAdmin() — V1-auth, geen V0-cookie
+  //
+  // /voorbeeld/* + /api/voorbeeld/*: de publieke demo (voorbeeld-dashboard op vaste
+  // nepdata + voorbeeldwebsite van een fictief bedrijf). Geen klantdata; de demo-chat-
+  // route beveiligt zichzelf (origin-lock + per-IP rate-limit + org-budgetgate).
   // api/v1/feedback staat er bewust NIET bij: de duimpjes zijn uit de V1-widget.
   matcher: [
-    '/((?!login|privacy(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!login|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };

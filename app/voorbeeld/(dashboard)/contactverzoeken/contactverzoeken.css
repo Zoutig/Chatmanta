@@ -1,0 +1,31 @@
+/* Contactverzoeken (V1-ontwerplaag). Alleen onder .v1-ui, prefix v1-cv-. */
+
+.v1-ui .v1-cv-list { display: flex; flex-direction: column; gap: 16px; margin: 0; padding: 0; list-style: none; }
+
+.v1-ui .v1-cv-card { display: flex; flex-direction: column; gap: 12px; }
+.v1-ui .v1-cv-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.v1-ui .v1-cv-who { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v1-ui .v1-cv-name { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-ui .v1-cv-meta { margin: 0; font-size: 12px; color: var(--v1-muted); }
+
+.v1-ui .v1-cv-contact { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.v1-ui .v1-cv-contact a {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; font-weight: 500;
+  color: var(--v1-accent-ink); text-decoration: none; overflow-wrap: anywhere; border-radius: 4px;
+}
+.v1-ui .v1-cv-contact a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.v1-ui .v1-cv-contact a:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+
+.v1-ui .v1-cv-subject { margin: 0; font-size: 14px; font-weight: 600; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-ui .v1-cv-message { margin: 0; font-size: 14px; line-height: 1.55; color: var(--v1-ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.v1-ui .v1-cv-note { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--v1-line); }
+.v1-ui .v1-cv-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.v1-ui .v1-cv-note-label { margin: 0; font-size: 13px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-cv-note-text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--v1-ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.v1-ui .v1-cv-note-empty { margin: 0; font-size: 13px; color: var(--v1-muted); }
+.v1-ui .v1-cv-note-form { display: flex; flex-direction: column; gap: 10px; animation: v1-enter var(--v1-base) var(--v1-ease) both; }
+.v1-ui .v1-cv-note-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.v1-ui .v1-cv-note-count { margin-left: auto; font-size: 12px; color: var(--v1-muted); }
+
+.v1-ui .v1-cv-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
