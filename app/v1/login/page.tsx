@@ -1,4 +1,4 @@
-import { V1SignInCard } from './v1-sign-in-card';
+import { V1SignInCard, type LoginMode } from './v1-sign-in-card';
 
 // Provisionele V1-route (fundament-proof). Definitieve route-/group-naam volgt bij
 // de kernel-graduatie. Valt buiten de V0-demo-gate via de /v1-branch in proxy.ts.
@@ -13,9 +13,11 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function V1LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; as?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, as } = await searchParams;
   const initialError = error ? (ERROR_MESSAGES[error] ?? error) : undefined;
-  return <V1SignInCard initialError={initialError} />;
+  // ?as=admin opent de login direct in admin-modus (deelbare link voor het team).
+  const initialMode: LoginMode = as === 'admin' ? 'admin' : 'klant';
+  return <V1SignInCard initialError={initialError} initialMode={initialMode} />;
 }
