@@ -182,7 +182,8 @@ export async function getV1OverviewMetrics(
       .maybeSingle(),
     // Actieve bronnen: geüploade documenten. Zelfde filter als de Kennisbank
     // (source='upload'), zodat Overzicht en Kennisbank hetzelfde aantal tonen.
-    // Quiz-kennis en websitepagina's tellen hier dus niet mee.
+    // Websitepagina's en seed-documenten (v0_local) tellen niet mee; quiz- en Q&A-
+    // kennis wel (die zijn ook source='upload' en staan ook in de Kennisbank-lijst).
     client
       .from('documents')
       .select('id', { count: 'exact', head: true })
