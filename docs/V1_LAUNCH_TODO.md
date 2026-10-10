@@ -175,6 +175,10 @@ De rest (🟡) wil je er kort daarna bij; de 🟢's kunnen wachten.
 - **Wat:** De eval vond dat de bot soms een *plausibele maar ongefundeerde negatieve bewering* doet ("wij leveren niet aan huis", "op kerstdag gesloten") i.p.v. puur door te verwijzen. Géén verzonnen feiten, géén blocker — een milde softness.
 - **Hoe:** Een strengere grounding-gate op negatieve beweringen. Aparte scoped wijziging + her-eval. Advies: doe dit sámen met de eerste echte klant-KB (dan is het meetbaar representatief).
 
+### <a name="17"></a>17. 🟢 Drempel "widget weg" (7 dagen) evalueren · 🤖
+- **Wat:** Het klantendashboard meldt een widget pas als kritiek "weg" als hij eerder gezien is en daarna 7 dagen geen heartbeat stuurde (`WIDGET_MISSING_AFTER_MS` in `lib/v1/dashboard/attention.ts`). Bewust voorzichtig gekozen, tegen valse rode stippen.
+- **Hoe:** Kijk na de eerste weken met echte klanten of 7 dagen klopt: komen er valse meldingen (bijvoorbeeld bij sites met weinig bezoek), of juist te late? Pas dan de constante aan; meer is er niet nodig.
+
 ---
 
 ## Wat kan ik (Claude) nu meteen voor je doen?

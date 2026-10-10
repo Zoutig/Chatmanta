@@ -107,6 +107,7 @@ export async function getV1OverviewMetrics(
     qaItemsRes,
     websitePagesRes,
     botLifecycleRes,
+    uploadsRes,
   ] = await Promise.all([
     // Maand-turns (= messages) — getOrgConversationsThisMonth telt query_log-rijen.
     getOrgConversationsThisMonth(client, orgId),
@@ -179,6 +180,16 @@ export async function getV1OverviewMetrics(
       .select('is_active, widget_last_seen_at')
       .eq('id', chatbotId)
       .maybeSingle(),
+    // Actieve bronnen: geüploade documenten. Zelfde filter als de Kennisbank
+    // (source='upload'), zodat Overzicht en Kennisbank hetzelfde aantal tonen.
+    // Quiz-kennis en websitepagina's tellen hier dus niet mee.
+    client
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .eq('source', 'upload')
+      .is('deleted_at', null),
   ]);
 
   // --- Maand-scan verwerking ---
@@ -260,7 +271,7 @@ export async function getV1OverviewMetrics(
 
   // --- Bronnen ---
   const websitePages = websitePagesRes.count ?? 0;
-  const docUploads = Math.max(0, (docRes.count ?? 0) - websitePages);
+  const docUploads = uploadsRes.count ?? 0;
   const qaItems = qaItemsRes.count ?? 0;
 
   // --- Setup + afgeleide statussen ---

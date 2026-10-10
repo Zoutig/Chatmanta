@@ -209,6 +209,24 @@ export function buildV1ChatbotInputs(
   return { overrides, persona: buildV1Persona(companyName) };
 }
 
+/**
+ * Verandert een save iets aan wat de engine krijgt? Alleen dan moet de answer-cache
+ * leeg. Puur uiterlijk (kleur, logo, titel, welkomsttekst, startvragen) of de
+ * contactverzoek-instellingen raken de antwoorden niet; een purge zou dan ook de
+ * FAQ-voorcache onnodig wissen. We vergelijken precies wat buildV1ChatbotInputs
+ * oplevert, dus een nieuw antwoord-veld in die mapping valt hier vanzelf onder.
+ */
+export function answerInputsChanged(
+  before: ChatbotSettings,
+  after: ChatbotSettings,
+  fallbackCompanyName: string,
+): boolean {
+  return (
+    JSON.stringify(buildV1ChatbotInputs(before, fallbackCompanyName)) !==
+    JSON.stringify(buildV1ChatbotInputs(after, fallbackCompanyName))
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Save-patch sanitatie (NIT-hardening)
 // ---------------------------------------------------------------------------

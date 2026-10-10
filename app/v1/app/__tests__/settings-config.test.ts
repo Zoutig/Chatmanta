@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  answerInputsChanged,
   V1_DEFAULT_CHATBOT_SETTINGS,
   mergeChatbotSettings,
   buildV1ChatbotInputs,
@@ -133,4 +134,31 @@ test('buildV1ChatbotInputs: lege chatbotName → val terug op de DB-naam', () =>
   const settings: ChatbotSettings = { ...V1_DEFAULT_CHATBOT_SETTINGS, chatbotName: '   ' };
   const { persona } = buildV1ChatbotInputs(settings, 'Manta Bakkerij');
   assert.equal(persona.company, 'Manta Bakkerij');
+});
+
+test('answerInputsChanged: puur uiterlijk of contactverzoeken → geen purge nodig', () => {
+  const base = mergeChatbotSettings({});
+  const cosmetic = {
+    ...base,
+    accentColor: '#112233',
+    headerTitle: 'Nieuwe titel',
+    subtitle: 'Ondertitel',
+    welcomeMessage: 'Welkom!',
+    launcherText: 'Vraag het ons',
+    logoStyle: 'custom-logo' as const,
+    customLogoDataUrl: 'data:image/png;base64,AAAA',
+    position: 'bottom-left' as const,
+    starterQuestions: ['Wat kost het?'],
+    contactRequestsEnabled: true,
+    notificationEmail: 'x@example.com',
+  };
+  assert.equal(answerInputsChanged(base, cosmetic, 'Acme'), false);
+});
+
+test('answerInputsChanged: antwoord-velden → wel purge', () => {
+  const base = mergeChatbotSettings({});
+  assert.equal(answerInputsChanged(base, { ...base, toneOfVoice: 'professional' }, 'Acme'), true);
+  assert.equal(answerInputsChanged(base, { ...base, fallbackMessage: 'Andere tekst' }, 'Acme'), true);
+  assert.equal(answerInputsChanged(base, { ...base, extraInstructions: 'Wees kort.' }, 'Acme'), true);
+  assert.equal(answerInputsChanged(base, { ...base, chatbotName: 'Bob' }, 'Acme'), true);
 });
