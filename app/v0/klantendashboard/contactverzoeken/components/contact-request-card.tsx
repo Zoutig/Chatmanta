@@ -125,7 +125,7 @@ export function ContactRequestCard({ request }: { request: ContactRequest }) {
 
       {/* Null-safe: alléén een werkende link tonen als er een bron-gesprek is. */}
       {request.threadId && (
-        <Link href={`/klantendashboard/gesprekken/${request.threadId}`} className="contactverzoek-thread-link">
+        <Link href={`/v0/klantendashboard/gesprekken/${request.threadId}`} className="contactverzoek-thread-link">
           <ExternalLink size={12} strokeWidth={1.8} /> Bekijk het gesprek
         </Link>
       )}

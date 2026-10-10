@@ -11,11 +11,11 @@ import { verifyEmbedToken } from '@/lib/v0/server/embed-token';
 import { getActiveOrgId, resolveOrgSlugFromId } from '@/lib/v0/server/active-org';
 
 // Widget-detectie via referer-header. Twee publieke chat-paden:
-//   /widget/<slug>  — de demo-rotatie op onze eigen omgeving
+//   /v0/widget/<slug>  — de demo-rotatie op onze eigen omgeving
 //   /embed/<slug>   — de iframe van public/widget.js op een externe site
 // Beide moeten server-side een v0_threads-rij krijgen (commitTurn) zodat het
 // gesprek in klanten-/admindashboard verschijnt. De testtool zit op
-// /klantendashboard/test en commit zelf client-side → bewust géén match hier
+// /v0/klantendashboard/test en commit zelf client-side → bewust géén match hier
 // (anders dubbele rijen). Als extra zekerheid telt ook een aanwezig embed-token
 // (alleen de embed-client stuurt dat) als widget-signaal voor het geval de
 // referer door een strikte Referrer-Policy gestript is.
@@ -25,7 +25,7 @@ export function isWidgetRequest(req: Request): boolean {
   if (!referer) return false;
   try {
     const path = new URL(referer).pathname;
-    return path.startsWith('/widget/') || path.startsWith('/embed/');
+    return path.startsWith('/v0/widget/') || path.startsWith('/embed/');
   } catch {
     return false;
   }

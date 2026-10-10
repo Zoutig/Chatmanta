@@ -35,7 +35,7 @@ export type OrgSkin = {
   /**
    * Sub-pagina's die de fake-website rendert. Elke entry mapt 1:1 naar een
    * markdown-bestand in `scripts/fixtures/sandbox-orgs/<slug>/`. De eerste
-   * entry is de "home" — `/widget` redirect daar naartoe. Orgs zonder
+   * entry is de "home" — `/v0/widget` redirect daar naartoe. Orgs zonder
    * markdown-bronnen (zoals `dev-org`) krijgen een lege array en worden
    * uitgesloten via `ORG_SLUGS_WIDGET`. `kind` bepaalt welke page-template
    * de site-renderer gebruikt (`lib/widget/page-templates/`).
@@ -180,7 +180,7 @@ export const ORG_SLUGS_ORDERED: OrgSlug[] = [
 ];
 
 /**
- * Orgs die in de `/widget` demo-rotatie meedoen — alleen orgs met
+ * Orgs die in de `/v0/widget` demo-rotatie meedoen — alleen orgs met
  * markdown-bronnen (`pages.length > 0`). Dev-org valt af omdat er geen
  * fixtures voor zijn. Wordt gebruikt door de demo-dropdown en de
  * cookie→eerste-pagina redirect in `app/widget/page.tsx`.

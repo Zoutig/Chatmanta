@@ -48,7 +48,7 @@ function buildHref(sp: SP, patch: Partial<SP>): string {
     if (v) merged[k] = v;
   }
   const qs = new URLSearchParams(merged).toString();
-  return qs ? `/admindashboard/issues?${qs}` : '/admindashboard/issues';
+  return qs ? `/v0/admindashboard/issues?${qs}` : '/v0/admindashboard/issues';
 }
 
 function Chip({ active, href, children }: { active: boolean; href: string; children: React.ReactNode }) {
@@ -102,7 +102,7 @@ function LoggedRow({ g }: { g: ErrorGroup }) {
   const orgName = slug ? KNOWN_ORGS[slug].name : '—';
   return (
     <Link
-      href={`/admindashboard/issues/${g.id}`}
+      href={`/v0/admindashboard/issues/${g.id}`}
       className="klant-convo-row"
       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--klant-r-md)', textDecoration: 'none', color: 'var(--klant-ink)' }}
     >
@@ -121,7 +121,7 @@ function LoggedRow({ g }: { g: ErrorGroup }) {
 function DerivedRow({ issue }: { issue: ControlRoomIssue }) {
   return (
     <Link
-      href={`/admindashboard/klanten/${issue.orgSlug}?tab=${issue.tab}`}
+      href={`/v0/admindashboard/klanten/${issue.orgSlug}?tab=${issue.tab}`}
       className="klant-convo-row"
       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--klant-r-md)', textDecoration: 'none', color: 'var(--klant-ink)' }}
     >

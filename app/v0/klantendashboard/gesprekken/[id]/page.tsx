@@ -57,7 +57,7 @@ export default async function GesprekDetailPage({
   return (
     <>
       <Link
-        href="/klantendashboard/gesprekken"
+        href="/v0/klantendashboard/gesprekken"
         className="klant-btn"
         data-variant="ghost"
         style={{

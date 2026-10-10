@@ -65,7 +65,7 @@ export default async function AdminGesprekDetailPage({
   return (
     <>
       <Link
-        href={`/admindashboard/klanten/${slug}?tab=gesprekken`}
+        href={`/v0/admindashboard/klanten/${slug}?tab=gesprekken`}
         className="klant-btn"
         data-variant="ghost"
         style={{ textDecoration: 'none', marginBottom: 14, padding: '6px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}

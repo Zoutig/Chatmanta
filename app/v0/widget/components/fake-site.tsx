@@ -53,7 +53,7 @@ export function FakeSite({
         }}
       >
         <Link
-          href={`/widget/${skin.slug}/${skin.pages[0]?.slug ?? ''}`}
+          href={`/v0/widget/${skin.slug}/${skin.pages[0]?.slug ?? ''}`}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -88,7 +88,7 @@ export function FakeSite({
             return (
               <Link
                 key={p.slug}
-                href={`/widget/${skin.slug}/${p.slug}`}
+                href={`/v0/widget/${skin.slug}/${p.slug}`}
                 style={{
                   color: isActive ? skin.primaryColor : skin.textColor,
                   textDecoration: 'none',

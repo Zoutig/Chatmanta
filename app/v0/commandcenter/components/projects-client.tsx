@@ -240,7 +240,7 @@ export function ProjectsClient({ tasks, milestones }: Props) {
               )}
 
               <Link
-                href="/commandcenter/tasks"
+                href="/v0/commandcenter/tasks"
                 style={{
                   marginTop: 4,
                   fontSize: 12,

@@ -64,7 +64,7 @@ function buildHref(sp: SP, patch: Partial<SP>): string {
     if (v) merged[k] = v;
   }
   const qs = new URLSearchParams(merged).toString();
-  return qs ? `/admindashboard/feedback?${qs}` : '/admindashboard/feedback';
+  return qs ? `/v0/admindashboard/feedback?${qs}` : '/v0/admindashboard/feedback';
 }
 
 function Chip({ active, href, children }: { active: boolean; href: string; children: React.ReactNode }) {
@@ -119,7 +119,7 @@ function FeedbackRow({ f }: { f: FeedbackItem }) {
   const orgName = slug ? KNOWN_ORGS[slug].name : '—';
   return (
     <Link
-      href={`/admindashboard/feedback/${f.id}`}
+      href={`/v0/admindashboard/feedback/${f.id}`}
       className="klant-convo-row"
       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--klant-r-md)', textDecoration: 'none', color: 'var(--klant-ink)' }}
     >
@@ -251,7 +251,7 @@ export default async function FeedbackInboxPage({ searchParams }: { searchParams
                 ))}
               </FilterRow>
               <FilterRow label="Zoeken">
-                <form method="get" action="/admindashboard/feedback" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1, alignItems: 'center' }}>
+                <form method="get" action="/v0/admindashboard/feedback" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1, alignItems: 'center' }}>
                   {view !== 'actief' && <input type="hidden" name="view" value={view} />}
                   {type && <input type="hidden" name="type" value={type} />}
                   {urgency && <input type="hidden" name="urgency" value={urgency} />}

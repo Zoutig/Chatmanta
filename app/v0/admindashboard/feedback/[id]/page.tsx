@@ -215,7 +215,7 @@ export default async function FeedbackDetail({ params }: { params: Promise<{ id:
         <FeedbackNoteForm id={item.id} />
       </Card>
 
-      <Link href="/admindashboard/feedback" className="klant-btn">← Terug naar Feedback</Link>
+      <Link href="/v0/admindashboard/feedback" className="klant-btn">← Terug naar Feedback</Link>
     </>
   );
 }

@@ -18,7 +18,7 @@ export function FilterBar({ active }: { active: ConversationFilter }) {
   function setFilter(key: ConversationFilter) {
     const next = new URLSearchParams(params);
     next.set('filter', key);
-    router.push(`/klantendashboard/gesprekken?${next.toString()}`);
+    router.push(`/v0/klantendashboard/gesprekken?${next.toString()}`);
   }
 
   return (

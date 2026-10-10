@@ -10,8 +10,8 @@ import { Btn } from '../ui/btn';
 import { Icon } from '../ui/icons';
 import type { UnansweredQuestion } from '@/lib/v0/klantendashboard/types';
 
-const UNANSWERED_HREF = '/klantendashboard/gesprekken?filter=unanswered';
-const ADD_KNOWLEDGE_HREF = '/klantendashboard/kennisbank';
+const UNANSWERED_HREF = '/v0/klantendashboard/gesprekken?filter=unanswered';
+const ADD_KNOWLEDGE_HREF = '/v0/klantendashboard/kennisbank';
 
 function relTimeNl(iso: string): string {
   const then = new Date(iso).getTime();

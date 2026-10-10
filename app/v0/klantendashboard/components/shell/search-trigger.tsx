@@ -8,15 +8,15 @@ import { Search } from 'lucide-react';
 // (geen backend-zoek). ⌘K / Ctrl-K opent ook. Bewust licht gehouden — een
 // echte content-zoek komt bij V1.
 const ROUTES: { href: string; label: string; hint: string }[] = [
-  { href: '/klantendashboard', label: 'Overzicht', hint: 'Dashboard & triage' },
-  { href: '/klantendashboard/kennisbank', label: 'Kennisbank', hint: "Pagina's, documenten, Q&A" },
-  { href: '/klantendashboard/test', label: 'Preview Chatbot', hint: 'Zie je chatbot op je eigen site' },
-  { href: '/klantendashboard/instellingen', label: 'Instellingen', hint: 'Toon, gedrag, fallback' },
-  { href: '/klantendashboard/widget', label: 'Widget', hint: 'Uiterlijk & embed-code' },
-  { href: '/klantendashboard/gesprekken', label: 'Gesprekken', hint: 'Alle conversaties' },
-  { href: '/klantendashboard/contactverzoeken', label: 'Contactverzoeken', hint: 'Terugbel- en mailverzoeken van bezoekers' },
-  { href: '/klantendashboard/account', label: 'Account', hint: 'Profiel, team, abonnement' },
-  { href: '/klantendashboard/feedback', label: 'Feedback', hint: 'Meld een bug, wens of antwoordkwaliteit' },
+  { href: '/v0/klantendashboard', label: 'Overzicht', hint: 'Dashboard & triage' },
+  { href: '/v0/klantendashboard/kennisbank', label: 'Kennisbank', hint: "Pagina's, documenten, Q&A" },
+  { href: '/v0/klantendashboard/test', label: 'Preview Chatbot', hint: 'Zie je chatbot op je eigen site' },
+  { href: '/v0/klantendashboard/instellingen', label: 'Instellingen', hint: 'Toon, gedrag, fallback' },
+  { href: '/v0/klantendashboard/widget', label: 'Widget', hint: 'Uiterlijk & embed-code' },
+  { href: '/v0/klantendashboard/gesprekken', label: 'Gesprekken', hint: 'Alle conversaties' },
+  { href: '/v0/klantendashboard/contactverzoeken', label: 'Contactverzoeken', hint: 'Terugbel- en mailverzoeken van bezoekers' },
+  { href: '/v0/klantendashboard/account', label: 'Account', hint: 'Profiel, team, abonnement' },
+  { href: '/v0/klantendashboard/feedback', label: 'Feedback', hint: 'Meld een bug, wens of antwoordkwaliteit' },
 ];
 
 export function SearchTrigger() {

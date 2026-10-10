@@ -88,7 +88,7 @@ export default async function GesprekkenPage({
       />
 
       <TabsNav
-        basePath="/klantendashboard/gesprekken"
+        basePath="/v0/klantendashboard/gesprekken"
         paramName="view"
         active={view}
         tabs={[
@@ -143,7 +143,7 @@ export default async function GesprekkenPage({
               {recentNegativeCount === 1 ? 'bezoeker gaf' : 'bezoekers gaven'} negatieve
               feedback in de laatste 7 dagen.{' '}
               <Link
-                href="/klantendashboard/gesprekken?filter=negative_feedback"
+                href="/v0/klantendashboard/gesprekken?filter=negative_feedback"
                 style={{ color: 'var(--klant-accent)' }}
               >
                 Bekijk
@@ -166,7 +166,7 @@ export default async function GesprekkenPage({
               {unansweredCount === 1 ? 'gesprek heeft' : 'gesprekken hebben'} een onbeantwoorde
               vraag.{' '}
               <Link
-                href="/klantendashboard/gesprekken?filter=unanswered"
+                href="/v0/klantendashboard/gesprekken?filter=unanswered"
                 style={{ color: 'var(--klant-accent)' }}
               >
                 Bekijk
@@ -186,7 +186,7 @@ export default async function GesprekkenPage({
               {items.map((c, i) => (
                 <li key={c.id} style={{ borderTop: i ? '1px solid var(--klant-border)' : 'none' }}>
                   <Link
-                    href={`/klantendashboard/gesprekken/${c.id}`}
+                    href={`/v0/klantendashboard/gesprekken/${c.id}`}
                     className="klant-convo-row"
                     style={{
                       display: 'flex',

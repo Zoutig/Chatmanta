@@ -13,7 +13,7 @@ import type { NegativeFeedbackItem } from '@/lib/v0/klantendashboard/types';
 
 // Doel-URL van de Kennisbank Q&A-tab; per dashboard anders (V1 vs V0).
 // Default = V0-pad zodat het V0-dashboard niet breekt; V1 geeft z'n eigen pad door.
-const DEFAULT_QA_BASE_PATH = '/klantendashboard/kennisbank';
+const DEFAULT_QA_BASE_PATH = '/v0/klantendashboard/kennisbank';
 
 function qaHref(basePath: string, question: string): string {
   return `${basePath}?tab=qa&prefillQuestion=${encodeURIComponent(question)}`;

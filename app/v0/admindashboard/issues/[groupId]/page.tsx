@@ -111,7 +111,7 @@ export default async function ErrorGroupDetail({ params }: { params: Promise<{ g
         <div className="klant-section-title" style={{ marginBottom: 8 }}>Claude Code-payload (preview)</div>
         <pre style={codeBlock}>{payload}</pre>
         <div style={{ marginTop: 10 }}>
-          <Link href="/admindashboard/issues" className="klant-btn">← Terug naar Issues</Link>
+          <Link href="/v0/admindashboard/issues" className="klant-btn">← Terug naar Issues</Link>
         </div>
       </Card>
     </>

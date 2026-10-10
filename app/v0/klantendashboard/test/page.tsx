@@ -57,7 +57,7 @@ export default async function TestPage() {
         title="Zie je chatbot live op je eigen site"
         subtitle="Dit is je chatbot over een schermafbeelding van je website — open hem rechtsonder en stel testvragen precies zoals een bezoeker dat zou doen, vóór je live gaat."
         actions={
-          <Btn href="/widget" variant="secondary" leadingIcon={<Icon name="arrow-up-right" size={13} />}>
+          <Btn href="/v0/widget" variant="secondary" leadingIcon={<Icon name="arrow-up-right" size={13} />}>
             Open in widget
           </Btn>
         }

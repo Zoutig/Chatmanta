@@ -114,14 +114,14 @@ export default async function OverviewPage() {
           <>
             <StartTourButton />
             <Btn
-              href="/widget"
+              href="/v0/widget"
               variant="secondary"
               leadingIcon={<Icon name="arrow-up-right" size={13} />}
             >
               Preview chatbot
             </Btn>
             <Btn
-              href="/klantendashboard/kennisbank"
+              href="/v0/klantendashboard/kennisbank"
               variant="primary"
               leadingIcon={<Icon name="plus" size={13} />}
             >
@@ -142,7 +142,7 @@ export default async function OverviewPage() {
               variant="warning"
               title="Je hebt nog geen bronnen toegevoegd"
               message="Voeg websitepagina's, documenten of Q&A toe zodat je chatbot vragen kan beantwoorden."
-              cta={{ label: 'Bronnen toevoegen', href: '/klantendashboard/kennisbank' }}
+              cta={{ label: 'Bronnen toevoegen', href: '/v0/klantendashboard/kennisbank' }}
             />
           )}
           {metrics.widgetStatus === 'not_installed' && hasAnySource && (
@@ -152,7 +152,7 @@ export default async function OverviewPage() {
               variant="info"
               title="Je widget is nog niet geplaatst"
               message="Plaats de embed-code op je website om je chatbot zichtbaar te maken voor bezoekers."
-              cta={{ label: 'Widget installeren', href: '/klantendashboard/widget' }}
+              cta={{ label: 'Widget installeren', href: '/v0/klantendashboard/widget' }}
             />
           )}
         </div>
@@ -167,7 +167,7 @@ export default async function OverviewPage() {
             variant="info"
             title={`Er ${quizBanner.remaining === 1 ? 'staat 1 vraag' : `staan ${quizBanner.remaining} vragen`} voor je klaar`}
             message="Beantwoord een paar korte vragen om je kennisbank te verbeteren — je chatbot wordt er slimmer van."
-            cta={{ label: 'Quiz starten', href: '/klantendashboard/quiz' }}
+            cta={{ label: 'Quiz starten', href: '/v0/klantendashboard/quiz' }}
           />
         </div>
       )}

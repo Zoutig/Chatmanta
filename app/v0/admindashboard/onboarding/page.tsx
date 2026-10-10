@@ -57,7 +57,7 @@ export default async function OnboardingOverviewPage() {
               {rows.map(({ k, total, done, blocked }) => (
                 <tr key={k.slug}>
                   <td>
-                    <Link href={`/admindashboard/klanten/${k.slug}?tab=onboarding`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
+                    <Link href={`/v0/admindashboard/klanten/${k.slug}?tab=onboarding`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
                       {k.name}
                     </Link>
                   </td>

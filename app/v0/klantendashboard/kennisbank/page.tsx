@@ -74,7 +74,7 @@ export default async function KennisbankPage({
       />
 
       <TabsNav
-        basePath="/klantendashboard/kennisbank"
+        basePath="/v0/klantendashboard/kennisbank"
         active={activeTab}
         tabs={[
           { key: 'documenten', label: 'Documenten', count: docs.length },

@@ -18,7 +18,7 @@ export function TopQuestionsBars({ result }: { result: KlantFaqResult }) {
         subtitle="Wat bezoekers het vaakst aan je chatbot vragen."
         right={
           <Link
-            href="/klantendashboard/gesprekken?view=top-questions"
+            href="/v0/klantendashboard/gesprekken?view=top-questions"
             style={{ fontSize: 12.5, color: 'var(--klant-accent)', textDecoration: 'none' }}
           >
             Alles ›

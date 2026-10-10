@@ -406,7 +406,7 @@ export function TopQuestionsTab({
                     style={{ borderTop: i ? '1px solid var(--klant-border)' : 'none' }}
                   >
                     <Link
-                      href={`/klantendashboard/gesprekken/${h.threadId}`}
+                      href={`/v0/klantendashboard/gesprekken/${h.threadId}`}
                       className="klant-convo-row"
                       style={{
                         display: 'flex',

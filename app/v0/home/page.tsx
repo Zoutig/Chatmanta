@@ -115,7 +115,7 @@ export default function HomePage() {
               iconName="sliders"
               title="Admintool"
               description="Beheer en test je ChatManta chatomgeving."
-              href="/admintool"
+              href="/v0/admintool"
               cta="Open admintool"
             />
             <HubCard
@@ -123,7 +123,7 @@ export default function HomePage() {
               iconName="command"
               title="Command Center"
               description="Founder cockpit voor taken, roadmap en testklanten."
-              href="/commandcenter"
+              href="/v0/commandcenter"
               cta="Open command center"
             />
             <HubCard
@@ -131,7 +131,7 @@ export default function HomePage() {
               iconName="flag"
               title="Admin Dashboard"
               description="Interne control room: testklanten beheren, monitoren en debuggen."
-              href="/admindashboard"
+              href="/v0/admindashboard"
               cta="Open admin dashboard"
             />
             <HubCard
@@ -139,7 +139,7 @@ export default function HomePage() {
               iconName="monitor"
               title="Klantendashboard v0"
               description="Beheer je chatbot, bronnen, widget en gesprekken."
-              href="/klantendashboard"
+              href="/v0/klantendashboard"
               cta="Open dashboard"
             />
             <HubCard
@@ -152,7 +152,7 @@ export default function HomePage() {
               iconName="panel-right"
               title="Klant-experience · Widget"
               description="Bekijk en test de klantzijde van de chatwidget."
-              href="/widget"
+              href="/v0/widget"
               cta="Open demo"
             />
           </div>

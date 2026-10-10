@@ -54,7 +54,7 @@ export default async function KlantenlijstPage() {
                 <tr key={k.slug}>
                   <td>
                     <Link
-                      href={`/admindashboard/klanten/${k.slug}`}
+                      href={`/v0/admindashboard/klanten/${k.slug}`}
                       style={{ textDecoration: 'none', color: 'var(--klant-ink)' }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 13.5 }}>{k.name}</div>

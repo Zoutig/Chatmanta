@@ -55,7 +55,7 @@ export default async function QuizOverviewPage() {
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {slug && (
                           <Link
-                            href={`/admindashboard/klanten/${slug}?tab=quiz`}
+                            href={`/v0/admindashboard/klanten/${slug}?tab=quiz`}
                             className="klant-btn"
                             data-variant="ghost"
                             style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}

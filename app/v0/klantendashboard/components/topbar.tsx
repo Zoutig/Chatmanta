@@ -12,13 +12,13 @@ import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 // Breadcrumb-labels per route. usePathname is client-only — vandaar dat de
 // topbar een client-island blijft (zoals voorheen voor de drawer-state).
 const SECTION_LABELS: { match: (p: string) => boolean; label: string }[] = [
-  { match: (p) => p === '/klantendashboard', label: 'Overzicht' },
-  { match: (p) => p.startsWith('/klantendashboard/kennisbank'), label: 'Kennisbank' },
-  { match: (p) => p.startsWith('/klantendashboard/test'), label: 'Preview Chatbot' },
-  { match: (p) => p.startsWith('/klantendashboard/instellingen'), label: 'Instellingen' },
-  { match: (p) => p.startsWith('/klantendashboard/widget'), label: 'Widget' },
-  { match: (p) => p.startsWith('/klantendashboard/gesprekken'), label: 'Gesprekken' },
-  { match: (p) => p.startsWith('/klantendashboard/account'), label: 'Account' },
+  { match: (p) => p === '/v0/klantendashboard', label: 'Overzicht' },
+  { match: (p) => p.startsWith('/v0/klantendashboard/kennisbank'), label: 'Kennisbank' },
+  { match: (p) => p.startsWith('/v0/klantendashboard/test'), label: 'Preview Chatbot' },
+  { match: (p) => p.startsWith('/v0/klantendashboard/instellingen'), label: 'Instellingen' },
+  { match: (p) => p.startsWith('/v0/klantendashboard/widget'), label: 'Widget' },
+  { match: (p) => p.startsWith('/v0/klantendashboard/gesprekken'), label: 'Gesprekken' },
+  { match: (p) => p.startsWith('/v0/klantendashboard/account'), label: 'Account' },
 ];
 
 function sectionLabel(pathname: string): string {
@@ -123,7 +123,7 @@ export function Topbar({
 
         {/* Notificaties → onbeantwoord/negatieve feedback */}
         <Link
-          href="/klantendashboard/gesprekken?filter=unanswered"
+          href="/v0/klantendashboard/gesprekken?filter=unanswered"
           className="klant-ui-iconbtn"
           style={{ width: 34, height: 34, position: 'relative' }}
           title={
@@ -174,7 +174,7 @@ export function Topbar({
         <AnimatedThemeToggler />
 
         <Link
-          href="/widget"
+          href="/v0/widget"
           className="klant-ui-btn klant-topbar-preview-btn"
           data-variant="secondary"
           data-size="md"

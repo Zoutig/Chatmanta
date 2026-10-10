@@ -29,7 +29,7 @@ export async function ControlRoomSidebar() {
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
       {/* Brand */}
       <Link
-        href="/admindashboard"
+        href="/v0/admindashboard"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -95,37 +95,37 @@ export async function ControlRoomSidebar() {
       </Link>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, marginTop: 6 }}>
-        <NavItem href="/admindashboard" label="Overview" exact>
+        <NavItem href="/v0/admindashboard" label="Overview" exact>
           <LayoutDashboard size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/klanten" label="Klanten">
+        <NavItem href="/v0/admindashboard/klanten" label="Klanten">
           <Building2 size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/onboarding" label="Onboarding">
+        <NavItem href="/v0/admindashboard/onboarding" label="Onboarding">
           <ClipboardList size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/quiz" label="Quiz" badge={quiz.pendingApproval}>
+        <NavItem href="/v0/admindashboard/quiz" label="Quiz" badge={quiz.pendingApproval}>
           <ListChecks size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/jobs" label="Crawls & Jobs">
+        <NavItem href="/v0/admindashboard/jobs" label="Crawls & Jobs">
           <Workflow size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/issues" label="Issues">
+        <NavItem href="/v0/admindashboard/issues" label="Issues">
           <AlertTriangle size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/feedback" label="Feedback" badge={feedback.open}>
+        <NavItem href="/v0/admindashboard/feedback" label="Feedback" badge={feedback.open}>
           <Inbox size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/usage" label="Usage & Kosten">
+        <NavItem href="/v0/admindashboard/usage" label="Usage & Kosten">
           <BarChart3 size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/bot-prestaties" label="Bot prestaties">
+        <NavItem href="/v0/admindashboard/bot-prestaties" label="Bot prestaties">
           <Gauge size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/maandelijkse-recap" label="Maandelijkse Recap">
+        <NavItem href="/v0/admindashboard/maandelijkse-recap" label="Maandelijkse Recap">
           <CalendarRange size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/admindashboard/instellingen" label="Instellingen">
+        <NavItem href="/v0/admindashboard/instellingen" label="Instellingen">
           <Settings2 size={17} strokeWidth={1.7} />
         </NavItem>
       </nav>
@@ -141,11 +141,11 @@ export async function ControlRoomSidebar() {
           gap: 2,
         }}
       >
-        <Link href="/klantendashboard" className="klant-nav-item">
+        <Link href="/v0/klantendashboard" className="klant-nav-item">
           <ArrowLeft size={16} strokeWidth={1.7} />
           <span style={{ flex: 1 }}>Klantendashboard</span>
         </Link>
-        <Link href="/commandcenter" className="klant-nav-item">
+        <Link href="/v0/commandcenter" className="klant-nav-item">
           <ArrowLeft size={16} strokeWidth={1.7} />
           <span style={{ flex: 1 }}>Command Center</span>
         </Link>

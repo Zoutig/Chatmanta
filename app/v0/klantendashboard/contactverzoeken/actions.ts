@@ -24,7 +24,7 @@ const CONTACT_REQUEST_STATUSES: readonly ContactRequestStatus[] = ['nieuw', 'opg
 function revalidateTab() {
   // 'layout'-kind dekt zowel de tab-pagina (zelf-refresh) als de sidebar-badge
   // ("Nieuw"-count wordt in layout.tsx gefetcht).
-  revalidatePath('/klantendashboard', 'layout');
+  revalidatePath('/v0/klantendashboard', 'layout');
 }
 
 /** Werk de werkstroom-status bij (Nieuw → Opgepakt → Afgehandeld). */

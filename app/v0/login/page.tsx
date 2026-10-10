@@ -8,5 +8,5 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  return <SignInCard next={next ?? '/home'} />;
+  return <SignInCard next={next ?? '/v0/home'} />;
 }

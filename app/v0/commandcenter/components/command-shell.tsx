@@ -21,16 +21,16 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { href: '/commandcenter', label: 'Dashboard', icon: 'command', status: 'live' },
-  { href: '/commandcenter/tasks', label: 'Taken', icon: 'list', status: 'live' },
-  { href: '/commandcenter/completed', label: 'Voltooid', icon: 'check', status: 'live' },
-  { href: '/commandcenter/milestones', label: 'Milestones', icon: 'flag', status: 'live' },
-  { href: '/commandcenter/roadmap', label: 'Roadmap', icon: 'sparkle', status: 'live' },
-  { href: '/commandcenter/checkins', label: 'Check-ins', icon: 'refresh', status: 'live' },
-  { href: '/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'live' },
-  { href: '/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'live' },
-  { href: '/commandcenter/projects', label: 'Projectgebieden', icon: 'folder', status: 'live' },
-  { href: '/commandcenter/crawl-health', label: 'Crawl-health', icon: 'globe', status: 'live' },
+  { href: '/v0/commandcenter', label: 'Dashboard', icon: 'command', status: 'live' },
+  { href: '/v0/commandcenter/tasks', label: 'Taken', icon: 'list', status: 'live' },
+  { href: '/v0/commandcenter/completed', label: 'Voltooid', icon: 'check', status: 'live' },
+  { href: '/v0/commandcenter/milestones', label: 'Milestones', icon: 'flag', status: 'live' },
+  { href: '/v0/commandcenter/roadmap', label: 'Roadmap', icon: 'sparkle', status: 'live' },
+  { href: '/v0/commandcenter/checkins', label: 'Check-ins', icon: 'refresh', status: 'live' },
+  { href: '/v0/commandcenter/decisions', label: 'Beslissingen', icon: 'edit', status: 'live' },
+  { href: '/v0/commandcenter/customers', label: 'Testklanten', icon: 'monitor', status: 'live' },
+  { href: '/v0/commandcenter/projects', label: 'Projectgebieden', icon: 'folder', status: 'live' },
+  { href: '/v0/commandcenter/crawl-health', label: 'Crawl-health', icon: 'globe', status: 'live' },
 ];
 
 // Accent met fallback: --manta-accent is opt-in (alleen actief onder data-style="glass"),
@@ -75,7 +75,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
         }}
       >
         <Link
-          href="/home"
+          href="/v0/home"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -119,7 +119,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
             const active =
               item.status === 'live' &&
               (pathname === item.href ||
-                (item.href !== '/commandcenter' && pathname.startsWith(item.href)));
+                (item.href !== '/v0/commandcenter' && pathname.startsWith(item.href)));
             const disabled = item.status === 'soon';
             const inner = (
               <span
@@ -191,7 +191,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
           }}
         >
           <Link
-            href="/home"
+            href="/v0/home"
             style={{
               color: 'var(--fg-muted)',
               fontSize: 12,

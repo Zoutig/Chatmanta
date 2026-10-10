@@ -5,5 +5,5 @@
 import { redirect } from 'next/navigation';
 
 export default function BronnenRedirect() {
-  redirect('/admindashboard/klanten');
+  redirect('/v0/admindashboard/klanten');
 }

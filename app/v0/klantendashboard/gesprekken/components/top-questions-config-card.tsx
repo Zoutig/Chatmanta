@@ -8,7 +8,7 @@
 // useTransition + "Opgeslagen ✓"-flash). Validatie is best-effort client-side;
 // saveTopQuestionsConfig in de server-action checkt nogmaals en gooit
 // AppError('INPUT_INVALID') bij overschrijding. Na save herleest de
-// revalidatePath('/klantendashboard','layout') in de action de ranglijst.
+// revalidatePath('/v0/klantendashboard','layout') in de action de ranglijst.
 
 import { useState, useTransition } from 'react';
 import { Check, Save } from 'lucide-react';

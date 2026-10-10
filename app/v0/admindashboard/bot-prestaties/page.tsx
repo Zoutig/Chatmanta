@@ -48,7 +48,7 @@ function hrefFor(org: string | null, window: PerfWindow): string {
   const sp = new URLSearchParams();
   if (org) sp.set('org', org);
   sp.set('window', window);
-  return `/admindashboard/bot-prestaties?${sp.toString()}`;
+  return `/v0/admindashboard/bot-prestaties?${sp.toString()}`;
 }
 
 // ───────────────────────── small UI helpers ─────────────────────────
@@ -97,9 +97,9 @@ function Disclaimer() {
       Observationele kwaliteit uit <strong>live verkeer</strong> (proxies + duim-feedback) —{' '}
       <strong>geen accuraatheidsmeting</strong>, want live verkeer heeft geen ground-truth. De
       in-dashboard test-tool telt niet mee; alleen echte bezoekers. Voor kosten/volume zie{' '}
-      <Link href="/admindashboard/usage" style={{ color: 'var(--klant-accent)' }}>Usage &amp; Kosten</Link>, voor
+      <Link href="/v0/admindashboard/usage" style={{ color: 'var(--klant-accent)' }}>Usage &amp; Kosten</Link>, voor
       het maand-narratief de{' '}
-      <Link href="/admindashboard/maandelijkse-recap" style={{ color: 'var(--klant-accent)' }}>Maandelijkse Recap</Link>.
+      <Link href="/v0/admindashboard/maandelijkse-recap" style={{ color: 'var(--klant-accent)' }}>Maandelijkse Recap</Link>.
     </p>
   );
 }

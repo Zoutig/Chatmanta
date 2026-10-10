@@ -24,5 +24,5 @@ export default async function WidgetRootRedirect() {
     : ORG_SLUGS_WIDGET[0];
 
   const firstPage = getSkin(targetSlug).pages[0];
-  redirect(`/widget/${targetSlug}/${firstPage.slug}`);
+  redirect(`/v0/widget/${targetSlug}/${firstPage.slug}`);
 }

@@ -4,8 +4,8 @@
 //
 // Patroon: actionTry + actieve org server-side resolven (geen slug uit client
 // payload — voorkomt cross-org tampering, defense-in-depth bovenop V0's gedeelde
-// password-gate). Na succesvolle write revalidatePath('/klantendashboard', 'layout')
-// + bij widget-changes ook '/widget' zodat de demo-pagina meteen herrendert.
+// password-gate). Na succesvolle write revalidatePath('/v0/klantendashboard', 'layout')
+// + bij widget-changes ook '/v0/widget' zodat de demo-pagina meteen herrendert.
 
 import { revalidatePath } from 'next/cache';
 import { actionTry, fail, type ActionResult } from '@/lib/errors/action';
@@ -78,12 +78,12 @@ export async function saveWidgetSettingsAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const widget = await saveWidgetSettings(activeOrg.slug, patch);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     // 'layout'-kind invalideert /widget én alle nested [slug]/[page] segmenten.
     // Zonder die kind blijven de generateStaticParams-prerendered demo-pages
     // hangen op de oude kleuren/titel — saved widget-config werd dan pas
     // zichtbaar na een rebuild of cache-TTL.
-    revalidatePath('/widget', 'layout');
+    revalidatePath('/v0/widget', 'layout');
     return { widget };
   });
 }
@@ -111,7 +111,7 @@ export async function checkWidgetInstallationAction(): Promise<
       Number.isFinite(seenMs) && Date.now() - seenMs < WIDGET_INSTALL_FRESHNESS_SEC * 1000;
     const lastCheckedAt = new Date().toISOString();
     await saveWidgetSettings(activeOrg.slug, { isInstalled: installed, lastCheckedAt });
-    revalidatePath('/klantendashboard/widget', 'page');
+    revalidatePath('/v0/klantendashboard/widget', 'page');
     return {
       isInstalled: installed,
       lastSeenAt: w.lastSeenAt,
@@ -130,13 +130,13 @@ export async function saveChatbotSettingsAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const chatbot = await saveChatbotSettings(activeOrg.slug, patch);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     // chatbot-settings beïnvloeden het hele /widget demo-platform: starter-
     // questions, welcomeMessage, chatbotName en (via build-chatbot-overrides
     // → runRagQueryStreaming) tone, length, system-prompt overrides. 'layout'-
     // kind invalideert nested [slug]/[page] segmenten zodat saved settings
     // direct zichtbaar zijn.
-    revalidatePath('/widget', 'layout');
+    revalidatePath('/v0/widget', 'layout');
     return { chatbot };
   });
 }
@@ -154,7 +154,7 @@ export async function saveContactRequestsSettingsAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const contactRequests = await saveContactRequestsSettings(activeOrg.slug, patch);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { contactRequests };
   });
 }
@@ -168,7 +168,7 @@ export async function saveAccountInfoAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const account = await saveAccountInfo(activeOrg.slug, patch);
-    revalidatePath('/klantendashboard/account', 'page');
+    revalidatePath('/v0/klantendashboard/account', 'page');
     return { account };
   });
 }
@@ -238,7 +238,7 @@ export async function captureWidgetPreviewAction(): Promise<ActionResult<{ url: 
     try {
       const { url: previewUrl } = await uploadWidgetPreview(activeOrg.id, bytes);
       await saveWidgetPreview(activeOrg.slug, { url: previewUrl, capturedAt: new Date().toISOString() });
-      revalidatePath('/klantendashboard/widget', 'page');
+      revalidatePath('/v0/klantendashboard/widget', 'page');
       return { url: previewUrl };
     } catch (e) {
       console.error('[captureWidgetPreview] upload/save faalde', (e as Error).message);
@@ -257,7 +257,7 @@ export async function setSetupStepSkippedAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const skips = await setSetupStepSkipped(activeOrg.slug, stepId, skipped);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { skips };
   });
 }
@@ -271,7 +271,7 @@ export async function upsertQAItemAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const qa = await upsertQAItem(activeOrg.slug, item);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { qa };
   });
 }
@@ -282,7 +282,7 @@ export async function deleteQAItemAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const qa = await deleteQAItem(activeOrg.slug, id);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { qa };
   });
 }
@@ -294,7 +294,7 @@ export async function setQAActiveAction(
   return actionTry(async () => {
     const activeOrg = await getActiveOrgFromCookies();
     const qa = await setQAActive(activeOrg.slug, id, active);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { qa };
   });
 }
@@ -310,7 +310,7 @@ export async function saveTopQuestionsAction(
     const topQuestions = await saveTopQuestionsConfig(activeOrg.slug, config);
     // Revalidatie van /klantendashboard layout dekt zowel /instellingen
     // (zelf-refresh na save) als /gesprekken (de drempel-toepassing).
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { topQuestions };
   });
 }
@@ -334,7 +334,7 @@ export async function addQAFromTopQuestionAction(
       updatedAt: new Date().toISOString(),
     };
     const qa = await upsertQAItem(activeOrg.slug, item);
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { qa };
   });
 }
@@ -399,7 +399,7 @@ export async function submitFeedbackAction(
     await notifyNewFeedback(item, KNOWN_ORGS[activeOrg.slug].name);
 
     // Laat de operator-inbox (Admin Dashboard) de nieuwe melding meteen zien.
-    revalidatePath('/admindashboard', 'layout');
+    revalidatePath('/v0/admindashboard', 'layout');
     return { id: item.id };
   });
 }
@@ -511,9 +511,9 @@ export async function submitQuizAnswerAction(
     const done = active.length > 0 && active.every((q) => answeredIds.has(q.id));
     if (done) {
       await setQuizStatus(quiz.id, 'voltooid');
-      revalidatePath('/admindashboard', 'layout');
+      revalidatePath('/v0/admindashboard', 'layout');
     }
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { done, answered: answeredCount, total: active.length };
   });
 }

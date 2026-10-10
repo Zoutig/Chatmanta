@@ -52,7 +52,7 @@ export function WidgetForm({
   orgSlug,
   action = saveWidgetSettingsAction,
   checkAction = checkWidgetInstallationAction,
-  demoHref = '/widget',
+  demoHref = '/v0/widget',
   showReset = false,
   botVersion,
   starterQuestions = [],

@@ -32,7 +32,7 @@ import { NotesEditor } from '../components/notes-editor';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const BASE_PATH = '/admindashboard/maandelijkse-recap';
+const BASE_PATH = '/v0/admindashboard/maandelijkse-recap';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (

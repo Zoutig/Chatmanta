@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 function KlantLine({ k, meta }: { k: ControlRoomKlant; meta?: string }) {
   return (
     <Link
-      href={`/admindashboard/klanten/${k.slug}`}
+      href={`/v0/admindashboard/klanten/${k.slug}`}
       className="klant-convo-row"
       style={{
         display: 'flex',
@@ -90,7 +90,7 @@ export default async function ControlRoomOverviewPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
           <ReloadButton />
-          <Link href="/admindashboard/klanten" className="klant-btn" data-variant="primary">
+          <Link href="/v0/admindashboard/klanten" className="klant-btn" data-variant="primary">
             Alle klanten →
           </Link>
         </div>
@@ -135,7 +135,7 @@ export default async function ControlRoomOverviewPage() {
               Dagelijkse kosten van de klant-chatbots (embedding + rewrite/HyDE + rerank + antwoord +
               follow-ups), berekend uit de token-telling per gesprek in query_log. Eval-/judge-kosten
               tellen hier niet mee. Voor het totale OpenAI-accountbedrag (incl. evals &amp; dev) zie{' '}
-              <Link href="/admindashboard/usage" style={{ color: 'var(--klant-accent)' }}>
+              <Link href="/v0/admindashboard/usage" style={{ color: 'var(--klant-accent)' }}>
                 Usage &amp; Kosten
               </Link>
               .

@@ -1283,7 +1283,7 @@ export function ChatMantaWidget({
           >
             Powered by{' '}
             <a
-              href="/home"
+              href="/v0/home"
               style={{ color: '#6b7280', textDecoration: 'none', fontWeight: 600 }}
               target="_blank"
               rel="noopener noreferrer"

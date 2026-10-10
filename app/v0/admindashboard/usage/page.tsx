@@ -76,7 +76,7 @@ export default async function UsagePage() {
                 return (
                   <tr key={k.slug}>
                     <td>
-                      <Link href={`/admindashboard/klanten/${k.slug}?tab=usage`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
+                      <Link href={`/v0/admindashboard/klanten/${k.slug}?tab=usage`} style={{ textDecoration: 'none', color: 'var(--klant-ink)', fontWeight: 600, fontSize: 13.5 }}>
                         {k.name}
                       </Link>
                     </td>

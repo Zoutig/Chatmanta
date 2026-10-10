@@ -569,7 +569,7 @@ export function RoadmapProgress({
       )}
 
       <Link
-        href="/commandcenter/roadmap"
+        href="/v0/commandcenter/roadmap"
         style={{
           fontSize: 12.5,
           color: 'var(--manta-accent, var(--accent))',
@@ -605,7 +605,7 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
       >
         Nog geen check-ins.{' '}
         <Link
-          href="/commandcenter/checkins"
+          href="/v0/commandcenter/checkins"
           style={{ color: 'var(--bd-info-fg)', textDecoration: 'underline' }}
         >
           Begin met een wekelijkse check-in
@@ -659,7 +659,7 @@ export function LatestCheckIn({ checkIns }: { checkIns: CheckIn[] }) {
           </p>
         </div>
         <Link
-          href="/commandcenter/checkins"
+          href="/v0/commandcenter/checkins"
           style={{
             fontSize: 12,
             color: 'var(--manta-accent, var(--accent))',
@@ -753,7 +753,7 @@ export function ActiveDecisions({ decisions }: { decisions: Decision[] }) {
           Recente beslissingen
         </h2>
         <Link
-          href="/commandcenter/decisions"
+          href="/v0/commandcenter/decisions"
           style={{
             fontSize: 12,
             color: 'var(--manta-accent, var(--accent))',
@@ -839,7 +839,7 @@ export function PipelineSnapshot({ customers }: { customers: TestCustomer[] }) {
           Testklanten pipeline
         </h2>
         <Link
-          href="/commandcenter/customers"
+          href="/v0/commandcenter/customers"
           style={{
             fontSize: 12,
             color: 'var(--manta-accent, var(--accent))',

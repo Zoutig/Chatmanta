@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
 // De AI-samenvatting wordt in de genereer-actie synchroon opgehaald (~enkele sec).
 export const maxDuration = 60;
 
-const BASE_PATH = '/admindashboard/maandelijkse-recap';
+const BASE_PATH = '/v0/admindashboard/maandelijkse-recap';
 
 export default async function MaandRecapOverviewPage({
   searchParams,

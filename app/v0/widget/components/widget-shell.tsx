@@ -65,7 +65,7 @@ export function WidgetShell({
     if (newSlug === skin.slug) return;
     const firstPage = getSkin(newSlug).pages[0];
     if (!firstPage) return;
-    router.push(`/widget/${newSlug}/${firstPage.slug}`);
+    router.push(`/v0/widget/${newSlug}/${firstPage.slug}`);
   };
 
   return (
@@ -148,7 +148,7 @@ export function WidgetShell({
           Reset chat
         </button>
         <a
-          href="/home"
+          href="/v0/home"
           style={{
             color: 'rgba(155,213,224,0.7)',
             fontSize: 11,

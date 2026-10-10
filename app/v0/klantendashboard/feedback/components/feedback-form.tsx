@@ -119,7 +119,7 @@ export function FeedbackForm({
           contact met je op zodra hij je melding heeft bekeken.
         </p>
         <div style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'center' }}>
-          <Link href="/klantendashboard" className="klant-btn" data-variant="primary">
+          <Link href="/v0/klantendashboard" className="klant-btn" data-variant="primary">
             ← Terug naar het portaal
           </Link>
           <button

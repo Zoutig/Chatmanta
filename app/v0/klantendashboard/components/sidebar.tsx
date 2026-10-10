@@ -35,7 +35,7 @@ export function Sidebar({
     <aside className="klant-sidebar" aria-label="Hoofdnavigatie">
       {/* Brand */}
       <Link
-        href="/home"
+        href="/v0/home"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -104,37 +104,37 @@ export function Sidebar({
 
       {/* Nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, marginTop: 6 }}>
-        <NavItem href="/klantendashboard" label="Overzicht" exact>
+        <NavItem href="/v0/klantendashboard" label="Overzicht" exact>
           <LayoutDashboard size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/kennisbank" label="Kennisbank">
+        <NavItem href="/v0/klantendashboard/kennisbank" label="Kennisbank">
           <Library size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/test" label="Preview Chatbot">
+        <NavItem href="/v0/klantendashboard/test" label="Preview Chatbot">
           <MessageSquareText size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/instellingen" label="Instellingen">
+        <NavItem href="/v0/klantendashboard/instellingen" label="Instellingen">
           <Settings2 size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/widget" label="Widget">
+        <NavItem href="/v0/klantendashboard/widget" label="Widget">
           <Code2 size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/gesprekken" label="Gesprekken" badge={unansweredCount}>
+        <NavItem href="/v0/klantendashboard/gesprekken" label="Gesprekken" badge={unansweredCount}>
           <MessagesSquare size={17} strokeWidth={1.7} />
         </NavItem>
         {showContactRequests && (
           <NavItem
-            href="/klantendashboard/contactverzoeken"
+            href="/v0/klantendashboard/contactverzoeken"
             label="Contactverzoeken"
             badge={contactRequestsCount}
           >
             <PhoneCall size={17} strokeWidth={1.7} />
           </NavItem>
         )}
-        <NavItem href="/klantendashboard/account" label="Account">
+        <NavItem href="/v0/klantendashboard/account" label="Account">
           <CircleUserRound size={17} strokeWidth={1.7} />
         </NavItem>
-        <NavItem href="/klantendashboard/feedback" label="Feedback">
+        <NavItem href="/v0/klantendashboard/feedback" label="Feedback">
           <MessageSquarePlus size={17} strokeWidth={1.7} />
         </NavItem>
       </nav>

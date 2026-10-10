@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 function BackLink() {
   return (
-    <Link href="/klantendashboard" className="klant-btn" data-variant="ghost" style={{ textDecoration: 'none', alignSelf: 'flex-start' }}>
+    <Link href="/v0/klantendashboard" className="klant-btn" data-variant="ghost" style={{ textDecoration: 'none', alignSelf: 'flex-start' }}>
       ← Terug naar het portaal
     </Link>
   );
