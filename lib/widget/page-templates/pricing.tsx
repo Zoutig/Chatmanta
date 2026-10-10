@@ -6,7 +6,7 @@
 //   - extra tabellen blijven als rich tabel; bullets/paragraphs als fallback
 
 import { parseMarkdown, type ParsedBlock } from '../parse-md';
-import type { OrgSkin } from '@/app/widget/org-skins';
+import type { OrgSkin } from '@/app/v0/widget/org-skins';
 import {
   GradientHero,
   SectionBand,

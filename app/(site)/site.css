@@ -1,0 +1,397 @@
+/* =====================================================================
+   ChatManta marketingsite — ontwerplaag `.site-ui`
+   ---------------------------------------------------------------------
+   Bron: docs/site/mockup-final.html (Diepzee Licht). Contract voor
+   sectie-agents: docs/site/CONTRACT.md.
+
+   Regels:
+   - ALLES hier is gescoped onder `.site-ui` (de wrapper in app/(site)/layout.tsx),
+     zodat V0/V1/voorbeeld (die globals.css + klant.css delen) nooit geraakt worden.
+   - Bewust NIET in app/globals.css: de Tailwind-v4-PostCSS-pipeline dropt daar
+     soms stil properties. Dit bestand wordt alleen door de site-layout geïmporteerd.
+   - Alleen GEDEELDE stijlen staan hier (tokens, basis, typografie, knoppen,
+     logo, nav, footer, gedeeld chatvenster). Sectie-specifieke CSS hoort in
+     components/site/sections/<naam>.css.
+   - Fonts: --font-site / --font-site-mono komen van next/font in de layout.
+   ===================================================================== */
+
+.site-ui {
+  /* ---------- Kleur ---------- */
+  --bg: #f6f8fb;
+  --bg-2: #eef3f7;
+  --surface: #ffffff;
+  --surface-2: #f3f6f9;
+  --line: #e2e8ef;
+  --line-2: #d3dce5;
+  --ink: #0c1e2e;
+  --ink-2: #16314a;
+  --muted: #4d6074;
+  --faint: #5f7083; /* mockup #7a8a9b; donkerder voor WCAG AA-contrast (≥4.5:1 op wit én --bg-2) */
+  --teal: #0d9488;
+  --teal-ink: #0f766e;
+  --teal-soft: #e7f6f4;
+  --teal-line: #b7e4de;
+  --warn: #b45309;
+  --warn-soft: #fdf1e3;
+  /* navy-blokken (hero-paneel, eerlijk, Groei, rekenhulp, slot) */
+  --navy-deep: #08151f;
+  --navy-hi: #183a57;
+  --aqua: #2dd4bf;
+  --aqua-hi: #5eead4;
+  --aqua-pale: #99f6e4;
+  --on-dark: #dce8f1;
+  --on-dark-2: #a9bccd;
+  --line-dark: rgba(255, 255, 255, 0.12);
+  --warn-dark: #fdba74;
+  /* fictief-bedrijf-accent (Fietsenmaker Van Dam / Voorbeeldbedrijf) */
+  --demo-brand: #c4512a; /* mockup #e0663c = 3.4:1 met witte tekst (live-demo-venster); #c4512a haalt AA */
+  --contours: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 520'%3E%3Cg fill='none' stroke='%235eead4' stroke-opacity='.10' stroke-width='1.1'%3E%3Cpath d='M-20 40C140 0 260 90 420 52S660 -6 820 30'/%3E%3Cpath d='M-20 100C150 64 270 150 430 112S670 50 820 92'/%3E%3Cpath d='M-20 164C160 128 280 214 440 176S680 112 820 156'/%3E%3Cpath d='M-20 230C170 196 290 280 450 242S690 176 820 222'/%3E%3Cpath d='M-20 298C180 266 300 348 460 310S700 242 820 290'/%3E%3Cpath d='M-20 368C190 338 310 418 470 380S710 310 820 360'/%3E%3Cpath d='M-20 440C200 412 320 490 480 452S720 380 820 432'/%3E%3Cpath d='M-20 512C210 486 330 562 490 524S730 452 820 504'/%3E%3C/g%3E%3C/svg%3E");
+  --focus: 0 0 0 3px rgba(13, 148, 136, 0.35);
+  --focus-dark: 0 0 0 3px rgba(45, 212, 191, 0.6);
+
+  /* ---------- Vorm & schaduw ---------- */
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --sh-1: 0 1px 0 rgba(12, 30, 46, 0.04), 0 1px 2px rgba(12, 30, 46, 0.06);
+  --sh-2: 0 1px 2px rgba(12, 30, 46, 0.05), 0 4px 12px -2px rgba(12, 30, 46, 0.07), 0 12px 32px -8px rgba(12, 30, 46, 0.08);
+  --sh-3: 0 2px 4px rgba(12, 30, 46, 0.04), 0 12px 24px -6px rgba(12, 30, 46, 0.1), 0 40px 80px -24px rgba(22, 49, 74, 0.22);
+
+  /* ---------- Motion ---------- */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --fast: 150ms;
+  --base: 220ms;
+  --slow: 340ms;
+
+  /* ---------- Type ---------- */
+  --font: var(--font-site), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: var(--font-site), system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* alleen voor het codefragment: Azeret Mono heeft een gewone 0 (geen punt/streep) */
+  --code: var(--font-site-mono), ui-monospace, monospace;
+
+  /* ---------- Merkteken (echt logo, als mask ingekleurd) ---------- */
+  --mark: url("/logo/mono-mark.png");
+
+  /* ---------- Layout ---------- */
+  --gutter: 16px;
+  --maxw: 1200px;
+  --nav-h: 68px;
+  /* ankers vallen nooit onder de sticky nav */
+  --anchor-offset: 72px;
+
+  color-scheme: light;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+@media (min-width: 640px) { .site-ui { --gutter: 28px; } }
+@media (min-width: 1024px) { .site-ui { --gutter: 40px; } }
+@media (max-width: 979px) { .site-ui { --nav-h: 56px; } }
+
+/* Pagina-niveau: alleen actief als de site-ui op de pagina staat. */
+html:has(.site-ui) {
+  scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: clip;
+  scroll-padding-top: 72px;
+  /* globals.css zet html op 14px (app-UI); de site rekent — net als de mockup —
+     met rem = 16px. Zonder dit is élke rem-maat 12,5% te klein. */
+  font-size: 16px;
+}
+body:has(.site-ui) {
+  margin: 0;
+  background: #f6f8fb;
+  overflow-x: clip;
+}
+
+/* ---------- Basis ---------- */
+.site-ui *,
+.site-ui *::before,
+.site-ui *::after { box-sizing: border-box; }
+.site-ui section[id],
+.site-ui #top { scroll-margin-top: var(--anchor-offset); }
+.site-ui img,
+.site-ui svg { display: block; max-width: 100%; }
+.site-ui a { color: inherit; }
+.site-ui b,
+.site-ui strong { font-weight: 600; }
+.site-ui button { font: inherit; color: inherit; }
+.site-ui :focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var(--focus); border-radius: 6px; }
+.site-ui .sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.site-ui .skip-link:focus {
+  position: fixed; top: 8px; left: 8px; z-index: 100; width: auto; height: auto;
+  margin: 0; clip: auto; overflow: visible; white-space: normal;
+  padding: 10px 14px; border-radius: 10px; background: var(--ink); color: #fff;
+  font-weight: 600; text-decoration: none;
+}
+.site-ui .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+.site-ui .tnum,
+.site-ui time,
+.site-ui output { font-variant-numeric: tabular-nums; }
+
+/* ---------- Typografie ---------- */
+.site-ui h1,
+.site-ui h2,
+.site-ui h3 {
+  font-family: var(--display); color: var(--ink); letter-spacing: -0.022em;
+  margin: 0; font-weight: 700; text-wrap: balance;
+}
+.site-ui h1 { font-size: clamp(2.35rem, 1.1rem + 4.4vw, 4.6rem); line-height: 0.98; letter-spacing: -0.045em; font-weight: 800; }
+.site-ui h2 { font-size: clamp(2rem, 1.05rem + 3.2vw, 3.5rem); line-height: 1.02; letter-spacing: -0.04em; font-weight: 800; }
+.site-ui h3 { font-size: 1.125rem; line-height: 1.3; letter-spacing: -0.015em; }
+.site-ui p,
+.site-ui li,
+.site-ui dd,
+.site-ui summary { text-wrap: pretty; }
+.site-ui p { margin: 0; }
+.site-ui .lede { font-size: clamp(1.02rem, 0.95rem + 0.35vw, 1.18rem); color: var(--muted); line-height: 1.6; }
+/* sectielabel ("HOE HET WERKT") */
+.site-ui .label,
+.site-ui .eyebrow {
+  font-family: var(--font); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; line-height: 1.4; font-variant-numeric: tabular-nums;
+}
+.site-ui .eyebrow { display: block; color: var(--teal-ink); }
+
+/* ---------- Sectie-ritme ---------- */
+.site-ui .sec { padding: clamp(72px, 8vw, 128px) 0; position: relative; }
+.site-ui .sec-head { max-width: 720px; margin-bottom: clamp(36px, 4vw, 56px); }
+.site-ui .eyebrow + h2 { margin-top: 12px; }
+.site-ui .sec-head .lede { margin-top: 16px; }
+.site-ui .center { text-align: center; margin-left: auto; margin-right: auto; }
+/* donkere sectie-variant (bv. "Liever eerlijk"): navy verloop, lichte tekst */
+.site-ui .sec-dark { background: linear-gradient(180deg, var(--ink), var(--navy-deep)); color: var(--on-dark); }
+.site-ui .sec-dark h2,
+.site-ui .sec-dark h3 { color: #fff; }
+.site-ui .sec-dark .lede { color: var(--on-dark-2); }
+.site-ui .sec-dark .eyebrow { color: var(--aqua-hi); }
+.site-ui .sec-dark :focus-visible { box-shadow: var(--focus-dark); }
+/* getinte variant (bv. "Hoe het werkt") */
+.site-ui .sec-tint { background: linear-gradient(var(--bg), var(--bg-2)); }
+/* placeholder (verdwijnt zodra een sectie gevuld is) */
+.site-ui .sec-placeholder {
+  border: 1px dashed var(--line-2); border-radius: var(--r-lg); padding: 28px;
+  color: var(--faint); font-size: 0.9rem; text-align: center;
+}
+
+/* ---------- Knoppen ---------- */
+.site-ui .btn {
+  --h: 48px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--h); padding: 0 20px; border-radius: 12px;
+  font-weight: 600; font-size: 0.98rem; text-decoration: none;
+  border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease),
+    background-color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.site-ui .btn:active { transform: scale(0.97); }
+.site-ui .btn-primary {
+  background: var(--ink); color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 1px 2px rgba(12, 30, 46, 0.2), 0 6px 16px -6px rgba(12, 30, 46, 0.45);
+}
+.site-ui .btn-primary:hover { background: var(--ink-2); }
+/* teal-gevulde primaire knop op navy (Groei-kaart, slot-CTA) */
+.site-ui .btn-teal { background: var(--teal-ink); color: #fff; box-shadow: none; } /* mockup var(--teal) = 3.7:1 met wit; teal-ink haalt AA (5.5:1) */
+.site-ui .btn-teal:hover { background: #0c5f58; }
+.site-ui .btn-outline { background: var(--surface); color: var(--ink); border-color: var(--line-2); box-shadow: var(--sh-1); }
+.site-ui .btn-outline:hover { border-color: var(--ink); }
+/* wit op navy (rekenhulp-uitkomst) */
+.site-ui .btn-light { background: #fff; color: var(--ink); }
+.site-ui .btn-light:hover { background: var(--teal-soft); }
+.site-ui .btn-link {
+  color: var(--teal-ink); font-weight: 600; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+}
+.site-ui .btn-link:hover { color: var(--ink); }
+.site-ui .sec-dark .btn-link,
+.site-ui .on-dark .btn-link { color: var(--aqua-pale); }
+.site-ui .sec-dark .btn-link:hover,
+.site-ui .on-dark .btn-link:hover { color: #fff; }
+.site-ui .arrow { display: inline-block; transition: transform var(--fast) var(--ease); }
+.site-ui .btn:hover .arrow,
+.site-ui .btn-link:hover .arrow { transform: translateX(2px); }
+@media (hover: hover) {
+  .site-ui .btn:hover { transform: translateY(-1px); }
+  .site-ui .btn:active { transform: scale(0.97); }
+}
+.site-ui .btn-sm { --h: 40px; padding: 0 14px; font-size: 0.88rem; border-radius: 10px; }
+.site-ui .btn-block { width: 100%; }
+
+/* ---------- Risk-reversal-lijstje (hero, prijskaarten) ---------- */
+.site-ui .rr { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 16px 0 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
+.site-ui .rr li { display: inline-flex; align-items: center; gap: 6px; }
+.site-ui .rr svg { width: 14px; height: 14px; color: var(--teal); }
+
+/* ---------- Ja/nee-markeringen (prijzen, vergelijking) ---------- */
+.site-ui .yes { color: var(--teal-ink); font-weight: 600; }
+.site-ui .nope { color: var(--faint); }
+
+/* ---------- Merkteken + woordmerk ---------- */
+/* Echt ChatManta-merkteken (public/logo/mono-mark.png, 270x148) als mask: kleurt mee met currentColor */
+.site-ui .mk {
+  display: block; flex: none; width: 32px; aspect-ratio: 270 / 148;
+  background-color: currentColor;
+  -webkit-mask: var(--mark) center / contain no-repeat;
+  mask: var(--mark) center / contain no-repeat;
+}
+.site-ui .logo {
+  display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+  font-family: var(--display); font-weight: 700; font-size: 1.15rem; letter-spacing: -0.02em;
+  color: var(--ink); min-height: 44px; line-height: 1;
+}
+.site-ui .logo .mk { color: var(--teal); }
+.site-ui .wm em { font-style: normal; color: var(--teal-ink); }
+.site-ui .logo.on-dark { color: #fff; }
+.site-ui .logo.on-dark .mk { color: var(--aqua-hi); }
+.site-ui .logo.on-dark .wm em { color: var(--aqua-hi); }
+
+/* ---------- Gedeeld chatvenster (hero + "Liever eerlijk" + demo) ---------- */
+.site-ui .chat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-3); overflow: hidden; position: relative; }
+.site-ui .chat-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: linear-gradient(#fff, #fbfcfd); }
+.site-ui .chat-av { width: 32px; height: 32px; border-radius: 10px; background: var(--ink); display: grid; place-items: center; flex: none; }
+.site-ui .chat-av .mk { width: 22px; color: #fff; }
+.site-ui .chat-title { font-weight: 600; font-size: 0.92rem; line-height: 1.2; }
+.site-ui .chat-sub { font-size: 0.76rem; color: var(--faint); display: flex; align-items: center; gap: 6px; }
+.site-ui .dot-live { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+.site-ui .chat-head > div:nth-child(2) { min-width: 0; }
+.site-ui .chat-clock { flex: none; margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 0.78rem; color: var(--muted); padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+.site-ui .chat-log { padding: 18px 16px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 250px; }
+.site-ui .msg { display: flex; flex-direction: column; max-width: 88%; transition: opacity var(--base) var(--ease), transform var(--base) var(--ease); }
+.site-ui .msg.user { align-self: flex-end; align-items: flex-end; }
+.site-ui .msg.bot { align-self: flex-start; }
+.site-ui .bubble { padding: 11px 14px; border-radius: 14px; font-size: 0.95rem; line-height: 1.5; }
+.site-ui .user .bubble { background: var(--ink); color: #fff; border-bottom-right-radius: 5px; }
+.site-ui .bot .bubble { background: var(--surface-2); border: 1px solid var(--line); border-bottom-left-radius: 5px; color: var(--ink); }
+.site-ui .chip {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; margin-top: 8px;
+  padding: 6px 10px 6px 8px; border-radius: 8px; background: var(--teal-soft); border: 1px solid var(--teal-line);
+  color: var(--teal-ink); font-size: 0.8rem; font-weight: 600;
+  transition: opacity var(--base) var(--ease), transform var(--slow) var(--spring);
+}
+.site-ui .chip svg { width: 14px; height: 14px; }
+.site-ui .chip .u { font-weight: 500; color: var(--ink-2); }
+.site-ui .typing { align-self: flex-start; display: none; gap: 4px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; border-bottom-left-radius: 5px; }
+.site-ui .typing.on { display: flex; }
+.site-ui .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); animation: site-blink 1s infinite; }
+.site-ui .typing i:nth-child(2) { animation-delay: 0.15s; }
+.site-ui .typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes site-blink { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+.site-ui .chat-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: #fbfcfd; }
+.site-ui .chat-input { flex: 1; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 0.86rem; color: var(--faint); display: flex; align-items: center; padding: 0 12px; }
+.site-ui .chat-send { width: 38px; height: 38px; border-radius: 10px; background: var(--teal); display: grid; place-items: center; color: #fff; }
+.site-ui .chat-send svg { width: 16px; }
+.site-ui .label-ex { position: absolute; top: -11px; left: 18px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0; padding: 3px 9px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); box-shadow: var(--sh-1); z-index: 2; }
+/* NB: de mockup bedoelde .chat-sub/.chat-title op mobiel te verbergen/verkleinen, maar
+   door de cascade-volgorde wint daar de basisregel: de goedgekeurde render toont de
+   subregel "Antwoordt uit …" óók op mobiel. Wij volgen die render (en de boodschap). */
+
+/* =====================================================================
+   NAV  (components/site/nav.tsx)
+   ===================================================================== */
+.site-ui .nav { position: sticky; top: 0; z-index: 50; transition: background-color var(--base) var(--ease), box-shadow var(--base) var(--ease); }
+.site-ui .nav-in { height: var(--nav-h); display: flex; align-items: center; gap: 16px; transition: height var(--base) var(--ease); }
+.site-ui .nav.is-compact {
+  background: rgba(246, 248, 251, 0.94); /* mockup 0.78; 0.94 houdt nav-tekst ≥4.5:1 boven de navy-blokken */
+  -webkit-backdrop-filter: saturate(1.6) blur(14px);
+  backdrop-filter: saturate(1.6) blur(14px);
+  box-shadow: 0 1px 0 var(--line);
+}
+.site-ui .nav.is-compact .nav-in { height: 58px; }
+.site-ui .nav-links { display: none; position: relative; margin-left: auto; gap: 2px; list-style: none; padding: 0; margin-block: 0; }
+.site-ui .nav-links a { display: block; padding: 10px 12px; font-size: 0.92rem; font-weight: 500; color: var(--muted); text-decoration: none; border-radius: 8px; transition: color var(--fast) var(--ease); }
+.site-ui .nav-links a:hover,
+.site-ui .nav-links a[aria-current="true"] { color: var(--ink); }
+.site-ui .nav-ind { position: absolute; left: 0; bottom: 2px; height: 2px; width: 100px; background: var(--teal); border-radius: 2px; transform-origin: left center; transform: translateX(0) scaleX(0); transition: transform var(--slow) var(--ease), opacity var(--base) var(--ease); opacity: 0; pointer-events: none; }
+.site-ui .nav-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.site-ui .nav-login { display: none; padding: 10px 12px; font-size: 0.92rem; font-weight: 500; color: var(--ink); text-decoration: none; border-radius: 8px; }
+.site-ui .nav-login:hover { color: var(--teal-ink); }
+.site-ui .nav-cta { font-size: 0.86rem; }
+.site-ui .burger { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; display: inline-grid; place-items: center; cursor: pointer; }
+.site-ui .burger span { display: block; width: 16px; height: 1.5px; background: var(--ink); position: relative; }
+.site-ui .burger span::before,
+.site-ui .burger span::after { content: ""; position: absolute; left: 0; width: 16px; height: 1.5px; background: var(--ink); }
+.site-ui .burger span::before { top: -5px; }
+.site-ui .burger span::after { top: 5px; }
+.site-ui .progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--teal); transform-origin: left; transform: scaleX(0); opacity: 0.9; }
+@media (min-width: 980px) {
+  .site-ui .nav-links { display: flex; margin-left: 28px; }
+  .site-ui .nav-actions { margin-left: auto; }
+  .site-ui .nav-login { display: inline-block; }
+  .site-ui .nav .burger { display: none; }
+  .site-ui .nav-cta { font-size: 0.9rem; }
+}
+@media (max-width: 979px) {
+  .site-ui .nav.is-compact .nav-in { height: 56px; }
+  .site-ui .nav-in { gap: 6px; }
+  .site-ui .nav-cta { --h: 40px; padding: 0 10px; font-size: 0.8rem; }
+  .site-ui .nav-actions { gap: 4px; }
+  .site-ui .nav .logo { font-size: 1.04rem; gap: 8px; }
+  .site-ui .nav .logo .mk { width: 28px; }
+}
+@media (max-width: 360px) { .site-ui .nav .logo .wm { display: none; } }
+
+/* mobiele sheet */
+.site-ui .sheet { position: fixed; inset: 0; z-index: 60; display: none; }
+.site-ui .sheet.open { display: block; }
+.site-ui .sheet-bg { position: absolute; inset: 0; background: rgba(12, 30, 46, 0.35); animation: site-fade var(--base) var(--ease); }
+.site-ui .sheet-panel { position: absolute; top: 8px; left: 8px; right: 8px; background: var(--surface); border-radius: 16px; box-shadow: var(--sh-3); padding: 12px; animation: site-drop var(--base) var(--ease); }
+.site-ui .sheet-panel .row { display: flex; justify-content: space-between; align-items: center; padding: 0 4px 8px; }
+.site-ui .sheet-panel ul { list-style: none; margin: 0; padding: 0; }
+.site-ui .sheet-panel li a { display: flex; align-items: center; min-height: 48px; padding: 0 12px; border-radius: 10px; text-decoration: none; font-weight: 500; }
+.site-ui .sheet-panel li a:hover { background: var(--surface-2); }
+.site-ui .sheet-panel .btn { width: 100%; margin-top: 10px; }
+.site-ui .sheet-panel .burger svg { width: 16px; height: 16px; }
+@keyframes site-fade { from { opacity: 0; } }
+@keyframes site-drop { from { opacity: 0; transform: translateY(-8px); } }
+
+/* =====================================================================
+   FOOTER  (components/site/footer.tsx)
+   ===================================================================== */
+.site-ui .site-footer { border-top: 1px solid var(--line); background: var(--surface); padding: 56px 0 28px; font-size: 0.92rem; }
+.site-ui .foot { display: grid; gap: 32px; grid-template-columns: 1fr 1fr; }
+@media (min-width: 860px) { .site-ui .foot { grid-template-columns: 1.6fr 1fr 1fr 1fr; } }
+.site-ui .foot .foot-brand { grid-column: 1 / -1; }
+@media (min-width: 860px) { .site-ui .foot .foot-brand { grid-column: auto; } }
+.site-ui .foot .foot-brand .logo { min-height: 0; }
+.site-ui .foot .foot-brand p { color: var(--muted); margin-top: 12px; max-width: 300px; }
+.site-ui .foot h2 { margin: 0 0 6px; font-family: var(--font); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.4; color: var(--faint); }
+.site-ui .foot ul { list-style: none; margin: 0; padding: 0; }
+.site-ui .foot li a { display: inline-flex; align-items: center; min-height: 40px; text-decoration: none; color: var(--ink-2); }
+.site-ui .foot li a:hover { color: var(--teal-ink); }
+.site-ui .foot-bottom { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: var(--faint); font-size: 0.84rem; }
+@media (max-width: 639px) { .site-ui .site-footer { padding-bottom: 88px; } }
+
+/* =====================================================================
+   Losse inhoudspagina's (/voorwaarden e.d.)
+   ===================================================================== */
+.site-ui .page-simple { padding: clamp(56px, 8vw, 112px) 0; }
+.site-ui .page-simple .card { max-width: 680px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-1); padding: clamp(24px, 4vw, 44px); }
+.site-ui .page-simple h1 { font-size: clamp(2rem, 1.2rem + 2.6vw, 3rem); line-height: 1.05; }
+.site-ui .page-simple p { margin-top: 16px; color: var(--muted); }
+.site-ui .page-simple a:not(.btn) { color: var(--teal-ink); font-weight: 600; text-underline-offset: 3px; }
+
+/* =====================================================================
+   Reduced motion — rustige variant (CSS-animaties + transities)
+   JS/motion-animaties checken zelf useReducedMotion() (zie ui/reveal.tsx).
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .site-ui *,
+  .site-ui *::before,
+  .site-ui *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

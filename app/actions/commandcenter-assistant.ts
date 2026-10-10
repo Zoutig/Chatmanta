@@ -18,7 +18,7 @@ import {
 import type { AssistantMessage, AssistantThread } from '@/lib/commandcenter/types';
 
 function revalidate() {
-  revalidatePath('/commandcenter');
+  revalidatePath('/v0/commandcenter');
 }
 
 export async function listThreadsAction(): Promise<

@@ -1,0 +1,60 @@
+/* Sectie honest — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-honest` (root-klasse van deze sectie).
+   - Keyframes heten `honest-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css.
+   Port van mockup-final §7 ("EERLIJK"). Navy-achtergrond + koppen komen van .sec-dark. */
+
+.site-ui .s-honest .sec-head .lede { max-width: 680px; margin-left: auto; margin-right: auto; }
+
+.site-ui .s-honest .split { display: grid; gap: 18px; }
+.site-ui .s-honest .split > * { min-width: 0; }
+@media (min-width: 880px) { .site-ui .s-honest .split { grid-template-columns: 1fr 1fr; gap: 24px; } }
+
+.site-ui .s-honest .side { border-radius: var(--r-lg); border: 1px solid var(--line-dark); background: rgba(255, 255, 255, 0.03); padding: 18px; position: relative; }
+.site-ui .s-honest .side.good { background: rgba(13, 148, 136, 0.08); border-color: rgba(94, 234, 212, 0.4); }
+.site-ui .s-honest .side-lab { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--on-dark-2); min-height: 20px; }
+.site-ui .s-honest .side.good .side-lab { color: var(--aqua-hi); }
+.site-ui .s-honest .side-lab svg { width: 16px; height: 16px; flex: none; }
+.site-ui .s-honest .side-lab .mk { width: 24px; }
+
+/* donkere chatvariant */
+.site-ui .s-honest .side .chat-log { padding: 0; min-height: 200px; }
+.site-ui .s-honest .side .user .bubble { background: #24496a; color: #fff; }
+.site-ui .s-honest .side .typing { background: #10263a; border-color: var(--line-dark); }
+.site-ui .s-honest .side.bad .bot .bubble { background: #10263a; border-color: var(--line-dark); color: var(--on-dark); }
+.site-ui .s-honest .side.good .bot .bubble { background: #fff; border-color: #fff; color: var(--ink); }
+
+/* verzonnen zin: oranje markering */
+.site-ui .s-honest mark.fake { background: none; color: inherit; position: relative; padding: 0 1px; }
+.site-ui .s-honest mark.fake::after { content: ""; position: absolute; left: -2px; right: -2px; bottom: 1px; height: 42%; background: rgba(251, 146, 60, 0.28); border-bottom: 2px solid var(--warn-dark); transform-origin: left; transform: scaleX(1); z-index: 0; transition: transform 520ms var(--ease); }
+.site-ui .s-honest .fake-note { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.78rem; font-weight: 600; color: var(--warn-dark); background: rgba(251, 146, 60, 0.12); border: 1px solid rgba(253, 186, 116, 0.3); padding: 4px 10px; border-radius: 6px; transition: opacity var(--base) var(--ease), transform var(--base) var(--ease); }
+.site-ui .s-honest .fake-note svg { width: 13px; height: 13px; }
+
+/* bel-me-terug-knop (outline, op navy) */
+.site-ui .s-honest .callback { align-self: flex-start; margin-top: 10px; --h: 44px; font-size: 0.88rem; background: transparent; color: var(--aqua-pale); border-color: rgba(94, 234, 212, 0.55); box-shadow: none; transition: opacity var(--base) var(--ease), transform 420ms var(--spring), border-color var(--fast) var(--ease), color var(--fast) var(--ease); }
+.site-ui .s-honest .callback:focus-visible { box-shadow: var(--focus-dark); }
+.site-ui .s-honest .callback:hover { border-color: var(--aqua-hi); color: #fff; }
+.site-ui .s-honest .callback .ok { display: none; align-items: center; gap: 6px; }
+.site-ui .s-honest .callback.done .ok { display: inline-flex; }
+.site-ui .s-honest .callback.done .lbl { display: none; }
+.site-ui .s-honest .callback .ok svg { width: 16px; height: 16px; }
+.site-ui .s-honest .callback .ok path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: honest-draw 320ms var(--ease) forwards; }
+@keyframes honest-draw { to { stroke-dashoffset: 0; } }
+
+/* typ-engine-staten (alleen na hydratie, zonder reduced motion) */
+.site-ui .s-honest .prep .msg { opacity: 0; transform: translateY(8px); }
+.site-ui .s-honest .prep .msg.in { opacity: 1; transform: none; }
+.site-ui .s-honest .prep mark.fake::after { transform: scaleX(0); }
+.site-ui .s-honest .prep mark.fake.drawn::after { transform: scaleX(1); }
+.site-ui .s-honest .prep .fake-note { opacity: 0; transform: translateY(4px); }
+.site-ui .s-honest .prep .callback { opacity: 0; transform: scale(0.85); }
+.site-ui .s-honest .prep .fake-note.in,
+.site-ui .s-honest .prep .callback.in { opacity: 1; transform: none; }
+.site-ui .s-honest .w { transition: opacity 140ms linear; }
+.site-ui .s-honest .streaming .w { opacity: 0; }
+.site-ui .s-honest .streaming .w.on { opacity: 1; }
+
+/* belofte-strook */
+.site-ui .s-honest .strip { list-style: none; margin: 32px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: center; font-size: 0.92rem; font-weight: 600; color: var(--on-dark); }
+.site-ui .s-honest .strip li { display: inline-flex; align-items: center; gap: 8px; }
+.site-ui .s-honest .strip svg { width: 16px; height: 16px; color: var(--aqua-hi); flex: none; }

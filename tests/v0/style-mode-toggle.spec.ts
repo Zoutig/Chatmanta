@@ -4,18 +4,18 @@ const STORAGE_KEY = 'chatmanta-style';
 
 test.describe('V0 style mode toggle (Classic/Glass)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate((k) => window.localStorage.removeItem(k), STORAGE_KEY);
   });
 
   test('default = classic, geen localStorage', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     const html = page.locator('html');
     await expect(html).toHaveAttribute('data-style', 'classic');
   });
 
   test('Settings-radio wisselt data-style en persisteert over reload', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     // Open Instellingen-tab in het right-panel.
     await page.getByRole('tab', { name: 'Instellingen' }).click();
@@ -41,7 +41,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
 
   test('no FOUC — initial paint matches stored choice', async ({ page }) => {
     // Set glass eerst
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate(() => window.localStorage.setItem('chatmanta-style', 'glass'));
 
     // Hard-reload met cache-bust; data-style moet 'glass' zijn vóór React hydrateert.
@@ -51,7 +51,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test('corrupte localStorage valt terug op classic', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate(() => window.localStorage.setItem('chatmanta-style', 'garbage'));
     await page.goto('/?cb=' + Date.now());
     const html = page.locator('html');
@@ -59,7 +59,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test('AI message body krijgt msg-ai-bubble class', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     // Trigger een AI-respons zodat AssistantMessage rendert.
     // Home toont geen seeded conversation, dus we sturen eerst een vraag via de composer.
     await page.fill('.composer textarea', 'test');
@@ -72,7 +72,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test('dark + glass heeft Bioluminescent Abyss base-bg #02050d', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     // Zet dark + glass
     await page.evaluate(() => {
       document.documentElement.classList.add('dark');
@@ -87,7 +87,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test('light + glass heeft Reef Pop base-bg #a7f3d0', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate(() => {
       document.documentElement.classList.remove('dark');
       document.documentElement.setAttribute('data-style', 'glass');
@@ -100,7 +100,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test('glass body bg gebruikt radial-gradient blobs + fixed attachment', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate(() => {
       document.documentElement.setAttribute('data-style', 'glass');
     });
@@ -154,7 +154,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   // ondanks dat de regel correct in de geserveerde CSS staat. Visuele smoke (Task 10)
   // dekt de feitelijke render. Skip tot CSSOM-quirk root cause bekend is.
   test.skip('glass: topbar/sidebar/composer hebben frosted-glass CSS-regels', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     for (const cls of ['.topbar', '.sidebar', '.composer']) {
       const ok = await glassRuleExists(page, cls, 'backdrop-filter');
       expect(ok, `Glass-rule met backdrop-filter voor ${cls} ontbreekt in CSSOM`).toBe(true);
@@ -162,7 +162,7 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test.skip('glass: user + AI bubbles hebben frosted-glass CSS-regels', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     const userOk = await glassRuleExists(page, '.msg-user-bubble', 'backdrop-filter');
     expect(userOk, '.msg-user-bubble Glass-regel ontbreekt').toBe(true);
     const aiOk = await glassRuleExists(page, '.msg-ai-bubble', 'backdrop-filter');
@@ -170,13 +170,13 @@ test.describe('V0 style mode toggle (Classic/Glass)', () => {
   });
 
   test('glass: AI avatar krijgt radial gradient CSS-regel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     const ok = await glassRuleExists(page, '.msg-avatar', 'radial-gradient');
     expect(ok, '.msg-avatar Glass-regel met radial-gradient ontbreekt').toBe(true);
   });
 
   test('glass: primary actie-knoppen zijn pill-shaped', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate(() => document.documentElement.setAttribute('data-style', 'glass'));
     const br = await page.evaluate(() => {
       const el = document.querySelector('.btn-new');

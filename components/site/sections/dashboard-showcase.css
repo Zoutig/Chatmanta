@@ -1,0 +1,50 @@
+/* Sectie dashboard-showcase — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-dashboard` (root-klasse van deze sectie).
+   - Keyframes heten `dashboard-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css.
+   Port van mockup-final §8; de nagebouwde UI is vervangen door een echte screenshot. */
+
+.site-ui .s-dashboard .dash-frame {
+  position: relative; border-radius: var(--r-xl); border: 1px solid var(--line);
+  background: var(--surface); box-shadow: var(--sh-3); overflow: hidden;
+}
+.site-ui .s-dashboard .dash-top {
+  height: 40px; display: flex; align-items: center; gap: 6px; padding: 0 14px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line);
+}
+.site-ui .s-dashboard .dash-top i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); flex: none; }
+.site-ui .s-dashboard .dash-url {
+  margin-left: 12px; font-size: 0.75rem; font-weight: 500; color: var(--faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.site-ui .s-dashboard .dash-env { margin-left: auto; font-size: 0.74rem; font-weight: 500; color: var(--faint); white-space: nowrap; }
+
+.site-ui .s-dashboard .dash-shot { position: relative; container-type: inline-size; line-height: 0; }
+.site-ui .s-dashboard .dash-shot img { display: block; width: 100%; height: auto; }
+
+/* Contactverzoek-badge: staat in de tegel "Contactverzoeken" van de screenshot (posities in %
+   van de afbeelding, 1440×632-viewport). Te klein om leesbaar te zijn op smalle schermen → verborgen. */
+.site-ui .s-dashboard .lead-badge {
+  position: absolute; right: 23.6%; top: 26.4%;
+  display: inline-flex; align-items: center; gap: 0.5em; line-height: 1.4;
+  font-size: clamp(9px, 1.05cqi, 12.5px); font-weight: 600; white-space: nowrap;
+  background: var(--ink); color: #fff; padding: 0.42em 0.85em; border-radius: 6px;
+  box-shadow: 0 0 0 6px rgba(13, 148, 136, 0.18), var(--sh-2);
+}
+.site-ui .s-dashboard .lead-badge i { width: 0.6em; height: 0.6em; border-radius: 50%; background: #5eead4; flex: none; }
+@media (max-width: 639px) { .site-ui .s-dashboard .lead-badge { display: none; } }
+
+/* ---------- Motion: eenmalig bij in beeld ---------- */
+.site-ui .s-dashboard .dash-frame {
+  transition: opacity 600ms var(--ease), transform 800ms var(--ease);
+}
+.site-ui .s-dashboard .dash-frame.is-pre { opacity: 0; transform: translateY(28px) scale(0.98); }
+.site-ui .s-dashboard .dash-frame.is-pre .lead-badge { opacity: 0; transform: scale(0.8); box-shadow: var(--sh-2); }
+.site-ui .s-dashboard .dash-frame.is-on .lead-badge {
+  transition: opacity var(--base) var(--ease) 1s, transform 420ms var(--spring) 1s, box-shadow 900ms var(--ease) 1.2s;
+}
+.site-ui .s-dashboard .dash-frame.is-on .lead-badge i { animation: dashboard-ping 1.6s var(--ease) 1.4s 2; }
+@keyframes dashboard-ping {
+  0% { box-shadow: 0 0 0 0 rgba(94, 234, 212, 0.7); }
+  100% { box-shadow: 0 0 0 8px rgba(94, 234, 212, 0); }
+}

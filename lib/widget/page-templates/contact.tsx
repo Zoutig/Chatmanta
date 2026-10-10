@@ -6,7 +6,7 @@
 // Onderaan: rest van de markdown-content per H2-sectie.
 
 import { parseMarkdown, type ParsedBlock } from '../parse-md';
-import type { OrgSkin } from '@/app/widget/org-skins';
+import type { OrgSkin } from '@/app/v0/widget/org-skins';
 import {
   GradientHero,
   SectionBand,
