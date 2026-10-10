@@ -48,6 +48,13 @@ export type RagConfig = {
       de drempel, wacht dan op de pre-processor en zoek één keer opnieuw met de herschreven vraag.
       Nodig zonder hybrid search (V1). Default uit. */
   speculativeRetryOnEmpty?: boolean;
+  /** v0.14f: een bericht dat in zijn geheel een NL-begroeting/bedankje/afscheid is krijgt een vaste,
+      toon-bewuste reply zonder LLM-call (lib/rag/smalltalk-detect.ts). Default uit. */
+  deterministicSmalltalk?: boolean;
+  /** v0.14f: geen LLM-voorbewerking vooraf (behalve bij een vervolgvraag die naar eerdere context
+      verwijst). Met speculativeRetryOnEmpty start de voorbewerking alleen nog lui bij nul treffers
+      (route + herschreven zoekvraag). Default uit. */
+  lazyPreprocess?: boolean;
   /** v0.14: compacte router-prompt (alleen route + smalltalk-reply, geen herschrijving) voor het
       deferPreprocess-pad — daar zoekt de engine al op de originele vraag, dus de rewrite is overbodig
       en een kortere prompt is sneller. Persona-tokens zoals preProcessSystem. Default: volle prompt. */

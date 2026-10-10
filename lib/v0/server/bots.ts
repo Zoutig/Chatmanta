@@ -1704,6 +1704,19 @@ const V0_14D2: BotConfig = {
     'v0.14d; vindt het speculatieve zoeken op de originele vraag niets boven de drempel, dan wordt alsnog op de voorbewerking gewacht en één keer opnieuw gezocht met de herschreven vraag (vangnet voor V1 zonder hybrid search).',
   speculativeRetryOnEmpty: true,
 };
+// v0.14f — v0.14d2 zonder LLM-voorbewerking vooraf: begroetingen/bedankjes deterministisch,
+// al het andere direct zoeken + antwoorden; de voorbewerking draait alleen nog lui bij nul
+// treffers (route + herschrijven) of bij een vervolgvraag die naar eerdere context verwijst.
+// Experiment (vraag Seb 2026-10-10: is de voorbewerking voor Luna nog nodig?).
+const V0_14F: BotConfig = {
+  ...V0_14D2,
+  version: 'v0.14f',
+  label: 'v0.14f — v0.14d2 zonder voorbewerking vooraf (alleen lui bij nul treffers) (experiment)',
+  description:
+    'v0.14d2; geen LLM-voorbewerking vóór het zoeken. Smalltalk via vaste herkenning; voorbewerking alleen bij nul treffers of een contextafhankelijke vervolgvraag. Experiment.',
+  deterministicSmalltalk: true,
+  lazyPreprocess: true,
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1793,6 +1806,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_14D.version]: V0_14D,
   [V0_14E.version]: V0_14E,
   [V0_14D2.version]: V0_14D2,
+  [V0_14F.version]: V0_14F,
 };
 
 /**
