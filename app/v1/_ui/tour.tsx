@@ -40,19 +40,19 @@ const DEFAULT_STEPS: TourStep[] = [
     body: 'In een paar stappen laten we zien waar alles staat. Je kunt de rondleiding altijd overslaan.',
   },
   {
-    selector: 'a[href="/v0/klantendashboard/kennisbank"]',
+    selector: 'a[href="/klantendashboard/kennisbank"]',
     placement: 'right',
     title: 'Kennisbank',
     body: 'Hier voeg je je website en documenten toe. Dit is de kennis waaruit je chatbot put — zonder bronnen kan hij nog niets beantwoorden.',
   },
   {
-    selector: 'a[href="/v0/klantendashboard/test"]',
+    selector: 'a[href="/klantendashboard/test"]',
     placement: 'right',
     title: 'Preview Chatbot',
     body: 'Zie je chatbot zoals een bezoeker hem op je eigen site ziet, en stel zelf testvragen vóór je live gaat.',
   },
   {
-    selector: 'a[href="/v0/klantendashboard/widget"]',
+    selector: 'a[href="/klantendashboard/widget"]',
     placement: 'right',
     title: 'Widget',
     body: 'Pas de kleuren aan en kopieer de code om de chatbot op je eigen website te zetten.',

@@ -32,9 +32,11 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   // Validate `next` is an internal path (avoid open-redirect).
   // Chrome/Firefox normaliseren `/\` naar `//` → `/\evil.com` zou redirecten
-  // naar evil.com. Naast `//` dus ook `/\` blokkeren.
+  // naar evil.com. Naast `//` dus ook `/\` blokkeren. Browsers strippen tab/
+  // newline uit de Location-header (`/\t/evil.com` → `//evil.com`), dus
+  // control-tekens en backslashes overal weigeren.
   const safeNext =
-    next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')
+    next.startsWith('/') && !next.startsWith('//') && !/[\x00-\x1f\\]/.test(next)
       ? next
       : '/';
   redirect(safeNext);
