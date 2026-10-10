@@ -179,7 +179,7 @@ export async function POST(req: Request) {
   // Q&A die de bezoeker zelf toevoegde: bij een match neemt runRagQuery's
   // handmatige-Q&A-pad het over (geen retrieval, geen antwoord-LLM).
   const qaMatch = await matchDemoQA(question, parseDemoQA(body.qa));
-  const qaCostUsd = qaMatch?.costUsd ?? 0;
+  const qaCostUsd = qaMatch.costUsd;
 
   // disableCache: de cache-key kent de instellingen niet; met wisselende tone/lengte
   // per bezoeker zou een cache-hit het antwoord van een ándere instelling geven.
@@ -197,7 +197,7 @@ export async function POST(req: Request) {
     chatbotOverrides: overrides,
     serviceClient: svc,
     disableCache: true,
-    manualQAItems: qaMatch ? [qaMatch.item] : undefined,
+    manualQAItems: qaMatch.item ? [qaMatch.item] : undefined,
   });
 
   const encoder = new TextEncoder();
