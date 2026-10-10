@@ -1,0 +1,4 @@
+/* Sectie pricing — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-pricing` (root-klasse van deze sectie).
+   - Keyframes heten `pricing-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */

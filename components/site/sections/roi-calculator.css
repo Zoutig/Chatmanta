@@ -1,0 +1,4 @@
+/* Sectie roi-calculator — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-roi` (root-klasse van deze sectie).
+   - Keyframes heten `roi-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */

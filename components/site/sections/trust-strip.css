@@ -1,0 +1,12 @@
+/* Sectie trust-strip — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-trust` (root-klasse van deze sectie).
+   - Keyframes heten `trust-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css. */
+
+/* Uit mockup-final §3. */
+.site-ui .s-trust { border-block: 1px solid var(--line); background: var(--surface); }
+.site-ui .s-trust ul { list-style: none; margin: 0; padding: 18px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+@media (min-width: 900px) { .site-ui .s-trust ul { display: flex; justify-content: space-between; padding: 22px 0; } }
+@media (max-width: 539px) { .site-ui .s-trust ul { grid-template-columns: 1fr; } }
+.site-ui .s-trust li { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; color: var(--ink-2); }
+.site-ui .s-trust svg { width: 20px; height: 20px; color: var(--teal); flex: none; }
