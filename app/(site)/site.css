@@ -361,10 +361,10 @@ body:has(.site-ui) {
 .site-ui .site-footer { border-top: 1px solid var(--line); background: var(--surface); padding: 56px 0 28px; font-size: 0.92rem; }
 .site-ui .foot { display: grid; gap: 32px; grid-template-columns: 1fr 1fr; }
 @media (min-width: 860px) { .site-ui .foot { grid-template-columns: 1.6fr 1fr 1fr 1fr; } }
-.site-ui .foot .brand { grid-column: 1 / -1; }
-@media (min-width: 860px) { .site-ui .foot .brand { grid-column: auto; } }
-.site-ui .foot .brand .logo { min-height: 0; }
-.site-ui .foot .brand p { color: var(--muted); margin-top: 12px; max-width: 300px; }
+.site-ui .foot .foot-brand { grid-column: 1 / -1; }
+@media (min-width: 860px) { .site-ui .foot .foot-brand { grid-column: auto; } }
+.site-ui .foot .foot-brand .logo { min-height: 0; }
+.site-ui .foot .foot-brand p { color: var(--muted); margin-top: 12px; max-width: 300px; }
 .site-ui .foot h2 { margin: 0 0 6px; font-family: var(--font); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.4; color: var(--faint); }
 .site-ui .foot ul { list-style: none; margin: 0; padding: 0; }
 .site-ui .foot li a { display: inline-flex; align-items: center; min-height: 40px; text-decoration: none; color: var(--ink-2); }

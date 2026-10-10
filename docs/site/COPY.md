@@ -183,7 +183,7 @@ Opgeslagen in Europa · Verwerkersovereenkomst beschikbaar · Volledig Nederland
 - Naast of onder het formulier
   - Reactie binnen 1 werkdag
   - Geen verplichtingen
-  - Je gegevens blijven in Europa
+  - Gegevens opgeslagen in Europa
   - Je spreekt met een van de oprichters: Sebastiaan of Niels. *(geen foto)*
 - Blok "Wat bespreken we" (3 bullets, voorstel)
   - Welke vragen je klanten nu stellen
