@@ -71,8 +71,9 @@ export default async function V1AccountPage() {
         orgName={(org?.name as string | undefined) ?? ''}
         isOwner={membership?.role === 'owner'}
         orgId={orgId}
-        daily={{ ...daily, over: daily.over || budget.over }}
+        daily={daily}
         monthly={monthly}
+        pausedToday={budget.over}
         documentsCount={docCount ?? 0}
       />
     </div>

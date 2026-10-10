@@ -21,15 +21,17 @@ export function AccountForm({
   orgId,
   daily,
   monthly,
+  pausedToday = false,
   documentsCount,
 }: {
   email: string;
   orgName: string;
   isOwner: boolean;
   orgId: string;
-  /** Vragen vandaag; `over` is ook true als het interne kosten-vangnet dicht is. */
   daily: QuestionVerdict;
   monthly: QuestionVerdict;
+  /** Het interne kosten-vangnet is vandaag dicht (bedrag blijft onzichtbaar). */
+  pausedToday?: boolean;
   documentsCount: number;
 }) {
   return (
@@ -68,7 +70,7 @@ export function AccountForm({
           <Metric label="Documenten" value={String(documentsCount)} of="in je kennisbank" />
         </div>
         <p className="v1-note">
-          {monthly.over || daily.over
+          {monthly.over || daily.over || pausedToday
             ? 'Een limiet is bereikt, dus je chatbot pauzeert tot morgen (daglimiet) of tot de 1e van de maand (maandlimiet). Neem contact op als je meer nodig hebt.'
             : 'Is een limiet bereikt, dan pauzeert je chatbot tot morgen of tot de 1e van de maand.'}
         </p>

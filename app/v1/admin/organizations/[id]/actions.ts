@@ -80,15 +80,17 @@ export async function setOrgLimitsAction(orgId: string, input: OrgLimitsInput): 
     if (!Number.isFinite(dailyBudgetEur) || dailyBudgetEur < 0 || dailyBudgetEur > MAX_DAILY_BUDGET_EUR) {
       fail('INPUT_INVALID', `Kostenplafond moet tussen €0 en €${MAX_DAILY_BUDGET_EUR} liggen.`);
     }
-    const { error } = await admin
+    const { data, error } = await admin
       .from('organizations')
       .update({
         daily_question_limit: dailyQuestions,
         monthly_question_limit: monthlyQuestions,
         daily_budget_eur: Math.round(dailyBudgetEur * 100) / 100,
       })
-      .eq('id', orgId);
+      .eq('id', orgId)
+      .select('id');
     if (error) throw new Error(`organizations update: ${error.message}`);
+    if (!data?.length) fail('NOT_FOUND', 'Organisatie niet gevonden.');
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
   });
