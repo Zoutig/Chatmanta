@@ -30,6 +30,10 @@ export type RagConfig = {
   chatModel: string;
   /** Optioneel model voor de HULPSTAPPEN (pre-process, rewrite/multi-query, HyDE, decompose, rerank, follow-ups, reclassify). Default = chatModel. Antwoord-generatie/regenerate/cascade blijven chatModel. */
   auxModel?: string;
+  /** v0.14: OpenAI Fast mode (`service_tier: 'priority'`, 2× tarief) voor de chatModel-calls (antwoord, regenerate). Default undefined = standaard. */
+  chatServiceTier?: 'priority';
+  /** v0.14: Fast mode voor de hulpstap-calls (auxModel). Default undefined = standaard. */
+  auxServiceTier?: 'priority';
   /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */

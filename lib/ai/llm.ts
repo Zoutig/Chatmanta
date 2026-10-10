@@ -59,22 +59,27 @@ export type SupportedModelUsd = keyof typeof MODEL_COSTS_USD;
  * `temperature` blijft dan gewoon werken (gemeten 2026-10). Niet-GPT-6 modellen
  * krijgen exact de oude parameters — byte-identiek gedrag voor v0.10 en ouder.
  */
+export type OpenAIServiceTier = 'priority';
+
 export function openaiChatParams(
   model: string,
   opts: { temperature: number; maxTokens: number },
+  serviceTier?: OpenAIServiceTier,
 ):
   | ({ temperature: number; max_tokens: number } & { service_tier?: 'priority' })
   | ({ temperature: number; max_completion_tokens: number; reasoning_effort: 'none' } & {
       service_tier?: 'priority';
     }) {
+  // Expliciete tier (RagConfig.chatServiceTier/auxServiceTier, v0.14+): de kosten
+  // worden dan per response afgerekend op het werkelijk toegepaste tier
+  // (costForModelUsd met serviceTier), dus dit pad mag óók op productie.
   // Meet-hefboom (Luna-onderzoek): OPENAI_SERVICE_TIER=priority → snellere, ~2× duurdere
   // verwerking op ALLE calls. Alleen voor metingen; een klant-tier wordt later per org.
-  // Genegeerd op Vercel-productie: costForModelUsd kent geen priority-tarief, dus de
-  // per-org dag-budget-cap zou ~2× onderschatten als de env daar per ongeluk aan staat.
-  const tier =
-    process.env.OPENAI_SERVICE_TIER === 'priority' && process.env.VERCEL_ENV !== 'production'
-      ? { service_tier: 'priority' as const }
-      : {};
+  // Genegeerd op Vercel-productie: de env-hefboom geeft de tier niet door aan de
+  // kostenberekening, dus de per-org dag-budget-cap zou ~2× onderschatten.
+  const envTier =
+    process.env.OPENAI_SERVICE_TIER === 'priority' && process.env.VERCEL_ENV !== 'production';
+  const tier = serviceTier === 'priority' || envTier ? { service_tier: 'priority' as const } : {};
   if (model.startsWith('gpt-6')) {
     return {
       temperature: opts.temperature,
@@ -100,16 +105,28 @@ export function costForModelUsd(
   model: string,
   inputTokens: number,
   outputTokens: number,
+  servedTier?: string | null,
 ): number {
   const rates = (MODEL_COSTS_USD as Record<string, { input_per_m: number; output_per_m: number }>)[model];
   if (!rates) {
     console.warn(`[MODEL_COSTS_USD] onbekend model: ${model} — cost berekend als 0`);
     return 0;
   }
-  return (
+  const base =
     (inputTokens / 1_000_000) * rates.input_per_m +
-    (outputTokens / 1_000_000) * rates.output_per_m
-  );
+    (outputTokens / 1_000_000) * rates.output_per_m;
+  return base * serviceTierCostMultiplier(servedTier);
+}
+
+/**
+ * Fast mode (voorheen priority processing) kost 2× het standaardtarief
+ * (developers.openai.com/api/docs/guides/fast-mode). Afrekenen op het tier dat de
+ * response TERUGGEEFT (`service_tier`): bij ramp-rate-terugval antwoordt OpenAI
+ * met 'default' en rekent het standaardtarief. GPT-6 meldt 'fast', GPT-4o-mini
+ * 'priority'. Onbekend/afwezig → 1× (byte-identiek met het oude gedrag).
+ */
+export function serviceTierCostMultiplier(servedTier?: string | null): number {
+  return servedTier === 'priority' || servedTier === 'fast' ? 2 : 1;
 }
 
 /**

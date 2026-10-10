@@ -119,16 +119,18 @@ async function chatComplete({
   user,
   temperature,
   maxTokens = RAG_DEFAULTS.CHAT_MAX_TOKENS,
+  serviceTier,
 }: {
   model: string;
   system: string;
   user: string;
   temperature: number;
   maxTokens?: number;
+  serviceTier?: 'priority';
 }): Promise<ChatCompleteResult> {
   const resp = await openai().chat.completions.create({
     model,
-    ...openaiChatParams(model, { temperature, maxTokens }),
+    ...openaiChatParams(model, { temperature, maxTokens }, serviceTier),
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -137,7 +139,7 @@ async function chatComplete({
   const text = resp.choices[0]?.message?.content ?? '';
   const inputTokens = resp.usage?.prompt_tokens ?? 0;
   const outputTokens = resp.usage?.completion_tokens ?? 0;
-  const costUsd = costForModelUsd(model, inputTokens, outputTokens);
+  const costUsd = costForModelUsd(model, inputTokens, outputTokens, resp.service_tier);
   return { text, inputTokens, outputTokens, costUsd };
 }
 
@@ -225,6 +227,7 @@ async function preProcessInput(
       : basePreProcess;
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: systemPrompt,
     user: userMessage,
     temperature: RAG_DEFAULTS.REWRITE_TEMPERATURE,
@@ -290,6 +293,7 @@ async function generateHydeDocument(
 ): Promise<{ hypothetical: string; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: HYDE_SYSTEM,
     user: query,
     temperature: 0.5,
@@ -331,6 +335,7 @@ async function decomposeQuery(
 ): Promise<{ subQueries: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: DECOMP_SYSTEM,
     user: query,
     temperature: 0.2,
@@ -547,6 +552,7 @@ async function generateMultiQueries(
   }
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: MULTI_QUERY_SYSTEM,
     user: `Geef ${count - 1} alternatieve formuleringen van deze zoekvraag (één per regel):\n\n${baseQuery}`,
     temperature: 0.5,
@@ -640,6 +646,7 @@ async function generateFollowUps(
 ): Promise<{ followUps: string[]; inputTokens: number; outputTokens: number; costUsd: number }> {
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: FOLLOWUP_SYSTEM,
     user: `Vraag: ${question}\n\nAntwoord: ${answer}\n\nVervolgvragen:`,
     temperature: 0.6,
@@ -680,6 +687,7 @@ async function rerankChunks(
 
   const result = await chatComplete({
     model: auxModelOf(bot),
+    serviceTier: bot.auxServiceTier,
     system: RERANK_SYSTEM,
     user: `Vraag: ${question}\n\nFragmenten:\n${numbered}\n\nGeef de top ${topN} fragmenten op relevantie:`,
     temperature: 0.0,
@@ -1896,7 +1904,11 @@ KRITISCHE FORMAT-REGELS:
         try {
           const resp = await openai().chat.completions.create({
             model: bot.chatModel,
-            ...openaiChatParams(bot.chatModel, { temperature: bot.chatTemperature, maxTokens: 200 }),
+            ...openaiChatParams(
+              bot.chatModel,
+              { temperature: bot.chatTemperature, maxTokens: 200 },
+              bot.chatServiceTier,
+            ),
             messages: [
               { role: 'system', content: generalSystem },
               { role: 'user', content: original },
@@ -1905,7 +1917,12 @@ KRITISCHE FORMAT-REGELS:
           modelText = resp.choices[0]?.message?.content ?? '';
           genChatInputTokens = resp.usage?.prompt_tokens ?? 0;
           genChatOutputTokens = resp.usage?.completion_tokens ?? 0;
-          genChatCostUsd = costForModelUsd(bot.chatModel, genChatInputTokens, genChatOutputTokens);
+          genChatCostUsd = costForModelUsd(
+            bot.chatModel,
+            genChatInputTokens,
+            genChatOutputTokens,
+            resp.service_tier,
+          );
         } catch (err) {
           stopGenerationGen();
           const code = classifyLlmError(err);
@@ -2311,13 +2328,18 @@ KRITISCHE FORMAT-REGELS:
   // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
   // ongewijzigd; alleen het LLM-payload-venster is begrensd.
   const answerHistory = history.slice(-RAG_CHAT_HISTORY_TURNS);
+  let servedChatTier: string | null | undefined;
   try {
     const stream = await openai().chat.completions.create({
       model: bot.chatModel,
-      ...openaiChatParams(bot.chatModel, {
-        temperature: bot.chatTemperature,
-        maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
-      }),
+      ...openaiChatParams(
+        bot.chatModel,
+        {
+          temperature: bot.chatTemperature,
+          maxTokens: RAG_DEFAULTS.CHAT_MAX_TOKENS,
+        },
+        bot.chatServiceTier,
+      ),
       stream: true,
       stream_options: { include_usage: true },
       messages: [
@@ -2335,10 +2357,11 @@ KRITISCHE FORMAT-REGELS:
       }
       // Last chunk in OpenAI stream carries the usage when stream_options
       // include_usage:true is set.
+      if (chunk.service_tier) servedChatTier = chunk.service_tier;
       if (chunk.usage) {
         chatInputTokens = chunk.usage.prompt_tokens ?? 0;
         chatOutputTokens = chunk.usage.completion_tokens ?? 0;
-        chatCostUsd = costForModelUsd(bot.chatModel, chatInputTokens, chatOutputTokens);
+        chatCostUsd = costForModelUsd(bot.chatModel, chatInputTokens, chatOutputTokens, servedChatTier);
       }
     }
   } catch (err) {
@@ -2818,6 +2841,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
     try {
       const stricter = await chatComplete({
         model: bot.chatModel,
+        serviceTier: bot.chatServiceTier,
         system: styledSystemPrompt + REGENERATE_SYSTEM_ADDON,
         user: userPrompt,
         temperature: Math.max(0.0, bot.chatTemperature - 0.2),
