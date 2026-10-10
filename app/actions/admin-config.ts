@@ -36,7 +36,7 @@ export async function setFaqRefreshCadenceAction(
     await requireV0Auth();
     if (!isCadence(cadence)) fail('INPUT_INVALID', 'Ongeldige FAQ-cadans.');
     await setFaqRefreshCadence(cadence);
-    revalidatePath('/admindashboard/instellingen');
+    revalidatePath('/v0/admindashboard/instellingen');
     return {};
   });
 }

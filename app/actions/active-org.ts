@@ -36,8 +36,8 @@ export async function setActiveOrgAction(
     // geeft alle org-gescopte data (threads, docs, usage) door aan de
     // ChatShell. Klantendashboard layout leest dezelfde cookie en moet
     // ook re-renderen op org-switch.
-    revalidatePath('/admintool');
-    revalidatePath('/klantendashboard', 'layout');
+    revalidatePath('/v0/admintool');
+    revalidatePath('/v0/klantendashboard', 'layout');
     return { slug: validSlug };
   });
 }

@@ -10,7 +10,7 @@
 // normale BlockList.
 
 import { parseMarkdown } from '../parse-md';
-import type { OrgSkin } from '@/app/widget/org-skins';
+import type { OrgSkin } from '@/app/v0/widget/org-skins';
 import {
   GradientHero,
   SectionBand,

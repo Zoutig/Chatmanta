@@ -6,12 +6,12 @@ const authState = path.resolve(__dirname, '../.auth-state.json');
 test.describe('V0 theme switch', () => {
   test.beforeEach(async ({ page }) => {
     // Wis alleen localStorage (theme keuze), maar behoud de auth-cookie.
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate(() => window.localStorage.clear());
   });
 
   test('icon-toggle wisselt html.dark en blijft over reload', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     const html = page.locator('html');
     const toggle = page.getByRole('switch', { name: /Schakel naar (dark|light) mode/ });
@@ -39,7 +39,7 @@ test.describe('V0 theme switch', () => {
 
   test('no FOUC on hard reload — initial paint matches stored choice', async ({ page }) => {
     // Stel dark in via een eerste bezoek
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     const html = page.locator('html');
     const isDarkNow = await html.evaluate((el) => el.classList.contains('dark'));
     if (!isDarkNow) {
@@ -60,7 +60,7 @@ test.describe('V0 theme switch', () => {
       storageState: authState,
     });
     const darkPage = await darkContext.newPage();
-    await darkPage.goto('/');
+    await darkPage.goto('/v0/admintool');
     // Default = system, dus <html> moet class='dark' hebben
     await expect(darkPage.locator('html')).toHaveClass(/(?:^| )dark(?: |$)/);
     await darkContext.close();
@@ -70,7 +70,7 @@ test.describe('V0 theme switch', () => {
       storageState: authState,
     });
     const lightPage = await lightContext.newPage();
-    await lightPage.goto('/');
+    await lightPage.goto('/v0/admintool');
     await expect(lightPage.locator('html')).not.toHaveClass(/(?:^| )dark(?: |$)/);
     await lightContext.close();
   });

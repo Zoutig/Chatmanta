@@ -9,7 +9,7 @@
 // Wrapper = app/v1/layout.tsx (ontwerplaag, font, lichte modus) + app/v1/app/layout.tsx
 // (klant.css + de schil), want /voorbeeld valt buiten de /v1-boom.
 import '@/app/v1/_ui/ui.css';
-import '../../klantendashboard/klant.css';
+import '../../v0/klantendashboard/klant.css';
 import './_demo/demo.css';
 import type { Metadata } from 'next';
 import { DEMO_SHARE_BASE, DEMO_SHARE_IMAGE } from '@/lib/voorbeeld/demo-defaults';

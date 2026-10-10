@@ -6,7 +6,7 @@ import { headers } from 'next/headers';
 import { LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import { getOrgSettings } from '@/lib/v0/klantendashboard/server/settings';
 import { ALL_ORG_SLUGS, type OrgSlug } from '@/lib/v0/server/active-org';
-import { applyWidgetOverrides, getSkin } from '@/app/widget/org-skins';
+import { applyWidgetOverrides, getSkin } from '@/app/v0/widget/org-skins';
 import { createEmbedToken } from '@/lib/v0/server/embed-token';
 import { evaluateEmbedAccess } from '@/lib/widget/origin-allowlist';
 import { EmbedClient } from './embed-client';
