@@ -28,6 +28,7 @@ import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/inje
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
+import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
 import { V1_RAG_DEFAULTS, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from '@/app/v1/app/instellingen/settings-config';
 import type { ChatbotPromptOverrides } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
@@ -177,7 +178,11 @@ export async function POST(req: Request) {
   //     rate-limit (gate #0) blijft staan; dit voegt per-org + kosten/maand toe. Block →
   //     terminale 'fallback'-NDJSON met de gate-message (zoals de injection-block);
   //     geen pipeline → niet billable.
-  const gate = await checkOrgChatGates(svc, organizationId);
+  //     Fast-mode-read parallel (eigen fail-safe → standaard tier bij een fout).
+  const [gate, fastMode] = await Promise.all([
+    checkOrgChatGates(svc, organizationId),
+    getOrgFastMode(svc, organizationId),
+  ]);
   if (!gate.ok) {
     return ndjsonOnce(requestId, queryLogId, {
       kind: 'fallback',
@@ -199,11 +204,15 @@ export async function POST(req: Request) {
   }
 
   // 6. Config — widget-override: sourceLinksEnabled UIT (document-only RPC).
-  const config = {
-    ...V1_RAG_DEFAULTS,
-    version: activeChatbot.bot_version,
-    sourceLinksEnabled: false,
-  };
+  //    Fast mode per org (organizations.fast_mode_enabled, V1-admin): uit → standaard tier.
+  const config = applyFastMode(
+    {
+      ...V1_RAG_DEFAULTS,
+      version: activeChatbot.bot_version,
+      sourceLinksEnabled: false,
+    },
+    fastMode,
+  );
 
   // 7. Stream. GK blijft fail-closed (geen enableGeneralKnowledge meegegeven →
   //    config.generalKnowledgeEnabled=false wint). Cache leest+schrijft via svc.
