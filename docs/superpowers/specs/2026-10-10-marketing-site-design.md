@@ -40,7 +40,7 @@ Eén lange landingspagina + losse pagina's. Alles Nederlands.
 **`/` secties, in volgorde:**
 1. **Nav** (sticky): logo · Hoe het werkt · Functies · Prijzen · Demo · FAQ · **Inloggen** · **[Plan een kennismaking]**.
 2. **Hero**: één scherpe belofte (richting: *"Je website beantwoordt elke klantvraag. Ook om 23:00."*), subregel, twee CTA's (kennismaking primair, live demo secundair). Ernaast een geanimeerd chatgesprek (vraag → typend antwoord → bronlink).
-3. **Vertrouwensstrook**: Data in Europa · AVG-proof · Volledig Nederlands · Antwoordt alleen uit jouw content.
+3. **Vertrouwensstrook**: Opgeslagen in Europa · Verwerkersovereenkomst beschikbaar · Volledig Nederlands · Antwoordt alleen uit jouw content (besluit 2026-10-10; "AVG-proof/Data in Europa" pas na OpenAI-EU + DPA).
 4. **Probleem**: klanten zoeken, vinden niets, mailen of haken af; medewerkers beantwoorden steeds dezelfde vragen.
 5. **Hoe het werkt (3 stappen)**: URL invullen → ChatManta leest je site (crawl-animatie) → één regel code, live. Signatuur-motionmoment, scroll-gestuurd.
 6. **Functies (bento-grid)**: leads binnenhalen, gesprekken teruglezen, kennisgat-quiz, eigen stijl/logo, Fast mode.
@@ -61,7 +61,7 @@ Eén lange landingspagina + losse pagina's. Alles Nederlands.
 
 Alle pakketten, prijzen, limieten en vlaggen in **één bestand**: `lib/site/pricing.ts` (voorwerk: later lezen Mollie-billing en limiet-enforcement dezelfde bron — `V2_SCOPE` §4 "tiers leven in code"). Bedragen excl. btw.
 
-| | **Start** | **Groei** ⭐ *Meest gekozen* | **Compleet** |
+| | **Start** | **Groei** ⭐ *Aanbevolen* | **Compleet** |
 |---|---|---|---|
 | Normale prijs / mnd | €49 | €99 | €249 |
 | Normaal, jaarlijks p/m | €39 | €79 | €199 |
@@ -81,7 +81,7 @@ Alle pakketten, prijzen, limieten en vlaggen in **één bestand**: `lib/site/pri
 | Support | Elke werkdag, reactie binnen 1 werkdag | 24/7 bereikbaar, reactie binnen 24 uur | 24/7 prioriteit, reactie binnen 4 uur |
 
 **Prijspsychologie (vastgelegd):**
-- Center-stage: Groei in het midden, visueel groter, badge "Meest gekozen". Op mobiel Groei eerst.
+- Center-stage: Groei in het midden, visueel groter, badge "Aanbevolen" (besluit 2026-10-10: "Meest gekozen" pas met echte klantdata). Op mobiel Groei eerst.
 - Anker: Compleet maakt Groei redelijk; Start bewust kaal (geen leads) als decoy.
 - Jaar/maand-toggle, **standaard op jaarlijks**, label "2 maanden gratis".
 - Doorgestreepte normale prijs naast de introductieprijs — echt anker: na de eerste 25 klanten gaat de normale prijs gelden.
