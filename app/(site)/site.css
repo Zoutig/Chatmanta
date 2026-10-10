@@ -101,6 +101,9 @@ html:has(.site-ui) {
   -webkit-text-size-adjust: 100%;
   overflow-x: clip;
   scroll-padding-top: 72px;
+  /* globals.css zet html op 14px (app-UI); de site rekent — net als de mockup —
+     met rem = 16px. Zonder dit is élke rem-maat 12,5% te klein. */
+  font-size: 16px;
 }
 body:has(.site-ui) {
   margin: 0;
@@ -289,10 +292,9 @@ body:has(.site-ui) {
 .site-ui .chat-send { width: 38px; height: 38px; border-radius: 10px; background: var(--teal); display: grid; place-items: center; color: #fff; }
 .site-ui .chat-send svg { width: 16px; }
 .site-ui .label-ex { position: absolute; top: -11px; left: 18px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0; padding: 3px 9px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); box-shadow: var(--sh-1); z-index: 2; }
-@media (max-width: 639px) {
-  .site-ui .chat-sub { display: none; }
-  .site-ui .chat-title { font-size: 0.86rem; }
-}
+/* NB: de mockup bedoelde .chat-sub/.chat-title op mobiel te verbergen/verkleinen, maar
+   door de cascade-volgorde wint daar de basisregel: de goedgekeurde render toont de
+   subregel "Antwoordt uit …" óók op mobiel. Wij volgen die render (en de boodschap). */
 
 /* =====================================================================
    NAV  (components/site/nav.tsx)
