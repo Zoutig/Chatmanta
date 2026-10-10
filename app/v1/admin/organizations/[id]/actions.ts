@@ -491,6 +491,55 @@ export async function setOrgSuspendedAction(
   });
 }
 
+// ─────────────────────────── Fast mode per klant ───────────────────────────
+//
+// organizations.fast_mode_enabled (migr 0029). Aan = OpenAI Fast mode (service_tier
+// priority) op de antwoord- en hulpstap-calls: sneller antwoord, ~2× LLM-kosten. De
+// chat-paden lezen de kolom via lib/v1/limits/fast-mode.ts. Gate = Jorion-admin
+// (cross-org); write via service-role; audit-log.
+
+/** Zet Fast mode voor een org aan (enabled=true) of uit. */
+export async function setOrgFastModeAction(
+  orgId: string,
+  enabled: boolean,
+): Promise<ActionResult> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    if (typeof enabled !== 'boolean') fail('INPUT_INVALID', 'Ongeldige waarde.');
+    const svc = getV1ServiceRoleClient();
+
+    const { data: org, error: orgErr } = await svc
+      .from('organizations')
+      .select('id')
+      .eq('id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (orgErr) throw new Error(`org-lookup faalde: ${orgErr.message}`);
+    if (!org) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+
+    const { error } = await svc
+      .from('organizations')
+      .update({ fast_mode_enabled: enabled })
+      .eq('id', orgId);
+    if (error) throw new Error(`Fast mode opslaan faalde: ${error.message}`);
+
+    await writeAuditLog(svc, {
+      organizationId: orgId,
+      userId: actorId,
+      action: enabled ? 'org.fast_mode_on' : 'org.fast_mode_off',
+      targetType: 'organization',
+      targetId: orgId,
+    });
+
+    revalidatePath(`/v1/admin/organizations/${orgId}`);
+    return {};
+  });
+}
+
 // ─────────────────────────── Soft-launch — widget-domeinen ───────────────────────────
 //
 // chatbots.allowed_domains is Jorion-beheerd (de klant ziet 'm read-only). Leeg = de

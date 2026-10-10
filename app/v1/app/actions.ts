@@ -10,6 +10,7 @@ import { logRagQuery } from '@/lib/rag/log-query';
 import { V1_RAG_DEFAULTS, getOrgChatbot } from './rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
+import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
 
 export type AskV1Result =
   | { ok: true; answer: string; sources: { title: string }[]; kind: string }
@@ -46,10 +47,14 @@ export async function askV1(question: string, history?: ChatHistoryTurn[]): Prom
     // M-C: cost/abuse-guard vóór de (betaalde) pipeline. Per-org rate-limit + maand-cap
     // + dag-budget op de service-role (org-expliciet, geen client-input). Geblokt →
     // geen runRagQuery → niet billable. UI mapt de code naar NL (v1-chat.tsx).
-    const gate = await checkOrgChatGates(getV1ServiceRoleClient(), orgId);
+    const svc = getV1ServiceRoleClient();
+    const [gate, fastMode] = await Promise.all([
+      checkOrgChatGates(svc, orgId),
+      getOrgFastMode(svc, orgId), // per-org Fast mode; fout → standaard tier
+    ]);
     if (!gate.ok) return { ok: false, error: gate.code };
 
-    const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
+    const config = applyFastMode({ ...V1_RAG_DEFAULTS, version: chatbot.bot_version }, fastMode);
 
     // Klant-settings → engine-overrides. Zonder deze stap negeert askV1 de
     // Instellingen-UI volledig (dode knoppen). Lezen onder de session-client (RLS);

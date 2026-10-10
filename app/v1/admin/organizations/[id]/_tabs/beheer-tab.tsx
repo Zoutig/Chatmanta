@@ -10,6 +10,7 @@ import { LimitsEditor } from '../limits-editor';
 import { DeleteOrgForm } from '../delete-org-form';
 import { MembersManager } from '../members-manager';
 import { SuspendOrgForm } from '../suspend-org-form';
+import { FastModeForm } from '../fast-mode-form';
 
 type Props = {
   orgId: string;
@@ -22,6 +23,16 @@ export async function BeheerTab({ orgId, slug, limits, suspendedAt }: Props) {
   const suspended = Boolean(suspendedAt);
   const admin = await getJorionAdminClient();
   const members = await listOrgMembers(admin, orgId);
+  // Fast mode (migr 0029): eigen read, zodat de pagina blijft werken zolang de kolom
+  // nog niet op deze omgeving staat (dan: 'onbekend' + uitleg i.p.v. een kapotte tab).
+  const { data: fmRow, error: fmErr } = await admin
+    .from('organizations')
+    .select('fast_mode_enabled')
+    .eq('id', orgId)
+    .maybeSingle();
+  const fastMode: boolean | null = fmErr
+    ? null
+    : (fmRow as { fast_mode_enabled?: boolean | null } | null)?.fast_mode_enabled === true;
 
   return (
     <div className="v1-stack">
@@ -41,6 +52,29 @@ export async function BeheerTab({ orgId, slug, limits, suspendedAt }: Props) {
           </span>
         </p>
         <SuspendOrgForm orgId={orgId} suspended={suspended} />
+      </section>
+
+      {/* Fast mode */}
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title v1-adm-title-row">
+            Fast mode
+            <InfoTip text="Laat OpenAI deze klant met voorrang verwerken. Antwoorden komen ongeveer twee keer zo snel, tegen ongeveer twee keer de LLM-kosten per vraag. Telt mee in het dagbudget." />
+          </h2>
+        </div>
+        <p className="v1-adm-strip v1-adm-muted" style={{ margin: '0 0 12px' }}>
+          <Badge tone={fastMode ? 'ok' : 'neutral'} dot>
+            {fastMode === null ? 'Onbekend' : fastMode ? 'Aan' : 'Uit'}
+          </Badge>
+          <span>
+            {fastMode === null
+              ? 'De instelling is nog niet beschikbaar op deze omgeving (migratie 0029 ontbreekt). De chatbot draait op standaard snelheid.'
+              : fastMode
+                ? 'Sneller antwoord (eerste woord rond 2 s), ongeveer 2× de LLM-kosten per vraag.'
+                : 'Standaard snelheid en kosten.'}
+          </span>
+        </p>
+        {fastMode !== null && <FastModeForm orgId={orgId} enabled={fastMode} />}
       </section>
 
       {/* Leden */}
