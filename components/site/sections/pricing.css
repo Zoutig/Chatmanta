@@ -60,7 +60,7 @@
 }
 .site-ui .s-pricing .plan h3 { margin: 0; }
 .site-ui .s-pricing .badge-top {
-  position: absolute; top: -12px; left: 24px; background: var(--teal); color: #fff; font-size: 0.75rem;
+  position: absolute; top: -12px; left: 24px; background: var(--teal-ink); color: #fff; font-size: 0.75rem;
   font-weight: 600; letter-spacing: 0.02em; padding: 3px 10px; border-radius: 6px; white-space: nowrap; line-height: 1.4;
 }
 .site-ui .s-pricing .plan .who { font-size: 0.88rem; color: var(--muted); margin: 4px 0 0; min-height: 2.8em; }

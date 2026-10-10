@@ -26,7 +26,7 @@
   --ink: #0c1e2e;
   --ink-2: #16314a;
   --muted: #4d6074;
-  --faint: #7a8a9b;
+  --faint: #5f7083; /* mockup #7a8a9b; donkerder voor WCAG AA-contrast (≥4.5:1 op wit én --bg-2) */
   --teal: #0d9488;
   --teal-ink: #0f766e;
   --teal-soft: #e7f6f4;
@@ -44,7 +44,7 @@
   --line-dark: rgba(255, 255, 255, 0.12);
   --warn-dark: #fdba74;
   /* fictief-bedrijf-accent (Fietsenmaker Van Dam / Voorbeeldbedrijf) */
-  --demo-brand: #e0663c;
+  --demo-brand: #c4512a; /* mockup #e0663c = 3.4:1 met witte tekst (live-demo-venster); #c4512a haalt AA */
   --contours: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 520'%3E%3Cg fill='none' stroke='%235eead4' stroke-opacity='.10' stroke-width='1.1'%3E%3Cpath d='M-20 40C140 0 260 90 420 52S660 -6 820 30'/%3E%3Cpath d='M-20 100C150 64 270 150 430 112S670 50 820 92'/%3E%3Cpath d='M-20 164C160 128 280 214 440 176S680 112 820 156'/%3E%3Cpath d='M-20 230C170 196 290 280 450 242S690 176 820 222'/%3E%3Cpath d='M-20 298C180 266 300 348 460 310S700 242 820 290'/%3E%3Cpath d='M-20 368C190 338 310 418 470 380S710 310 820 360'/%3E%3Cpath d='M-20 440C200 412 320 490 480 452S720 380 820 432'/%3E%3Cpath d='M-20 512C210 486 330 562 490 524S730 452 820 504'/%3E%3C/g%3E%3C/svg%3E");
   --focus: 0 0 0 3px rgba(13, 148, 136, 0.35);
   --focus-dark: 0 0 0 3px rgba(45, 212, 191, 0.6);
@@ -202,8 +202,8 @@ body:has(.site-ui) {
 }
 .site-ui .btn-primary:hover { background: var(--ink-2); }
 /* teal-gevulde primaire knop op navy (Groei-kaart, slot-CTA) */
-.site-ui .btn-teal { background: var(--teal); color: #fff; box-shadow: none; }
-.site-ui .btn-teal:hover { background: #0b7f75; }
+.site-ui .btn-teal { background: var(--teal-ink); color: #fff; box-shadow: none; } /* mockup var(--teal) = 3.7:1 met wit; teal-ink haalt AA (5.5:1) */
+.site-ui .btn-teal:hover { background: #0c5f58; }
 .site-ui .btn-outline { background: var(--surface); color: var(--ink); border-color: var(--line-2); box-shadow: var(--sh-1); }
 .site-ui .btn-outline:hover { border-color: var(--ink); }
 /* wit op navy (rekenhulp-uitkomst) */
@@ -302,7 +302,7 @@ body:has(.site-ui) {
 .site-ui .nav { position: sticky; top: 0; z-index: 50; transition: background-color var(--base) var(--ease), box-shadow var(--base) var(--ease); }
 .site-ui .nav-in { height: var(--nav-h); display: flex; align-items: center; gap: 16px; transition: height var(--base) var(--ease); }
 .site-ui .nav.is-compact {
-  background: rgba(246, 248, 251, 0.78);
+  background: rgba(246, 248, 251, 0.94); /* mockup 0.78; 0.94 houdt nav-tekst ≥4.5:1 boven de navy-blokken */
   -webkit-backdrop-filter: saturate(1.6) blur(14px);
   backdrop-filter: saturate(1.6) blur(14px);
   box-shadow: 0 1px 0 var(--line);

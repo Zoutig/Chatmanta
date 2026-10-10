@@ -81,7 +81,7 @@ export function Inbox() {
 
   const total = ROWS.length;
   return (
-    <aside className="inbox" ref={ref} aria-label="Voorbeeld van een volle inbox">
+    <figure className="inbox" ref={ref} aria-label="Voorbeeld van een volle inbox">
       <div className="inbox-head">
         <b>Inbox · info@</b>
         <span className="count">
@@ -105,6 +105,6 @@ export function Inbox() {
         })}
       </ul>
       <div className="inbox-foot">Illustratie — elke vraag hier had direct beantwoord kunnen worden.</div>
-    </aside>
+    </figure>
   );
 }
