@@ -52,6 +52,8 @@ function formatDateTime(iso: string): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    // Vaste zone: server (UTC) en browser renderen dan dezelfde tijd (geen hydration-mismatch).
+    timeZone: 'Europe/Amsterdam',
   });
 }
 
