@@ -5,17 +5,17 @@
 // SA-1: org uit de getrouwde sessie (getSessionOrg), NOOIT uit client/env, +
 // expliciete requireOrgMember(orgId)-gate vóór de service-role-write. De write
 // scoopt .eq(organization_id).eq(id) zodat alléén de eigen chatbot wordt geraakt
-// (RLS-bypass → object-level guard). Ná de write purgen we de answer-cache: zonder
-// purge overleeft een stale cache-hit een toon-/fallback-wijziging (bewezen V0-bug).
+// (RLS-bypass → object-level guard). De write zelf (atomische merge + purge van de
+// answer-cache als antwoord-velden veranderen) zit in settings-store.ts.
 
 import { revalidatePath } from 'next/cache';
 import { getSessionOrg, requireOrgMember } from '@/lib/auth';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { isAppError } from '@/lib/errors/app-error';
 import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/errors/action';
-import { purgeAnswerCache } from '@/lib/rag/ingest';
 import { getOrgChatbot } from '../rag-config';
-import { getChatbotSettings, sanitizeChatbotPatch, type V1ChatbotSettings } from './settings-config';
+import { sanitizeChatbotPatch, type V1ChatbotSettings } from './settings-config';
+import { writeChatbotSettingsPatch } from './settings-store';
 
 const SETTINGS_PATH = '/v1/app/instellingen';
 
@@ -44,21 +44,8 @@ export async function saveChatbotSettingsAction(
     // de UI toont + cap de vrije-tekstvelden (geen vreemde velden / prompt-bloat).
     const safePatch = sanitizeChatbotPatch(patch);
 
-    // Merge patch over de huidige (over defaults gemergde) settings → compleet object.
-    const current = await getChatbotSettings(svc, chatbot.id);
-    const next: V1ChatbotSettings = { ...current, ...safePatch };
-
-    const { error } = await svc
-      .from('chatbots')
-      .update({ settings: next })
-      .eq('organization_id', orgId)
-      .eq('id', chatbot.id);
-    if (error) throw new Error(`chatbot-settings opslaan faalde: ${error.message}`);
-
-    // Toon/taal/fallback zitten niet in de cache-key → settings-wijziging propageert
-    // pas ná een purge. Awaiten (geen fire-and-forget): serverless kan de runtime na
-    // de response killen. Een gefaalde purge draait de save niet terug (best-effort).
-    await purgeAnswerCache(svc, orgId, chatbot.id);
+    // Atomische merge in de DB (migr 0028) + purge alleen bij antwoord-wijziging.
+    const next = await writeChatbotSettingsPatch(svc, orgId, chatbot, safePatch);
 
     revalidatePath(SETTINGS_PATH);
     return { settings: next };

@@ -16,10 +16,10 @@ import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/error
 import { getOrgChatbot } from '@/app/v1/app/rag-config';
 import { parseAllowedOrigins } from '@/lib/widget/origin-allowlist';
 import {
-  getChatbotSettings,
   sanitizeChatbotPatch,
   type V1ChatbotSettings,
 } from '@/app/v1/app/instellingen/settings-config';
+import { writeChatbotSettingsPatch } from '@/app/v1/app/instellingen/settings-store';
 import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
 import { verifyMagicBytes } from '@/lib/rag/file-signature';
@@ -205,8 +205,8 @@ export async function deleteOrgDataAction(
 // ─────────────────────────── WP5b — botinstellingen + widget ───────────────────────────
 //
 // Eén admin-action voor zowel de Botinstellingen- als de Widget-tab: beide bewerken
-// dezelfde chatbots.settings jsonb. Hergebruikt de klant-datalaag (getChatbotSettings +
-// sanitizeChatbotPatch → geen eigen merge-logica) en purgt de answer-cache ná de write,
+// dezelfde chatbots.settings jsonb. Hergebruikt de klant-datalaag (sanitizeChatbotPatch +
+// writeChatbotSettingsPatch → atomische merge, purge alleen bij antwoord-wijziging),
 // net als saveChatbotSettingsAction. De org komt uit de route-param; de write scoopt
 // .eq(organization_id).eq(id) zodat alléén de chatbot van díe org wordt geraakt
 // (service-role-bypass → object-level guard). Gate = Jorion-admin (cross-org).
@@ -227,19 +227,7 @@ export async function adminSaveChatbotSettingsAction(
     if (!chatbot) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
 
     const safePatch = sanitizeChatbotPatch(patch);
-    const current = await getChatbotSettings(svc, chatbot.id);
-    const next: V1ChatbotSettings = { ...current, ...safePatch };
-
-    const { error } = await svc
-      .from('chatbots')
-      .update({ settings: next })
-      .eq('organization_id', orgId)
-      .eq('id', chatbot.id);
-    if (error) throw new Error(`chatbot-settings opslaan faalde: ${error.message}`);
-
-    // Toon/taal/fallback zitten niet in de cache-key → purge zodat een stale hit de
-    // wijziging niet overleeft (zelfde reden als de klant-save). Best-effort.
-    await purgeAnswerCache(svc, orgId, chatbot.id);
+    const next = await writeChatbotSettingsPatch(svc, orgId, chatbot, safePatch);
 
     await writeAuditLog(svc, {
       organizationId: orgId,
