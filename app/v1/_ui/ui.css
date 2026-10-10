@@ -541,6 +541,40 @@ a.v1-stat:focus-visible { outline: none; box-shadow: inset var(--v1-focus); }
 .v1-auth-foot { display: flex; justify-content: center; font-size: 13px; color: var(--v1-muted); }
 .v1-row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 
+/* Login: schuifschakelaar Klant ↔ Jorion-admin. In admin-modus "duikt" de pagina
+   de diepzee in: een navy laag faadt in achter de kaart, de kaart krijgt een teal rand. */
+.v1-auth { position: relative; isolation: isolate; }
+.v1-auth::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0; pointer-events: none;
+  background: radial-gradient(120% 80% at 50% 0%, var(--v1-navy-2) 0%, var(--v1-navy) 70%);
+  transition: opacity var(--v1-slow) var(--v1-ease);
+}
+.v1-auth:has(.v1-login-switch[data-mode='admin'])::before { opacity: 1; }
+.v1-auth-card { transition: box-shadow var(--v1-slow) var(--v1-ease); }
+.v1-auth:has(.v1-login-switch[data-mode='admin']) .v1-auth-card {
+  box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.55), 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+.v1-login-switch {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 4px; margin-top: -8px;
+  border-radius: 999px; background: var(--v1-surface-2); box-shadow: inset 0 0 0 1px var(--v1-line);
+}
+.v1-login-switch-thumb {
+  position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px;
+  background: var(--v1-surface); box-shadow: 0 1px 2px rgba(12, 30, 46, 0.12), 0 4px 12px rgba(12, 30, 46, 0.08);
+  transition: transform var(--v1-slow) var(--v1-spring), background-color var(--v1-base) ease;
+}
+.v1-login-switch[data-mode='admin'] .v1-login-switch-thumb { transform: translateX(100%); background: var(--v1-navy); }
+.v1-login-switch-opt {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  font: 600 13px/1 var(--v1-font); color: var(--v1-muted); transition: color var(--v1-base) ease;
+}
+.v1-login-switch-opt[aria-checked='true'] { color: var(--v1-ink); }
+.v1-login-switch[data-mode='admin'] .v1-login-switch-opt[aria-checked='true'] { color: var(--v1-on-navy); }
+.v1-login-switch-opt:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-form[data-mode='admin'] .v1-btn--primary { background: var(--v1-accent-ink); }
+.v1-form[data-mode='admin'] .v1-btn--primary:hover:not(:disabled) { background: var(--v1-accent); }
+
 @media (prefers-reduced-motion: reduce) {
   .v1-ui *:not(.v1-spinner):not([class*='spin']), .v1-ui *::before, .v1-ui *::after {
     animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
