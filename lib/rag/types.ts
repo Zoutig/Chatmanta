@@ -34,6 +34,12 @@ export type RagConfig = {
   chatServiceTier?: 'priority';
   /** v0.14: Fast mode voor de hulpstap-calls (auxModel). Default undefined = standaard. */
   auxServiceTier?: 'priority';
+  /** v0.14: pre-processor mag 0-2 `SUB:`-deelvragen teruggeven bij meervoudige vragen; die worden
+      parallel mee-opgehaald en round-robin met de hoofdzoekvraag gemerged. Default uit. */
+  preProcessSubQueries?: boolean;
+  /** v0.14: eerste vraag zonder history → zoeken op de originele vraag start meteen, parallel aan
+      de pre-processor (die dan alleen nog route + deelvragen levert). Default uit. */
+  speculativeRetrieval?: boolean;
   /** Aantal zoekvragen om te genereren via LLM (1 = geen multi-query). */
   multiQueryCount: number;
   /** LLM-rerank-stap na retrieve — verbetert precision tegen extra LLM-call. */

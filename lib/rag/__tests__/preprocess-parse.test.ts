@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePreProcessOutput } from '../preprocess-parse';
+import { parsePreProcessOutput, parseSubQueries } from '../preprocess-parse';
 
 test('off_topic action → kind off_topic', () => {
   assert.deepEqual(parsePreProcessOutput('ACTION: off_topic'), { kind: 'off_topic' });
@@ -26,4 +26,21 @@ test('search blijft werken', () => {
 
 test('onbekende action → null', () => {
   assert.equal(parsePreProcessOutput('ACTION: foobar'), null);
+});
+
+test('parseSubQueries — max 2, ontdubbeld, niet gelijk aan hoofdvraag; QUERY blijft één regel', () => {
+  const raw = [
+    'ACTION: search',
+    'QUERY: tarief dakreparatie Acme',
+    'SUB: tarief bitumen dak',
+    'SUB: Tarief  dakreparatie acme',
+    'SUB: levertijd dakreparatie',
+    'SUB: garantie',
+  ].join('\n');
+  assert.deepEqual(parsePreProcessOutput(raw), { kind: 'search', query: 'tarief dakreparatie Acme' });
+  assert.deepEqual(parseSubQueries(raw, 'tarief dakreparatie Acme'), [
+    'tarief bitumen dak',
+    'levertijd dakreparatie',
+  ]);
+  assert.deepEqual(parseSubQueries(['ACTION: search', 'QUERY: x'].join('\n'), 'x'), []);
 });

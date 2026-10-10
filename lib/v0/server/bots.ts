@@ -1588,6 +1588,56 @@ const V0_13X7V: BotConfig = {
   smalltalkToneAware: true,
 };
 const V0_13X7: BotConfig = { ...V0_13X7V, version: 'v0.13x7', label: 'v0.13x7 — x6 + precisie: synoniemen, dienst-premisse, titels vs tekst, afstand, smalltalk-u (hybrid, V0)', hybridSearch: true };
+// v0.14* — Luna-voorbewerking + Fast mode (2026-10-10, Seb: "Luna bij beide, Fast mode
+// voor beide, haal meer uit de voorbewerking"). Basis = v0.13x7. Experimenten, NIET
+// gepromoveerd (LATEST blijft v0.13x7 tot de eval-gate).
+// v0.14a — puur config: hulpstappen ook op Luna (goedkoper: $0,10/$0,50 vs $0,15/$0,60)
+// en Fast mode (service_tier priority, 2× tarief) op alle calls.
+const V0_14A: BotConfig = {
+  ...V0_13X7,
+  version: 'v0.14a',
+  label: 'v0.14a — v0.13x7 met Luna voor de hulpstappen + Fast mode (experiment)',
+  description:
+    'v0.13x7-gedrag; auxModel gpt-6-luna (was gpt-4o-mini), chatServiceTier en auxServiceTier priority (Fast mode). Experiment; niet gepromoveerd.',
+  auxModel: 'gpt-6-luna',
+  chatServiceTier: 'priority',
+  auxServiceTier: 'priority',
+};
+// v0.14b — voorbewerking v2: Luna splitst meervoudige vragen in 0-2 deelvragen (SUB:)
+// die parallel mee worden opgehaald; de context krijgt round-robin de beste bron per
+// deelvraag (anders verdringt de sterkste deelvraag de rest op similarity).
+const V0_14_PREPROCESS_SYSTEM = V0_10_PREPROCESS_SYSTEM.replace(
+  `→ Geef GEEN antwoord — alleen de herschreven zoekvraag.`,
+  `→ Geef GEEN antwoord — alleen de herschreven zoekvraag.
+   → Bevat de input MEERDERE losse vragen of onderwerpen (bv. "wat kost X en hoe lang duurt Y?", "verschil tussen A en B"), geef dan per extra onderwerp een korte zelfstandige deelvraag op een eigen SUB-regel (maximaal 2). Eén onderwerp = geen SUB-regels.`,
+).replace(
+  `ACTION: search
+QUERY: <herschreven zoekvraag>`,
+  `ACTION: search
+QUERY: <herschreven zoekvraag>
+SUB: <deelvraag> (optioneel, 0-2 regels)`,
+);
+const V0_14B: BotConfig = {
+  ...V0_14A,
+  version: 'v0.14b',
+  label: 'v0.14b — v0.14a + voorbewerking v2: deelvragen parallel opgehaald (experiment)',
+  description:
+    'v0.14a; pre-processor (Luna) geeft bij meervoudige vragen 0-2 SUB-deelvragen, die parallel mee worden opgehaald; contextselectie round-robin per deelvraag. Experiment.',
+  preProcessSystem: V0_14_PREPROCESS_SYSTEM,
+  preProcessSubQueries: true,
+};
+// v0.14c — v0.14b + speculatieve retrieval: bij een eerste vraag (geen history) zoeken
+// we meteen op de originele vraag, parallel aan de voorbewerking. De herschreven
+// hoofdvraag vervalt dan; deelvragen worden nog wel opgehaald. Bij vervolgvragen
+// blijft het v0.14b-pad (herschrijven is daar nodig).
+const V0_14C: BotConfig = {
+  ...V0_14B,
+  version: 'v0.14c',
+  label: 'v0.14c — v0.14b + speculatief zoeken bij de eerste vraag (experiment)',
+  description:
+    'v0.14b; eerste vraag zonder history: retrieval op de originele vraag start parallel aan de pre-processor (die levert dan alleen route + deelvragen). Experiment.',
+  speculativeRetrieval: true,
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1671,6 +1721,9 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_13X6.version]: V0_13X6,
   [V0_13X7V.version]: V0_13X7V,
   [V0_13X7.version]: V0_13X7,
+  [V0_14A.version]: V0_14A,
+  [V0_14B.version]: V0_14B,
+  [V0_14C.version]: V0_14C,
 };
 
 /**

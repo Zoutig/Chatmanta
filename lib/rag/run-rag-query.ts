@@ -26,7 +26,7 @@ import type {
 } from '@/lib/rag/types';
 import { embedTexts } from '@/lib/rag/embeddings';
 import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
-import { stripQuotes, parsePreProcessOutput } from '@/lib/rag/preprocess-parse';
+import { stripQuotes, parsePreProcessOutput, parseSubQueries } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
 import { auxModelOf, costForModelUsd, openaiChatParams } from '@/lib/ai/llm';
@@ -157,7 +157,7 @@ type PreProcessTokens = {
 
 type PreProcessResult =
   | ({ kind: 'smalltalk'; reply: string } & PreProcessTokens)
-  | ({ kind: 'search'; query: string } & PreProcessTokens)
+  | ({ kind: 'search'; query: string; subQueries?: string[] } & PreProcessTokens)
   | ({ kind: 'off_topic' } & PreProcessTokens);
 
 // Beperk hoeveel turns we meegeven aan de LLM-calls. Meer = duurder en
@@ -243,6 +243,9 @@ async function preProcessInput(
     // Defensive: malformed output → assume search with the original query so
     // we still produce a useful response.
     return { kind: 'search', query: original, ...tokens };
+  }
+  if (parsed.kind === 'search' && bot.preProcessSubQueries === true) {
+    return { ...parsed, subQueries: parseSubQueries(result.text, parsed.query), ...tokens };
   }
   return { ...parsed, ...tokens };
 }
@@ -1063,6 +1066,13 @@ export type PhaseTimings = {
       ge-set. Op streaming-paden = tijd tot eerste answer-delta; op
       smalltalk/fallback = tijd tot het terminal event (geen streaming). */
   first_token_ms?: number;
+  /** v0.14: tijd tot het eerste ZICHTBARE antwoordteken (na een eventueel
+      <thinking>-blok, dat de widget verbergt). Gelijk aan first_token_ms bij
+      bots zonder chainOfThought. Gevoelde TTFT voor de bezoeker. */
+  first_answer_token_ms?: number;
+  /** v0.14 EVAL-ONLY (input.debugTimeline): per stap de [start, eind]-offsets in
+      ms vanaf pipeline-start, voor een tijdlijn-weergave. Niet op productie. */
+  timeline_ms?: Record<string, [number, number][]>;
 };
 
 export type ChatResponse =
@@ -1261,6 +1271,8 @@ export async function* runRagQuery(
      * aan zodat hij ALTIJD het huidige bot-gedrag test, niet een gecachte run.
      */
     disableCache?: boolean;
+    /** EVAL-ONLY (v0.14): verzamel per stap start/eind-offsets in phaseTimingsMs.timeline_ms. */
+    debugTimeline?: boolean;
     /**
      * EVAL-ONLY: voeg op elke ChatSource het ongetrunceerde `parentContentFull`
      * toe (de volledige SURROUNDING_CONTEXT die de answer-LLM kreeg). De
@@ -1370,11 +1382,22 @@ export async function* runRagQuery(
   // hieronder gecapture-d via tMark() helper en opgeteld in `timings`.
   const tPipelineStart = performance.now();
   const timings: Partial<PhaseTimings> = {};
-  const tMark = (key: keyof PhaseTimings) => {
+  // v0.14 eval-tijdlijn: alleen gevuld bij input.debugTimeline.
+  const timeline: Record<string, [number, number][]> | null = input.debugTimeline ? {} : null;
+  const markSpan = (key: string, start: number, end: number) => {
+    if (!timeline) return;
+    (timeline[key] ??= []).push([
+      Math.round(start - tPipelineStart),
+      Math.round(end - tPipelineStart),
+    ]);
+  };
+  const tMark = (key: Exclude<keyof PhaseTimings, 'timeline_ms'>) => {
     const start = performance.now();
     return () => {
-      const dt = Math.round(performance.now() - start);
+      const end = performance.now();
+      const dt = Math.round(end - start);
       timings[key] = ((timings[key] as number | undefined) ?? 0) + dt;
+      markSpan(key, start, end);
     };
   };
   // V0 TTFT (time-to-first-token): tijd vanaf pipeline-start tot de eerste
@@ -1389,6 +1412,21 @@ export async function* runRagQuery(
     if (firstTokenAtMs === null) {
       firstTokenAtMs = Math.round(performance.now() - tPipelineStart);
     }
+  };
+  // v0.14: eerste zichtbare antwoordteken. Bij chainOfThought streamt het model
+  // eerst <thinking>…</thinking>; de widget verbergt dat, dus de bezoeker ziet
+  // pas iets zodra er tekst ná het denkblok staat.
+  let firstAnswerAtMs: number | null = null;
+  const markFirstAnswerToken = (acc: string) => {
+    if (firstAnswerAtMs !== null) return;
+    let visible = acc;
+    if (/<thinking>/i.test(acc)) {
+      const close = acc.search(/<\/thinking>/i);
+      if (close === -1) return;
+      visible = acc.slice(close + '</thinking>'.length);
+    }
+    if (visible.replace(/<\/?answer>?/gi, '').replace(/<[^>]*$/, '').trim().length === 0) return;
+    firstAnswerAtMs = Math.round(performance.now() - tPipelineStart);
   };
   // V0.5 latency-budgeting: bij bot.latencyBudgetEnabled wordt elke optionele
   // fase pas uitgevoerd als de cumulative elapsed onder bot.latencyBudgetMs
@@ -1510,6 +1548,52 @@ export async function* runRagQuery(
   // dus geen discard-catch nodig op het smalltalk-pad.
   const cacheEpochPromise = cacheActive ? readCacheEpoch(cacheWriteClient, orgId) : null;
 
+  // v0.14 speculatieve retrieval: bij een eerste vraag (geen history) hangt de
+  // zoekopdracht niet van de pre-processor af — we zoeken meteen op de originele
+  // vraag, parallel aan de pre-processor. Die levert dan alleen nog route
+  // (smalltalk/off_topic/search) en eventuele deelvragen. Hergebruikt de
+  // cache-embed als die al loopt (zelfde tekst). Default uit.
+  type SpecResult = { hits: RetrievedChunk[]; embedTokens: number; embedCost: number };
+  const specPromise: Promise<SpecResult> | null =
+    bot.speculativeRetrieval === true && preProcessPromise && history.length === 0
+      ? (async () => {
+          const tEmbed = performance.now();
+          const ownEmbed = cacheEmbedPromise === null;
+          const emb = await (cacheEmbedPromise ?? embedTexts([original]));
+          const tRetrieve = performance.now();
+          markSpan('spec_embedding_ms', tEmbed, tRetrieve);
+          const hits = bot.hybridSearch
+            ? await retrieveChunksHybrid(
+                client,
+                emb.vectors[0],
+                original,
+                retrievalTopK,
+                bot.parentDocumentRetrieval,
+                orgId,
+                chatbotId,
+                chatbotScoped,
+              )
+            : await retrieveChunks(
+                client,
+                emb.vectors[0],
+                retrievalTopK,
+                bot.parentDocumentRetrieval,
+                orgId,
+                chatbotId,
+                chatbotScoped,
+              );
+          markSpan('spec_retrieval_ms', tRetrieve, performance.now());
+          return {
+            hits,
+            embedTokens: ownEmbed ? emb.tokens : 0,
+            embedCost: ownEmbed ? emb.costUsd : 0,
+          };
+        })()
+      : null;
+  // Geen unhandled rejection als het smalltalk-pad de speculatie negeert.
+  if (specPromise) void specPromise.catch(() => undefined);
+  let ppSubQueries: string[] = [];
+
   if (preProcessPromise) {
     yield { kind: 'status', phase: 'preprocess' };
     const stopPp = tMark('preprocess_ms');
@@ -1556,6 +1640,7 @@ export async function* runRagQuery(
         costUsd: pp.costUsd,
       };
       queryForEmbed = pp.query;
+      ppSubQueries = pp.subQueries ?? [];
     }
   }
   const rewriteCost = rewriteInfo?.costUsd ?? 0;
@@ -1720,11 +1805,32 @@ export async function* runRagQuery(
   }
   const expansionCost = mq.costUsd;
 
+  // v0.14: pre-processor-deelvragen (preProcessSubQueries) gaan mee in dezelfde
+  // batch-embed + parallelle retrieve. Bij speculatieve retrieval is de originele
+  // vraag al opgehaald: dan zoeken we alleen nog de deelvragen (de herschreven
+  // hoofdvraag vervalt — die zou de wachttijd terugbrengen).
+  let specHits: RetrievedChunk[] | null = null;
+  let specEmbedTokens = 0;
+  let specEmbedCost = 0;
+  if (specPromise) {
+    const stopSpecWait = tMark('retrieval_ms');
+    const spec = await specPromise;
+    stopSpecWait();
+    specHits = spec.hits;
+    specEmbedTokens = spec.embedTokens;
+    specEmbedCost = spec.embedCost;
+    querySet.length = 0;
+  }
+  for (const q of ppSubQueries) querySet.push({ text: q, isHyde: false });
+
   // 4. Embed all queries (batched).
   yield { kind: 'status', phase: 'embed' };
   const stopEmbed = tMark('embedding_ms');
   const queryTexts = querySet.map((q) => q.text);
-  const { vectors, tokens: embedTokens, costUsd: embedCost } = await embedTexts(queryTexts);
+  const embedded = await embedTexts(queryTexts);
+  const { vectors } = embedded;
+  const embedTokens = embedded.tokens + specEmbedTokens;
+  const embedCost = embedded.costUsd + specEmbedCost;
   stopEmbed();
   // Selective-HyDE embed wordt later optioneel toegevoegd (v0.4). Zelfde
   // vorm als de hoofd-embed; we splitsen voor logging-helderheid.
@@ -1764,6 +1870,11 @@ export async function* runRagQuery(
     }),
   );
   stopRetrieve();
+  if (specHits) allHits.unshift(specHits);
+  // v0.14: per-query hitlijsten bewaren voor round-robin-contextselectie, zodat
+  // elke deelvraag zijn beste bron in de context krijgt (anders duwt de
+  // sterkste deelvraag de rest eruit op similarity).
+  const perQueryHits = bot.preProcessSubQueries === true && allHits.length > 1 ? allHits : null;
   const bestById = new Map<string, RetrievedChunk>();
   for (const hits of allHits) {
     for (const h of hits) {
@@ -2135,6 +2246,23 @@ KRITISCHE FORMAT-REGELS:
   });
 
   let final: RetrievedChunk[] = aboveThreshold.slice(0, finalContextMax);
+  if (perQueryHits) {
+    const lists = perQueryHits.map((l) =>
+      [...l].filter((c) => c.similarity >= threshold).sort((a, b) => b.similarity - a.similarity),
+    );
+    const seen = new Set<string>();
+    const rr: RetrievedChunk[] = [];
+    for (let r = 0; rr.length < finalContextMax && lists.some((l) => r < l.length); r++) {
+      for (const l of lists) {
+        const c = l[r];
+        if (!c || seen.has(c.id)) continue;
+        seen.add(c.id);
+        rr.push(bestById.get(c.id) ?? c);
+        if (rr.length >= finalContextMax) break;
+      }
+    }
+    final = rr;
+  }
   if (
     bot.rerank === 'llm' &&
     aboveThreshold.length > 1 &&
@@ -2353,6 +2481,7 @@ KRITISCHE FORMAT-REGELS:
       if (delta) {
         markFirstToken();
         accText += delta;
+        markFirstAnswerToken(accText);
         yield { kind: 'answer-delta', text: delta };
       }
       // Last chunk in OpenAI stream carries the usage when stream_options
@@ -2583,6 +2712,7 @@ KRITISCHE FORMAT-REGELS:
     generation_ms: timings.generation_ms ?? 0,
     total_ms: Math.round(performance.now() - tPipelineStart),
     ...(firstTokenAtMs !== null ? { first_token_ms: firstTokenAtMs } : {}),
+    ...(firstAnswerAtMs !== null ? { first_answer_token_ms: firstAnswerAtMs } : {}),
     ...(timings.preprocess_ms !== undefined ? { preprocess_ms: timings.preprocess_ms } : {}),
     ...(timings.cache_lookup_ms !== undefined
       ? { cache_lookup_ms: timings.cache_lookup_ms }
@@ -3045,6 +3175,9 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
   const phaseTimingsFinal: PhaseTimings = {
     ...phaseTimingsAtAnswer,
     ...(timings.followups_ms !== undefined ? { followups_ms: timings.followups_ms } : {}),
+    ...(timeline
+      ? { timeline_ms: { ...timeline, answer_done: [[0, phaseTimingsAtAnswer.total_ms]] } }
+      : {}),
   };
   yield { kind: 'metrics-done', phaseTimingsMs: phaseTimingsFinal };
 

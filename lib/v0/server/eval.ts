@@ -881,6 +881,8 @@ export async function runEvalRow(args: {
       // de antwoord-LLM kreeg, niet de ≤800-char preview: anders tellen gegronde
       // feiten voorbij teken ~800 als verzonnen. Zelfde fix als de hard-eval.
       includeFullParentContent: true,
+      // v0.14: per-stap tijdlijn (start/eind) in stage_timings_ms.timeline_ms.
+      debugTimeline: true,
       tone: getEvalToneForOrgId(organizationId),
     })) {
       if (ev.kind === 'smalltalk' || ev.kind === 'fallback' || ev.kind === 'answer-done') {

@@ -15,7 +15,10 @@ import type { PhaseTimings } from '@/lib/v0/server/rag';
 // dit type te gebruiken voor de lookup tables krijgen we compile-time
 // exhaustiveness: een nieuwe PhaseTimings-key zonder color/label triggert een
 // type-error.
-type PhaseDisplayKey = Exclude<keyof PhaseTimings, 'total_ms' | 'first_token_ms'>;
+type PhaseDisplayKey = Exclude<
+  keyof PhaseTimings,
+  'total_ms' | 'first_token_ms' | 'first_answer_token_ms' | 'timeline_ms'
+>;
 
 // Kleuren — Tokyo Night uitgebreid, mode-aware via CSS-vars in globals.css.
 // 12 unieke tints; dark = default, light = override op html:not(.dark).
