@@ -15,6 +15,9 @@
 //      de kosten van de demo zijn begrensd door het budget van die ene org
 //   4. instellingen: whitelist + lengte-caps (sanitizeChatbotPatch), daarna een
 //      extra demo-cap op extraInstructions
+//   5. eigen Q&A's van de bezoeker (body.qa, max 10, gecapt): alleen gebruikt om
+//      een kant-en-klaar antwoord te KIEZEN (lib/voorbeeld/qa-match), nooit als
+//      prompt-tekst voor het antwoord-model
 // Geen transcript-write (appendTurn): bezoekersgesprekken in de demo blijven in
 // de browser. Wel logRagQuery, zodat het dagbudget van de demo-org meetelt.
 
@@ -36,6 +39,7 @@ import {
 } from '@/app/v1/app/instellingen/settings-config';
 import { DEMO_DEFAULT_SETTINGS, DEMO_ORG_NAME } from '@/lib/voorbeeld/demo-defaults';
 import { DEMO_ORG_SLUG } from '@/lib/voorbeeld/constants';
+import { matchDemoQA, parseDemoQA } from '@/lib/voorbeeld/qa-match';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -44,7 +48,7 @@ const MAX_QUESTION_CHARS = 2000;
 // Demo-cap: vrije extra instructies houden we kort (geen prompt-bloat op onze kosten).
 const MAX_DEMO_EXTRA_INSTRUCTIONS = 600;
 
-type Body = { question?: unknown; history?: unknown; settings?: unknown };
+type Body = { question?: unknown; history?: unknown; settings?: unknown; qa?: unknown };
 
 function parseHistory(input: unknown): ChatHistoryTurn[] {
   if (!Array.isArray(input)) return [];
@@ -172,6 +176,11 @@ export async function POST(req: Request) {
 
   const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version, sourceLinksEnabled: false };
 
+  // Q&A die de bezoeker zelf toevoegde: bij een match neemt runRagQuery's
+  // handmatige-Q&A-pad het over (geen retrieval, geen antwoord-LLM).
+  const qaMatch = await matchDemoQA(question, parseDemoQA(body.qa));
+  const qaCostUsd = qaMatch?.costUsd ?? 0;
+
   // disableCache: de cache-key kent de instellingen niet; met wisselende tone/lengte
   // per bezoeker zou een cache-hit het antwoord van een ándere instelling geven.
   const generator = runRagQuery(svc, {
@@ -188,6 +197,7 @@ export async function POST(req: Request) {
     chatbotOverrides: overrides,
     serviceClient: svc,
     disableCache: true,
+    manualQAItems: qaMatch ? [qaMatch.item] : undefined,
   });
 
   const encoder = new TextEncoder();
@@ -224,7 +234,11 @@ export async function POST(req: Request) {
       }
 
       if (finalResponse) {
-        const responseForLog = finalResponse;
+        // De Q&A-classifier telt mee voor het dagbudget van de demo-org.
+        const responseForLog: ChatResponse =
+          qaCostUsd > 0 && 'totalCostUsd' in finalResponse
+            ? { ...finalResponse, totalCostUsd: finalResponse.totalCostUsd + qaCostUsd }
+            : finalResponse;
         const ipHash = hashIp(getClientIp(req));
         after(() =>
           logRagQuery(getV1ServiceRoleClient(), {

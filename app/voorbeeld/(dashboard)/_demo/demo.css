@@ -21,3 +21,16 @@
   .vb-banner { flex-direction: column; align-items: stretch; margin-top: 0; }
   .vb-banner-actions { justify-content: flex-end; flex-wrap: wrap; }
 }
+
+/* Overzicht: "Jouw activiteit in deze demo" */
+.vb-activity { margin-bottom: 0; }
+.vb-activity-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 2px 10px;
+}
+.vb-activity-head h2 { font-size: 15px; font-weight: 700; margin: 0; color: var(--v1-ink); }
+.vb-activity-head span { font-size: 12.5px; color: var(--v1-muted); }

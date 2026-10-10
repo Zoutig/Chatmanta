@@ -10,7 +10,7 @@
 // beide doen alsof; er gaat geen bestand de deur uit).
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Globe, MessageSquarePlus, Plus, Upload, UploadCloud } from 'lucide-react';
 import { ALLOWED_DOC_EXT } from '@/lib/rag/doc-ext';
@@ -26,6 +26,7 @@ import { parseKbTab, type KbTab } from './kb-tab';
 import { V1Documents, extOf, type FailedUpload, type UploadedDoc } from './v1-documents';
 import { WebsiteTab } from './components/website-tab';
 import { QATab, type QAItem } from './qa/qa-tab';
+import { readDemoQA, useDemoQA, writeDemoQA } from '@/lib/voorbeeld/demo-store';
 
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
 const ACCEPT = ALLOWED_DOC_EXT.map((e) => `.${e}`).join(',');
@@ -70,7 +71,13 @@ export function KennisbankView({
   const [failures, setFailures] = useState<FailedUpload[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [sources, setSources] = useState<WebsiteSource[]>(initialSources);
-  const [qa, setQa] = useState<QAItem[]>(initialQA);
+  // Q&A leeft in de browser van de bezoeker (demo-store); zonder eigen wijziging de voorbeeldlijst.
+  const storedQA = useDemoQA();
+  const qa: QAItem[] = storedQA ?? initialQA;
+  const setQa = useCallback<Dispatch<SetStateAction<QAItem[]>>>(
+    (v) => writeDemoQA(typeof v === 'function' ? v(readDemoQA() ?? initialQA) : v),
+    [initialQA],
+  );
   const [crawlRequest, setCrawlRequest] = useState(0);
   const [qaRequest, setQaRequest] = useState(0);
   const [dragging, setDragging] = useState(false);

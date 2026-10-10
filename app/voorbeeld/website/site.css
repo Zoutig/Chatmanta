@@ -148,6 +148,12 @@
   white-space: nowrap;
 }
 
+.dh-demobar-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
 .dh-site .dh-demobar-link:hover {
   color: #bfe3e0;
 }

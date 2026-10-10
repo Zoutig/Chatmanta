@@ -35,7 +35,7 @@ export function ownToListItem(c: DemoConversation): V1ConversationListItem {
     firstQuestion: c.turns[0]?.question ?? '',
     messageCount: c.turns.length * 2,
     lastMessageAt: last?.at ?? c.startedAt,
-    unanswered: last?.kind === 'fallback',
+    unanswered: last ? (last.unanswered ?? last.kind === 'fallback') : false,
   };
 }
 

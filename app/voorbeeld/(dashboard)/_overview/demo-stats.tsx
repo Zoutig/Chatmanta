@@ -8,7 +8,7 @@
 
 import type { V1OverviewMetrics } from '@/lib/v1/dashboard/metrics';
 import { StatStrip, type Stat } from '@/app/v1/_ui/stat-strip';
-import { useDemoContactRequests, useDemoConversations, useDemoSettings } from '@/lib/voorbeeld/demo-store';
+import { useDemoContactRequests, useDemoConversations, useDemoQA, useDemoSettings } from '@/lib/voorbeeld/demo-store';
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -18,6 +18,7 @@ function buildStats(
   m: V1OverviewMetrics,
   ownConversations: number,
   contacts: { enabled: boolean; newCount: number },
+  qaCount: number,
 ): Stat[] {
   const { deltaPct } = m.conversationsWeekDelta;
   const conversations: Stat = {
@@ -51,7 +52,7 @@ function buildStats(
     });
   }
 
-  const s = m.sources;
+  const s = { ...m.sources, qaItems: qaCount };
   stats.push({
     label: 'Kennisbronnen',
     value: String(s.websitePages + s.documents + s.qaItems),
@@ -66,10 +67,11 @@ export function DemoStats({ metrics, contactRequestsNewCount }: { metrics: V1Ove
   const ownContacts = useDemoContactRequests();
   const ownConversations = useDemoConversations();
   const ownNew = ownContacts.filter((r) => r.status === 'new').length;
+  const qa = useDemoQA();
 
   const stats = buildStats(metrics, ownConversations.length, {
     enabled: settings.contactRequestsEnabled,
     newCount: contactRequestsNewCount + ownNew,
-  });
+  }, qa ? qa.length : metrics.sources.qaItems);
   return <StatStrip label="Cijfers deze maand" items={stats} />;
 }
