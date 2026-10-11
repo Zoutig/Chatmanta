@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducedMotion } from 'motion/react';
+import { useReducedMotion } from '../../ui/motion-hooks';
 import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { useHydrated } from '../../ui/use-hydrated';
 import { Icon } from '../../ui/icon';

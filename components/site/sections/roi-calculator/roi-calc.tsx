@@ -1,10 +1,10 @@
 'use client';
 
-import { useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ROUTES } from '@/lib/site/navigation';
 import { Icon } from '../../ui/icon';
 import { LinkButton } from '../../ui/button';
+import { useReducedMotion } from '../../ui/motion-hooks';
 import {
   ROI_DEFAULTS,
   ROI_FIELDS,
@@ -16,32 +16,55 @@ import {
   type RoiInput,
 } from './calc';
 
-/** Mockup: verende cijfers met stiffness 120, damping 20. */
+/** Mockup: verende cijfers met stiffness 120, damping 20 (massa 1). */
 const SPRING = { stiffness: 120, damping: 20, restDelta: 0.05 };
 
 /**
- * Getal dat naar zijn doelwaarde "veert". SSR + eerste render tonen meteen de eindtekst
- * (content-first); bij reduced motion springt hij direct.
+ * Getal dat naar zijn doelwaarde "veert" (kleine rAF-veersimulatie, geen bibliotheek).
+ * SSR + eerste render tonen meteen de eindtekst (content-first); bij reduced motion
+ * springt hij direct.
  */
 function SpringValue({ value, format }: { value: number; format: (v: number) => string }) {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLSpanElement>(null);
-  const source = useMotionValue(value);
-  const spring = useSpring(source, SPRING);
-
-  useEffect(() => spring.on('change', (v) => {
-    if (ref.current) ref.current.textContent = format(v);
-  }), [spring, format]);
+  const state = useRef({ x: value, v: 0, raf: 0 });
 
   useEffect(() => {
+    const st = state.current;
+    const show = (x: number) => {
+      if (ref.current) ref.current.textContent = format(x);
+    };
+    cancelAnimationFrame(st.raf);
     if (reduce) {
-      source.jump(value);
-      spring.jump(value);
-      if (ref.current) ref.current.textContent = format(value);
-    } else {
-      source.set(value);
+      st.x = value;
+      st.v = 0;
+      show(value);
+      return;
     }
-  }, [value, reduce, source, spring, format]);
+    let last = performance.now();
+    const step = (now: number) => {
+      // vaste substappen houden de simulatie stabiel bij haperende frames
+      let dt = Math.min(0.064, (now - last) / 1000);
+      last = now;
+      while (dt > 0) {
+        const h = Math.min(dt, 0.008);
+        const a = -SPRING.stiffness * (st.x - value) - SPRING.damping * st.v;
+        st.v += a * h;
+        st.x += st.v * h;
+        dt -= h;
+      }
+      if (Math.abs(st.x - value) < SPRING.restDelta && Math.abs(st.v) < SPRING.restDelta) {
+        st.x = value;
+        st.v = 0;
+        show(value);
+        return;
+      }
+      show(st.x);
+      st.raf = requestAnimationFrame(step);
+    };
+    st.raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(st.raf);
+  }, [value, reduce, format]);
 
   return <span ref={ref}>{format(value)}</span>;
 }

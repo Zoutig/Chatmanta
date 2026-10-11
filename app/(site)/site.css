@@ -152,6 +152,11 @@ body:has(.site-ui) {
 .site-ui strong { font-weight: 600; }
 .site-ui button { font: inherit; color: inherit; }
 .site-ui :focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var(--focus); border-radius: 6px; }
+/* Scroll-reveal (components/site/ui/reveal.tsx): alleen gezet ná hydratie, op elementen
+   die nog onder de vouw staan. Verbergen gaat direct, tonen met een fade + lift. */
+.site-ui .rv { transition: opacity 0.5s var(--ease) var(--rv-delay, 0s), transform 0.5s var(--ease) var(--rv-delay, 0s); }
+.site-ui .rv-hidden { opacity: 0; transform: translateY(var(--rv-y, 12px)); transition: none; }
+
 .site-ui .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;

@@ -1,6 +1,5 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { ROUTES } from '@/lib/site/navigation';
 import {
@@ -18,34 +17,47 @@ import {
   type Tier,
 } from '@/lib/site/pricing';
 import { Icon } from '../../ui/icon';
+import { useReducedMotion } from '../../ui/motion-hooks';
 import { LinkButton } from '../../ui/button';
 import { cx } from '../../ui/cx';
 
-const EASE = [0.2, 0.8, 0.2, 1] as const;
 // useLayoutEffect geeft een waarschuwing op de server; daar is meten toch niet nodig.
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 const nlDecimal = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 });
 
-/** Prijsrol: oud getal rolt omhoog weg, nieuw komt van onder (mockup `rollTo`). */
+/** Prijsrol: oud getal rolt omhoog weg, nieuw komt van onder (mockup `rollTo`). CSS-keyframes
+ *  in pricing.css; het oude getal blijft één animatieduur staan en verdwijnt dan. */
 function Roll({ value, widthCh, animate }: { value: number; widthCh: number; animate: boolean }) {
+  const [prev, setPrev] = useState<{ value: number; key: number } | null>(null);
+  const last = useRef(value);
+  const n = useRef(0);
+
+  useEffect(() => {
+    if (last.current === value) return;
+    const old = last.current;
+    last.current = value;
+    if (!animate) return;
+    n.current += 1;
+    setPrev({ value: old, key: n.current });
+  }, [value, animate]);
+
+  useEffect(() => {
+    if (!prev) return;
+    const t = setTimeout(() => setPrev(null), 380);
+    return () => clearTimeout(t);
+  }, [prev]);
+
   return (
     <span className="roll" style={{ width: `${widthCh}ch` }}>
-      {animate ? (
-        <AnimatePresence initial={false} mode="popLayout">
-          <motion.span
-            key={value}
-            initial={{ y: '100%', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: '-100%', opacity: 0 }}
-            transition={{ duration: 0.36, ease: EASE }}
-          >
-            {value}
-          </motion.span>
-        </AnimatePresence>
-      ) : (
-        <span>{value}</span>
-      )}
+      {animate && prev ? (
+        <span key={`o${prev.key}`} className="roll-out" aria-hidden="true">
+          {prev.value}
+        </span>
+      ) : null}
+      <span key={animate && prev ? `i${prev.key}` : 'v'} className={animate && prev ? 'roll-in' : undefined}>
+        {value}
+      </span>
     </span>
   );
 }
