@@ -3,6 +3,7 @@
 // lib/site/kennismaking-handler.ts; hier alleen de echte deps:
 //   - per-IP rate-limit: eigen Upstash-bucket (lib/site/kennismaking-rate-limit.ts),
 //     sleutel = gehasht IP (hashIp, AVG: nooit plain IP in Redis)
+//   - globaal dagplafond voor bevestigingsmails (zelfde bestand)
 //   - Resend via lib/notifications/email.ts (RESEND_FROM verplicht, geverifieerd
 //     domein chatmanta.com — zonder afzender fail-closed i.p.v. stille 403)
 //   - fouten naar Sentry, door de PII-redactor
@@ -17,7 +18,7 @@ import { captureServerError } from '@/lib/observability/sentry';
 import { getClientIp } from '@/lib/v0/server/rate-limit';
 import { MAX_BODY_BYTES, SITE_LEADS_DEFAULT_TO, isValidEmail } from '@/lib/site/kennismaking';
 import { handleKennismaking } from '@/lib/site/kennismaking-handler';
-import { getKennismakingRateLimiter } from '@/lib/site/kennismaking-rate-limit';
+import { getConfirmationBudget, getKennismakingRateLimiter } from '@/lib/site/kennismaking-rate-limit';
 import { ROUTES, SITE_URL } from '@/lib/site/navigation';
 
 export const runtime = 'nodejs';
@@ -54,6 +55,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       leadsTo: leadsEnv && isValidEmail(leadsEnv) ? leadsEnv : SITE_LEADS_DEFAULT_TO,
       fromConfigured: Boolean(process.env.RESEND_FROM?.trim()),
       demoUrl: `${SITE_URL}${ROUTES.demo}`,
+      confirmationBudget: getConfirmationBudget(),
     },
   );
 

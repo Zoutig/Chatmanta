@@ -146,11 +146,14 @@ test('bevestiging noemt een link-achtige naam niet (geen merk-phishing-relay)', 
 
 type Sent = { to: string; subject: string; replyTo?: string };
 
-function makeDeps(over: Partial<KennismakingDeps> & { sendResults?: SendResult[]; allowed?: boolean } = {}) {
+function makeDeps(
+  over: Partial<KennismakingDeps> & { sendResults?: SendResult[]; allowed?: boolean; budgetLeft?: number } = {},
+) {
   const sent: Sent[] = [];
   const errors: string[] = [];
   const limiterKeys: string[] = [];
   const results = over.sendResults ?? [];
+  let budgetLeft = over.budgetLeft ?? Infinity;
   const deps: KennismakingDeps = {
     limiter: {
       async check(key) {
@@ -166,6 +169,13 @@ function makeDeps(over: Partial<KennismakingDeps> & { sendResults?: SendResult[]
     leadsTo: 'info@chatmanta.com',
     fromConfigured: true,
     demoUrl: 'https://www.chatmanta.nl/voorbeeld',
+    confirmationBudget: {
+      async take() {
+        if (budgetLeft <= 0) return false;
+        budgetLeft -= 1;
+        return true;
+      },
+    },
     ...over,
   };
   return { deps, sent, errors, limiterKeys };
@@ -284,4 +294,14 @@ test('foutmeldingen aan reportError bevatten geen PII uit het formulier', async 
   await handleKennismaking(req(VALID), deps);
   const joined = errors.join(' ');
   for (const pii of [VALID.naam, VALID.email, VALID.bedrijf, 'vandam.nl']) assert.ok(!joined.includes(pii), pii);
+});
+
+test('dagplafond bevestigingen bereikt → lead wel gemeld, geen bevestiging, 200', async () => {
+  const { deps, sent, errors } = makeDeps({ budgetLeft: 0 });
+  const r = await handleKennismaking(req(VALID), deps);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { ok: true, confirmationSent: false });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'info@chatmanta.com');
+  assert.ok(errors[0].startsWith('SITE_LEAD_CONFIRM_CAP'));
 });

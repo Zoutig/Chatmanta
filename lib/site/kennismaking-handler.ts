@@ -4,7 +4,9 @@
 //
 // Flow: origin-check → per-IP rate-limit → body (grootte + JSON) → honeypot
 // (stil 200) → validatie → config-check (RESEND_FROM) → notificatie naar
-// info@ (moet slagen) → bevestiging aan aanvrager (best-effort).
+// info@ (moet slagen) → bevestiging aan aanvrager (best-effort, binnen een
+// globaal dagplafond: de bevestiging gaat naar een vrij ingevuld adres, dus het
+// plafond begrenst hoeveel mail een IP-roterende spammer via ons kan sturen).
 //
 // GEEN database-opslag (spec §7): de notificatiemail ís de lead. Faalt die, dan
 // krijgt de bezoeker een nette fout met info@chatmanta.com als alternatief.
@@ -37,6 +39,8 @@ export type KennismakingDeps = {
   fromConfigured: boolean;
   /** Absolute URL van de live demo (voor de bevestigingsmail). */
   demoUrl: string;
+  /** Globaal dagplafond voor bevestigingsmails. take() = true → er mag er nog één uit. */
+  confirmationBudget: { take(): Promise<boolean> };
 };
 
 export type KennismakingRequest = {
@@ -114,6 +118,12 @@ export async function handleKennismaking(req: KennismakingRequest, deps: Kennism
   if (!r.ok) {
     deps.reportError('SITE_LEAD_NOTIFY_FAILED', r.skipped ? `skipped: ${r.reason}` : r.error);
     return { status: 502, body: { ok: false, error: 'send_failed' } };
+  }
+
+  if (!(await deps.confirmationBudget.take())) {
+    // Lead is binnen; alleen de bevestiging vervalt. PII-vrij signaal (mogelijk misbruik).
+    deps.reportError('SITE_LEAD_CONFIRM_CAP', 'dagplafond bevestigingsmails bereikt');
+    return { status: 200, body: { ok: true, confirmationSent: false } };
   }
 
   const conf = buildLeadConfirmationEmail(v.data, { replyTo: deps.leadsTo, demoUrl: deps.demoUrl });

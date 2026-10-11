@@ -79,6 +79,7 @@ export default function Features() {
             <small>&ldquo;Doen jullie ook e-bikes?&rdquo;</small>
           </div>
           <h3 id="f-quiz">Kennisgat-quiz</h3>
+          <span className="tag">In Groei en Compleet</span>
           <p>
             ChatManta ziet welke vragen hij niet kon beantwoorden en stelt jou een paar korte vragen. Jouw antwoord vult
             het gat, voortaan voor iedereen.
