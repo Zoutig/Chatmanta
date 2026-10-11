@@ -36,6 +36,10 @@ const nextConfig: NextConfig = {
     ]);
   },
   experimental: {
+    // Meerdere root layouts (marketingsite apart van de app, zie
+    // app/_shell/app-root.tsx) → geen app/layout.tsx om een 404 uit op te bouwen;
+    // app/global-not-found.tsx levert de globale 404.
+    globalNotFound: true,
     // Feedback-formulier (migratie 0043) accepteert een bijlage tot 10 MB via
     // een server action. De default body-limit is 1 MB — verhoog naar 12 MB zodat
     // een 10 MB-bestand + form-velden ruim passen.
