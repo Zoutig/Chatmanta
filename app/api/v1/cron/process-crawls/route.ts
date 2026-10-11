@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
-import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v1/crawler/processJobs';
+import { processCrawlJobs, healStuckSources, type OpenJob, JOBS_PER_TICK } from '@/lib/v1/crawler/processJobs';
 import { isAuthorizedCron } from '@/lib/security/cron-auth';
 
 export const dynamic = 'force-dynamic';
@@ -31,5 +31,7 @@ export async function GET(req: Request): Promise<Response> {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const outcomes = jobs && jobs.length > 0 ? await processCrawlJobs(sb, jobs as OpenJob[]) : [];
-  return NextResponse.json({ processed: outcomes.length, outcomes });
+  // Zelfherstel cross-org: bronnen die op 'crawling' hangen zonder open job → 'failed'.
+  const healed = await healStuckSources(sb);
+  return NextResponse.json({ processed: outcomes.length, outcomes, healed });
 }

@@ -272,6 +272,22 @@ export function getClientErrorRateLimiter(): RateLimiter {
   return _clientErrorInstance;
 }
 
+const _firecrawlInstances = new Map<string, RateLimiter>();
+
+/**
+ * Globale (cross-org, cross-instance) teller vóór onze Firecrawl-sleutel — één
+ * bucket per Firecrawl-endpoint, want Firecrawl begrenst per endpoint en per TEAM
+ * (alle keys en klanten delen dezelfde teller). `limitPerMin` komt uit
+ * lib/v1/crawler/firecrawl-gate.ts (FIRECRAWL_PER_MIN).
+ */
+export function getFirecrawlRateLimiter(endpoint: string, limitPerMin: number): RateLimiter {
+  const existing = _firecrawlInstances.get(endpoint);
+  if (existing) return existing;
+  const limiter = buildLimiter({ limit: limitPerMin, prefix: `@chatmanta/rl-firecrawl-${endpoint}` });
+  _firecrawlInstances.set(endpoint, limiter);
+  return limiter;
+}
+
 /**
  * Pak de client IP uit een Next.js Request. Probeert de gangbare proxy-headers
  * (Vercel, Cloudflare) en valt terug op 'unknown' als niets bruikbaar is.

@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import { groupPagesForDisplay, pathLabel } from '@/lib/v0/klantendashboard/group-pages';
-import { MAX_CRAWL_PAGES } from '@/lib/v1/crawler/firecrawl';
+import { MAX_CRAWL_PAGES } from '@/lib/v1/crawler/limits';
 import { Button } from '@/app/v1/_ui/button';
 
 export function PageSelection({

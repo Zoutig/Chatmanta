@@ -72,6 +72,21 @@ export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult
     const safe = (await filterPublicUrls([root, ...discovered])).slice(0, MAX_CRAWL_PAGES);
     if (safe.length === 0) fail('CRAWL_FAILED', 'Geen geldige pagina’s om te crawlen.');
 
+    // Eerst Firecrawl starten, pas daarna de bron op 'crawling' (zie startSelectedCrawlAction):
+    // een mislukte start laat de bron op z'n huidige status i.p.v. hangend/rood.
+    let crawlId: string;
+    let invalidURLs: string[] = [];
+    try {
+      ({ crawlId, invalidURLs } = await startBatchScrape(safe));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
+      await recordCrawlEvent(admin, {
+        organizationId: orgId, chatbotId, eventType: 'fail', knowledgeSourceId: sourceId,
+        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length, rerun: true },
+      });
+      fail('CRAWL_FAILED', msg);
+    }
+
     const now = new Date().toISOString();
     await admin
       .from('knowledge_sources')
@@ -79,25 +94,6 @@ export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult
       .eq('id', sourceId)
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId);
-
-    let crawlId: string;
-    let invalidURLs: string[] = [];
-    try {
-      ({ crawlId, invalidURLs } = await startBatchScrape(safe));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
-      await admin
-        .from('knowledge_sources')
-        .update({ status: 'failed' })
-        .eq('id', sourceId)
-        .eq('organization_id', orgId)
-        .eq('chatbot_id', chatbotId);
-      await recordCrawlEvent(admin, {
-        organizationId: orgId, chatbotId, eventType: 'fail', knowledgeSourceId: sourceId,
-        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length, rerun: true },
-      });
-      fail('CRAWL_FAILED', msg);
-    }
 
     const { data: newJob, error: jobErr } = await admin
       .from('processing_jobs')

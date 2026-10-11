@@ -12,6 +12,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getCrawlJobStatus } from './firecrawl';
+import { isFirecrawlRateLimit } from './firecrawl-gate';
 import { ingestCrawlResults } from './processCrawl';
 import { recordCrawlEvent, buildPagesPayload } from './crawlEvents';
 
@@ -202,12 +203,57 @@ export async function processCrawlJobs(sb: Sb, jobs: OpenJob[]): Promise<JobOutc
   return summary;
 }
 
-/** Herkent een Firecrawl rate-limit-fout (HTTP 429) op .status/.statusCode of de message. */
-function isRateLimited(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as { status?: number; statusCode?: number; message?: unknown };
-  if (e.status === 429 || e.statusCode === 429) return true;
-  return typeof e.message === 'string' && /rate.?limit/i.test(e.message);
+const isRateLimited = isFirecrawlRateLimit;
+
+/** Een bron die zó lang op 'crawling' staat zonder open job, is blijven hangen. */
+export const STUCK_SOURCE_AFTER_MS = 10 * 60 * 1000; // 10 min
+
+/**
+ * Zelfherstel: zet website-bronnen die op 'crawling' blijven hangen zonder open
+ * crawl-job (bv. een afgekapte serverfunctie tussen bron-update en job-insert) op
+ * 'failed', zodat de klant gewoon opnieuw kan proberen. Optioneel per org+chatbot
+ * (client-tick) of cross-org (cron). Geeft het aantal herstelde bronnen terug.
+ */
+export async function healStuckSources(
+  sb: Sb,
+  scope?: { organizationId: string; chatbotId: string },
+): Promise<number> {
+  const cutoff = new Date(Date.now() - STUCK_SOURCE_AFTER_MS).toISOString();
+  let q = sb
+    .from('knowledge_sources')
+    .select('id, organization_id, chatbot_id')
+    .eq('type', 'website')
+    .eq('status', 'crawling')
+    .is('deleted_at', null)
+    .lt('updated_at', cutoff)
+    .limit(50);
+  if (scope) q = q.eq('organization_id', scope.organizationId).eq('chatbot_id', scope.chatbotId);
+  const { data: stuck, error } = await q;
+  if (error || !stuck || stuck.length === 0) return 0;
+
+  const { data: openJobs, error: jobsErr } = await sb
+    .from('processing_jobs')
+    .select('target_id')
+    .eq('job_type', 'crawl_website')
+    .in('status', ['pending', 'processing'])
+    .in('target_id', stuck.map((s) => s.id as string));
+  if (jobsErr) return 0; // fail-safe: bij twijfel niets aanraken
+  const busy = new Set((openJobs ?? []).map((j) => j.target_id as string));
+
+  let healed = 0;
+  for (const src of stuck) {
+    if (busy.has(src.id as string)) continue;
+    const { data: updated } = await sb
+      .from('knowledge_sources')
+      .update({ status: 'failed', updated_at: new Date().toISOString() })
+      .eq('id', src.id as string)
+      .eq('organization_id', src.organization_id as string)
+      .eq('chatbot_id', src.chatbot_id as string)
+      .eq('status', 'crawling') // race-guard: intussen gestart → niet overschrijven
+      .select('id');
+    if (updated && updated.length > 0) healed++;
+  }
+  return healed;
 }
 
 async function failJob(
