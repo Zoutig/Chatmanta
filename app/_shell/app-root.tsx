@@ -1,7 +1,17 @@
+// Gedeelde root-shell voor V0, V1, /voorbeeld, /privacy en de embed-pagina's:
+// <html>/<body>, globals.css + manta.css (Tailwind/shadcn + V0-thema), de
+// Inter/JetBrains/Jakarta-fonts en het thema-bootscript. Was app/layout.tsx.
+//
+// De app heeft sinds de marketingsite MEERDERE root layouts (geen app/layout.tsx):
+// elke top-level sectie (v0, v1, voorbeeld, privacy, embed, embed-v1) heeft een
+// eigen layout.tsx die deze shell rendert, en app/(site)/layout.tsx is een eigen
+// root zonder deze ~145 KB CSS en font-preloads. Navigeren tussen site en app
+// geeft daardoor een volledige page load (Next-gedrag bij verschillende roots).
+// Nieuwe top-level route? Geef hem een layout.tsx die AppRoot rendert.
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
-import './globals.css';
-import './styles/manta.css';
+import '../globals.css';
+import '../styles/manta.css';
 
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
 const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'] });
@@ -12,7 +22,7 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ['600', '700', '800'],
 });
 
-export const metadata: Metadata = {
+export const appMetadata: Metadata = {
   title: 'ChatManta V0',
   description: 'V0 RAG demo — Jorion Solutions.',
 };
@@ -20,7 +30,7 @@ export const metadata: Metadata = {
 // Mobiele schaling + iOS safe-area. Zonder dit rendert elke mobiele browser
 // de hele app als een 980px-desktop in mini — alle responsive @media rules
 // blijven dan dood.
-export const viewport: Viewport = {
+export const appViewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -96,7 +106,7 @@ const themeBootScript = `
 })();
 `;
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export function AppRoot({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="nl"

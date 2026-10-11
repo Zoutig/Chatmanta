@@ -1,29 +1,15 @@
-import type { Metadata } from 'next';
-import { Azeret_Mono, Plus_Jakarta_Sans } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
 import { Footer } from '@/components/site/footer';
 import { Nav } from '@/components/site/nav';
 import { SITE_URL } from '@/lib/site/navigation';
+import { siteFontClasses } from './fonts';
 import './site.css';
 
-// Marketingsite-layout (route group, dus geen URL-segment). Hangt onder de root-
-// layout (app/layout.tsx: <html>/<body>, globals.css) maar zet een eigen ontwerplaag
-// `.site-ui` neer; V0/V1/voorbeeld hebben hun eigen layouts en worden niet geraakt.
-
-// Plus Jakarta Sans als variable font (één bestand, dekt 400-800). Enige UI-font.
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-site',
-  display: 'swap',
-});
-// Azeret Mono ALLEEN voor het codefragment (gewone 0, geen punt/streep). Niet preloaden:
-// staat ver onder de vouw.
-const azeret = Azeret_Mono({
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-site-mono',
-  display: 'swap',
-  preload: false,
-});
+// Marketingsite-layout (route group, dus geen URL-segment). EIGEN root layout
+// (<html>/<body>): de site laadt bewust NIET globals.css/manta.css en de
+// Inter/JetBrains-fonts van de app-shell (app/_shell/app-root.tsx) — scheelt
+// ~145 KB render-blocking CSS + font-preloads. De basis-reset die Tailwind's
+// preflight voorheen leverde staat nu in site.css (@layer site-base).
 
 const DESCRIPTION =
   'ChatManta: de Nederlandse website-chatbot die alleen antwoordt uit jouw eigen website en documenten, met bron erbij.';
@@ -50,15 +36,25 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
+
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`site-ui ${jakarta.variable} ${azeret.variable}`}>
-      <a className="sr-only skip-link" href="#hoofd">
-        Naar de inhoud
-      </a>
-      <Nav />
-      <main id="hoofd">{children}</main>
-      <Footer />
-    </div>
+    <html lang="nl">
+      <body>
+        <div className={`site-ui ${siteFontClasses}`}>
+          <a className="sr-only skip-link" href="#hoofd">
+            Naar de inhoud
+          </a>
+          <Nav />
+          <main id="hoofd">{children}</main>
+          <Footer />
+        </div>
+      </body>
+    </html>
   );
 }
