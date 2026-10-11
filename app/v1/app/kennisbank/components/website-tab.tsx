@@ -12,6 +12,7 @@ import { Button } from '@/app/v1/_ui/button';
 import { Field } from '@/app/v1/_ui/controls';
 import { EmptyState } from '@/app/v1/_ui/feedback';
 import { useToast } from '@/app/v1/_ui/toast';
+import { normalizeHost } from '@/lib/rag/crawler/normalizeHost';
 import { PageSelection } from './page-selection';
 import { WebsiteList } from './website-list';
 import { SinglePageImport } from './single-page-import';
@@ -85,11 +86,12 @@ export function WebsiteTab({
     });
   }
 
-  // Kies-scherm heeft voorrang.
+  // Kies-scherm heeft voorrang. (Bestaande pagina's van hetzelfde domein worden gemarkeerd.)
   if (discovered) {
     return (
       <>
         <PageSelection rootUrl={discovered.rootUrl} urls={discovered.urls} pending={pending}
+          existingUrls={existingUrlsFor(sources, discovered.rootUrl)}
           onStart={onStart} onCancel={() => { setDiscovered(null); setMode('list'); }} />
         {error && <p className="v1-alert v1-alert--error" role="alert">{error}</p>}
       </>
@@ -152,4 +154,11 @@ export function WebsiteTab({
       )}
     </>
   );
+}
+
+/** Pagina-URLs die al in de kennisbank staan voor het domein van `rootUrl`. */
+function existingUrlsFor(sources: WebsiteSource[], rootUrl: string): string[] {
+  const host = normalizeHost(rootUrl);
+  if (!host) return [];
+  return sources.filter((s) => s.source.host === host).flatMap((s) => s.pages.map((p) => p.url));
 }
