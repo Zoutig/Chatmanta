@@ -30,6 +30,7 @@ import 'server-only';
 // future-edits.
 import type { OrgSlug } from './active-org';
 import type { RagPersona } from '@/lib/rag/types';
+import { resolveEvalCopyOrg } from './eval-copy-orgs';
 
 // Back-compat alias — RagPersona is the canonical type home in lib/rag/types.ts.
 export type OrgPersona = RagPersona;
@@ -237,7 +238,8 @@ export function getPersonaBySlug(slug: string): OrgPersona {
  * Resolve persona via organization UUID. Loopt de lokale slug→id map door
  * om de juiste persona te vinden. Onbekende ID → DEV_ORG persona.
  */
-export function getPersonaById(orgId: string): OrgPersona {
+export function getPersonaById(rawOrgId: string): OrgPersona {
+  const orgId = resolveEvalCopyOrg(rawOrgId);
   const extra = EVAL_EXTRA_PERSONAS_BY_ID[orgId];
   if (extra) return extra;
   for (const slug of Object.keys(ORG_SLUG_TO_ID) as OrgSlug[]) {

@@ -53,6 +53,25 @@ const ORG_ID_BY_SLUG: Readonly<Record<string, string>> = Object.freeze({
   initech: '00000000-0000-0000-0000-0000000000a3',
 });
 
+// Ingest-onderzoek fase B (2026-10-11): experimentele versies draaien op hun eigen
+// eval-kopie-orgs (anders geknipt/geëmbed). Zie lib/v0/server/eval-copy-orgs.ts.
+const INGEST_B_ORG_VARIANT: Readonly<Record<string, string>> = Object.freeze({
+  'v0.14i1': 'b',
+  'v0.14i2': 'c',
+  'v0.14i3': 'e',
+});
+const ORIGINAL_ORG_NUMBER: Readonly<Record<string, string>> = Object.freeze({
+  'acme-corp': '1',
+  'globex-inc': '2',
+  initech: '3',
+});
+function orgIdFor(orgSlug: string, version: string): string | undefined {
+  const variant = INGEST_B_ORG_VARIANT[version];
+  if (!variant) return ORG_ID_BY_SLUG[orgSlug];
+  const n = ORIGINAL_ORG_NUMBER[orgSlug];
+  return n ? `00000000-0000-0000-0000-0000000000${variant}${n}` : undefined;
+}
+
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
   process.exit(1);
@@ -342,7 +361,7 @@ type CaseResult = {
 
 async function evaluateCase(c: HardCase, version: string): Promise<CaseResult> {
   const bot = resolveBot(version);
-  const orgId = ORG_ID_BY_SLUG[c.orgSlug];
+  const orgId = orgIdFor(c.orgSlug, version);
   // ORG_ID_BY_SLUG is een Record<string,string> en de fixture-JSON wordt
   // ongevalideerd gecast → een onbekende/nieuwe orgSlug levert hier runtime
   // `undefined` op zonder dat tsc dat ziet. Sinds PR-1 eist runRagQueryStreaming
@@ -689,7 +708,10 @@ function buildJudgeQueue(
 async function main(): Promise<void> {
   const fixtureRaw = readFileSync(join(process.cwd(), 'eval-fixtures', 'hard-dimension-cases.json'), 'utf8');
   const fixture = JSON.parse(fixtureRaw) as HardCaseFile;
-  const cases = fixture.cases;
+  // HARD_EVAL_EXCLUDE_ORGS=dev-org — voor vergelijkingen waarin niet elke versie een
+  // kopie van elke org heeft (ingest-onderzoek fase B).
+  const excludeOrgs = new Set((process.env.HARD_EVAL_EXCLUDE_ORGS ?? '').split(',').filter(Boolean));
+  const cases = fixture.cases.filter((c) => !excludeOrgs.has(c.orgSlug));
 
   // Rubric-anchoring (Groep 4): laad gouden anker-verdicts indien aanwezig.
   const anchorsPath = join(process.cwd(), 'eval-fixtures', 'hard-eval-anchors.json');

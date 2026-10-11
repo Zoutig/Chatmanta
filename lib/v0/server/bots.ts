@@ -1704,6 +1704,35 @@ const V0_14D2: BotConfig = {
     'v0.14d; vindt het speculatieve zoeken op de originele vraag niets boven de drempel, dan wordt alsnog op de voorbewerking gewacht en één keer opnieuw gezocht met de herschreven vraag (vangnet voor V1 zonder hybrid search).',
   speculativeRetryOnEmpty: true,
 };
+// v0.14i* — ingest-onderzoek fase B (2026-10-11). Basis = v0.14d2 (LATEST). Draaien
+// ALLEEN op de eval-kopie-orgs die met hetzelfde model/dezelfde knipper zijn opgebouwd
+// (scripts in eval-out/ingest-onderzoek-2026-10/fase-b). Answer-cache uit: de cache keyt
+// op een small-embedding van de vraag. NIET gepromoveerd.
+const V0_14I1: BotConfig = {
+  ...V0_14D2,
+  version: 'v0.14i1',
+  label: 'v0.14i1 — v0.14d2 met text-embedding-3-large (1536) als zoekmodel (experiment)',
+  description: 'Alleen het embeddingmodel van de zoekvraag gewisseld; index = zelfde knipper, opnieuw geëmbed met 3-large.',
+  embeddingModel: 'text-embedding-3-large',
+  cacheEnabled: false,
+};
+const V0_14I2: BotConfig = {
+  ...V0_14D2,
+  version: 'v0.14i2',
+  label: 'v0.14i2 — v0.14d2 met context tot tekenbudget 18k (voor kopjes-knippen) (experiment)',
+  description: 'Index geknipt op kopjes (K3-1200 + kruimelpad in de vector); context gevuld tot 18k tekens i.p.v. top-8.',
+  retrievalTopK: 60,
+  finalContextMaxChunks: 60,
+  maxContextChars: 18000,
+  cacheEnabled: false,
+};
+const V0_14I3: BotConfig = {
+  ...V0_14I2,
+  version: 'v0.14i3',
+  label: 'v0.14i3 — v0.14i2 + text-embedding-3-large (experiment)',
+  description: 'Kopjes-knippen + kruimelpad + tekenbudget 18k + 3-large als zoekmodel.',
+  embeddingModel: 'text-embedding-3-large',
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1793,6 +1822,9 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_14D.version]: V0_14D,
   [V0_14E.version]: V0_14E,
   [V0_14D2.version]: V0_14D2,
+  [V0_14I1.version]: V0_14I1,
+  [V0_14I2.version]: V0_14I2,
+  [V0_14I3.version]: V0_14I3,
 };
 
 /**

@@ -267,6 +267,11 @@ export type RagConfig = {
    * finalContextMaxChunks. Hoger = het answer-model kiest echt zelf.
    */
   maxContextChars?: number;
+  /** Ingest-onderzoek fase B (okt 2026): embeddingmodel voor de zoekvraag. Default
+   *  text-embedding-3-small. Moet gelijk zijn aan het model waarmee de index van de
+   *  org is opgebouwd — alleen voor experimentele versies op eval-kopie-orgs.
+   *  Claim-verificatie blijft bewust op small (embedt claims én bronnen zelf). */
+  embeddingModel?: 'text-embedding-3-small' | 'text-embedding-3-large';
   /**
    * v0.12b: sla een chunk over als zijn parent al in de context staat (de
    * parent bevat het child al). Default false (oude gedrag: parent herhaald).

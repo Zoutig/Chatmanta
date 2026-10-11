@@ -16,6 +16,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { resolveEvalCopyOrg } from './eval-copy-orgs';
 
 // Hardcoded mapping spiegelt KNOWN_ORGS in lib/v0/server/active-org.ts. Niet
 // importeren omdat active-org.ts `next/headers` binnentrekt en deze loader
@@ -73,12 +74,12 @@ const EVAL_TONE_BY_SLUG: Readonly<Record<string, 'formal'>> = Object.freeze({
 });
 
 export function getEvalToneForOrgId(orgId: string): 'formal' | undefined {
-  const slug = SLUG_BY_ORG_ID[orgId];
+  const slug = SLUG_BY_ORG_ID[resolveEvalCopyOrg(orgId)];
   return slug ? EVAL_TONE_BY_SLUG[slug] : undefined;
 }
 
 export function getPersonaForOrgId(orgId: string): string | null {
-  const slug = SLUG_BY_ORG_ID[orgId];
+  const slug = SLUG_BY_ORG_ID[resolveEvalCopyOrg(orgId)];
   if (!slug) return null;
   return getPersonaForOrgSlug(slug);
 }
