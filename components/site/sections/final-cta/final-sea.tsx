@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducedMotion } from 'motion/react';
+import { useReducedMotion } from '../../ui/motion-hooks';
 import { useEffect, useRef } from 'react';
 import { Mark } from '../../ui/logo';
 

@@ -8,7 +8,7 @@ import { SectionBlock } from './_components/page-body';
 const home = getPageBySlug('')!;
 
 export const metadata: Metadata = {
-  title: { absolute: 'Vakantiepark De Duinhoeve | Vakantie tussen duin en zee' },
+  title: { absolute: 'Vakantiepark De Helmduin | Vakantie tussen duin en zee' },
   description: home.description,
 };
 
@@ -109,7 +109,7 @@ export default function VoorbeeldWebsiteHome() {
             <div>
               <p className="dh-eyebrow dh-eyebrow-dark">Accommodaties</p>
               <h2 id="dh-stay" className="dh-h2">
-                {stay?.heading ?? 'Overnachten op De Duinhoeve'}
+                {stay?.heading ?? 'Overnachten op De Helmduin'}
               </h2>
             </div>
             <Link href={pathFor('accommodaties')} className="dh-text-link">

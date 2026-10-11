@@ -6,14 +6,14 @@ import type { V1ChatbotSettings } from '@/app/v1/app/instellingen/settings-confi
 
 export type DemoSettings = V1ChatbotSettings;
 
-export const DEMO_ORG_NAME = 'Vakantiepark De Duinhoeve';
+export const DEMO_ORG_NAME = 'Vakantiepark De Helmduin';
 export const DEMO_SITE_PATH = '/voorbeeld/website';
 
 export const DEMO_DEFAULT_SETTINGS: DemoSettings = {
-  chatbotName: 'De Duinhoeve',
+  chatbotName: 'De Helmduin',
   companyDescription:
     'Familievakantiepark in de duinen bij Westerduin aan de Zeeuwse kust, met strandhuisjes, lodges, boshuizen, glamping en kampeerplaatsen.',
-  welcomeMessage: 'Hoi! Ik beantwoord je vragen over je verblijf op De Duinhoeve. Waar kan ik je mee helpen?',
+  welcomeMessage: 'Hoi! Ik beantwoord je vragen over je verblijf op De Helmduin. Waar kan ik je mee helpen?',
   starterQuestions: [
     'Mag mijn hond mee?',
     'Hoe laat kan ik inchecken?',
@@ -33,13 +33,13 @@ export const DEMO_DEFAULT_SETTINGS: DemoSettings = {
   answerGeneralKnowledge: false,
   fallbackMessage:
     'Daar heb ik helaas geen informatie over. Bel of mail gerust met onze receptie, die helpt je graag verder.',
-  contactEmail: 'info@duinhoeve.example',
+  contactEmail: 'info@helmduin.example',
   contactPhone: '0118 000 000',
   contactPageUrl: '/voorbeeld/website/contact',
   unknownAnswerMessage: '',
   accentColor: '#1F4E4A',
   position: 'bottom-right',
-  headerTitle: 'De Duinhoeve',
+  headerTitle: 'De Helmduin',
   launcherText: 'Vragen over je verblijf?',
   logoStyle: 'chat-bubble',
   customLogoDataUrl: null,

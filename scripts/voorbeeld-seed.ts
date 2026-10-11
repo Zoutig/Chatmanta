@@ -13,7 +13,11 @@ import { SITE_PAGES, pageToPlainText } from '../lib/voorbeeld/site-content';
 import { DEMO_ORG_SLUG } from '../lib/voorbeeld/constants';
 
 const SITE_ORIGIN = process.env.VOORBEELD_SITE_ORIGIN ?? 'https://www.chatmanta.nl';
-const ORG_NAME = 'Vakantiepark De Duinhoeve (voorbeeld)';
+const ORG_NAME = 'Vakantiepark De Helmduin (voorbeeld)';
+const CHATBOT_NAME = 'De Helmduin';
+// Vorige naam van dezelfde fictieve demo (bleek een bestaand park te zijn); de
+// seed hernoemt een org met deze naam gewoon naar ORG_NAME.
+const LEGACY_ORG_NAMES = ['Vakantiepark De Duinhoeve (voorbeeld)'];
 // Ruimer dan de default (1 euro): de demo wordt aan prospects getoond.
 const DAILY_BUDGET_EUR = 5;
 
@@ -27,7 +31,7 @@ async function main() {
     .eq('slug', DEMO_ORG_SLUG)
     .maybeSingle();
   if (perr) throw perr;
-  if (prior && prior.name !== ORG_NAME) {
+  if (prior && prior.name !== ORG_NAME && !LEGACY_ORG_NAMES.includes(prior.name)) {
     throw new Error(`slug ${DEMO_ORG_SLUG} is in gebruik door "${prior.name}", geen demo-org; afgebroken`);
   }
   const { data: org, error: oerr } = await sb
@@ -58,12 +62,16 @@ async function main() {
   if (!chatbotId) {
     const { data: bot, error } = await sb
       .from('chatbots')
-      .insert({ organization_id: orgId, name: 'De Duinhoeve', bot_version: 'v1.0' })
+      .insert({ organization_id: orgId, name: CHATBOT_NAME, bot_version: 'v1.0' })
       .select('id')
       .single();
     if (error) throw error;
     chatbotId = bot.id as string;
     console.log(`+ chatbot aangemaakt: ${chatbotId}`);
+  }
+  {
+    const { error } = await sb.from('chatbots').update({ name: CHATBOT_NAME }).eq('id', chatbotId).eq('organization_id', orgId);
+    if (error) console.warn(`! chatbotnaam zetten faalde: ${error.message}`);
   }
 
   // Oude pagina's weg (chunks volgen via on delete cascade), dan opnieuw ingesten.

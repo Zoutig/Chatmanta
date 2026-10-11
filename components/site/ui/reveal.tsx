@@ -1,17 +1,17 @@
 'use client';
 
-import { motion, useInView, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-
-const EASE = [0.2, 0.8, 0.2, 1] as const;
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { cx } from './cx';
+import { useInView, useReducedMotion } from './motion-hooks';
 
 /**
  * Scroll-reveal (fade + kleine lift) — content-first:
  * - SSR/no-JS: inhoud staat gewoon zichtbaar in de HTML (geen opacity:0 in de markup).
  * - Pas ná hydratie wordt een element dat nog ONDER de vouw staat verborgen en bij
- *   binnenscrollen (whileInView-gedrag via useInView) ingefade. Wat al in beeld is
- *   bij laden, animeert niet (geen flits, geen LCP-vertraging).
+ *   binnenscrollen ingefade. Wat al in beeld is bij laden, animeert niet (geen flits,
+ *   geen LCP-vertraging).
  * - prefers-reduced-motion: doet niets.
+ * Puur CSS-transities (.rv in site.css) — geen animatiebibliotheek nodig.
  * Gebruik NIET voor de hero/LCP-content; die moet direct staan.
  */
 export function Reveal({
@@ -40,34 +40,20 @@ export function Reveal({
     if (el && el.getBoundingClientRect().top > window.innerHeight) setArmed(true);
   }, [reduce]);
 
-  const variants = {
-    hidden: { opacity: 0, y, transition: { duration: 0 } },
-    shown: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE, delay } },
-  };
-  const state = !armed || inView ? 'shown' : 'hidden';
+  const hidden = armed && !inView;
+  const cls = cx(className, armed && 'rv', hidden && 'rv-hidden');
+  const style = armed ? ({ '--rv-y': `${y}px`, '--rv-delay': `${delay}s` } as CSSProperties) : undefined;
 
   if (as === 'li') {
     return (
-      <motion.li
-        ref={ref as React.Ref<HTMLLIElement>}
-        className={className}
-        initial={false}
-        animate={state}
-        variants={variants}
-      >
+      <li ref={ref as React.Ref<HTMLLIElement>} className={cls} style={style}>
         {children}
-      </motion.li>
+      </li>
     );
   }
   return (
-    <motion.div
-      ref={ref as React.Ref<HTMLDivElement>}
-      className={className}
-      initial={false}
-      animate={state}
-      variants={variants}
-    >
+    <div ref={ref as React.Ref<HTMLDivElement>} className={cls} style={style}>
       {children}
-    </motion.div>
+    </div>
   );
 }

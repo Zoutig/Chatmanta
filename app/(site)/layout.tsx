@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next';
 import type { Metadata, Viewport } from 'next';
 import { Footer } from '@/components/site/footer';
 import { Nav } from '@/components/site/nav';
@@ -54,6 +55,9 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           <main id="hoofd">{children}</main>
           <Footer />
         </div>
+        {/* Cookieloze bezoekersstatistiek (Vercel Web Analytics): geen cookies, geen
+            persoonsgegevens → geen cookiebanner nodig. Alleen op de publieke site. */}
+        <Analytics />
       </body>
     </html>
   );

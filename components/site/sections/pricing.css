@@ -87,6 +87,10 @@
   font-variant-numeric: tabular-nums; color: var(--ink); text-align: left;
 }
 .site-ui .s-pricing .roll > span { display: block; }
+.site-ui .s-pricing .roll > .roll-out { position: absolute; inset: 0 auto auto 0; animation: pricing-rollOut 0.36s var(--ease) forwards; }
+.site-ui .s-pricing .roll > .roll-in { animation: pricing-rollIn 0.36s var(--ease); }
+@keyframes pricing-rollOut { to { transform: translateY(-100%); opacity: 0; } }
+@keyframes pricing-rollIn { from { transform: translateY(100%); opacity: 0; } }
 .site-ui .s-pricing .price .per { font-size: 0.84rem; color: var(--muted); padding-bottom: 3.5px; line-height: 1.25; }
 .site-ui .s-pricing .billed { font-size: 0.8rem; color: var(--muted); min-height: 1.4em; margin: 2px 0 0; }
 .site-ui .s-pricing .perday { display: block; margin-top: 2px; font-size: 0.84rem; font-weight: 600; color: #5eead4; }

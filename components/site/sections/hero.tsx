@@ -1,4 +1,5 @@
-import { SECTION_IDS, ROUTES } from '@/lib/site/navigation';
+import { SECTION_IDS, ROUTES, anchor } from '@/lib/site/navigation';
+import { TIERS, formatEuro, monthlyPrice } from '@/lib/site/pricing';
 import { LinkButton } from '../ui/button';
 import { Icon } from '../ui/icon';
 import { Section } from '../ui/section';
@@ -11,6 +12,9 @@ import './hero.css';
  * dat tot de schermrand doorloopt, met daarop de zelftypende chat (client-blad
  * `hero/hero-chat.tsx`). Mobiel: copy + primaire CTA staan in DOM-volgorde vóór het gesprek.
  */
+/** Laagste maandprijs (jaarlijks, introductie) — zelfde bron als de prijskaarten. */
+const FROM_PRICE = Math.min(...TIERS.map((t) => monthlyPrice(t, 'yearly')));
+
 export default function Hero() {
   return (
     <Section
@@ -50,6 +54,10 @@ export default function Hero() {
             Inrichting gratis
           </li>
         </ul>
+        <p className="hero-price">
+          Pakketten vanaf {formatEuro(FROM_PRICE)} per maand, excl. btw.{' '}
+          <a href={anchor('pricing')}>Bekijk prijzen</a>
+        </p>
       </div>
 
       <div className="hero-stage">

@@ -179,6 +179,13 @@ export default function PrivacyPage() {
           e-mailadressen en telefoonnummers worden daar vooraf uit gefilterd en IP-adressen worden
           daar niet opgeslagen.
         </p>
+        <p style={gap}>
+          Op chatmanta.nl tellen we bezoeken met Vercel Web Analytics. Dat werkt zonder cookies en
+          zonder je te herkennen: we zien alleen totalen, zoals welke pagina&rsquo;s bekeken worden,
+          via welke website je binnenkwam, je land en je type apparaat en browser. Een bezoek wordt
+          niet aan jou of aan je IP-adres gekoppeld en na 24 uur kan het ook niet meer aan andere
+          bezoeken van dezelfde dag worden gekoppeld.
+        </p>
       </Section>
 
       <Section title="3. Waarvoor gebruiken we deze gegevens?">
@@ -277,7 +284,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Vercel</strong> (servers in Dublin, Ierland, EU) — hosting van de website, de
-            chatbot en het klantportaal.
+            chatbot en het klantportaal, en de cookieloze bezoekersstatistiek van chatmanta.nl.
           </li>
           <li>
             <strong>Upstash</strong> (Frankfurt, Duitsland, EU) — het kortstondig tellen van verzoeken

@@ -164,7 +164,7 @@ const TEMPLATES: Template[] = [
       { q: 'Mag ik in de buurt vissen? Heb ik een vergunning nodig?', a: FALLBACK, kind: 'fallback' },
       {
         q: 'Wat is het nummer van de receptie?',
-        a: 'Je bereikt de receptie op 0118 000 000 of via WhatsApp op 06 00 00 00 00. Mailen kan ook, naar info@duinhoeve.example.',
+        a: 'Je bereikt de receptie op 0118 000 000 of via WhatsApp op 06 00 00 00 00. Mailen kan ook, naar info@helmduin.example.',
         src: ['contact'],
       },
       { q: 'Kan ik op het park vissen?', a: FALLBACK, kind: 'fallback' },
@@ -181,7 +181,7 @@ const TEMPLATES: Template[] = [
       },
       {
         q: 'Hoe annuleer ik?',
-        a: 'Stuur een e-mail naar info@duinhoeve.example met je boekingsnummer en de naam van de hoofdboeker. Telefonisch annuleren kan ook, maar is pas geldig als we het per e-mail hebben bevestigd.',
+        a: 'Stuur een e-mail naar info@helmduin.example met je boekingsnummer en de naam van de hoofdboeker. Telefonisch annuleren kan ook, maar is pas geldig als we het per e-mail hebben bevestigd.',
         src: ['annuleren'],
       },
     ],
@@ -223,7 +223,7 @@ const TEMPLATES: Template[] = [
     turns: [
       {
         q: 'Is er wifi in de huisjes?',
-        a: 'Ja, op het hele park heb je gratis wifi via het netwerk Duinhoeve-Gast. Het wachtwoord staat op je sleutelpas.',
+        a: 'Ja, op het hele park heb je gratis wifi via het netwerk Helmduin-Gast. Het wachtwoord staat op je sleutelpas.',
         src: ['faciliteiten'],
       },
     ],
@@ -335,7 +335,7 @@ const TEMPLATES: Template[] = [
   // 16
   {
     turns: [
-      { q: 'Hoi', a: 'Hoi! Waarmee kan ik je helpen? Je kunt me alles vragen over je verblijf op De Duinhoeve.', kind: 'smalltalk' },
+      { q: 'Hoi', a: 'Hoi! Waarmee kan ik je helpen? Je kunt me alles vragen over je verblijf op De Helmduin.', kind: 'smalltalk' },
       {
         q: 'Hoe ver is het strand?',
         a: 'Het strand ligt op 400 meter, ongeveer vijf minuten lopen via het duinpad. Het dichtstbijzijnde vakantiehuis ligt op 250 meter van het strand, het verste op 900 meter.',
@@ -553,7 +553,7 @@ const TEMPLATES: Template[] = [
     turns: [
       {
         q: 'Do you speak English?',
-        a: 'Yes, of course! Feel free to ask me anything about your stay at De Duinhoeve, for example about our accommodations, check-in times or facilities.',
+        a: 'Yes, of course! Feel free to ask me anything about your stay at De Helmduin, for example about our accommodations, check-in times or facilities.',
         kind: 'smalltalk',
       },
       {
@@ -578,7 +578,7 @@ const TEMPLATES: Template[] = [
     turns: [
       {
         q: 'Kan ik een cadeaubon kopen voor mijn ouders?',
-        a: 'Ja, een Duinhoeve-cadeaubon is te koop vanaf € 25 en 2 jaar geldig. Je gebruikt hem voor een verblijf, in het restaurant, het strandpaviljoen en de wellness. Bestellen gaat via de receptie of per e-mail.',
+        a: 'Ja, een Helmduin-cadeaubon is te koop vanaf € 25 en 2 jaar geldig. Je gebruikt hem voor een verblijf, in het restaurant, het strandpaviljoen en de wellness. Bestellen gaat via de receptie of per e-mail.',
         src: ['boeken'],
       },
     ],
@@ -599,7 +599,7 @@ const TEMPLATES: Template[] = [
     turns: [
       {
         q: 'Hoe kom ik met het openbaar vervoer naar het park?',
-        a: 'Neem de trein naar station Middelburg. Vanaf daar rijdt buslijn 52 naar Westerduin; stap uit bij halte Westerduin, Duinhoeve, op 200 meter van de receptie. In de zomer rijdt de bus elk half uur, de rest van het jaar elk uur.',
+        a: 'Neem de trein naar station Middelburg. Vanaf daar rijdt buslijn 52 naar Westerduin; stap uit bij halte Westerduin, Helmduin, op 200 meter van de receptie. In de zomer rijdt de bus elk half uur, de rest van het jaar elk uur.',
         src: ['bereikbaarheid'],
       },
     ],

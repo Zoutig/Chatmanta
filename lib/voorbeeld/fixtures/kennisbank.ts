@@ -1,4 +1,4 @@
-// Vaste voorbeelddata voor de Kennisbank van De Duinhoeve: documenten, de
+// Vaste voorbeelddata voor de Kennisbank van De Helmduin: documenten, de
 // voorbeeldwebsite als website-bron en eigen Q&A. De paginatekst komt uit
 // site-content.ts, zodat het dashboard precies laat zien wat de chatbot kent.
 import type { UploadedDoc } from '@/app/voorbeeld/(dashboard)/kennisbank/v1-documents';
@@ -16,7 +16,7 @@ const DEMO_SITE_HOST = 'chatmanta.nl';
 /** Elk document is een "export" van de bijbehorende websitepagina(s). */
 const DOC_SOURCES: Record<string, { intro: string; slugs: string[] }> = {
   'vb-doc-huisregels': {
-    intro: 'Huisregels Vakantiepark De Duinhoeve, versie 2027. Uitgereikt bij aankomst en te vinden in elke accommodatie.',
+    intro: 'Huisregels Vakantiepark De Helmduin, versie 2027. Uitgereikt bij aankomst en te vinden in elke accommodatie.',
     slugs: ['huisregels'],
   },
   'vb-doc-prijslijst': {
@@ -24,7 +24,7 @@ const DOC_SOURCES: Record<string, { intro: string; slugs: string[] }> = {
     slugs: ['prijzen'],
   },
   'vb-doc-annuleren': {
-    intro: 'Annuleringsvoorwaarden Vakantiepark De Duinhoeve.',
+    intro: 'Annuleringsvoorwaarden Vakantiepark De Helmduin.',
     slugs: ['annuleren'],
   },
   'vb-doc-welkomstmap': {
@@ -130,7 +130,7 @@ export function getDemoWebsiteSources(): WebsiteSource[] {
 
   return [
     {
-      source: { id: 'vb-src-duinhoeve', rootUrl: DEMO_SITE_ROOT, host: DEMO_SITE_HOST, status: 'ready' },
+      source: { id: 'vb-src-helmduin', rootUrl: DEMO_SITE_ROOT, host: DEMO_SITE_HOST, status: 'ready' },
       job: {
         status: 'completed',
         error: null,
@@ -198,7 +198,7 @@ export const DEMO_QA_ITEMS: QAItem[] = [
     id: 'vb-qa-5',
     question: 'Verkopen jullie cadeaubonnen?',
     answer:
-      'Ja, een Duinhoeve-cadeaubon is er vanaf 25 euro en is 2 jaar geldig. Je kunt hem gebruiken voor een verblijf, in het restaurant, het strandpaviljoen of bij de wellness. Bestellen gaat via de receptie of per e-mail.',
+      'Ja, een Helmduin-cadeaubon is er vanaf 25 euro en is 2 jaar geldig. Je kunt hem gebruiken voor een verblijf, in het restaurant, het strandpaviljoen of bij de wellness. Bestellen gaat via de receptie of per e-mail.',
     category: 'Boeken en betalen',
     active: true,
     ingestedDocumentId: 'vb-doc-qa-5',

@@ -136,7 +136,7 @@ export default function Features() {
               <div className="bubble">Een nieuwe ketting kost €24,95, inclusief montage.</div>
               <span className="chip">
                 <Icon name="link" />
-                Bron: <span className="u">vandam-fietsen.nl/prijzen</span>
+                Bron: <span className="u">devrijloop.nl/prijzen</span>
               </span>
             </div>
           </div>

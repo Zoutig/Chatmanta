@@ -1,8 +1,8 @@
-// Vaste voorbeeld-kennisquiz: vragen over gaten in de kennisbank van De Duinhoeve.
+// Vaste voorbeeld-kennisquiz: vragen over gaten in de kennisbank van De Helmduin.
 import type { QuizQuestion } from '@/lib/controlroom/types';
 
 const QUIZ_ID = 'vb-quiz-1';
-const ORG_ID = 'vb-org-duinhoeve';
+const ORG_ID = 'vb-org-helmduin';
 const CREATED = '2026-01-01T09:00:00.000Z';
 
 function q(

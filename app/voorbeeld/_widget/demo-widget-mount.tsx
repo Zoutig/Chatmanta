@@ -57,7 +57,7 @@ export function DemoWidgetMount() {
   const hydrated = useHydrated();
   const settings = useDemoSettings();
   const widget = useDemoWidgetState();
-  const appearance = toWidgetAppearance(settings, 'De Duinhoeve');
+  const appearance = toWidgetAppearance(settings, 'De Helmduin');
 
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);

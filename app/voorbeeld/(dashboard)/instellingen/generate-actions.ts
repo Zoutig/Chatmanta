@@ -25,7 +25,7 @@ export async function generateFallbackMessageV1Action(): Promise<ActionResult<{ 
   return {
     ok: true,
     message:
-      'Dat weet ik helaas niet zeker. Onze receptie helpt je graag verder: bel 0118 000 000 of mail naar info@duinhoeve.example.',
+      'Dat weet ik helaas niet zeker. Onze receptie helpt je graag verder: bel 0118 000 000 of mail naar info@helmduin.example.',
   };
 }
 
@@ -33,7 +33,7 @@ export async function extractContactInfoV1Action(): Promise<ActionResult<Extract
   await pause();
   return {
     ok: true,
-    contactEmail: 'info@duinhoeve.example',
+    contactEmail: 'info@helmduin.example',
     contactPhone: '0118 000 000',
     contactPageUrl: '/voorbeeld/website/contact',
   };

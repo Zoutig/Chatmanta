@@ -113,6 +113,20 @@
 .site-ui .s-how .mini small { display: block; margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
 .site-ui .s-how .how-after { margin-top: 32px; }
 
+/* mobiel afspelen (MiniPlay): .is-armed = beginstand, .is-play = één keer afspelen.
+   Zonder JS of met reduced motion krijgt .mini geen van beide → statische eindstand. */
+.site-ui .s-how .mini.is-armed .urlbox .val { clip-path: inset(0 100% 0 0); }
+.site-ui .s-how .mini.is-play .urlbox .val { animation: how-type 0.9s steps(13, end) 0.15s forwards; }
+.site-ui .s-how .mini.is-play .urlbox .go { animation: how-press 0.35s var(--ease) 1.25s; }
+.site-ui .s-how .mini.is-armed .tiles i:nth-child(-n + 16) { background: #fff; border-color: var(--line-2); }
+.site-ui .s-how .mini.is-play .tiles i:nth-child(-n + 16) { animation: how-tile 0.35s var(--ease) calc(0.2s + var(--i) * 70ms) forwards; }
+.site-ui .s-how .mini.is-armed small { opacity: 0; }
+.site-ui .s-how .mini.is-play small { animation: how-fade 0.4s var(--ease) 1.4s forwards; }
+@keyframes how-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes how-press { 50% { transform: scale(0.92); } }
+@keyframes how-tile { to { background: var(--teal-soft); border-color: var(--teal-line); } }
+@keyframes how-fade { to { opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
   .site-ui .s-how .caret { animation: none; }
   .site-ui .s-how .blk { display: none; }
