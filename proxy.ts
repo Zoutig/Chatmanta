@@ -97,9 +97,10 @@ export const config = {
   //   - opengraph-image: de OG-route van app/(site)/opengraph-image.tsx. Next kan er een
   //     hash-suffix aan hangen (/opengraph-image-<hash>), dus geankerd op
   //     `opengraph-image(?:-\w+)?$` i.p.v. een open prefix.
+  //   - _vercel/: Vercel-platformroutes (Web Analytics-script en -intake).
   // Assets van de site (/logo/*.png, next/font onder /_next/static) vallen al onder
   // bestaande uitzonderingen. V0 server actions checken zelf requireAuth() (defense in depth).
   matcher: [
-    '/((?!$|kennismaking(?:/|$)|voorwaarden(?:/|$)|api/site(?:/|$)|sitemap\\.xml$|robots\\.txt$|opengraph-image(?:-\\w+)?$|v0/login(?:/|$)|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!$|kennismaking(?:/|$)|voorwaarden(?:/|$)|api/site(?:/|$)|sitemap\\.xml$|robots\\.txt$|opengraph-image(?:-\\w+)?$|v0/login(?:/|$)|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|_vercel/|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };
