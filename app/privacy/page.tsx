@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: 'Hoe ChatManta omgaat met persoonsgegevens.',
 };
 
-const UPDATED = '6 oktober 2026';
+const UPDATED = '11 oktober 2026';
 
 /** Zichtbaar gemarkeerd gat dat vóór go-live ingevuld moet worden. */
 function Bevestig({ children }: { children: React.ReactNode }) {
@@ -163,7 +163,15 @@ export default function PrivacyPage() {
           </li>
         </ul>
 
-        <SubTitle>C. Technische gegevens</SubTitle>
+        <SubTitle>C. Als je via chatmanta.nl een kennismaking aanvraagt</SubTitle>
+        <p>
+          Vul je het kennismakingsformulier in en geef je toestemming, dan ontvangen we je naam,
+          bedrijfsnaam, website, e-mailadres en, als je die invult, je telefoonnummer, je
+          pakketvoorkeur en je bericht. Deze gegevens worden niet in onze database opgeslagen: ze
+          komen per e-mail binnen in onze mailbox. Je krijgt zelf een bevestigingsmail.
+        </p>
+
+        <SubTitle>D. Technische gegevens</SubTitle>
         <p>
           Zoals bij vrijwel elke website registreert onze hostingpartij bij elk verzoek technische
           gegevens zoals IP-adres, tijdstip en browsertype in serverlogboeken. Bij technische fouten
@@ -181,6 +189,7 @@ export default function PrivacyPage() {
             website kan verbeteren.
           </li>
           <li>Contactverzoeken doorsturen naar het bedrijf dat je wilt bereiken.</li>
+          <li>Contact met je opnemen over een kennismaking die je via chatmanta.nl hebt aangevraagd.</li>
           <li>Klantaccounts beheren, inloggen mogelijk maken en meldingen afhandelen.</li>
           <li>
             Misbruik, overbelasting en technische problemen voorkomen en oplossen, en de kwaliteit van
@@ -201,8 +210,8 @@ export default function PrivacyPage() {
             de dienst aan onze klanten.
           </li>
           <li>
-            <strong>Toestemming</strong> — voor contactverzoeken via de chatbot en voor meldingen die
-            je indient. Je kunt je toestemming altijd intrekken.
+            <strong>Toestemming</strong> — voor contactverzoeken via de chatbot, kennismakingsaanvragen
+            via chatmanta.nl en meldingen die je indient. Je kunt je toestemming altijd intrekken.
           </li>
           <li>
             <strong>Gerechtvaardigd belang</strong> — om de dienst veilig en werkend te houden
@@ -236,6 +245,10 @@ export default function PrivacyPage() {
           <li>
             <strong>Meldingen en feedback via het portaal</strong>: zolang nodig om de melding af te
             handelen en daarna niet langer dan nodig.
+          </li>
+          <li>
+            <strong>Kennismakingsaanvragen</strong>: maximaal 12 maanden na ons laatste contact, tenzij
+            je klant wordt. Je kunt ons altijd vragen ze eerder te verwijderen.
           </li>
           <li>
             <strong>Rate-limit-tellers</strong> (op basis van je IP-adres): ongeveer een minuut.
@@ -276,7 +289,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Resend</strong> (Verenigde Staten) — het versturen van e-mails, zoals
-            contactverzoeken aan klanten, uitnodigingen en wachtwoord-mails.
+            contactverzoeken aan klanten, kennismakingsaanvragen, uitnodigingen en wachtwoord-mails.
           </li>
           <li>
             <strong>Sentry</strong> (opslag in Frankfurt, Duitsland, EU) — foutmonitoring.
