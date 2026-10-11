@@ -26,6 +26,13 @@ export async function proxy(req: NextRequest) {
   if (verifyAuthCookieValue(cookie)) {
     return NextResponse.next();
   }
+  // Niet ingelogd op een pad buiten /v0 en /api: (bijna altijd) een bezoeker van de
+  // marketingsite met een typfout of oude link → toon de site-404 i.p.v. de V0-login.
+  // Nog steeds deny-by-default: we rewriten naar een pad dat nooit bestaat, dus er wordt
+  // geen inhoud geserveerd (Next rendert app/global-not-found.tsx met status 404).
+  if (!/^\/(?:v0|api)(?:\/|$)/.test(req.nextUrl.pathname)) {
+    return NextResponse.rewrite(new URL('/__geen-pagina', req.url));
+  }
   const loginUrl = new URL('/v0/login', req.url);
   // Preserve where the user wanted to go so /v0/login can bounce them back.
   loginUrl.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search);
