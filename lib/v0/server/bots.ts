@@ -1882,6 +1882,16 @@ const V0_15RW: BotConfig = {
   description: 'v0.15r (= V1 live); GEOGRAFIE-regel: noemt de CONTEXT geen werkgebied, dan niet zeggen of een plaats binnen/buiten valt, maar afstemmen via contact.',
   systemPrompt: V0_15W_SYSTEM_PROMPT,
 };
+// v0.15 — eindronde-winnaar (2026-10-12): v0.14d2 (hybrid aan voor V0; V1 zet hem uit) met de
+// werkgebied-regel uit v0.15rw. Zie docs/LUNA_EINDRONDE.md.
+const V0_15: BotConfig = {
+  ...V0_14D2,
+  version: 'v0.15',
+  label: 'v0.15 — v0.14d2 + geen werkgebied-claim zonder werkgebied in de bron',
+  description:
+    'v0.14d2 met één promptregel extra (GEOGRAFIE): noemt de CONTEXT geen werkgebied, dan niet zeggen of een plaats binnen of buiten valt, maar afstemmen via contact. Eindronde okt 2026: opzet met voorbewerking en de huidige prompt bleven het best.',
+  systemPrompt: V0_15W_SYSTEM_PROMPT,
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1980,6 +1990,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_15GM.version]: V0_15GM,
   [V0_15GT.version]: V0_15GT,
   [V0_15RW.version]: V0_15RW,
+  [V0_15.version]: V0_15,
 };
 
 /**
@@ -2059,7 +2070,12 @@ export const BOTS: Record<string, BotConfig> = {
 // 0 catastrofaal, enige veto (ot-acme-ander-bedrijf-01) = refusal-regex-false-positive
 // (3× handmatig nette weigering; bij v0.13x7 op 2026-10-08 idem herscoord). Prijs: ~2×
 // LLM-kosten per vraag (Luna-hulpstappen + Fast mode). v0.13x7 blijft append-only behouden.
-export const LATEST_BOT_VERSION = V0_14D2.version;
+// 2026-10-12: v0.15 gepromoveerd (Luna-eindronde, docs/LUNA_EINDRONDE.md). Opzet zonder of
+// met luie voorbewerking, "alles in één prompt", opgeschoonde/minimale prompt en zonder
+// denkstap verloren allemaal van v0.14d2; alleen de werkgebied-regel won: holdout2 (120×2)
+// 0 vs 2 kritiek, gewogen 25,6 vs 30,2/100 (gepaard 22/17, n.s.); geo-set 0 vs 4 kritiek;
+// hard-eval gate JA (63/63); V1-eval 15/15. v0.14d2 blijft append-only behouden.
+export const LATEST_BOT_VERSION = V0_15.version;
 
 /** Versions sorted oldest → newest. UI lists them in this order. */
 export const BOT_VERSIONS_ORDERED: string[] = [
@@ -2090,6 +2106,8 @@ export const BOT_VERSIONS_ORDERED: string[] = [
   V0_12E.version,
   V0_13X6.version,
   V0_13X7.version,
+  V0_14D2.version,
+  V0_15.version,
 ];
 
 /**

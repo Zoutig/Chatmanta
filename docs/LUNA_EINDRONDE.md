@@ -90,3 +90,52 @@ op de g-opzet (de prompt-invloed is los van de opzet), plus de referentie r op d
 - Terugkerende kritieke fout in álle versies: "Leeuwarden/Maastricht ligt buiten ons vaste werkgebied" terwijl de
   bot geen werkgebied in zijn bronnen had. De prompt zegt nu letterlijk dat hij dat mag zeggen als de CONTEXT
   "daar niets over zegt". → ronde 3.
+
+### Ronde 3 — gerichte reparatie: werkgebied (2026-10-12)
+
+v0.15rw = v0.15r + één zin in GEOGRAFIE: *"Noemt de CONTEXT helemaal geen werkgebied, regio of afstandsgrens,
+zeg dan niet of de plaats binnen of buiten jullie werkgebied ligt: zeg dat jullie dat graag even afstemmen en
+geef het contact uit de CONTEXT."* Geo-set: 20 werkgebied/afstand-vragen × 4 runs (160 antwoorden).
+
+| versie | kritiek | ernstig | licht | gewogen/100 |
+|---|---|---|---|---|
+| v0.15r | **4** (Leeuwarden 3×, Maastricht 1×) | 14 | 7 | 61,3 |
+| v0.15rw | **0** | 17 | 12 | 78,8 |
+
+De kritieke verzinsels verdwijnen; de ernstige fouten verschuiven (Lelystad beter, Randstad/Dronten slechter)
+binnen ruisniveau. Blijvend zwak punt in béide: plaatsen in Flevoland die niet bij naam genoemd staan (Urk,
+Emmeloord, Dronten) worden stellig "buiten" genoemd, terwijl Flevoland standaard werkgebied is.
+
+### Ronde 4 — eindtoets (2026-10-12)
+
+holdout2 (120 ongeziene vragen, 5 bedrijven) × 2 runs, interleaved (480 antwoorden):
+
+| versie | kritiek | ernstig | licht | gewogen/100 | gepaard | TTFT p50 | $/antw |
+|---|---|---|---|---|---|---|---|
+| v0.15r | 2 | 6 | 54 | 30,2 | — | 1,94 s | 0,0021 |
+| **v0.15rw** | **0** | **3** | 52 | **25,6** | 22 beter / 17 slechter (p=0,52) | 1,90 s | 0,0021 |
+
+- **Hard-eval (prod-gate):** v0.15r én v0.15rw 63/63, gate JA, 0 catastrofaal, over-/under-refusal 0%
+  (`eval-out/hard/20261012-002956-report.md`).
+- **V1-eval** (seed-org, echte V1-pad) met v0.15rw: 15/15 (grounded 6/6, eerlijke weigeringen 4/4, isolatie,
+  off-topic en injectie 5/5).
+
+## Conclusie
+
+**Winnaar: v0.15 = v0.14d2 + de werkgebied-regel.** Kwaliteit minstens gelijk op ongeziene vragen (0 vs 2 kritiek,
+lagere foutscore), het enige terugkerende verzinsel weg, prod-gate JA, zelfde snelheid en kosten.
+
+Wat níet won (en waarom dat goed nieuws is): de huidige opzet mét voorbewerking en de huidige, lange prompt zijn
+in twee onafhankelijke rondes het best gebleken. Luna is sterk, maar haalt de kwaliteit uit de concrete regels en
+voorbeelden; een kortere prompt of "alles in één prompt" kost aantoonbaar kwaliteit (Engelse vragen, begroetingen,
+valse aannames). Snelheidswinst die nog ligt: zonder denkstap −0,4 s en luie voorbewerking −1 s op vervolgvragen,
+maar beide met meer fouten — niet doen vóór de launch.
+
+Spend: antwoorden genereren $3,74 + hard-eval $0,43 + V1-eval $0,01 + smoke ≈ **$4,20** (budget $10). Jury en
+hard-eval-judge via Claude-subagents ($0).
+
+**Na merge:** V1-answer_cache purgen (key `v1.0` verandert niet bij een config-wijziging) zoals bij #263/#266/#268/#277.
+
+**Open voor later (x8, echte gesprekken):** Flevoland-plaatsen niet bij naam; "kan niet bevestigen" i.p.v. stellig
+rechtzetten bij een onbekende medewerker (Mark Visser, Sophie, Geldrop); te korte antwoorden die een tweede nuttig
+feit uit dezelfde bron laten liggen (meest voorkomende lichte fout).
