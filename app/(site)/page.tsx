@@ -15,6 +15,7 @@ import Pricing from '@/components/site/sections/pricing';
 import Problem from '@/components/site/sections/problem';
 import RoiCalculator from '@/components/site/sections/roi-calculator';
 import TrustStrip from '@/components/site/sections/trust-strip';
+import { homeJsonLd } from '@/lib/site/structured-data';
 
 // Canonical alleen hier (niet in de layout: subpagina's zouden hem anders erven).
 export const metadata: Metadata = {
@@ -24,6 +25,10 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd()).replace(/</g, '\\u003c') }}
+      />
       <Hero />
       <TrustStrip />
       <Problem />
