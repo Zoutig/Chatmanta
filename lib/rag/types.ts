@@ -55,6 +55,10 @@ export type RagConfig = {
       verwijst). Met speculativeRetryOnEmpty start de voorbewerking alleen nog lui bij nul treffers
       (route + herschreven zoekvraag). Default uit. */
   lazyPreprocess?: boolean;
+  /** v0.15h: nooit een LLM-voorbewerking (ook niet lui of bij vervolgvragen). Vervolgvragen zoeken
+      daarnaast op "vorige gebruikersvraag + huidige vraag" (deterministisch); nul treffers = vaste
+      fallback. Vereist lazyPreprocess. Default uit. */
+  noLlmPreprocess?: boolean;
   /** v0.14: compacte router-prompt (alleen route + smalltalk-reply, geen herschrijving) voor het
       deferPreprocess-pad — daar zoekt de engine al op de originele vraag, dus de rewrite is overbodig
       en een kortere prompt is sneller. Persona-tokens zoals preProcessSystem. Default: volle prompt. */

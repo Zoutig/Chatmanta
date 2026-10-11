@@ -1566,7 +1566,7 @@ export async function* runRagQuery(
   const lazyPreprocess =
     bot.lazyPreprocess === true &&
     enableRewrite &&
-    (history.length === 0 || !needsHistoryResolution(original));
+    (history.length === 0 || bot.noLlmPreprocess === true || !needsHistoryResolution(original));
   // v0.14 deferPreprocess (eerste vraag): de pre-processor hoeft alleen nog te
   // routeren → compacte router-prompt als de bot die heeft.
   const routeOnlyPreprocess =
@@ -1658,7 +1658,7 @@ export async function* runRagQuery(
   const settleDeferredPreprocess = async (force = false): Promise<PreProcessResult | null> => {
     if ((!deferPreprocess && !lazyPreprocess) || deferredSettled) return null;
     if (!preProcessPromise) {
-      if (!(lazyPreprocess && force)) return null;
+      if (!(lazyPreprocess && force) || bot.noLlmPreprocess === true) return null;
       ppStartedAt = performance.now();
       preProcessPromise = preProcessInput(original, bot, persona, history, tone, false);
     }
@@ -1931,6 +1931,12 @@ export async function* runRagQuery(
     querySet.length = 0;
   }
   for (const q of ppSubQueries) querySet.push({ text: q, isHyde: false });
+  // v0.15h noLlmPreprocess: geen herschrijving, dus een vervolgvraag zoekt óók op de vorige
+  // gebruikersvraag + de huidige (de losse vraag blijft er ook in voor een nieuw onderwerp).
+  if (bot.noLlmPreprocess === true) {
+    const lastUser = [...history].reverse().find((t) => t.role === 'user')?.content?.trim();
+    if (lastUser) querySet.push({ text: `${lastUser} ${original}`, isHyde: false });
+  }
 
   // 4. Embed all queries (batched).
   yield { kind: 'status', phase: 'embed' };
