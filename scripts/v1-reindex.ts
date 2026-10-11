@@ -7,8 +7,12 @@
 //
 //   npm run v1:reindex -- --chatbot=<id>          (proefdraai: alleen tellingen)
 //   npm run v1:reindex -- --chatbot=<id> --apply
-//   npm run v1:reindex -- --all [--apply]         (alle chatbots die nog niet op --to staan)
+//   npm run v1:reindex -- --all [--apply]         (alle chatbots; alleen documenten die nog niet op --to staan)
 //   --to=v2 (default) | --to=v1 (terugdraaien)
+//
+// Per document telt documents.metadata.index_version; ontbreekt die, dan is het document door
+// code van vóór migr 0030 geschreven en dus v1 — ook als de chatbot al op v2 staat (bv. een
+// chatbot die tussen migratie en deploy is aangemaakt). Zo herstelt --all die gevallen ook.
 //
 // Reconstructie-check: voor v1-documenten wordt de herbouwde tekst opnieuw met de v1-knipper
 // geknipt en vergeleken met de opgeslagen parents. Klopt dat niet exact, dan wordt het
@@ -68,7 +72,7 @@ type Prepared = {
   vectors: number[][];
 };
 
-async function prepareChatbot(sb: Sb, orgId: string, chatbotId: string, from: IndexVersion) {
+async function prepareChatbot(sb: Sb, orgId: string, chatbotId: string) {
   const docs = await all<Doc>((a, b) =>
     sb
       .from('documents')
@@ -83,6 +87,9 @@ async function prepareChatbot(sb: Sb, orgId: string, chatbotId: string, from: In
   const skipped: string[] = [];
   let cost = 0;
   for (const doc of docs) {
+    const metaVersion = doc.metadata?.index_version;
+    const docVersion: IndexVersion = isIndexVersion(metaVersion) ? metaVersion : 'v1';
+    if (docVersion === target) continue;
     const ps = await all<{ parent_index: number; content: string }>((a, b) =>
       sb
         .from('parent_chunks')
@@ -96,8 +103,6 @@ async function prepareChatbot(sb: Sb, orgId: string, chatbotId: string, from: In
       // Gefaalde/uitgesloten pagina's (status failed/excluded) hebben geen chunks: niets te doen.
       continue;
     }
-    const metaVersion = doc.metadata?.index_version;
-    const docVersion: IndexVersion = isIndexVersion(metaVersion) ? metaVersion : from;
     const parentsOld = ps.map((p) => p.content);
     let text: string | null;
     if (docVersion === 'v1') {
@@ -177,22 +182,24 @@ async function main() {
   if (ONLY) q = q.eq('id', ONLY);
   const { data: bots, error } = await q;
   if (error) throw new Error(error.message);
-  const todo = (bots ?? []).filter((b) => b.index_version !== target);
-  console.log(
-    `${APPLY ? 'APPLY' : 'PROEFDRAAI'} → ${target}: ${todo.length} chatbot(s) (${(bots ?? []).length - todo.length} staan al op ${target})`,
-  );
+  const todo = bots ?? [];
+  console.log(`${APPLY ? 'APPLY' : 'PROEFDRAAI'} → ${target}: ${todo.length} chatbot(s)`);
   let totalCost = 0;
   for (const bot of todo) {
     const orgId = bot.organization_id as string;
     const chatbotId = bot.id as string;
     const from = bot.index_version as IndexVersion;
     const t0 = Date.now();
-    const prep = await prepareChatbot(sb, orgId, chatbotId, from);
+    const prep = await prepareChatbot(sb, orgId, chatbotId);
+    if (from === target && prep.prepared.length === 0 && prep.skipped.length === 0) {
+      console.log(`\n• ${bot.name} (${chatbotId}): staat al volledig op ${target}`);
+      continue;
+    }
     totalCost += prep.cost;
     const newChildren = prep.prepared.reduce((s, p) => s + p.children.length, 0);
     const newParents = prep.prepared.reduce((s, p) => s + p.parents.length, 0);
     console.log(
-      `\n• ${bot.name} (${chatbotId}) ${from} → ${target}: ${prep.docs.length} documenten, ${prep.prepared.length} met inhoud → ${newParents} parents / ${newChildren} chunks, embed $${prep.cost.toFixed(4)}`,
+      `\n• ${bot.name} (${chatbotId}) ${from} → ${target}: ${prep.docs.length} documenten, ${prep.prepared.length} om te zetten → ${newParents} parents / ${newChildren} chunks, embed $${prep.cost.toFixed(4)}`,
     );
     for (const s of prep.skipped) console.log(`  ! ${s}`);
     if (!APPLY) continue;
