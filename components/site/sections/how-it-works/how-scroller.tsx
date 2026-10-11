@@ -1,6 +1,6 @@
 'use client';
 
-import { useInView, useReducedMotion } from 'motion/react';
+import { useInView, useReducedMotion } from '../../ui/motion-hooks';
 import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Mark } from '../../ui/logo';
 import { cx } from '../../ui/cx';
@@ -14,7 +14,7 @@ const TILES = Array.from({ length: N }, (_, i) => {
   const r = Math.floor(i / COLS);
   return { x: 3 + c * 14, y: 4 + r * 15.5 };
 });
-const URL_TXT = 'vandam-fietsen.nl';
+const URL_TXT = 'devrijloop.nl';
 /** Desktop-breekpunt waarop de sticky stage zichtbaar is (gelijk aan how-it-works.css). */
 const STAGE_MIN_W = 900;
 
@@ -247,7 +247,7 @@ export function HowScroller({ children }: { children: ReactNode }) {
             <div className="minisite">
               <div className="hdr">
                 <i />
-                Fietsenmaker Van Dam
+                Fietsmakerij De Vrijloop
               </div>
               <div className="ln w55" />
               <div className="ln w72" />

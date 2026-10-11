@@ -1,5 +1,5 @@
 // Voorbeeld-dashboard (/voorbeeld): een publieke kopie van het V1-klantendashboard
-// zonder login, voor een fictieve klant (Vakantiepark De Duinhoeve).
+// zonder login, voor een fictieve klant (Vakantiepark De Helmduin).
 //
 // Geen auth, geen database-reads: alle pagina's draaien op vaste voorbeelddata
 // (lib/voorbeeld/fixtures) plus wat de bezoeker zelf in zijn browser wijzigt

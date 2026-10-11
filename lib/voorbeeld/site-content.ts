@@ -1,5 +1,5 @@
 /**
- * Vakantiepark De Duinhoeve — FICTIEF bedrijf.
+ * Vakantiepark De Helmduin — FICTIEF bedrijf.
  *
  * Enige bron van waarheid voor de voorbeeldwebsite onder /voorbeeld/website.
  * Dezelfde data wordt (via pageToPlainText) als kennisbank in de demo-chatbot
@@ -134,19 +134,19 @@ export function pathFor(slug: string): string {
 // ---------------------------------------------------------------------------
 
 export const COMPANY = {
-  name: 'Vakantiepark De Duinhoeve',
-  shortName: 'De Duinhoeve',
-  street: 'Duinhoeveweg 12',
+  name: 'Vakantiepark De Helmduin',
+  shortName: 'De Helmduin',
+  street: 'Helmduinweg 12',
   postcode: '4370 XX',
   city: 'Westerduin',
   province: 'Zeeland',
   phone: '0118 000 000',
   emergencyPhone: '0118 000 001',
   whatsapp: '06 00 00 00 00',
-  email: 'info@duinhoeve.example',
-  groupsEmail: 'groepen@duinhoeve.example',
-  jobsEmail: 'werken@duinhoeve.example',
-  privacyEmail: 'privacy@duinhoeve.example',
+  email: 'info@helmduin.example',
+  groupsEmail: 'groepen@helmduin.example',
+  jobsEmail: 'werken@helmduin.example',
+  privacyEmail: 'privacy@helmduin.example',
   kvk: '00000000',
   founded: 1987,
   hectares: 28,
@@ -320,7 +320,7 @@ export const ACCOMMODATIONS: Accommodation[] = [
     tagline: 'Rolstoeltoegankelijk familiehuis aan de bosrand, volledig gelijkvloers bruikbaar.',
     scene: 'bos',
     description: [
-      'De zes Boshuizen staan aan de rand van het dennenbos aan de oostkant van het park, op het rustigste deel van De Duinhoeve. Ze zijn in 2022 nieuw gebouwd en volledig rolstoeltoegankelijk. Alle deuren zijn minimaal 95 cm breed, er zijn geen drempels en je kunt met een rolstoel overal draaien.',
+      'De zes Boshuizen staan aan de rand van het dennenbos aan de oostkant van het park, op het rustigste deel van De Helmduin. Ze zijn in 2022 nieuw gebouwd en volledig rolstoeltoegankelijk. Alle deuren zijn minimaal 95 cm breed, er zijn geen drempels en je kunt met een rolstoel overal draaien.',
       'Op de begane grond liggen de woonkamer, de keuken, twee slaapkamers en een aangepaste badkamer. Op de verdieping zijn nog twee slaapkamers en een tweede badkamer. Zo kan een gezin met iemand die rolstoel gebruikt prima samen met opa en oma of vrienden op vakantie.',
       'Het Boshuis is allergievriendelijk: er liggen geen vloerkleden, de matrassen hebben anti-allergeenhoezen en er komen geen huisdieren in. Erkende assistentiehonden zijn natuurlijk wel welkom, en daarvoor betaal je niets.',
     ],
@@ -694,7 +694,7 @@ function accommodationPage(acc: Accommodation): SitePage {
     sections,
     group: 'verblijf',
     scene: acc.scene,
-    description: `${acc.name} bij Vakantiepark De Duinhoeve: ${acc.tagline}`,
+    description: `${acc.name} bij Vakantiepark De Helmduin: ${acc.tagline}`,
     accommodationSlug: acc.slug,
   };
 }
@@ -714,13 +714,13 @@ const HOME = makePage({
   slug: '',
   navLabel: 'Home',
   title: `Vakantie tussen duin en zee in Zeeland`,
-  intro: `Vakantiepark De Duinhoeve is een familiepark van ${COMPANY.hectares} hectare in de duinen bij Westerduin, op 400 meter van het strand. Sinds ${COMPANY.founded} ontvangen we gezinnen, stellen, groepen en kampeerders in strandhuisjes, lodges, safaritenten en op ruime kampeerplaatsen. Met een overdekt zwembad, een eigen strandpaviljoen en een animatieteam dat in elke schoolvakantie klaarstaat.`,
+  intro: `Vakantiepark De Helmduin is een familiepark van ${COMPANY.hectares} hectare in de duinen bij Westerduin, op 400 meter van het strand. Sinds ${COMPANY.founded} ontvangen we gezinnen, stellen, groepen en kampeerders in strandhuisjes, lodges, safaritenten en op ruime kampeerplaatsen. Met een overdekt zwembad, een eigen strandpaviljoen en een animatieteam dat in elke schoolvakantie klaarstaat.`,
   group: 'over',
   scene: 'duinen',
   description: `Familiepark in de Zeeuwse duinen bij Westerduin, op 400 meter van het strand. Strandhuisjes, lodges, glamping en kamperen.`,
   sections: [
     {
-      heading: `Waarom gasten voor De Duinhoeve kiezen`,
+      heading: `Waarom gasten voor De Helmduin kiezen`,
       bullets: [
         `Het strand ligt op 400 meter, je loopt er in vijf minuten via het duinpad naartoe`,
         `Overdekt zwembad De Golfslag met een glijbaan van 42 meter, gratis voor gasten`,
@@ -731,7 +731,7 @@ const HOME = makePage({
       ],
     },
     {
-      heading: `Overnachten op De Duinhoeve`,
+      heading: `Overnachten op De Helmduin`,
       paragraphs: [
         `We hebben ${HOUSES.reduce((n, a) => n + a.units, 0)} accommodaties en ${PITCHES.reduce((n, a) => n + a.units, 0)} kampeerplaatsen. Van het tiny house voor twee personen tot de groepsaccommodatie De Hoeve voor zestien personen. Alle accommodaties hebben gratis wifi, en in de meeste zijn honden welkom.`,
         `Een week in een strandhuisje voor vier personen boek je in het laagseizoen al vanaf ${euro(595)}. Een kampeerplaats kost vanaf ${euro(24.5)} per nacht voor twee personen. Op de pagina Prijzen en seizoenen vind je alle tarieven voor 2027.`,
@@ -780,7 +780,7 @@ const ACCOMMODATIONS_OVERVIEW = makePage({
   intro: `Kies uit zes soorten vakantiehuizen en twee soorten kampeerplaatsen. Alle accommodaties liggen binnen 900 meter van het strand en hebben gratis wifi.`,
   group: 'verblijf',
   scene: 'lodge',
-  description: `Overzicht van alle accommodaties en kampeerplaatsen op Vakantiepark De Duinhoeve.`,
+  description: `Overzicht van alle accommodaties en kampeerplaatsen op Vakantiepark De Helmduin.`,
   sections: [
     {
       heading: `Vakantiehuizen`,
@@ -959,7 +959,7 @@ const BOOKING = makePage({
   intro: `Je boekt het makkelijkst online, maar bellen of mailen mag natuurlijk ook. Hieronder lees je hoe het boeken werkt, wanneer je wat betaalt en hoe je je boeking wijzigt.`,
   group: 'praktisch',
   scene: 'duinen',
-  description: `Zo boek je bij De Duinhoeve: aanbetaling, restbetaling, betaalmethoden en wijzigen.`,
+  description: `Zo boek je bij De Helmduin: aanbetaling, restbetaling, betaalmethoden en wijzigen.`,
   sections: [
     {
       heading: `Zo boek je`,
@@ -1008,7 +1008,7 @@ const BOOKING = makePage({
     {
       heading: `Cadeaubonnen`,
       paragraphs: [
-        `Een Duinhoeve-cadeaubon is te koop vanaf ${euro(25)} en is 2 jaar geldig. Je kunt hem gebruiken voor een verblijf, in het restaurant, het strandpaviljoen of bij de wellness. Bestellen gaat via de receptie of per e-mail. Het bedrag kan in delen worden gebruikt.`,
+        `Een Helmduin-cadeaubon is te koop vanaf ${euro(25)} en is 2 jaar geldig. Je kunt hem gebruiken voor een verblijf, in het restaurant, het strandpaviljoen of bij de wellness. Bestellen gaat via de receptie of per e-mail. Het bedrag kan in delen worden gebruikt.`,
       ],
     },
   ],
@@ -1021,7 +1021,7 @@ const CANCELLATION = makePage({
   intro: `Soms gaat een vakantie niet door. Hier lees je wat annuleren kost, hoe je het doet en waarom een annuleringsverzekering verstandig kan zijn.`,
   group: 'praktisch',
   scene: 'duinen',
-  description: `Annuleringskosten, annuleringsverzekering en hoe je je boeking annuleert bij De Duinhoeve.`,
+  description: `Annuleringskosten, annuleringsverzekering en hoe je je boeking annuleert bij De Helmduin.`,
   sections: [
     {
       heading: `Annuleringskosten`,
@@ -1077,7 +1077,7 @@ const ARRIVAL = makePage({
   intro: `Alles over inchecken, uitchecken, de sleutel, de slagboom en wat je moet doen als je later aankomt.`,
   group: 'praktisch',
   scene: 'duinen',
-  description: `Aankomst- en vertrektijden, late check-in, late check-out en de slagboom bij De Duinhoeve.`,
+  description: `Aankomst- en vertrektijden, late check-in, late check-out en de slagboom bij De Helmduin.`,
   sections: [
     {
       heading: `Tijden`,
@@ -1132,7 +1132,7 @@ const PETS = makePage({
   slug: 'huisdieren',
   navLabel: 'Huisdieren',
   title: `Op vakantie met je hond`,
-  intro: `Honden zijn welkom op De Duinhoeve. In de meeste accommodaties en op alle kampeerplaatsen mag je huisdier mee. Wel hebben we een paar afspraken, zodat iedereen een fijne vakantie heeft.`,
+  intro: `Honden zijn welkom op De Helmduin. In de meeste accommodaties en op alle kampeerplaatsen mag je huisdier mee. Wel hebben we een paar afspraken, zodat iedereen een fijne vakantie heeft.`,
   group: 'praktisch',
   scene: 'strand',
   description: `Welke accommodaties hondvriendelijk zijn, wat het kost en de regels voor huisdieren op het park en het strand.`,
@@ -1194,15 +1194,15 @@ const FACILITIES = makePage({
   slug: 'faciliteiten',
   navLabel: 'Faciliteiten',
   title: `Faciliteiten op het park`,
-  intro: `Van fietsverhuur tot laadpalen en van de wasserette tot de kinderboerderij: dit vind je allemaal op De Duinhoeve. Voor het zwembad en de wellness hebben we een aparte pagina.`,
+  intro: `Van fietsverhuur tot laadpalen en van de wasserette tot de kinderboerderij: dit vind je allemaal op De Helmduin. Voor het zwembad en de wellness hebben we een aparte pagina.`,
   group: 'park',
   scene: 'duinen',
-  description: `Fietsverhuur, laadpalen, wifi, wasserette, winkel, speeltuin en sport op Vakantiepark De Duinhoeve.`,
+  description: `Fietsverhuur, laadpalen, wifi, wasserette, winkel, speeltuin en sport op Vakantiepark De Helmduin.`,
   sections: [
     {
       heading: `Fietsverhuur`,
       paragraphs: [
-        `Zeeland ontdek je het best op de fiets. Bij Fietsverhuur De Duinhoeve, naast de receptie, huur je fietsen voor het hele gezin. De verhuur is open van 09:00 tot 17:30 uur, in het laagseizoen alleen op vrijdag, zaterdag en zondag. In het hoogseizoen raden we aan om je fietsen vooraf te reserveren via de receptie of bij het boeken. Een helm leen je gratis.`,
+        `Zeeland ontdek je het best op de fiets. Bij Fietsverhuur De Helmduin, naast de receptie, huur je fietsen voor het hele gezin. De verhuur is open van 09:00 tot 17:30 uur, in het laagseizoen alleen op vrijdag, zaterdag en zondag. In het hoogseizoen raden we aan om je fietsen vooraf te reserveren via de receptie of bij het boeken. Een helm leen je gratis.`,
       ],
       table: {
         columns: ['Fiets', 'Per dag', 'Per week'],
@@ -1226,7 +1226,7 @@ const FACILITIES = makePage({
     {
       heading: `Wifi`,
       paragraphs: [
-        `Op het hele park heb je gratis wifi via het netwerk Duinhoeve-Gast. Het wachtwoord staat op je sleutelpas. De snelheid is ongeveer 50 Mbit per seconde per accommodatie, genoeg om te streamen en te videobellen. Moet je echt werken? In de bibliotheek naast de receptie staan vier werkplekken met glasvezel en een printer (${euro(0.25)} per pagina).`,
+        `Op het hele park heb je gratis wifi via het netwerk Helmduin-Gast. Het wachtwoord staat op je sleutelpas. De snelheid is ongeveer 50 Mbit per seconde per accommodatie, genoeg om te streamen en te videobellen. Moet je echt werken? In de bibliotheek naast de receptie staan vier werkplekken met glasvezel en een printer (${euro(0.25)} per pagina).`,
       ],
     },
     {
@@ -1392,7 +1392,7 @@ const FOOD = makePage({
       bullets: [
         `Zeeuwse mosselen met frites en salade, ${euro(26.5)} (in het mosselseizoen, van juli tot april)`,
         `Vis van de dag uit Vlissingen, dagprijs rond ${euro(24.5)}`,
-        `Duinhoeve-burger van rund uit de Zak van Zuid-Beveland, ${euro(18.5)}`,
+        `Helmduin-burger van rund uit de Zak van Zuid-Beveland, ${euro(18.5)}`,
         `Groene curry met tofu en jasmijnrijst (vegan), ${euro(17.5)}`,
         `Dagschotel, ${euro(17.5)}`,
         `Pizza uit de steenoven, vanaf ${euro(13.5)}, ook om af te halen`,
@@ -1455,7 +1455,7 @@ const ACTIVITIES = makePage({
   intro: `In elke schoolvakantie staat animatieteam Helmgras klaar met een programma voor kinderen, tieners en volwassenen. Ons konijn Duinie is er natuurlijk ook bij.`,
   group: 'park',
   scene: 'duinen',
-  description: `Animatieprogramma per seizoen, kinderclub, tieneractiviteiten en workshops op De Duinhoeve.`,
+  description: `Animatieprogramma per seizoen, kinderclub, tieneractiviteiten en workshops op De Helmduin.`,
   sections: [
     {
       heading: `Wanneer is er animatie?`,
@@ -1521,10 +1521,10 @@ const AREA = makePage({
   slug: 'omgeving',
   navLabel: 'Omgeving',
   title: `De omgeving van Westerduin`,
-  intro: `De Duinhoeve ligt midden in het duingebied tussen de zee en de Zeeuwse polders. Het strand, het dorp en een hoop uitstapjes liggen op fietsafstand.`,
+  intro: `De Helmduin ligt midden in het duingebied tussen de zee en de Zeeuwse polders. Het strand, het dorp en een hoop uitstapjes liggen op fietsafstand.`,
   group: 'park',
   scene: 'omgeving',
-  description: `Strand, dorp Westerduin en uitjes in de omgeving met afstanden vanaf Vakantiepark De Duinhoeve.`,
+  description: `Strand, dorp Westerduin en uitjes in de omgeving met afstanden vanaf Vakantiepark De Helmduin.`,
   sections: [
     {
       heading: `Het strand`,
@@ -1582,15 +1582,15 @@ const DIRECTIONS = makePage({
   slug: 'bereikbaarheid',
   navLabel: 'Route en parkeren',
   title: `Bereikbaarheid en parkeren`,
-  intro: `Je bereikt De Duinhoeve makkelijk met de auto, maar ook met trein en bus. Hieronder lees je hoe je bij ons komt en waar je parkeert.`,
+  intro: `Je bereikt De Helmduin makkelijk met de auto, maar ook met trein en bus. Hieronder lees je hoe je bij ons komt en waar je parkeert.`,
   group: 'praktisch',
   scene: 'omgeving',
-  description: `Route met de auto en het openbaar vervoer naar De Duinhoeve, en alles over parkeren en laden.`,
+  description: `Route met de auto en het openbaar vervoer naar De Helmduin, en alles over parkeren en laden.`,
   sections: [
     {
       heading: `Adres`,
       paragraphs: [
-        `${COMPANY.name}, ${COMPANY.street}, ${COMPANY.postcode} ${COMPANY.city} (${COMPANY.province}). Gebruik voor je navigatie het adres Duinhoeveweg 12. Navigeer niet op postcode, want dan kom je bij de achteringang voor leveranciers uit.`,
+        `${COMPANY.name}, ${COMPANY.street}, ${COMPANY.postcode} ${COMPANY.city} (${COMPANY.province}). Gebruik voor je navigatie het adres Helmduinweg 12. Navigeer niet op postcode, want dan kom je bij de achteringang voor leveranciers uit.`,
       ],
     },
     {
@@ -1599,13 +1599,13 @@ const DIRECTIONS = makePage({
         `Vanuit Rotterdam: via de A29 en de N57 over de Haringvlietdam en de Zeelandbrug, ongeveer 1 uur en 30 minuten`,
         `Vanuit Utrecht en Brabant: A58 richting Vlissingen, afslag Middelburg, dan de borden Westerduin volgen, vanaf Breda ongeveer 1 uur en 15 minuten`,
         `Vanuit België: via Antwerpen en de Westerscheldetunnel (tol), ongeveer 1 uur vanaf Antwerpen`,
-        `Vanaf de rotonde bij Westerduin is De Duinhoeve aangegeven met bruine toeristische borden`,
+        `Vanaf de rotonde bij Westerduin is De Helmduin aangegeven met bruine toeristische borden`,
       ],
     },
     {
       heading: `Met het openbaar vervoer`,
       paragraphs: [
-        `Neem de trein naar station Middelburg. Vanaf daar rijdt buslijn 52 (fictief) naar Westerduin. Stap uit bij halte Westerduin, Duinhoeve; die ligt op 200 meter van de receptie. De bus rijdt in de zomer elk half uur en de rest van het jaar elk uur, van 07:00 tot 23:00 uur. De reistijd van het station naar het park is 25 minuten.`,
+        `Neem de trein naar station Middelburg. Vanaf daar rijdt buslijn 52 (fictief) naar Westerduin. Stap uit bij halte Westerduin, Helmduin; die ligt op 200 meter van de receptie. De bus rijdt in de zomer elk half uur en de rest van het jaar elk uur, van 07:00 tot 23:00 uur. De reistijd van het station naar het park is 25 minuten.`,
         `Liever een taxi? Een taxi van station Middelburg naar het park kost ongeveer ${euro(38)}. De receptie kan een taxi voor je bestellen. Met veel bagage kun je ook de bagageservice gebruiken: we halen je bagage op het station op voor ${euro(15)} per rit, als je dat 48 uur van tevoren aanvraagt.`,
       ],
     },
@@ -1634,10 +1634,10 @@ const GROUPS = makePage({
   slug: 'groepen-en-bedrijven',
   navLabel: 'Groepen en bedrijven',
   title: `Groepen, families en bedrijfsuitjes`,
-  intro: `Met de hele familie een weekend weg, een teamdag met vergadering en strandactiviteit, of een reünie met vrienden: op De Duinhoeve is ruimte voor groepen tot 60 personen.`,
+  intro: `Met de hele familie een weekend weg, een teamdag met vergadering en strandactiviteit, of een reünie met vrienden: op De Helmduin is ruimte voor groepen tot 60 personen.`,
   group: 'verblijf',
   scene: 'hoeve',
-  description: `Groepsaccommodatie De Hoeve, vergaderzaal De Zeereep en bedrijfsuitjes bij De Duinhoeve.`,
+  description: `Groepsaccommodatie De Hoeve, vergaderzaal De Zeereep en bedrijfsuitjes bij De Helmduin.`,
   sections: [
     {
       heading: `Overnachten met een groep`,
@@ -1696,7 +1696,7 @@ const DEALS = makePage({
   intro: `Met een van onze aanbiedingen of arrangementen ben je voordeliger uit. Kortingen zijn niet bij elkaar op te tellen, tenzij het er expliciet bij staat.`,
   group: 'verblijf',
   scene: 'strand',
-  description: `Vroegboekkorting, 55+ korting, last-minutes en arrangementen bij De Duinhoeve.`,
+  description: `Vroegboekkorting, 55+ korting, last-minutes en arrangementen bij De Helmduin.`,
   sections: [
     {
       heading: `Vroegboekkorting zomer 2027`,
@@ -1748,7 +1748,7 @@ const SUSTAINABILITY = makePage({
   intro: `We werken in een kwetsbaar duingebied en willen dat het park er over vijftig jaar nog net zo mooi bij ligt. Daarom investeren we flink in duurzaamheid.`,
   group: 'over',
   scene: 'duinen',
-  description: `Zonnepanelen, warmtepompen, afvalscheiding en natuurbeheer op Vakantiepark De Duinhoeve.`,
+  description: `Zonnepanelen, warmtepompen, afvalscheiding en natuurbeheer op Vakantiepark De Helmduin.`,
   sections: [
     {
       heading: `Energie`,
@@ -1801,7 +1801,7 @@ const ACCESSIBILITY = makePage({
   intro: `Iedereen moet bij ons een fijne vakantie kunnen hebben. Hier lees je wat we doen voor gasten met een beperking, en waar het nog niet perfect is.`,
   group: 'praktisch',
   scene: 'bos',
-  description: `Rolstoeltoegankelijke accommodaties, aangepast sanitair en hulpmiddelen op De Duinhoeve.`,
+  description: `Rolstoeltoegankelijke accommodaties, aangepast sanitair en hulpmiddelen op De Helmduin.`,
   sections: [
     {
       heading: `Aangepaste accommodaties`,
@@ -1857,7 +1857,7 @@ const HOUSE_RULES = makePage({
   intro: `Met veel mensen bij elkaar op een park is het fijn als iedereen zich aan dezelfde afspraken houdt. Dit zijn onze huisregels. Overtreed je ze ernstig of herhaaldelijk, dan kunnen we je vragen het park te verlaten, zonder teruggave van de huur.`,
   group: 'praktisch',
   scene: 'duinen',
-  description: `Huisregels van De Duinhoeve: nachtrust, barbecueën, roken, bezoek, verkeer en vuurwerk.`,
+  description: `Huisregels van De Helmduin: nachtrust, barbecueën, roken, bezoek, verkeer en vuurwerk.`,
   sections: [
     {
       heading: `Rust`,
@@ -1921,16 +1921,16 @@ const HOUSE_RULES = makePage({
 const ABOUT = makePage({
   slug: 'over-ons',
   navLabel: 'Over ons',
-  title: `Over De Duinhoeve`,
-  intro: `De Duinhoeve is een familiebedrijf. Wat in 1987 begon met twaalf kampeerplaatsen in de boomgaard van een boerderij, is uitgegroeid tot een park waar elk jaar zo'n 40.000 gasten logeren.`,
+  title: `Over De Helmduin`,
+  intro: `De Helmduin is een familiebedrijf. Wat in 1987 begon met twaalf kampeerplaatsen in de boomgaard van een boerderij, is uitgegroeid tot een park waar elk jaar zo'n 40.000 gasten logeren.`,
   group: 'over',
   scene: 'hoeve',
-  description: `Het verhaal van familiebedrijf De Duinhoeve, van boerderij in 1987 tot vakantiepark in de Zeeuwse duinen.`,
+  description: `Het verhaal van familiebedrijf De Helmduin, van boerderij in 1987 tot vakantiepark in de Zeeuwse duinen.`,
   sections: [
     {
       heading: `Hoe het begon`,
       paragraphs: [
-        `De boerderij De Duinhoeve werd in 1912 gebouwd door de familie Verhage, die er koeien en akkerbouw had. In 1987 besloten Kees en Marianne Verhage het over een andere boeg te gooien. Ze zetten twaalf kampeerplaatsen in de boomgaard en verkochten eieren en melk aan de kampeerders. De gasten bleven komen, en elk jaar kwamen er een paar plaatsen bij.`,
+        `De boerderij De Helmduin werd in 1912 gebouwd door de familie Verhage, die er koeien en akkerbouw had. In 1987 besloten Kees en Marianne Verhage het over een andere boeg te gooien. Ze zetten twaalf kampeerplaatsen in de boomgaard en verkochten eieren en melk aan de kampeerders. De gasten bleven komen, en elk jaar kwamen er een paar plaatsen bij.`,
         `In 1995 bouwden Kees en Marianne de eerste tien strandhuisjes, in 2003 kwam het overdekte zwembad en in 2011 strandpaviljoen Zilt. Sinds 2018 staat hun dochter Lotte Verhage samen met haar partner Joris de Wit aan het roer. Kees komt nog bijna elke dag langs, meestal bij de kinderboerderij.`,
       ],
     },
@@ -1956,7 +1956,7 @@ const ABOUT = makePage({
       table: {
         columns: ['Jaar', 'Wat gebeurde er'],
         rows: [
-          ['1912', 'De boerderij De Duinhoeve wordt gebouwd'],
+          ['1912', 'De boerderij De Helmduin wordt gebouwd'],
           ['1987', 'Kees en Marianne Verhage openen een camping met 12 plaatsen'],
           ['1995', 'De eerste 10 strandhuisjes'],
           ['2003', 'Overdekt zwembad De Golfslag'],
@@ -1975,11 +1975,11 @@ const ABOUT = makePage({
 const JOBS = makePage({
   slug: 'vacatures',
   navLabel: 'Werken bij',
-  title: `Werken bij De Duinhoeve`,
+  title: `Werken bij De Helmduin`,
   intro: `Werken waar een ander vakantie viert. We zoeken collega's die gastvrij zijn, aanpakken en het leuk vinden om mensen een mooie vakantie te geven.`,
   group: 'over',
   scene: 'duinen',
-  description: `Vacatures en seizoenswerk bij Vakantiepark De Duinhoeve in Westerduin.`,
+  description: `Vacatures en seizoenswerk bij Vakantiepark De Helmduin in Westerduin.`,
   sections: [
     {
       heading: `Wat we je bieden`,
@@ -2040,7 +2040,7 @@ const FAQ = makePage({
         },
         {
           q: `Kan ik met een cadeaubon betalen?`,
-          a: `Ja, een Duinhoeve-cadeaubon kun je gebruiken voor een verblijf, in het restaurant, het strandpaviljoen en de wellness. Hij is 2 jaar geldig. Andere cadeaukaarten nemen we niet aan.`,
+          a: `Ja, een Helmduin-cadeaubon kun je gebruiken voor een verblijf, in het restaurant, het strandpaviljoen en de wellness. Hij is 2 jaar geldig. Andere cadeaukaarten nemen we niet aan.`,
         },
         {
           q: `Is de toeristenbelasting inbegrepen in de prijs?`,
@@ -2145,7 +2145,7 @@ const FAQ = makePage({
         },
         {
           q: `Is er wifi?`,
-          a: `Ja, gratis op het hele park via het netwerk Duinhoeve-Gast. Het wachtwoord staat op je sleutelpas.`,
+          a: `Ja, gratis op het hele park via het netwerk Helmduin-Gast. Het wachtwoord staat op je sleutelpas.`,
         },
         {
           q: `Kan ik mijn elektrische auto opladen?`,
@@ -2208,7 +2208,7 @@ const CONTACT = makePage({
   intro: `Heb je een vraag over je boeking of het park? De receptie helpt je graag. Je kunt ons bellen, mailen, appen of gewoon even langskomen.`,
   group: 'praktisch',
   scene: 'duinen',
-  description: `Telefoonnummer, e-mail, WhatsApp, adres en openingstijden van de receptie van De Duinhoeve.`,
+  description: `Telefoonnummer, e-mail, WhatsApp, adres en openingstijden van de receptie van De Helmduin.`,
   sections: [
     {
       heading: `Contactgegevens`,
@@ -2260,7 +2260,7 @@ const TERMS = makePage({
   intro: `Op alle boekingen zijn de RECRON-voorwaarden van toepassing, aangevuld met onze eigen parkvoorwaarden. Hieronder vind je de belangrijkste punten in gewone taal. De volledige tekst sturen we mee met je bevestiging.`,
   group: 'over',
   scene: 'duinen',
-  description: `Samenvatting van de algemene voorwaarden en parkvoorwaarden van De Duinhoeve.`,
+  description: `Samenvatting van de algemene voorwaarden en parkvoorwaarden van De Helmduin.`,
   sections: [
     {
       heading: `De boeking`,
@@ -2312,7 +2312,7 @@ const PRIVACY = makePage({
   intro: `We gaan zorgvuldig om met je gegevens. In deze verklaring lees je welke gegevens we verzamelen, waarom we dat doen en wat je rechten zijn.`,
   group: 'over',
   scene: 'duinen',
-  description: `Privacyverklaring van Vakantiepark De Duinhoeve: welke gegevens we bewaren en waarom.`,
+  description: `Privacyverklaring van Vakantiepark De Helmduin: welke gegevens we bewaren en waarom.`,
   sections: [
     {
       heading: `Welke gegevens we verzamelen`,

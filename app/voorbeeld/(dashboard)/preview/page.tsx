@@ -26,7 +26,7 @@ export default function V1PreviewPage() {
           </>
         }
       />
-      <PreviewFrame address="duinhoeve.example">
+      <PreviewFrame address="helmduin.example">
         <DemoPreviewWidget />
       </PreviewFrame>
     </div>

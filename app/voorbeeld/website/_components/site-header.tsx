@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { DuinhoeveLogo } from './logo';
+import { HelmduinLogo } from './logo';
 
 type NavItem = { href: string; label: string };
 
@@ -17,8 +17,8 @@ export function SiteHeader({ nav, bookHref, homeHref }: { nav: NavItem[]; bookHr
   return (
     <header className="dh-header">
       <div className="dh-container dh-header-inner">
-        <Link href={homeHref} className="dh-logo-link" aria-label="De Duinhoeve, naar de homepage" onClick={close}>
-          <DuinhoeveLogo />
+        <Link href={homeHref} className="dh-logo-link" aria-label="De Helmduin, naar de homepage" onClick={close}>
+          <HelmduinLogo />
         </Link>
 
         <nav className="dh-nav" aria-label="Hoofdmenu">

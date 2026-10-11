@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducedMotion } from 'motion/react';
+import { useReducedMotion } from '../../ui/motion-hooks';
 import { useEffect, useRef } from 'react';
 import { Icon } from '../../ui/icon';
 import { Mark } from '../../ui/logo';
@@ -9,7 +9,7 @@ import { createGate, prefersReducedMotion } from './gate';
 const USER_TEXT = 'Zijn jullie zaterdag open? Mijn band is lek.';
 const BOT_TEXT =
   'Ja, op zaterdag zijn we open van 9:00 tot 16:00. Een lekke band plakken we meestal terwijl je wacht.';
-const SOURCE = 'vandam-fietsen.nl/openingstijden';
+const SOURCE = 'devrijloop.nl/openingstijden';
 
 /** Woorden als losse spans (voor het streamen); witruimte blijft gewone tekst. */
 function words(text: string) {
@@ -110,17 +110,17 @@ export function HeroChat() {
         className="chat"
         ref={chatRef}
         role="group"
-        aria-label="Voorbeeldgesprek met de chatbot van Fietsenmaker Van Dam (fictief bedrijf)"
+        aria-label="Voorbeeldgesprek met de chatbot van Fietsmakerij De Vrijloop (fictief bedrijf)"
       >
         <div className="chat-head">
           <div className="chat-av" aria-hidden="true">
             <Mark />
           </div>
           <div>
-            <div className="chat-title">Fietsenmaker Van Dam · voorbeeld</div>
+            <div className="chat-title">Fietsmakerij De Vrijloop · voorbeeld</div>
             <div className="chat-sub">
               <span className="dot-live" aria-hidden="true" />
-              Antwoordt uit vandam-fietsen.nl
+              Antwoordt uit devrijloop.nl
             </div>
           </div>
           <time className="chat-clock" dateTime="23:04" aria-label="Tijd: 23:04">

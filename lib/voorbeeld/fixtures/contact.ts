@@ -1,4 +1,4 @@
-// Vaste voorbeelddata voor Contactverzoeken (Vakantiepark De Duinhoeve).
+// Vaste voorbeelddata voor Contactverzoeken (Vakantiepark De Helmduin).
 // Alle namen, e-mailadressen en nummers zijn fictief. Pure data + kleine
 // helpers: veilig in zowel server- als client-componenten.
 import type { V1ContactRequest } from '@/lib/v1/dashboard/contact-requests';

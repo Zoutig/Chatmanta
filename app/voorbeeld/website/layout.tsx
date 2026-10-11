@@ -1,4 +1,4 @@
-// Voorbeeldwebsite van het FICTIEVE Vakantiepark De Duinhoeve (/voorbeeld/website).
+// Voorbeeldwebsite van het FICTIEVE Vakantiepark De Helmduin (/voorbeeld/website).
 // Op deze site draait de ChatManta-demowidget; de kennisbank van de bot is de
 // tekst van precies deze pagina's (lib/voorbeeld/site-content.ts).
 import './site.css';
@@ -19,7 +19,7 @@ import {
   type SitePageGroup,
 } from '@/lib/voorbeeld/site-content';
 import { SiteHeader } from './_components/site-header';
-import { DuinhoeveMark } from './_components/logo';
+import { HelmduinMark } from './_components/logo';
 
 const serif = Fraunces({
   subsets: ['latin'],
@@ -34,8 +34,8 @@ const sans = Inter({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Vakantiepark De Duinhoeve',
-    default: 'Vakantiepark De Duinhoeve',
+    template: '%s | Vakantiepark De Helmduin',
+    default: 'Vakantiepark De Helmduin',
   },
   description: 'Fictieve voorbeeldwebsite van een vakantiepark in de Zeeuwse duinen, met de ChatManta-chatbot.',
   robots: { index: false, follow: false },
@@ -89,8 +89,8 @@ export default function VoorbeeldWebsiteLayout({ children }: { children: React.R
             <div className="dh-footer-top">
               <div className="dh-footer-brand">
                 <div className="dh-footer-logo">
-                  <DuinhoeveMark size={44} />
-                  <span>De Duinhoeve</span>
+                  <HelmduinMark size={44} />
+                  <span>De Helmduin</span>
                 </div>
                 <address className="dh-footer-address">
                   {COMPANY.street}

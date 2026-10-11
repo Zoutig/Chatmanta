@@ -71,7 +71,7 @@
   --on-dark-2: #a9bccd;
   --line-dark: rgba(255, 255, 255, 0.12);
   --warn-dark: #fdba74;
-  /* fictief-bedrijf-accent (Fietsenmaker Van Dam / Voorbeeldbedrijf) */
+  /* fictief-bedrijf-accent (Fietsmakerij De Vrijloop / Voorbeeldbedrijf) */
   --demo-brand: #c4512a; /* mockup #e0663c = 3.4:1 met witte tekst (live-demo-venster); #c4512a haalt AA */
   --contours: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 520'%3E%3Cg fill='none' stroke='%235eead4' stroke-opacity='.10' stroke-width='1.1'%3E%3Cpath d='M-20 40C140 0 260 90 420 52S660 -6 820 30'/%3E%3Cpath d='M-20 100C150 64 270 150 430 112S670 50 820 92'/%3E%3Cpath d='M-20 164C160 128 280 214 440 176S680 112 820 156'/%3E%3Cpath d='M-20 230C170 196 290 280 450 242S690 176 820 222'/%3E%3Cpath d='M-20 298C180 266 300 348 460 310S700 242 820 290'/%3E%3Cpath d='M-20 368C190 338 310 418 470 380S710 310 820 360'/%3E%3Cpath d='M-20 440C200 412 320 490 480 452S720 380 820 432'/%3E%3Cpath d='M-20 512C210 486 330 562 490 524S730 452 820 504'/%3E%3C/g%3E%3C/svg%3E");
   --focus: 0 0 0 3px rgba(13, 148, 136, 0.35);

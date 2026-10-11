@@ -1,5 +1,5 @@
 // Merkteken van het fictieve park: duin + golf in een cirkel.
-export function DuinhoeveMark({ size = 40 }: { size?: number }) {
+export function HelmduinMark({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" focusable="false">
       <circle cx="24" cy="24" r="23" fill="#1F3D36" />
@@ -10,13 +10,13 @@ export function DuinhoeveMark({ size = 40 }: { size?: number }) {
   );
 }
 
-export function DuinhoeveLogo() {
+export function HelmduinLogo() {
   return (
     <span className="dh-logo">
-      <DuinhoeveMark />
+      <HelmduinMark />
       <span className="dh-logo-text">
         <span className="dh-logo-kicker">Vakantiepark</span>
-        <span className="dh-logo-name">De Duinhoeve</span>
+        <span className="dh-logo-name">De Helmduin</span>
       </span>
     </span>
   );

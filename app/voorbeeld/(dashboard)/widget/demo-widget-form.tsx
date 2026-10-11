@@ -25,7 +25,7 @@ export function DemoWidgetForm({ origin, missingAfterMs }: { origin: string; mis
         logoStyle: s.logoStyle,
         customLogoDataUrl: s.customLogoDataUrl,
       }}
-      fallbackTitle={s.chatbotName.trim() || 'De Duinhoeve'}
+      fallbackTitle={s.chatbotName.trim() || 'De Helmduin'}
       starterQuestions={normalizeStarters(s.starterQuestions, s.showStarterQuestions)}
       slug={DEMO_ORG_SLUG}
       origin={origin}

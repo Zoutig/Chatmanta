@@ -46,7 +46,7 @@ function downloadCsv(rows: V1ConversationListItem[]): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'gesprekken-duinhoeve.csv';
+  a.download = 'gesprekken-helmduin.csv';
   document.body.appendChild(a);
   a.click();
   a.remove();

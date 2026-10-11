@@ -8,6 +8,6 @@ import { V1PreviewWidget } from './v1-chat';
 export function DemoPreviewWidget() {
   const settings = useDemoSettings();
   return (
-    <V1PreviewWidget orgId="voorbeeld" chatbotId="duinhoeve" appearance={toWidgetAppearance(settings, 'De Duinhoeve')} />
+    <V1PreviewWidget orgId="voorbeeld" chatbotId="helmduin" appearance={toWidgetAppearance(settings, 'De Helmduin')} />
   );
 }
