@@ -1848,6 +1848,40 @@ const V0_15T_SYSTEM_PROMPT = V0_15G_SYSTEM_PROMPT.replace(
 <answer>je antwoord voor de gebruiker</answer>
 <confidence>0.0–1.0: hoe sterk de CONTEXT je antwoord dekt</confidence>`,
 );
+const V0_15GO: BotConfig = {
+  ...V0_15G,
+  version: 'v0.15go',
+  label: 'v0.15go — v0.15g met opgeschoonde prompt (experiment)',
+  description: 'v0.15g; antwoordprompt herschreven onder vijf principes, korter, de meeste voorbeelden eruit.',
+  systemPrompt: V0_15O_SYSTEM_PROMPT,
+};
+const V0_15GM: BotConfig = {
+  ...V0_15G,
+  version: 'v0.15gm',
+  label: 'v0.15gm — v0.15g met minimale prompt (experiment)',
+  description: 'v0.15g; antwoordprompt teruggebracht tot zes kernregels.',
+  systemPrompt: V0_15M_SYSTEM_PROMPT,
+};
+const V0_15GT: BotConfig = {
+  ...V0_15G,
+  version: 'v0.15gt',
+  label: 'v0.15gt — v0.15g zonder denkstap (experiment)',
+  description: 'v0.15g; geen <thinking>-blok vóór het antwoord.',
+  systemPrompt: V0_15T_SYSTEM_PROMPT,
+};
+// Ronde 3 — gericht blokje op de enige kritieke fout die in álle versies terugkwam: "X ligt
+// buiten ons vaste werkgebied" terwijl de CONTEXT helemaal geen werkgebied noemt.
+const V0_15W_SYSTEM_PROMPT = V0_13X7_SYSTEM_PROMPT.replace(
+  'zegt de CONTEXT daar niets over, zeg dan dat het buiten jullie vaste werkgebied ligt en verwijs naar contact.',
+  'zegt de CONTEXT daar niets over, zeg dan dat het buiten jullie vaste werkgebied ligt en verwijs naar contact.\nNoemt de CONTEXT helemaal geen werkgebied, regio of afstandsgrens, zeg dan niet of de plaats binnen of buiten jullie werkgebied ligt: zeg dat jullie dat graag even afstemmen en geef het contact uit de CONTEXT.',
+);
+const V0_15RW: BotConfig = {
+  ...V0_15R,
+  version: 'v0.15rw',
+  label: 'v0.15rw — v0.15r + geen werkgebied-claim zonder werkgebied in de bron (experiment)',
+  description: 'v0.15r (= V1 live); GEOGRAFIE-regel: noemt de CONTEXT geen werkgebied, dan niet zeggen of een plaats binnen/buiten valt, maar afstemmen via contact.',
+  systemPrompt: V0_15W_SYSTEM_PROMPT,
+};
 // v0.13r* — retrieval-experimenten (overzichtspagina's: team, tarieven, werkgebied).
 // Basis = v0.12e. NIET gepromoveerd.
 const V0_13R1: BotConfig = {
@@ -1942,6 +1976,10 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_15F.version]: V0_15F,
   [V0_15G.version]: V0_15G,
   [V0_15H.version]: V0_15H,
+  [V0_15GO.version]: V0_15GO,
+  [V0_15GM.version]: V0_15GM,
+  [V0_15GT.version]: V0_15GT,
+  [V0_15RW.version]: V0_15RW,
 };
 
 /**
