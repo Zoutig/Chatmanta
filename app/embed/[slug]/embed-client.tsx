@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ChatMantaWidget, type ChatMantaWidgetProps } from '@/app/widget/components/chatmanta-widget';
+import { ChatMantaWidget, type ChatMantaWidgetProps } from '@/app/v0/widget/components/chatmanta-widget';
 import { ClientErrorBoundary } from '@/lib/observability/client-error-boundary';
 import { reportClientError } from '@/lib/observability/report-client-error';
 

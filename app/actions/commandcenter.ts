@@ -64,14 +64,14 @@ import { requireV0Auth } from './_auth';
 import { actionTry, type ActionResult } from '@/lib/errors/action';
 
 function revalidate() {
-  revalidatePath('/commandcenter');
-  revalidatePath('/commandcenter/tasks');
-  revalidatePath('/commandcenter/roadmap');
-  revalidatePath('/commandcenter/milestones');
-  revalidatePath('/commandcenter/checkins');
-  revalidatePath('/commandcenter/decisions');
-  revalidatePath('/commandcenter/customers');
-  revalidatePath('/commandcenter/projects');
+  revalidatePath('/v0/commandcenter');
+  revalidatePath('/v0/commandcenter/tasks');
+  revalidatePath('/v0/commandcenter/roadmap');
+  revalidatePath('/v0/commandcenter/milestones');
+  revalidatePath('/v0/commandcenter/checkins');
+  revalidatePath('/v0/commandcenter/decisions');
+  revalidatePath('/v0/commandcenter/customers');
+  revalidatePath('/v0/commandcenter/projects');
 }
 
 export async function listTasksAction(): Promise<ActionResult<{ tasks: Task[] }>> {

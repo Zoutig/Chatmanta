@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('V0 Latency tab + inline waterfall', () => {
   test('Latency-tab opent en toont window-toggle', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     // Tab-knop met label "Latency" zit in de right-panel.
     const latencyTab = page.getByRole('tab', { name: /latency/i });
@@ -24,7 +24,7 @@ test.describe('V0 Latency tab + inline waterfall', () => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.getByRole('tab', { name: /latency/i }).click();
 
     await page.getByRole('tab', { name: '24u' }).click();

@@ -28,7 +28,7 @@ import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v0/crawler/
 import { recordCrawlEvent } from '@/lib/v0/crawler/crawlEvents';
 import { normalizeHost } from '@/lib/v0/crawler/normalizeHost';
 
-const KENNISBANK_PATH = '/klantendashboard/kennisbank';
+const KENNISBANK_PATH = '/v0/klantendashboard/kennisbank';
 
 /** Zorgt dat een kale invoer ("jouwsite.nl") een geldig http(s)-schema krijgt. */
 function normalizeUrl(input: string): string {

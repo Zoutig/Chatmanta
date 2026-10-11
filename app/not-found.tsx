@@ -15,7 +15,7 @@ export default function NotFound() {
           startpagina om verder te zoeken.
         </p>
         <div className="app-error-actions">
-          <Link href="/home" className="app-error-retry">
+          <Link href="/v0/home" className="app-error-retry">
             Terug naar start
           </Link>
         </div>

@@ -336,19 +336,19 @@ export async function getSetupChecklist(
       title: 'Website toevoegen',
       status: hasWebsite ? 'completed' : 'todo',
       // Deep-link naar de Website-subtab (anders land je op Documenten). Item 1.
-      href: '/klantendashboard/kennisbank?tab=website',
+      href: '/v0/klantendashboard/kennisbank?tab=website',
     },
     {
       id: 'verify_sources',
       title: 'Bronnen controleren',
       status: hasAnyContent ? 'completed' : 'todo',
-      href: '/klantendashboard/kennisbank',
+      href: '/v0/klantendashboard/kennisbank',
     },
     {
       id: 'tone_of_voice',
       title: 'Tone of voice instellen',
       status: settingsSaved ? 'completed' : hasAnyContent ? 'in_progress' : 'todo',
-      href: '/klantendashboard/instellingen',
+      href: '/v0/klantendashboard/instellingen',
     },
     {
       id: 'test_questions',
@@ -358,19 +358,19 @@ export async function getSetupChecklist(
         : hasAnyTestMessages || hasAnyContent
           ? 'in_progress'
           : 'todo',
-      href: '/klantendashboard/test',
+      href: '/v0/klantendashboard/test',
     },
     {
       id: 'install_widget',
       title: 'Widget plaatsen',
       status: widgetInstalled ? 'completed' : 'todo',
-      href: '/klantendashboard/widget',
+      href: '/v0/klantendashboard/widget',
     },
     {
       id: 'go_live',
       title: 'Chatbot live zetten',
       status: widgetActive ? 'completed' : widgetInstalled ? 'in_progress' : 'todo',
-      href: '/klantendashboard/widget',
+      href: '/v0/klantendashboard/widget',
     },
   ];
 

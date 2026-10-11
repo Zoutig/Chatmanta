@@ -4,14 +4,14 @@ const STORAGE_KEY = 'chatmanta:v0:style';
 
 test.describe('V0 tone/length toggles', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
     await page.evaluate((k) => window.localStorage.removeItem(k), STORAGE_KEY);
   });
 
   test('composer toont drempel + toon + lengte pills (Rewrite is verdwenen)', async ({
     page,
   }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     // Composer-rij heeft pills voor drempel/toon/lengte
     const drempel = page.getByRole('button', { name: /drempel/i });
@@ -28,7 +28,7 @@ test.describe('V0 tone/length toggles', () => {
   });
 
   test('tone-popover wijzigt label en persisteert na reload', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     // Default = neutraal.
     const toon = page.getByRole('button', { name: /toon/i });
@@ -56,7 +56,7 @@ test.describe('V0 tone/length toggles', () => {
   });
 
   test('Settings-tab segmented sync met composer-pill', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     // Open Settings-tab.
     await page.getByRole('tab', { name: /instellingen/i }).click();
@@ -69,7 +69,7 @@ test.describe('V0 tone/length toggles', () => {
   });
 
   test('Prompt-tab toont base, suffix en final met huidige stijl', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/v0/admintool');
 
     // Zet length op short via composer.
     await page.getByRole('button', { name: /lengte/i }).click();

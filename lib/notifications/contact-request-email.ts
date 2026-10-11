@@ -24,7 +24,7 @@ export function isValidContactEmail(email: string | null | undefined): email is 
  *  de lijst-tab. */
 export function contactRequestsDashboardUrl(): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.chatmanta.nl').replace(/\/+$/, '');
-  return `${base}/klantendashboard/contactverzoeken`;
+  return `${base}/v0/klantendashboard/contactverzoeken`;
 }
 
 function esc(s: string): string {

@@ -17,7 +17,7 @@ import { AppError } from '@/lib/errors/app-error';
  * Redirects to /v1/login if not authenticated.
  *
  * NB: dit is de V1-auth-laag (Supabase Auth tegen het V1-project). `/v1/login`
- * is de V1-login — NIET de V0-demo-wachtwoord-`/login`. De provisionele route
+ * is de V1-login — NIET de V0-demo-wachtwoord-`/v0/login`. De provisionele route
  * verandert mogelijk bij de kernel-graduatie.
  */
 export async function requireAuth(): Promise<User> {

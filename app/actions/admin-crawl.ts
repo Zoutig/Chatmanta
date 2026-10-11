@@ -108,8 +108,8 @@ function requireKnownOrgId(slug: string): string {
 }
 
 function revalidate(slug: string) {
-  revalidatePath('/admindashboard', 'layout');
-  revalidatePath(`/admindashboard/klanten/${slug}`);
+  revalidatePath('/v0/admindashboard', 'layout');
+  revalidatePath(`/v0/admindashboard/klanten/${slug}`);
 }
 
 /** Bovengrens voor een geüpload document (10 MB). */
@@ -418,7 +418,7 @@ export async function adminRerunCrawlAction(jobId: string): Promise<ActionResult
       payload: { requestedUrls: safe.length, rerun: true },
     });
 
-    revalidatePath('/admindashboard', 'layout');
+    revalidatePath('/v0/admindashboard', 'layout');
     return {};
   });
 }
@@ -445,7 +445,7 @@ export async function adminProcessOpenCrawlsAction(): Promise<ActionResult<{ pro
       const summary = await processCrawlJobs(sb, jobs as OpenJob[]);
       processed = summary.length;
     }
-    revalidatePath('/admindashboard', 'layout');
+    revalidatePath('/v0/admindashboard', 'layout');
     return { processed };
   });
 }

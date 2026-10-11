@@ -56,7 +56,7 @@ function assertYearMonth(year: number, month: number): void {
 
 /** 'layout' herrendert de hele /admindashboard-tree (overzicht + detail + tabs). */
 function revalidate() {
-  revalidatePath('/admindashboard', 'layout');
+  revalidatePath('/v0/admindashboard', 'layout');
 }
 
 /**

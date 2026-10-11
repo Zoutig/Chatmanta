@@ -43,7 +43,7 @@ Open `.env.local` en vul de waarden in (Sebastiaan deelt de keys via een passwor
 ### 4. Smoke test
 ```bash
 npm run check-env       # checkt of alle env vars er zijn
-npm run dev             # start de dev server op http://localhost:3000
+npm run dev             # start de dev server op http://localhost:3000 (V0-hub: /v0/home)
 ```
 
 Werkt het? Top, je bent klaar.

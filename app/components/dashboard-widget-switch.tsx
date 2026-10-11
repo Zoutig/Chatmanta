@@ -14,8 +14,8 @@ type Current = 'dashboard' | 'widget';
 type Variant = 'dashboard' | 'demo-chrome';
 
 const TARGETS: Record<Current, string> = {
-  dashboard: '/klantendashboard/widget',
-  widget: '/widget',
+  dashboard: '/v0/klantendashboard/widget',
+  widget: '/v0/widget',
 };
 
 const LABELS: Record<Current, string> = {

@@ -4,8 +4,8 @@
 // React-component (server component) terug die op de gegeven markdown + skin
 // is afgestemd.
 
-import type { OrgSkin } from '@/app/widget/org-skins';
-import type { PageKind } from '@/app/widget/org-skins';
+import type { OrgSkin } from '@/app/v0/widget/org-skins';
+import type { PageKind } from '@/app/v0/widget/org-skins';
 import { HeroPageTemplate } from './hero';
 import { ServicesPageTemplate } from './services';
 import { PricingPageTemplate } from './pricing';

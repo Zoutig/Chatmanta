@@ -1,7 +1,8 @@
 // Next.js 16 proxy (was middleware in Next.js <16).
 //
-// Single job: gate ALL pages behind the V0 demo password except /login itself
-// and Next.js' internals. Server actions also re-check via requireAuth() in
+// Single job: gate ALL pages behind the V0 demo password except /v0/login itself
+// and Next.js' internals (deny-by-default: alles wat niet expliciet in de matcher
+// is uitgezonderd, valt achter de gate). Server actions also re-check via requireAuth() in
 // app/actions/_auth.ts — never rely on the proxy alone (defense in depth).
 
 import { NextResponse, type NextRequest } from 'next/server';
@@ -24,17 +25,17 @@ export async function proxy(req: NextRequest) {
   if (verifyAuthCookieValue(cookie)) {
     return NextResponse.next();
   }
-  const loginUrl = new URL('/login', req.url);
-  // Preserve where the user wanted to go so /login can bounce them back.
+  const loginUrl = new URL('/v0/login', req.url);
+  // Preserve where the user wanted to go so /v0/login can bounce them back.
   loginUrl.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search);
   return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  // Run on every path EXCEPT /login, Next.js internals, static assets, en de
+  // Run on every path EXCEPT /v0/login, Next.js internals, static assets, en de
   // Vercel-cron-route. Die laatste heeft geen login-cookie (Vercel roept 'm
   // server-side aan) en beveiligt zichzelf via CRON_SECRET in de route-handler —
-  // zou anders naar /login omgeleid worden en nooit draaien.
+  // zou anders naar /v0/login omgeleid worden en nooit draaien.
   // /privacy is een publieke privacyverklaring (gelinkt vanuit het feedback-
   // formulier) en MOET zonder demo-login bereikbaar zijn. Segment-geankerd
   // (`privacy(?:/|$)`) zodat alleen /privacy zelf de gate omzeilt.
@@ -53,7 +54,7 @@ export const config = {
   // api/v1/cron (process-crawls): de V1-crawler-pinger-route, exact zoals api/v0/cron.
   // Wordt server-side aangeroepen (externe pinger of Vercel-cron) zónder demo-cookie en
   // beveiligt zichzelf via Bearer CRON_SECRET in de handler — zonder deze exemptie zou
-  // elke ping naar /login omgeleid worden en de crawl-verwerking nooit draaien. Segment-
+  // elke ping naar /v0/login omgeleid worden en de crawl-verwerking nooit draaien. Segment-
   // geankerd (`api/v1/cron(?:/|$)`) zodat alleen dit pad-segment de gate omzeilt.
   //
   // /crawl-eval/* zijn statische fixture-pagina's (public/crawl-eval/) voor de
@@ -74,7 +75,13 @@ export const config = {
   // nepdata + voorbeeldwebsite van een fictief bedrijf). Geen klantdata; de demo-chat-
   // route beveiligt zichzelf (origin-lock + per-IP rate-limit + org-budgetgate).
   // api/v1/feedback staat er bewust NIET bij: de duimpjes zijn uit de V1-widget.
+  //
+  // Marketingsite M1: V0 verhuisde naar /v0/*. De login-exemptie is nu het
+  // segment-geankerde `v0/login(?:/|$)` (was een ongeankerd `login`-prefix). De
+  // oude /login is voor niet-ingelogde bezoekers bereikbaar via de 308-redirect in
+  // next.config.ts: config-redirects draaien vóór de proxy (Next 16 execution
+  // order), dus /login hoeft hier niet meer uitgezonderd te worden.
   matcher: [
-    '/((?!login|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!v0/login(?:/|$)|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };

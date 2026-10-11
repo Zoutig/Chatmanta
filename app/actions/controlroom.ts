@@ -88,8 +88,8 @@ function requireKnownOrgId(slug: string): string {
 function revalidate(slug?: string) {
   // 'layout' herrendert de hele /admindashboard-segmenttree (overview, lijst,
   // detail-tabs) zodat een statuswijziging overal meteen zichtbaar is.
-  revalidatePath('/admindashboard', 'layout');
-  if (slug) revalidatePath(`/admindashboard/klanten/${slug}`);
+  revalidatePath('/v0/admindashboard', 'layout');
+  if (slug) revalidatePath(`/v0/admindashboard/klanten/${slug}`);
 }
 
 export async function updateProfileAction(
@@ -313,8 +313,8 @@ export async function adminSaveChatbotSettingsAction(
     requireKnownOrgId(orgSlug);
     const chatbot = await saveChatbotSettings(orgSlug as OrgSlug, patch);
     revalidate(orgSlug);
-    revalidatePath('/klantendashboard', 'layout');
-    revalidatePath('/widget', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
+    revalidatePath('/v0/widget', 'layout');
     return { chatbot };
   });
 }
@@ -328,8 +328,8 @@ export async function adminSaveWidgetSettingsAction(
     requireKnownOrgId(orgSlug);
     const widget = await saveWidgetSettings(orgSlug as OrgSlug, patch);
     revalidate(orgSlug);
-    revalidatePath('/klantendashboard', 'layout');
-    revalidatePath('/widget', 'layout');
+    revalidatePath('/v0/klantendashboard', 'layout');
+    revalidatePath('/v0/widget', 'layout');
     return { widget };
   });
 }
@@ -510,7 +510,7 @@ export async function activateQuizAction(
     await updateQuizCounts(quizId, { questionCount: active.length });
     await setQuizStatus(quizId, 'actief');
     revalidate(orgSlug);
-    revalidatePath('/klantendashboard', 'layout'); // klant-banner (M4) verschijnt
+    revalidatePath('/v0/klantendashboard', 'layout'); // klant-banner (M4) verschijnt
     return { id: quizId };
   });
 }

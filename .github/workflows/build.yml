@@ -4,7 +4,7 @@ name: build
 # en bouwt (geen dev-server, geen lint/coverage): tsc-typecheck + unit-tests + next build.
 #
 # LET OP (HANDOFF — repo-secrets vereist): `next build` draait generateStaticParams
-# voor de SSG-widget-pagina's (`/widget/[slug]/[page]`), die Supabase queryt. Sinds de
+# voor de SSG-widget-pagina's (`/v0/widget/[slug]/[page]`), die Supabase queryt. Sinds de
 # V0/V1-namespace-split (kickoff §3) heten de keys V0_* / V1_*. Zet in GitHub →
 # Settings → Secrets and variables → Actions deze repo-secrets:
 #   - V0_SUPABASE_URL

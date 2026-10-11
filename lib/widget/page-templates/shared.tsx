@@ -12,7 +12,7 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { renderInline, type MarkdownTheme } from '../render-markdown';
 import type { ParsedBlock } from '../parse-md';
-import type { OrgSkin } from '@/app/widget/org-skins';
+import type { OrgSkin } from '@/app/v0/widget/org-skins';
 
 // ---------------------------------------------------------------------------
 // Theme + color helpers

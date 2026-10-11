@@ -40,7 +40,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <Link
-        href="/home"
+        href="/v0/home"
         prefetch={false}
         aria-label="Terug naar ChatManta home"
         className="brand"
@@ -165,7 +165,7 @@ function OrgSwitcher({
   function handleLogout() {
     startTransition(async () => {
       await logoutAction();
-      // logoutAction redirect()'t naar /login — code hieronder draait niet meer.
+      // logoutAction redirect()'t naar /v0/login — code hieronder draait niet meer.
     });
   }
 

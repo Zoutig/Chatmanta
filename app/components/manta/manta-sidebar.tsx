@@ -47,7 +47,7 @@ export function MantaSidebar({
         {/* Logo + "ChatManta" tekst zijn klikbaar — terug naar /home hub.
             Collapse-button blijft buiten de Link (geen button-in-anchor). */}
         <Link
-          href="/home"
+          href="/v0/home"
           prefetch={false}
           aria-label="Terug naar ChatManta home"
           className="manta-sidebar-brand-home"
