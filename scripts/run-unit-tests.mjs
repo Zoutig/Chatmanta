@@ -1,4 +1,4 @@
-// Draait alle unit-tests: elk bestand onder een __tests__-map in lib/ of app/.
+// Draait alle unit-tests: elk bestand onder een __tests__-map in lib/, app/ of components/.
 // TWEE passes met verschillende module-condities (panel-review 2026-07-02):
 //   pass 1 "react-server": alles BEHALVE files die react-dom/server importeren
 //     — modules met `import 'server-only'` (embed-token V0/V1) vereisen deze
@@ -9,7 +9,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const ROOTS = ['lib', 'app', 'scripts', 'tests'];
+const ROOTS = ['lib', 'app', 'components', 'scripts', 'tests'];
 const isTest = (p) => /\.test\.(ts|tsx)$/.test(p);
 const inTestsDir = (p) => /(^|[\\/])__tests__[\\/]/.test(p);
 

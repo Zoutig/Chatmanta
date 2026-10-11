@@ -1,0 +1,142 @@
+/* Sectie features — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
+   - Elke selector begint met `.site-ui .s-features` (root-klasse van deze sectie).
+   - Keyframes heten `features-<naam>`.
+   - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css.
+   Port van mockup-final §6 ("BENTO"). */
+
+.site-ui .s-features .bento { display: grid; gap: 14px; grid-template-columns: 1fr; }
+.site-ui .s-features .bento > * { min-width: 0; }
+@media (min-width: 700px) { .site-ui .s-features .bento { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1040px) {
+  .site-ui .s-features .bento { grid-template-columns: repeat(6, 1fr); }
+  .site-ui .s-features .t-lead,
+  .site-ui .s-features .t-read { grid-column: span 3; }
+  .site-ui .s-features .t-quiz,
+  .site-ui .s-features .t-style,
+  .site-ui .s-features .t-fast { grid-column: span 2; }
+  .site-ui .s-features .t-src { grid-column: span 6; }
+}
+/* 700–1039px: 2 kolommen; de bron-tegel neemt de volle breedte zodat er geen gat valt */
+@media (min-width: 700px) and (max-width: 1039px) {
+  .site-ui .s-features .t-src { grid-column: 1 / -1; }
+}
+
+.site-ui .s-features .tile-b { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px; box-shadow: var(--sh-1); overflow: hidden; transition: box-shadow var(--base) var(--ease); }
+.site-ui .s-features .tile-b:focus-within,
+.site-ui .s-features .tile-b:hover { box-shadow: var(--sh-2); }
+.site-ui .s-features .tile-b:focus-visible { box-shadow: var(--focus); border-radius: var(--r-lg); }
+.site-ui .s-features .tile-b .tag { display: block; margin-top: 4px; font-size: 0.8rem; font-weight: 500; color: var(--faint); }
+.site-ui .s-features .tile-b p { color: var(--muted); font-size: 0.93rem; margin-top: 8px; max-width: 520px; }
+
+/* micro-demo-paneel: loops staan stil tot BentoPlay de tegel aanzet */
+.site-ui .s-features .demo { position: relative; height: 150px; margin-bottom: 18px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.site-ui .s-features .demo,
+.site-ui .s-features .demo * { animation-play-state: paused !important; }
+.site-ui .s-features .bento[data-play~="lead"] .t-lead .demo *,
+.site-ui .s-features .bento[data-play~="read"] .t-read .demo *,
+.site-ui .s-features .bento[data-play~="quiz"] .t-quiz .demo *,
+.site-ui .s-features .bento[data-play~="style"] .t-style .demo *,
+.site-ui .s-features .bento[data-play~="fast"] .t-fast .demo *,
+.site-ui .s-features .bento[data-play~="src"] .t-src .demo * { animation-play-state: running !important; }
+
+/* leads: formulier vliegt de inbox in, badge popt */
+.site-ui .s-features .d-lead .form { position: absolute; left: 16px; top: 22px; width: 46%; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; box-shadow: var(--sh-1); animation: features-leadFly 3.6s var(--ease) infinite; }
+.site-ui .s-features .d-lead .form i { display: block; height: 7px; border-radius: 4px; background: var(--line); margin: 6px 0; }
+.site-ui .s-features .d-lead .form i:first-child { width: 50%; background: var(--ink-2); opacity: 0.6; }
+.site-ui .s-features .d-lead .form b { display: block; height: 16px; border-radius: 5px; background: var(--teal); margin-top: 8px; width: 60%; }
+.site-ui .s-features .d-lead .box { position: absolute; right: 16px; top: 30px; width: 34%; height: 88px; border-radius: 12px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; font-size: 0.75rem; color: var(--muted); }
+.site-ui .s-features .d-lead .box svg { width: 24px; color: var(--ink-2); }
+.site-ui .s-features .d-lead .badge { position: absolute; right: 10px; top: 22px; min-width: 22px; height: 22px; border-radius: 11px; background: var(--teal); color: #fff; font-size: 0.72rem; font-weight: 600; display: grid; place-items: center; animation: features-badgePop 3.6s var(--spring) infinite; }
+@keyframes features-leadFly {
+  0%, 20% { transform: none; opacity: 1; }
+  55% { transform: translate(120%, 8px) scale(0.35); opacity: 0; }
+  56%, 70% { transform: translate(0, 10px); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes features-badgePop {
+  0%, 50% { transform: scale(0); }
+  60% { transform: scale(1.15); }
+  68%, 92% { transform: scale(1); }
+  100% { transform: scale(0); }
+}
+
+/* gesprekken teruglezen: rijen scrollen omhoog */
+.site-ui .s-features .d-read .rows { position: absolute; top: 10px; left: 12px; right: 12px; animation: features-rowsUp 4s linear infinite; }
+.site-ui .s-features .d-read .r { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; font-size: 0.76rem; color: var(--ink-2); white-space: nowrap; overflow: hidden; }
+.site-ui .s-features .d-read .r time { font-size: 0.7rem; font-weight: 500; color: var(--faint); }
+.site-ui .s-features .d-read .r em { font-style: normal; font-size: 0.66rem; font-weight: 600; padding: 2px 6px; border-radius: 5px; background: var(--teal-soft); color: var(--teal-ink); }
+.site-ui .s-features .d-read .r em.no { background: var(--warn-soft); color: var(--warn); }
+@keyframes features-rowsUp { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+
+/* kennisgat-quiz: ? kantelt weg, ✓ verschijnt */
+.site-ui .s-features .d-quiz { display: grid; place-items: center; }
+.site-ui .s-features .d-quiz .q { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 1.8rem; position: relative; }
+.site-ui .s-features .d-quiz .q span { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 18px; }
+.site-ui .s-features .d-quiz .q .a { background: var(--warn-soft); color: var(--warn); animation: features-qOut 3.4s var(--ease) infinite; }
+.site-ui .s-features .d-quiz .q .b { background: var(--teal); color: #fff; animation: features-qIn 3.4s var(--spring) infinite; }
+.site-ui .s-features .d-quiz small { position: absolute; bottom: 12px; font-size: 0.74rem; color: var(--muted); }
+@keyframes features-qOut {
+  0%, 40% { opacity: 1; transform: none; }
+  55%, 92% { opacity: 0; transform: rotateY(90deg); }
+  100% { opacity: 1; }
+}
+@keyframes features-qIn {
+  0%, 48% { opacity: 0; transform: scale(0.6); }
+  60%, 92% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; }
+}
+
+/* eigen stijl: widgetknop wisselt van merkkleur */
+.site-ui .s-features .d-style .site { position: absolute; inset: 14px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.site-ui .s-features .d-style .site i { display: block; height: 6px; border-radius: 3px; background: var(--line); margin: 12px 12px 0; }
+.site-ui .s-features .d-style .site i:nth-child(2) { width: 60%; }
+.site-ui .s-features .d-style .wb { position: absolute; right: 24px; bottom: 24px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; animation: features-hue 4s steps(1) infinite; box-shadow: var(--sh-2); background: var(--teal); }
+.site-ui .s-features .d-style .wb .mk { width: 22px; color: #fff; }
+.site-ui .s-features .d-style .sw { position: absolute; left: 24px; bottom: 24px; display: flex; gap: 6px; }
+.site-ui .s-features .d-style .sw i { width: 16px; height: 16px; border-radius: 5px; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line-2); }
+.site-ui .s-features .d-style .sw i:nth-child(1) { background: #0d9488; }
+.site-ui .s-features .d-style .sw i:nth-child(2) { background: #e0663c; }
+.site-ui .s-features .d-style .sw i:nth-child(3) { background: #4f46e5; }
+.site-ui .s-features .d-style .sw i:nth-child(4) { background: #16314a; }
+@keyframes features-hue {
+  0% { background: #0d9488; }
+  25% { background: #e0663c; }
+  50% { background: #4f46e5; }
+  75% { background: #16314a; }
+}
+
+/* fast mode: snelheidsmeter */
+.site-ui .s-features .d-fast { display: grid; place-items: center; }
+.site-ui .s-features .d-fast svg.g { width: 150px; height: 90px; }
+.site-ui .s-features .d-fast .needle { transform-origin: 75px 78px; animation: features-needle 3.2s var(--ease) infinite; }
+@keyframes features-needle {
+  0%, 10% { transform: rotate(-80deg); }
+  45%, 85% { transform: rotate(55deg); }
+  100% { transform: rotate(-80deg); }
+}
+
+/* antwoord mét bron */
+.site-ui .s-features .t-src .inner { display: grid; gap: 22px; align-items: center; }
+.site-ui .s-features .t-src .inner > * { min-width: 0; }
+@media (min-width: 860px) {
+  .site-ui .s-features .t-src .inner { grid-template-columns: 1fr 1.1fr; }
+  .site-ui .s-features .t-src .demo { margin: 0; }
+}
+.site-ui .s-features .d-src { display: flex; flex-direction: column; justify-content: center; padding: 14px 18px; gap: 6px; }
+.site-ui .s-features .d-src .bubble { background: #fff; border: 1px solid var(--line); font-size: 0.85rem; max-width: 90%; border-bottom-left-radius: 5px; }
+.site-ui .s-features .d-src .chip { animation: features-chipIn 3.6s var(--spring) infinite; align-self: flex-start; }
+@keyframes features-chipIn {
+  0%, 25% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  38%, 90% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
+/* reduced motion: geen loops, wel de eindstand (vinkje, naald op 55°, badge, chip) */
+@media (prefers-reduced-motion: reduce) {
+  .site-ui .s-features .demo,
+  .site-ui .s-features .demo * { animation: none !important; }
+  .site-ui .s-features .d-quiz .q .a { opacity: 0; }
+  .site-ui .s-features .d-quiz .q .b { opacity: 1; }
+  .site-ui .s-features .d-fast .needle { transform: rotate(55deg); }
+  .site-ui .s-features .d-lead .badge { transform: scale(1); }
+}

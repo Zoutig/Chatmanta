@@ -1,0 +1,179 @@
+/* /kennismaking — pagina + formulier. Niet in de mockup; opgebouwd uit de
+   mockup-taal: witte kaart (--surface, --r-xl, --sh-2) naast een navy paneel met
+   contourlijnen (zoals .roi-out / .final-card). Alles gescoped onder .s-kennis. */
+
+.site-ui .s-kennis {
+  padding: clamp(40px, 6vw, 88px) 0 clamp(64px, 8vw, 120px);
+  background:
+    radial-gradient(60% 50% at 85% 0%, rgba(13, 148, 136, 0.07), transparent 70%),
+    linear-gradient(var(--bg), var(--bg-2));
+}
+
+/* ---------- Kop ---------- */
+.site-ui .s-kennis .kn-head { max-width: 720px; margin-bottom: clamp(28px, 4vw, 48px); }
+.site-ui .s-kennis .kn-head h1 { font-size: clamp(2.2rem, 1.2rem + 3.4vw, 3.9rem); line-height: 1; }
+.site-ui .s-kennis .kn-head .lede { margin-top: 16px; max-width: 560px; }
+
+/* ---------- Raster ---------- */
+.site-ui .s-kennis .kn-grid {
+  display: grid; gap: clamp(16px, 2.4vw, 28px);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .site-ui .s-kennis .kn-grid { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  .site-ui .s-kennis .kn-aside { position: sticky; top: calc(var(--nav-h) + 24px); }
+}
+
+/* ---------- Formulierkaart ---------- */
+.site-ui .s-kennis .kn-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
+  box-shadow: var(--sh-2); padding: clamp(20px, 3.4vw, 40px);
+  min-width: 0;
+}
+.site-ui .s-kennis .kn-form { display: grid; gap: 20px; }
+.site-ui .s-kennis .kn-row { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) {
+  .site-ui .s-kennis .kn-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.site-ui .s-kennis .kn-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.site-ui .s-kennis .kn-label { font-size: 0.9rem; font-weight: 600; color: var(--ink); padding: 0; line-height: 1.4; }
+.site-ui .s-kennis .kn-opt { font-weight: 500; color: var(--faint); }
+.site-ui .s-kennis .kn-hint { font-size: 0.82rem; color: var(--muted); margin-top: -2px; }
+
+.site-ui .s-kennis .kn-input {
+  width: 100%; min-height: 48px; padding: 11px 14px;
+  font: inherit; font-size: 1rem; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r);
+  box-shadow: 0 1px 0 rgba(12, 30, 46, 0.03) inset;
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+  -webkit-appearance: none; appearance: none;
+}
+.site-ui .s-kennis .kn-input::placeholder { color: var(--faint); opacity: 1; }
+.site-ui .s-kennis .kn-input:hover { border-color: #b9c6d3; }
+.site-ui .s-kennis .kn-input:focus,
+.site-ui .s-kennis .kn-input:focus-visible { outline: 2px solid transparent; outline-offset: 2px; border-color: var(--teal); box-shadow: var(--focus); border-radius: var(--r); }
+.site-ui .s-kennis .kn-textarea { min-height: 116px; resize: vertical; line-height: 1.5; }
+
+.site-ui .s-kennis .is-invalid .kn-input { border-color: var(--warn); }
+.site-ui .s-kennis .is-invalid .kn-input:focus { box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.22); }
+.site-ui .s-kennis .kn-error {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 0.84rem; font-weight: 500; color: var(--warn); line-height: 1.45;
+  animation: kennis-errIn var(--base) var(--ease);
+}
+.site-ui .s-kennis .kn-error svg { flex: none; margin-top: 2px; }
+@keyframes kennis-errIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Pakket: segment-keuze (radio) ---------- */
+.site-ui .s-kennis .kn-pakket legend { margin-bottom: 6px; }
+.site-ui .s-kennis .kn-seg {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+  padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
+}
+@media (min-width: 640px) {
+  .site-ui .s-kennis .kn-seg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.site-ui .s-kennis .kn-seg-opt { position: relative; display: block; cursor: pointer; }
+.site-ui .s-kennis .kn-seg-opt input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.site-ui .s-kennis .kn-seg-opt span {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 44px; padding: 6px 10px; border-radius: 10px;
+  font-size: 0.9rem; font-weight: 600; color: var(--muted); line-height: 1.2;
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.site-ui .s-kennis .kn-seg-opt:hover span { color: var(--ink); }
+.site-ui .s-kennis .kn-seg-opt input:checked + span { background: var(--surface); color: var(--ink); box-shadow: var(--sh-1), 0 0 0 1px var(--line-2); }
+.site-ui .s-kennis .kn-seg-opt input:focus-visible + span { box-shadow: var(--focus); }
+
+/* ---------- Toestemming ---------- */
+.site-ui .s-kennis .kn-consent { display: grid; gap: 6px; }
+.site-ui .s-kennis .kn-check {
+  position: relative; display: flex; align-items: flex-start; gap: 12px;
+  min-height: 44px; padding: 10px 0; cursor: pointer;
+  font-size: 0.92rem; color: var(--muted); line-height: 1.5;
+}
+.site-ui .s-kennis .kn-check input { position: absolute; left: 0; top: 10px; width: 22px; height: 22px; opacity: 0; margin: 0; cursor: pointer; }
+.site-ui .s-kennis .kn-box {
+  flex: none; pointer-events: none; width: 22px; height: 22px; margin-top: 1px;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--line-2); border-radius: 6px; background: var(--surface); color: #fff;
+  transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.site-ui .s-kennis .kn-box svg { opacity: 0; transform: scale(0.6); transition: opacity var(--fast) var(--ease), transform var(--base) var(--spring); }
+.site-ui .s-kennis .kn-check input:checked + .kn-box { background: var(--teal); border-color: var(--teal); }
+.site-ui .s-kennis .kn-check input:checked + .kn-box svg { opacity: 1; transform: none; }
+.site-ui .s-kennis .kn-check input:focus-visible + .kn-box { box-shadow: var(--focus); }
+.site-ui .s-kennis .is-invalid .kn-box { border-color: var(--warn); }
+.site-ui .s-kennis .kn-check a { color: var(--teal-ink); font-weight: 600; text-underline-offset: 3px; }
+.site-ui .s-kennis .kn-check a:hover { color: var(--ink); }
+
+/* ---------- Honeypot (onzichtbaar, niet display:none — sommige bots slaan dat over) ---------- */
+.site-ui .s-kennis .kn-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+/* ---------- Verzenden ---------- */
+.site-ui .s-kennis .kn-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.site-ui .s-kennis .kn-submit { width: 100%; }
+@media (min-width: 640px) { .site-ui .s-kennis .kn-submit { width: auto; padding: 0 26px; } }
+.site-ui .s-kennis .kn-submit:disabled { cursor: progress; opacity: 0.85; transform: none; }
+.site-ui .s-kennis .kn-spin {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35); border-top-color: #fff;
+  animation: kennis-spin 0.7s linear infinite;
+}
+@keyframes kennis-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Foutmelding (verzending) ---------- */
+.site-ui .s-kennis .kn-alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--r);
+  background: var(--warn-soft); border: 1px solid #f3d3ad; color: #7c3d06;
+  font-size: 0.92rem; line-height: 1.5;
+  animation: kennis-errIn var(--base) var(--ease);
+}
+.site-ui .s-kennis .kn-alert svg { flex: none; margin-top: 2px; color: var(--warn); }
+.site-ui .s-kennis .kn-alert a { color: inherit; font-weight: 700; text-underline-offset: 3px; overflow-wrap: anywhere; }
+
+/* ---------- Bevestiging ---------- */
+.site-ui .s-kennis .kn-success { display: grid; gap: 18px; justify-items: start; padding: clamp(8px, 2vw, 20px) 0; }
+.site-ui .s-kennis .kn-success-mark {
+  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%;
+  background: var(--teal-soft); color: var(--teal-ink); box-shadow: 0 0 0 6px rgba(13, 148, 136, 0.06);
+}
+.site-ui .s-kennis .kn-success-title { font-size: clamp(1.6rem, 1.1rem + 1.6vw, 2.25rem); line-height: 1.1; letter-spacing: -0.03em; font-weight: 800; overflow-wrap: anywhere; }
+.site-ui .s-kennis .kn-success-title:focus { outline: none; box-shadow: none; }
+.site-ui .s-kennis .kn-success-text { margin-top: 12px; color: var(--muted); font-size: 1.04rem; max-width: 520px; overflow-wrap: anywhere; }
+.site-ui .s-kennis .kn-success-text strong { color: var(--ink); }
+.site-ui .s-kennis .kn-success-demo { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--muted); }
+
+/* ---------- Navy paneel ---------- */
+.site-ui .s-kennis .kn-aside {
+  position: relative; overflow: hidden; isolation: isolate;
+  border-radius: var(--r-xl); background: var(--ink); color: var(--on-dark);
+  padding: clamp(24px, 3.4vw, 40px);
+  box-shadow: var(--sh-3);
+}
+.site-ui .s-kennis .kn-contour { position: absolute; inset: 0; z-index: -1; background: var(--contours) center/cover no-repeat; opacity: 0.9; }
+.site-ui .s-kennis .kn-aside h2 { color: #fff; font-size: clamp(1.35rem, 1.1rem + 0.8vw, 1.7rem); line-height: 1.15; letter-spacing: -0.025em; }
+.site-ui .s-kennis .kn-topics { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 14px; }
+.site-ui .s-kennis .kn-topics li { display: flex; gap: 12px; align-items: flex-start; color: var(--on-dark); line-height: 1.45; }
+.site-ui .s-kennis .kn-num {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(45, 212, 191, 0.12); border: 1px solid rgba(45, 212, 191, 0.3);
+  color: var(--aqua-hi); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.site-ui .s-kennis .kn-promises {
+  list-style: none; margin: 24px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line-dark);
+  display: grid; gap: 10px; font-size: 0.92rem; color: var(--on-dark-2);
+}
+.site-ui .s-kennis .kn-promises li { display: flex; gap: 10px; align-items: center; }
+.site-ui .s-kennis .kn-promises svg { flex: none; color: var(--aqua); }
+.site-ui .s-kennis .kn-founders { margin-top: 20px; font-size: 0.92rem; color: var(--on-dark-2); }
+.site-ui .s-kennis .kn-aside :focus-visible { box-shadow: var(--focus-dark); }
+
+/* Windows Contrast / forced-colors laat box-shadow weg → echte outline als focusindicator. */
+@media (forced-colors: active) {
+  .site-ui .s-kennis .kn-seg-opt input:focus-visible + span,
+  .site-ui .s-kennis .kn-check input:focus-visible + .kn-box { outline: 2px solid CanvasText; outline-offset: 2px; }
+}

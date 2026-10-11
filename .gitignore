@@ -73,3 +73,6 @@ dev-server.log
 # skills-installer artefacten (echte kopieën staan gecommit in .claude/skills/)
 .agents/
 skills-lock.json
+
+# Visuele QA-screenshots marketingsite (lokaal)
+.site-qa/

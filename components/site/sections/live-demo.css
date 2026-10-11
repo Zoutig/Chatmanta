@@ -1,0 +1,63 @@
+/* Sectie live-demo (§11): port van mockup-final "11. DEMO". Contract: docs/site/CONTRACT.md.
+   Elke selector begint met `.site-ui .s-demo`. Geen keyframes nodig (CSS-transitie). */
+
+.site-ui .s-demo .demo-blk { display: grid; gap: 32px; align-items: center; }
+.site-ui .s-demo .demo-blk > * { min-width: 0; }
+@media (min-width: 960px) {
+  .site-ui .s-demo .demo-blk { grid-template-columns: 0.9fr 1.1fr; gap: 56px; }
+}
+.site-ui .s-demo .lede { margin-top: 16px; }
+.site-ui .s-demo .demo-cta { margin-top: 26px; }
+
+/* Browser-frame */
+.site-ui .s-demo .browser {
+  border-radius: var(--r-lg); border: 1px solid var(--line); background: #fff;
+  box-shadow: var(--sh-3); overflow: hidden;
+}
+.site-ui .s-demo .browser .bar {
+  display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line);
+}
+.site-ui .s-demo .browser .bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); flex: none; }
+.site-ui .s-demo .browser .bar span {
+  margin-left: 10px; flex: 1; max-width: 280px; height: 24px; border-radius: 6px; background: #fff;
+  border: 1px solid var(--line); font-size: 0.75rem; font-weight: 500; color: var(--muted);
+  display: flex; align-items: center; padding: 0 10px; overflow: hidden; white-space: nowrap;
+}
+
+/* Voorbeeldbedrijf-pagina */
+.site-ui .s-demo .vb { position: relative; height: 340px; background: linear-gradient(160deg, #fff7f2, #fff 60%); }
+.site-ui .s-demo .vb .h {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; font-weight: 600; font-size: 0.85rem; color: var(--ink);
+}
+.site-ui .s-demo .vb .h i { font-style: normal; font-weight: 500; color: var(--faint); font-size: 0.75rem; white-space: nowrap; }
+.site-ui .s-demo .vb .hero2 { padding: 16px 18px; }
+.site-ui .s-demo .vb .hero2 b {
+  display: block; font-family: var(--display); font-weight: 800; font-size: 1.3rem;
+  letter-spacing: -0.02em; line-height: 1.2; max-width: 60%; color: var(--ink);
+}
+.site-ui .s-demo .vb .hero2 i { display: block; height: 8px; border-radius: 4px; background: #f0e3da; margin-top: 10px; width: 50%; }
+.site-ui .s-demo .vb .hero2 i + i { width: 40%; }
+
+/* Widget op de voorbeeldsite */
+.site-ui .s-demo .vw {
+  position: absolute; right: 16px; bottom: 16px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.site-ui .s-demo .vw .win {
+  width: 250px; max-width: calc(100vw - 2 * var(--gutter) - 34px);
+  background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-3); overflow: hidden;
+  transform-origin: bottom right;
+  transition: transform 480ms var(--spring), opacity var(--base) var(--ease);
+}
+.site-ui .s-demo .demo-pre .vw .win { transform: scale(0.6) translateY(20px); opacity: 0; }
+.site-ui .s-demo .vw .win .wh { background: var(--demo-brand); color: #fff; font-size: 0.78rem; font-weight: 600; padding: 9px 12px; }
+.site-ui .s-demo .vw .win .wbody { padding: 10px; display: grid; gap: 6px; font-size: 0.76rem; }
+.site-ui .s-demo .vw .win .wbody .msg.user { justify-self: end; }
+.site-ui .s-demo .vw .win .wbody .bubble { font-size: 0.76rem; padding: 7px 10px; }
+.site-ui .s-demo .vw .btnw {
+  width: 46px; height: 46px; border-radius: 50%; background: var(--demo-brand);
+  display: grid; place-items: center; box-shadow: 0 8px 20px -6px rgba(224, 102, 60, 0.7);
+}
+.site-ui .s-demo .vw .btnw .mk { width: 26px; color: #fff; }

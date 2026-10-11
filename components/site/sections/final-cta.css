@@ -1,0 +1,65 @@
+/* Sectie final-cta (§13): port van mockup-final "13. SLOT-CTA". Contract: docs/site/CONTRACT.md.
+   Elke selector begint met `.site-ui .s-final`. Geen keyframes (motion via JS in final-sea.tsx). */
+
+/* Mockup: .final { padding: clamp(56px,7vw,96px) 0 } i.p.v. het standaard sectieritme. */
+.site-ui .s-final.sec { padding: clamp(56px, 7vw, 96px) 0; }
+
+.site-ui .s-final .final-card {
+  --pad-y: clamp(40px, 6vw, 80px);
+  position: relative; overflow: hidden; isolation: isolate;
+  border-radius: 28px; background: var(--ink); color: #d9e6f0;
+  padding: var(--pad-y) clamp(22px, 5vw, 72px);
+}
+.site-ui .s-final .final-card .contour {
+  position: absolute; inset: 0; z-index: -2; background: var(--contours) center / cover no-repeat;
+}
+
+/* Tekst */
+.site-ui .s-final .final-copy { position: relative; }
+.site-ui .s-final .final-card h2 { color: #fff; max-width: 640px; }
+.site-ui .s-final .final-card p { margin: 16px 0 0; max-width: 560px; color: #b3c6d6; font-size: 1.06rem; line-height: 1.6; }
+.site-ui .s-final .final-card .ctas { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; margin-top: 28px; }
+.site-ui .s-final .final-card .btn-link { color: var(--aqua-pale); }
+.site-ui .s-final .final-card .btn-link:hover { color: #fff; }
+.site-ui .s-final .final-card .mail { margin-top: 18px; font-size: 0.9rem; color: #9fb4c6; }
+.site-ui .s-final .final-card .mail a {
+  color: #fff; text-decoration-color: rgba(255, 255, 255, 0.35); text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.site-ui .s-final .final-card :focus-visible { box-shadow: var(--focus-dark); }
+
+/* Zee: golflijn + manta in een eigen vlak dat nooit over de tekst valt.
+   < 960px: strook onder de tekst (kaart krijgt extra onderpadding).
+   ≥ 960px: kolom rechts naast de tekst (tekst begrensd tot ±54%). */
+.site-ui .s-final .final-sea {
+  --sea-h: 110px;
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--sea-h);
+  z-index: -1; pointer-events: none;
+}
+.site-ui .s-final .final-card { padding-bottom: calc(var(--pad-y) + 120px); }
+@media (min-width: 960px) {
+  .site-ui .s-final .final-card { padding-bottom: var(--pad-y); }
+  .site-ui .s-final .final-sea { left: auto; top: 0; height: auto; width: 42%; }
+  .site-ui .s-final .final-copy { max-width: min(600px, 54%); }
+}
+/* Breed genoeg: tekst krijgt de volle mockup-breedte (h2 640px → kop op 2 regels, zoals
+   de mockup); de zee-kolom neemt de rest rechts ervan (+32px lucht). */
+@media (min-width: 1200px) {
+  .site-ui .s-final .final-copy { max-width: 640px; }
+  .site-ui .s-final .final-sea { width: calc(100% - clamp(22px, 5vw, 72px) - 672px); }
+}
+
+.site-ui .s-final .wave-svg { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; }
+.site-ui .s-final .wave-svg .wv { fill: none; stroke: rgba(94, 234, 212, 0.5); stroke-width: 1.5; stroke-linecap: round; }
+.site-ui .s-final .wave-svg .wv2 { stroke: rgba(94, 234, 212, 0.18); }
+
+/* Echt merkteken (mono-mark.png als mask) in aqua. Positie/rotatie/opacity zet final-sea.tsx. */
+.site-ui .s-final .manta-fly {
+  position: absolute; left: 0; top: 0; display: block;
+  width: clamp(64px, 10vw, 120px); color: var(--aqua-hi);
+  opacity: 0; pointer-events: none; will-change: transform;
+}
+.site-ui .s-final .manta-fly .mk { width: 100%; }
+@media (min-width: 960px) {
+  .site-ui .s-final .manta-fly { width: clamp(72px, 8vw, 112px); }
+}
