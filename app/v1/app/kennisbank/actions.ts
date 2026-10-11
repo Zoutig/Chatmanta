@@ -30,7 +30,8 @@ import { validateCrawlUrl } from '@/lib/v1/crawler/validateCrawlUrl';
 import { normalizeHost } from '@/lib/v1/crawler/normalizeHost';
 import { mapSite, startBatchScrape, scrapeOne, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v1/crawler/firecrawl';
 import { ingestSinglePage } from '@/lib/v1/crawler/processCrawl';
-import { processCrawlJobs, type OpenJob, JOBS_PER_TICK } from '@/lib/v1/crawler/processJobs';
+import { processCrawlJobs, healStuckSources, type OpenJob, JOBS_PER_TICK } from '@/lib/v1/crawler/processJobs';
+import { isFirecrawlRateLimit } from '@/lib/v1/crawler/firecrawl-gate';
 import { recordCrawlEvent } from '@/lib/v1/crawler/crawlEvents';
 import { getWebsiteSources, type WebsiteSource } from './crawl-data';
 
@@ -63,6 +64,17 @@ function crawlRateLimitFail(retryAfterSec: number): ActionFail {
     error: `Te veel crawl-verzoeken. Probeer het over ${retryAfterSec} ${retryAfterSec === 1 ? 'seconde' : 'seconden'} opnieuw.`,
     retryAfterSec,
   };
+}
+
+/**
+ * Klantvriendelijke melding voor een Firecrawl-fout. De ruwe melding (Engels, met
+ * leveranciersnaam + "upgrade your plan") hoort in crawl_events/de sink, nooit in de UI.
+ */
+function crawlFailure(err: unknown): AppError {
+  const message = isFirecrawlRateLimit(err)
+    ? 'Het is even druk bij het ophalen van websites. Probeer het over een minuut opnieuw.'
+    : 'De website kon niet worden opgehaald. Controleer of de URL klopt en probeer het later opnieuw.';
+  return new AppError('CRAWL_FAILED', { message, cause: err });
 }
 
 /** Kale invoer ("jouwsite.nl") → geldig http(s)-schema. */
@@ -102,7 +114,12 @@ export async function discoverPagesAction(rawUrl: string): Promise<ActionResult<
     const url = normalizeUrl(rawUrl);
     const check = await validateCrawlUrl(url);
     if (!check.allowed) fail('CRAWL_FAILED', check.reason);
-    const found = await mapSite(url, MAX_DISCOVER_PAGES);
+    let found: string[];
+    try {
+      found = await mapSite(url, MAX_DISCOVER_PAGES);
+    } catch (err) {
+      throw crawlFailure(err);
+    }
     // SSRF (SA-2): élke teruggegeven URL opnieuw toetsen — een site kan naar interne hosts linken.
     const validated = await filterPublicUrls([url, ...found]);
     return { rootUrl: url, urls: Array.from(new Set(validated)) };
@@ -136,22 +153,24 @@ export async function startSelectedCrawlAction(
     const safe = (await filterPublicUrls(selectedUrls)).slice(0, cap);
     if (safe.length === 0) fail('CRAWL_FAILED', 'Geen geldige pagina’s geselecteerd.');
 
-    const sourceId = await upsertWebsiteSource(sb, orgId, chatbotId, root, hostnameOf(root));
-
+    // Eerst Firecrawl starten, pas daarna de bron op 'crawling' zetten: faalt de start,
+    // dan blijft er geen hangende bron achter en houdt een bestaande bron gewoon z'n
+    // huidige status + content (geen rode 'mislukt' over een werkende kennisbank).
     let crawlId: string;
     let invalidURLs: string[] = [];
     try {
       ({ crawlId, invalidURLs } = await startBatchScrape(safe));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
-      await sb.from('knowledge_sources').update({ status: 'failed' })
-        .eq('id', sourceId).eq('organization_id', orgId).eq('chatbot_id', chatbotId);
       await recordCrawlEvent(sb, {
-        organizationId: orgId, chatbotId, eventType: 'fail', knowledgeSourceId: sourceId,
+        organizationId: orgId, chatbotId, eventType: 'fail',
+        knowledgeSourceId: (await findWebsiteSourceId(sb, orgId, chatbotId, normalizeHost(root))) ?? null,
         decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length },
       });
-      fail('CRAWL_FAILED', msg);
+      throw crawlFailure(err);
     }
+
+    const sourceId = await upsertWebsiteSource(sb, orgId, chatbotId, root, hostnameOf(root));
 
     const { data: job, error: jobErr } = await sb
       .from('processing_jobs')
@@ -210,6 +229,7 @@ export async function deleteWebsiteSourceAction(sourceId: string): Promise<Actio
 /** Leest alle website-bronnen (client-polling). Read via de session-client (RLS). */
 export async function refreshWebsiteSources(): Promise<WebsiteSource[]> {
   const ctx = await requireV1OrgChatbot();
+  await healStuckSources(ctx.sb, { organizationId: ctx.orgId, chatbotId: ctx.chatbotId });
   const supabase = await createClient();
   return getWebsiteSources(supabase, ctx.orgId, ctx.chatbotId);
 }
@@ -422,9 +442,16 @@ export async function scrapeSinglePageAction(rawUrl: string): Promise<ActionResu
     const url = normalizeUrl(rawUrl);
     const check = await validateCrawlUrl(url);
     if (!check.allowed) fail('CRAWL_FAILED', check.reason);
-    const sourceId = await upsertWebsiteSource(sb, orgId, chatbotId, url, hostnameOf(url));
-    const page = await scrapeOne(url);
+    // Eerst scrapen, dan pas de bron op 'crawling': een mislukte scrape laat zo geen
+    // hangende bron achter.
+    let page: Awaited<ReturnType<typeof scrapeOne>>;
+    try {
+      page = await scrapeOne(url);
+    } catch (err) {
+      throw crawlFailure(err);
+    }
     page.url = page.url || url;
+    const sourceId = await upsertWebsiteSource(sb, orgId, chatbotId, url, hostnameOf(url));
     const { status, error: ingestError } = await ingestSinglePage(sb, sourceId, orgId, chatbotId, page);
     if (status === 'failed') fail('CRAWL_FAILED', ingestError ?? page.error ?? 'Pagina kon niet worden opgehaald.');
     await sb.from('knowledge_sources')
@@ -528,6 +555,21 @@ export async function deleteDocumentAction(docId: string): Promise<ActionResult>
 
 // ─── helper ────────────────────────────────────────────────────────────────
 
+/** Bestaande (niet-verwijderde) website-bron van de org+chatbot voor dit domein, of undefined. */
+async function findWebsiteSourceId(
+  sb: SupabaseClient,
+  orgId: string,
+  chatbotId: string,
+  host: string | null,
+): Promise<string | undefined> {
+  if (!host) return undefined;
+  const { data } = await sb.from('knowledge_sources').select('id')
+    .eq('organization_id', orgId).eq('chatbot_id', chatbotId)
+    .eq('type', 'website').eq('normalized_host', host)
+    .is('deleted_at', null).limit(1).maybeSingle();
+  return data?.id as string | undefined;
+}
+
 /** Hergebruikt of maakt de website-bron van de org+chatbot VOOR DIT DOMEIN; status
  *  'crawling'. Match op (org, chatbot, normalized_host) — uniek via index. Race → 23505 → opnieuw lezen. */
 async function upsertWebsiteSource(
@@ -540,13 +582,7 @@ async function upsertWebsiteSource(
   const host = normalizeHost(rootUrl);
   const now = new Date().toISOString();
 
-  const findExisting = async () => {
-    const { data } = await sb.from('knowledge_sources').select('id')
-      .eq('organization_id', orgId).eq('chatbot_id', chatbotId)
-      .eq('type', 'website').eq('normalized_host', host)
-      .is('deleted_at', null).limit(1).maybeSingle();
-    return data?.id as string | undefined;
-  };
+  const findExisting = () => findWebsiteSourceId(sb, orgId, chatbotId, host);
 
   const existingId = host ? await findExisting() : undefined;
   if (existingId) {

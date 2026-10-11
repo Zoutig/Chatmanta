@@ -16,18 +16,34 @@
 // Daarom: scrape-paden forceren verse content (maxAge=0), en discovery leest de
 // sitemap óók rechtstreeks uit (verse fetch) zodat we niet afhankelijk zijn van
 // Firecrawl's map-cache.
+//
+// ⚠️ Rate-limit: elke call (behalve statuspolls) loopt via het loket in
+// firecrawl-gate.ts — Firecrawl begrenst per team, dus alle klanten delen één teller.
 
 import Firecrawl, { type Document as FirecrawlDocument, type MapOptions } from '@mendable/firecrawl-js';
+import { getFirecrawlRateLimiter } from '@/lib/v0/server/rate-limit';
 import { logFirecrawlCredits } from './credit-log';
+import { FIRECRAWL_PER_MIN, gatedCall, type FirecrawlEndpoint } from './firecrawl-gate';
+import { MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from './limits';
 
-/** Harde bovengrens per crawl (= aantal pagina's dat we daadwerkelijk scrapen).
- *  Voorkomt explosieve Firecrawl-kosten (blueprint sectie 14). */
-export const MAX_CRAWL_PAGES = 50;
+export { MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES };
 
-/** Bovengrens voor *ontdekken* (map). Map scrapet niets — het kost ~1 credit
- *  ongeacht hoeveel URLs terugkomen — dus we tonen de klant ruim de hele sitemap.
- *  Bewust losgekoppeld van MAX_CRAWL_PAGES: de scrape-cap blijft 50, de keuzelijst niet. */
-export const MAX_DISCOVER_PAGES = 500;
+/** Wachtbudgetten (ms) voor het loket — ruim binnen de functietimeout (60s). */
+const DISCOVER_BUDGET_MS = 25_000;
+const START_BUDGET_MS = 20_000;
+const SCRAPE_ONE_BUDGET_MS = 20_000;
+const SCREENSHOT_BUDGET_MS = 5_000;
+/** Harde timeout op de batch-start-call zelf: liever een nette fout dan een afgekapte functie. */
+const START_TIMEOUT_MS = 30_000;
+/** Map vindt minder dan dit? Dan óók de sitemap vers lezen (vangnet voor Firecrawl's
+ *  verouderde map-cache). Daarboven is map betrouwbaar genoeg en sparen we de calls. */
+const SITEMAP_FALLBACK_BELOW = 20;
+
+function gate<T>(endpoint: FirecrawlEndpoint, fn: () => Promise<T>, deadline: number): Promise<T> {
+  return gatedCall(endpoint, fn, deadline, {
+    limiterFor: (ep) => getFirecrawlRateLimiter(ep, FIRECRAWL_PER_MIN[ep]),
+  });
+}
 
 /** maxAge (ms) voor scrape-calls. 0 = nooit cache accepteren, altijd vers ophalen.
  *  Bewust 0: de kennisbank moet de live site weerspiegelen, niet een dagenoude
@@ -157,26 +173,26 @@ function toCrawledPage(doc: FirecrawlDocument): CrawledPage {
  *  1. Firecrawl `map()` — vangt link-discovery + sites zónder sitemap.
  *  2. De sitemap.xml die we zélf vers ophalen — vangt het geval waarin Firecrawl's
  *     map-cache verouderd is (de bug die ons b: sitemap had 31 URLs, map gaf er 1).
+ *     Alleen als map weinig vond (< SITEMAP_FALLBACK_BELOW): elke sitemap-fetch is
+ *     een scrape-call, en een sitemap-index liet de minuut-limiet volstromen.
  *
  * Faalt map én levert de sitemap niets op, dan pas gooien we de map-fout door.
  */
 export async function mapSite(url: string, limit: number = MAX_DISCOVER_PAGES): Promise<string[]> {
+  const deadline = Date.now() + DISCOVER_BUDGET_MS;
   const opts: MapOptions = { sitemap: 'include', limit };
-  const [mapResult, sitemapUrls] = await Promise.all([
-    getClient()
-      .map(url, opts)
-      .then((res) => ({
-        ok: true as const,
-        urls: (res.links ?? []).map((l) => l.url).filter((u): u is string => typeof u === 'string'),
-      }))
-      .catch((err: unknown) => ({ ok: false as const, err })),
-    readSitemapUrls(url, limit),
-  ]);
+  const mapResult = await gate('map', () => getClient().map(url, opts), deadline)
+    .then((res) => ({
+      ok: true as const,
+      urls: (res.links ?? []).map((l) => l.url).filter((u): u is string => typeof u === 'string'),
+    }))
+    .catch((err: unknown) => ({ ok: false as const, err }));
 
   const mapUrls = mapResult.ok ? mapResult.urls : [];
   // De map()-call kost ~1 credit (ongeacht aantal URLs). Sitemap-fetches loggen
   // apart in readSitemapUrls. Fail-safe — breekt de discovery nooit.
   if (mapResult.ok) await logFirecrawlCredits('map', 1);
+  const sitemapUrls = mapUrls.length < SITEMAP_FALLBACK_BELOW ? await readSitemapUrls(url, limit, deadline) : [];
   const merged = Array.from(new Set([...mapUrls, ...sitemapUrls]));
   if (merged.length === 0 && !mapResult.ok) throw mapResult.err;
   return merged.slice(0, limit);
@@ -200,9 +216,13 @@ const SCREENSHOT_TIMEOUT_MS = 20_000;
  */
 export async function screenshotSite(url: string): Promise<Uint8Array | null> {
   try {
-    const doc = await withTimeout(
-      getClient().scrape(url, { formats: ['screenshot'], maxAge: SCREENSHOT_MAX_AGE_MS }),
-      SCREENSHOT_TIMEOUT_MS,
+    const doc = await gate(
+      'scrape',
+      () => withTimeout(
+        getClient().scrape(url, { formats: ['screenshot'], maxAge: SCREENSHOT_MAX_AGE_MS }),
+        SCREENSHOT_TIMEOUT_MS,
+      ),
+      Date.now() + SCREENSHOT_BUDGET_MS,
     );
     // Elke screenshot-scrape kost ~1 credit, ongeacht slagen/falen verderop.
     await logFirecrawlCredits('screenshot', 1);
@@ -239,18 +259,29 @@ const SCREENSHOT_MAX_AGE_MS = 0;
 
 /** Synchrone scrape van één pagina (C1: losse import). maxAge=0 → altijd vers. */
 export async function scrapeOne(url: string): Promise<CrawledPage> {
-  const doc = await getClient().scrape(url, { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS });
+  const doc = await gate(
+    'scrape',
+    () => getClient().scrape(url, { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS }),
+    Date.now() + SCRAPE_ONE_BUDGET_MS,
+  );
   await logFirecrawlCredits('scrape', 1);
   return toCrawledPage(doc);
 }
 
 /** Start een async batch-scrape van een expliciete URL-set. Geeft het batch-ID +
- *  de door Firecrawl geweigerde URLs terug (diagnostiek bij start). */
+ *  de door Firecrawl geweigerde URLs terug (diagnostiek bij start). Via het loket
+ *  (wacht bij drukte) én met een harde timeout, zodat de aanroepende actie altijd
+ *  zelf netjes kan afronden i.p.v. door de functietimeout te worden afgekapt. */
 export async function startBatchScrape(urls: string[]): Promise<{ crawlId: string; invalidURLs: string[] }> {
   const capped = urls.slice(0, MAX_CRAWL_PAGES);
-  const res = await getClient().startBatchScrape(capped, {
-    options: { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS },
-  });
+  const res = await gate(
+    'batch',
+    () => withTimeout(
+      getClient().startBatchScrape(capped, { options: { formats: ['markdown'], maxAge: SCRAPE_MAX_AGE_MS } }),
+      START_TIMEOUT_MS,
+    ),
+    Date.now() + START_BUDGET_MS,
+  );
   if (!res?.id) throw new Error('Firecrawl startBatchScrape gaf geen job-ID terug.');
   return { crawlId: res.id, invalidURLs: res.invalidURLs ?? [] };
 }
@@ -297,26 +328,29 @@ export async function getCrawlJobStatus(jobId: string): Promise<CrawlStatus> {
 
 // ─── sitemap-read (verse fallback naast Firecrawl's map-cache) ─────────────────
 
-const MAX_CHILD_SITEMAPS = 20;
+/** Max. aantal sub-sitemaps van een sitemap-index dat we volgen (één voor één). Meer
+ *  levert zelden extra pagina's op die in de 50-pagina-crawl passen, maar kost wél
+ *  elk een scrape-call. */
+const MAX_CHILD_SITEMAPS = 5;
 
 /**
  * <loc>-waarden uit een sitemap-XML trekken. De fetch loopt via Firecrawl-scrape
  * (op hún infra, niet de onze) met maxAge=0 → vers én géén eigen SSRF-oppervlak,
  * net als scrapeOne/startBatchScrape. Faalt stil → lege lijst.
  */
-async function fetchSitemapLocs(sitemapUrl: string): Promise<string[]> {
+async function fetchSitemapLocs(sitemapUrl: string, deadline: number): Promise<string[]> {
   try {
-    const doc = await getClient().scrape(sitemapUrl, {
-      formats: ['rawHtml'],
-      maxAge: SCRAPE_MAX_AGE_MS,
-      onlyMainContent: false,
-    });
+    const doc = await gate(
+      'scrape',
+      () => getClient().scrape(sitemapUrl, { formats: ['rawHtml'], maxAge: SCRAPE_MAX_AGE_MS, onlyMainContent: false }),
+      deadline,
+    );
     const xml = (doc as { rawHtml?: string }).rawHtml ?? '';
     // Elke sitemap-fetch is een Firecrawl-scrape (~1 credit). Fail-safe.
     await logFirecrawlCredits('sitemap', 1);
     return Array.from(xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)).map((m) => m[1]);
   } catch {
-    return []; // geen sitemap / niet-bereikbaar / niet-XML → gewoon geen bron
+    return []; // geen sitemap / niet-bereikbaar / niet-XML / loket vol → gewoon geen bron
   }
 }
 
@@ -326,7 +360,7 @@ async function fetchSitemapLocs(sitemapUrl: string): Promise<string[]> {
  * terug — cross-origin child-sitemaps worden níét opgehaald en cross-origin
  * <loc>'s weggefilterd. Faalt stil → [].
  */
-async function readSitemapUrls(siteUrl: string, limit: number): Promise<string[]> {
+async function readSitemapUrls(siteUrl: string, limit: number, deadline: number): Promise<string[]> {
   let origin: string;
   try {
     origin = new URL(siteUrl).origin;
@@ -341,15 +375,19 @@ async function readSitemapUrls(siteUrl: string, limit: number): Promise<string[]
     }
   };
 
-  const rootLocs = await fetchSitemapLocs(`${origin}/sitemap.xml`);
+  const rootLocs = await fetchSitemapLocs(`${origin}/sitemap.xml`, deadline);
   const isXml = (l: string) => /\.xml(\?|$)/i.test(l);
 
-  // Sitemap-index? Volg alleen same-origin child-sitemaps (geen externe fetches).
+  // Sitemap-index? Volg alleen same-origin child-sitemaps (geen externe fetches),
+  // één voor één (niet parallel: dat liet de minuut-limiet in één klap vollopen) en
+  // stop zodra we genoeg pagina's hebben.
   const childSitemaps = rootLocs.filter((l) => isXml(l) && isSameOrigin(l)).slice(0, MAX_CHILD_SITEMAPS);
   const directPages = rootLocs.filter((l) => !isXml(l));
-  const childPages = childSitemaps.length
-    ? (await Promise.all(childSitemaps.map(fetchSitemapLocs))).flat()
-    : [];
+  const childPages: string[] = [];
+  for (const child of childSitemaps) {
+    if (directPages.length + childPages.length >= limit) break;
+    childPages.push(...(await fetchSitemapLocs(child, deadline)));
+  }
 
   const out: string[] = [];
   const seen = new Set<string>();
