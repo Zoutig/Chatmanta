@@ -8,6 +8,7 @@
 import { createClient as createSb } from '@supabase/supabase-js';
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { embedTexts } from '../lib/rag/embeddings';
+import { embedModelFor } from '../lib/rag/index-version';
 import { ISO_TOKEN } from './v1-iso-token';
 
 const ORG_A = process.env.V1_SEED_ORG_ID;
@@ -30,7 +31,7 @@ async function main() {
   const admin = getV1ServiceRoleClient();
 
   // chatbot-id's + org B ophalen
-  const { data: bots, error: botErr } = await admin.from('chatbots').select('id, organization_id');
+  const { data: bots, error: botErr } = await admin.from('chatbots').select('id, organization_id, index_version');
   if (botErr) throw botErr;
   const botA = bots?.find((b) => b.organization_id === ORG_A);
   const { data: orgBRow, error: obErr } = await admin.from('organizations').select('id').eq('slug', 'seed-org-b').single();
@@ -39,7 +40,7 @@ async function main() {
   const botB = bots?.find((b) => b.organization_id === orgB);
   if (!botA || !botB) fail('chatbots ontbreken — draai npm run v1:seed:chunks');
 
-  const { vectors } = await embedTexts([`Wat is het geheime projectcodewoord? ${ISO_TOKEN}`]);
+  const { vectors } = await embedTexts([`Wat is het geheime projectcodewoord? ${ISO_TOKEN}`], embedModelFor(botA.index_version));
   const qv = vectors[0];
 
   // (a) service-role, gescoopt op A → mag B's token-chunk NIET bevatten

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/v1/server';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { runRagQuery, type ChatResponse, type ChatHistoryTurn } from '@/lib/rag/run-rag-query';
 import { logRagQuery } from '@/lib/rag/log-query';
-import { V1_RAG_DEFAULTS, getOrgChatbot } from './rag-config';
+import { v1RagConfigFor, getOrgChatbot } from './rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
@@ -54,7 +54,7 @@ export async function askV1(question: string, history?: ChatHistoryTurn[]): Prom
     ]);
     if (!gate.ok) return { ok: false, error: gate.code };
 
-    const config = applyFastMode({ ...V1_RAG_DEFAULTS, version: chatbot.bot_version }, fastMode);
+    const config = applyFastMode(v1RagConfigFor(chatbot), fastMode);
 
     // Klant-settings → engine-overrides. Zonder deze stap negeert askV1 de
     // Instellingen-UI volledig (dode knoppen). Lezen onder de session-client (RLS);

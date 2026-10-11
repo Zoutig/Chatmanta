@@ -8,6 +8,8 @@
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { ingestCrawlResults, ingestSinglePage } from '../lib/v1/crawler/processCrawl';
 import { embedTexts } from '../lib/rag/embeddings';
+import { embedModelFor } from '../lib/rag/index-version';
+import { readIndexVersion } from '../lib/rag/ingest';
 
 const TOKEN = 'PR3B-CRAWL-PROEF-QZ4417';
 const HOST = 'pr3b-crawl-proef.example';
@@ -60,7 +62,7 @@ async function main() {
     }
     console.log('✅ 3 website-documents; failed/excluded = included=false');
 
-    const { vectors } = await embedTexts(['Wat is de geheime crawl-proefcode?']);
+    const { vectors } = await embedTexts(['Wat is de geheime crawl-proefcode?'], embedModelFor(await readIndexVersion(sb, ORG as string, chatbotId)));
     const { data: hits, error: rpcErr } = await sb.rpc('match_chunks_with_parents', {
       p_organization_id: ORG, p_chatbot_id: chatbotId, query_embedding: vectors[0], match_count: 5,
     });

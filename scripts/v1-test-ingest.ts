@@ -7,10 +7,12 @@
 // Draai met: npm run v1:test-ingest
 
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
-import { ingestDocument } from '../lib/rag/ingest';
+import { ingestDocument, readIndexVersion } from '../lib/rag/ingest';
 import { embedTexts } from '../lib/rag/embeddings';
+import { embedModelFor } from '../lib/rag/index-version';
 import { runRagQuery } from '../lib/rag/run-rag-query';
-import { V1_RAG_DEFAULTS, buildV1Persona } from '../app/v1/app/rag-config';
+import { v1RagConfigFor, buildV1Persona } from '../app/v1/app/rag-config';
+import type { IndexVersion } from '../lib/rag/index-version';
 
 const TOKEN = 'PR2-INGEST-PROEF-KX7731';
 const FILENAME = 'pr2-ingest-proef.txt';
@@ -26,7 +28,7 @@ async function main() {
   const client = getV1ServiceRoleClient();
   const { data: bot } = await client
     .from('chatbots')
-    .select('id, name, bot_version')
+    .select('id, name, bot_version, index_version')
     .eq('organization_id', ORG_A as string)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
@@ -52,7 +54,7 @@ async function main() {
 
   try {
     // 1) deterministisch: de match-RPC vindt het ingeladen feit terug
-    const { vectors } = await embedTexts([QUESTION]);
+    const { vectors } = await embedTexts([QUESTION], embedModelFor(await readIndexVersion(client, ORG_A as string, chatbotId)));
     const { data: hits, error: rpcErr } = await client.rpc('match_chunks_with_parents', {
       p_organization_id: ORG_A,
       p_chatbot_id: chatbotId,
@@ -66,7 +68,7 @@ async function main() {
     console.log('✅ ingeladen feit is retrievebaar via de match-RPC');
 
     // 2) end-to-end: de engine geeft een echt answer (geen fallback)
-    const config = { ...V1_RAG_DEFAULTS, version: bot.bot_version as string };
+    const config = v1RagConfigFor({ bot_version: bot.bot_version as string, index_version: bot.index_version as IndexVersion });
     const persona = buildV1Persona(bot.name as string);
     let kind = 'none';
     let answer = '';

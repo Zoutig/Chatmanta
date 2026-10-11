@@ -1554,7 +1554,7 @@ export async function* runRagQuery(
   // (launch-onderzoek 2026-10-07). Met gebruikers-history: cache overslaan.
   const hasUserHistory = (input.history ?? []).some((t) => t.role === 'user');
   const cacheActive = bot.cacheEnabled && input.disableCache !== true && !hasUserHistory;
-  const cacheEmbedPromise = cacheActive ? embedTexts([original]) : null;
+  const cacheEmbedPromise = cacheActive ? embedTexts([original], bot.embeddingModel) : null;
   // Epoch-snapshot bij pipeline-start (plan 006): parallel met de embed, geen
   // wall-clock-impact. readCacheEpoch kan niet rejecten (vangt alles → null),
   // dus geen discard-catch nodig op het smalltalk-pad.
@@ -1571,7 +1571,7 @@ export async function* runRagQuery(
       ? (async () => {
           const tEmbed = performance.now();
           const ownEmbed = cacheEmbedPromise === null;
-          const emb = await (cacheEmbedPromise ?? embedTexts([original]));
+          const emb = await (cacheEmbedPromise ?? embedTexts([original], bot.embeddingModel));
           const tRetrieve = performance.now();
           markSpan('spec_embedding_ms', tEmbed, tRetrieve);
           const hits = bot.hybridSearch
@@ -1892,7 +1892,7 @@ export async function* runRagQuery(
   yield { kind: 'status', phase: 'embed' };
   const stopEmbed = tMark('embedding_ms');
   const queryTexts = querySet.map((q) => q.text);
-  const embedded = await embedTexts(queryTexts);
+  const embedded = await embedTexts(queryTexts, bot.embeddingModel);
   const { vectors } = embedded;
   const embedTokens = embedded.tokens + specEmbedTokens;
   const embedCost = embedded.costUsd + specEmbedCost;
@@ -1991,7 +1991,7 @@ export async function* runRagQuery(
     hydeTriggered = true;
 
     const stopHydeEmbed = tMark('embedding_ms');
-    const hydeEmbed = await embedTexts([hyde.hypothetical]);
+    const hydeEmbed = await embedTexts([hyde.hypothetical], bot.embeddingModel);
     stopHydeEmbed();
     const stopHydeRetrieve = tMark('retrieval_ms');
     const hydeRetrieved = await retrieveChunks(
@@ -2033,7 +2033,7 @@ export async function* runRagQuery(
     const rewritten = (rewriteInfo as ChatRewriteInfo | null)?.rewritten?.trim();
     if (rewritten && rewritten.toLowerCase() !== original.trim().toLowerCase()) {
       const stopRetryEmbed = tMark('embedding_ms');
-      const retryEmbed = await embedTexts([rewritten]);
+      const retryEmbed = await embedTexts([rewritten], bot.embeddingModel);
       stopRetryEmbed();
       const stopRetryRetrieve = tMark('retrieval_ms');
       const retryHits = bot.hybridSearch

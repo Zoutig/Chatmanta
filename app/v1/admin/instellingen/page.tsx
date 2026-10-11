@@ -90,7 +90,7 @@ export default async function V1InstellingenPage() {
         <Rows>
           <Row label="Chat en voorbewerking">gpt-4o-mini</Row>
           <Row label="Beoordeling en vangnet">gpt-4o</Row>
-          <Row label="Embeddings">text-embedding-3-small (1536)</Row>
+          <Row label="Embeddings">text-embedding-3-large (1536) — kennisbanken op index v2; v1 nog 3-small</Row>
         </Rows>
       </Panel>
 

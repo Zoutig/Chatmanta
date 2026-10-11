@@ -6,6 +6,7 @@
 import type { RagConfig, RagPersona } from '@/lib/rag/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveBot, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
+import { isIndexVersion, ragOverridesFor, type IndexVersion } from '@/lib/rag/index-version';
 
 // ponytail: V1's default RAG-config = de bewezen LATEST V0-bot + V1-specifieke
 // vlaggen, i.p.v. 38 velden + getunede anti-hallucinatie-prompts opnieuw te
@@ -53,6 +54,15 @@ export const V1_RAG_DEFAULTS: RagConfig = {
 };
 
 /**
+ * Volledige V1-config voor één chatbot: defaults + de index-versie-overrides
+ * (migr 0030). De zoekvraag MOET met het model van de index geëmbed worden, dus
+ * gebruik dit i.p.v. V1_RAG_DEFAULTS rechtstreeks op elk chat-pad.
+ */
+export function v1RagConfigFor(chatbot: { bot_version: string; index_version: IndexVersion }): RagConfig {
+  return { ...V1_RAG_DEFAULTS, ...ragOverridesFor(chatbot.index_version), version: chatbot.bot_version };
+}
+
+/**
  * Bouw een volledige RagPersona voor een V1-chatbot. Alle 10 velden ingevuld —
  * een ontbrekend veld zou als letterlijke {{TOKEN}} in de prompt belanden
  * (renderPersonaTemplate laat onbekende placeholders staan). PR-1b: een
@@ -82,15 +92,18 @@ export function buildV1Persona(company: string): RagPersona {
 export async function getOrgChatbot(
   client: SupabaseClient,
   orgId: string,
-): Promise<{ id: string; name: string; bot_version: string; is_active: boolean } | null> {
+): Promise<{ id: string; name: string; bot_version: string; is_active: boolean; index_version: IndexVersion } | null> {
   const { data, error } = await client
     .from('chatbots')
-    .select('id, name, bot_version, is_active')
+    .select('id, name, bot_version, is_active, index_version')
     .eq('organization_id', orgId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data ?? null;
+  if (!data) return null;
+  // Fail-closed: een onbekende index-versie zou met het verkeerde model zoeken.
+  if (!isIndexVersion(data.index_version)) throw new Error(`chatbot ${data.id}: ongeldige index_version`);
+  return data as { id: string; name: string; bot_version: string; is_active: boolean; index_version: IndexVersion };
 }

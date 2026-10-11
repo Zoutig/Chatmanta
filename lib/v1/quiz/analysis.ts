@@ -14,6 +14,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { costForModelUsd } from '@/lib/ai/llm';
 import { embedTexts } from '@/lib/rag/embeddings';
+import { readIndexVersion } from '@/lib/rag/ingest';
+import { embedModelFor, type IndexVersion } from '@/lib/rag/index-version';
 import type {
   QuizAnalyseModel,
   QuizBedrijfscontext,
@@ -31,8 +33,13 @@ import {
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const AUX_MODEL = 'gpt-4o-mini';
-const PRESENT_THRESHOLD = 0.55;
-const WEAK_THRESHOLD = 0.4;
+// Similarity-drempels zijn modelgebonden. v2 (3-large) geeft lagere top-1-sims; de
+// v2-waarden zijn kwantiel-gemapt op de v1-waarden (ingest-onderzoek fase A, 237 vragen:
+// zelfde fractie vragen onder de drempel → 0,55 ≈ 0,50 en 0,40 ≈ 0,37).
+const THRESHOLDS: Record<IndexVersion, { present: number; weak: number }> = {
+  v1: { present: 0.55, weak: 0.4 },
+  v2: { present: 0.5, weak: 0.37 },
+};
 const PROBE_MATCH_COUNT = 8;
 const EVIDENCE_CHARS = 700;
 const SAMPLE_MAX_DOCS = 12;
@@ -217,9 +224,9 @@ type ProbeResult = {
   evidence: string;
 };
 
-function verdictFor(sim: number | null): QuizProbeVerdict {
-  if (sim === null || sim < WEAK_THRESHOLD) return 'ontbreekt';
-  if (sim < PRESENT_THRESHOLD) return 'zwak';
+function verdictFor(sim: number | null, v: IndexVersion): QuizProbeVerdict {
+  if (sim === null || sim < THRESHOLDS[v].weak) return 'ontbreekt';
+  if (sim < THRESHOLDS[v].present) return 'zwak';
   return 'gedekt';
 }
 
@@ -230,7 +237,9 @@ async function runProbes(
   chatbotId: string,
   categories: ProbeCategory[],
 ): Promise<{ probes: ProbeResult[]; embedCostUsd: number }> {
-  const embed = await embedTexts(categories.map((c) => c.probe));
+  // Probes moeten met het model van de index geëmbed worden (migr V1 0030).
+  const indexVersion = await readIndexVersion(client, orgId, chatbotId);
+  const embed = await embedTexts(categories.map((c) => c.probe), embedModelFor(indexVersion));
   const results: ProbeResult[] = [];
   await Promise.all(
     categories.map(async (cat, i) => {
@@ -250,7 +259,7 @@ async function runProbes(
           evidence = (rows[0]?.content ?? '').slice(0, EVIDENCE_CHARS);
         }
       }
-      results.push({ categorie: cat.key, label: cat.label, top1Similarity: top1, verdict: verdictFor(top1), evidence });
+      results.push({ categorie: cat.key, label: cat.label, top1Similarity: top1, verdict: verdictFor(top1, indexVersion), evidence });
     }),
   );
   const order = new Map(categories.map((c, i) => [c.key, i]));

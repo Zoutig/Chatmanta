@@ -16,7 +16,14 @@ import { AppError } from '../errors/app-error';
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIM = 1536;
-const EMBED_COST_PER_M_USD = 0.02;
+// Ingest-onderzoek fase B (okt 2026): text-embedding-3-large ingekort tot 1536
+// dims past in dezelfde vector(1536)-kolom. Alleen voor experimentele botversies
+// op een index die met hetzelfde model is opgebouwd.
+export type EmbedModel = 'text-embedding-3-small' | 'text-embedding-3-large';
+const EMBED_COST_PER_M_USD: Record<EmbedModel, number> = {
+  'text-embedding-3-small': 0.02,
+  'text-embedding-3-large': 0.13,
+};
 const EMBED_BATCH_SIZE = 100;
 
 // V0.4 latency-cap: per-batch timeout 4s + max 1 retry. OpenAI SDK v6 doet de
@@ -42,7 +49,10 @@ export type EmbedResult = {
   costUsd: number;
 };
 
-export async function embedTexts(strings: string[]): Promise<EmbedResult> {
+export async function embedTexts(
+  strings: string[],
+  model: EmbedModel = EMBED_MODEL,
+): Promise<EmbedResult> {
   if (strings.length === 0) return { vectors: [], tokens: 0, costUsd: 0 };
   const vectors: number[][] = [];
   let totalTokens = 0;
@@ -50,8 +60,9 @@ export async function embedTexts(strings: string[]): Promise<EmbedResult> {
     const batch = strings.slice(i, i + EMBED_BATCH_SIZE);
     const resp = await openai().embeddings.create(
       {
-        model: EMBED_MODEL,
+        model,
         input: batch,
+        ...(model === EMBED_MODEL ? {} : { dimensions: EMBED_DIM }),
       },
       { timeout: EMBED_TIMEOUT_MS, maxRetries: EMBED_MAX_RETRIES },
     );
@@ -68,6 +79,6 @@ export async function embedTexts(strings: string[]): Promise<EmbedResult> {
   return {
     vectors,
     tokens: totalTokens,
-    costUsd: (totalTokens / 1_000_000) * EMBED_COST_PER_M_USD,
+    costUsd: (totalTokens / 1_000_000) * EMBED_COST_PER_M_USD[model],
   };
 }

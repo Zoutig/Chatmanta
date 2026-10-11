@@ -29,7 +29,7 @@ import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
-import { V1_RAG_DEFAULTS, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
+import { v1RagConfigFor, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from '@/app/v1/app/instellingen/settings-config';
 import type { ChatbotPromptOverrides } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
 import type { RagPersona } from '@/lib/rag/types';
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
   }
   const organizationId = org.id as string;
 
-  let chatbot: { id: string; name: string; bot_version: string; is_active: boolean } | null = null;
+  let chatbot: Awaited<ReturnType<typeof getOrgChatbot>> = null;
   try {
     chatbot = await getOrgChatbot(svc, organizationId);
   } catch {
@@ -207,8 +207,7 @@ export async function POST(req: Request) {
   //    Fast mode per org (organizations.fast_mode_enabled, V1-admin): uit → standaard tier.
   const config = applyFastMode(
     {
-      ...V1_RAG_DEFAULTS,
-      version: activeChatbot.bot_version,
+      ...v1RagConfigFor(activeChatbot),
       sourceLinksEnabled: false,
     },
     fastMode,

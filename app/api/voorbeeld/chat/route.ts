@@ -30,7 +30,7 @@ import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
-import { V1_RAG_DEFAULTS, getOrgChatbot } from '@/app/v1/app/rag-config';
+import { v1RagConfigFor, getOrgChatbot } from '@/app/v1/app/rag-config';
 import {
   buildV1ChatbotInputs,
   mergeChatbotSettings,
@@ -174,7 +174,7 @@ export async function POST(req: Request) {
   const settings = resolveSettings(body.settings);
   const { overrides, persona } = buildV1ChatbotInputs(settings, DEMO_ORG_NAME);
 
-  const config = { ...V1_RAG_DEFAULTS, version: chatbot.bot_version, sourceLinksEnabled: false };
+  const config = { ...v1RagConfigFor(chatbot), sourceLinksEnabled: false };
 
   // Q&A die de bezoeker zelf toevoegde: bij een match neemt runRagQuery's
   // handmatige-Q&A-pad het over (geen retrieval, geen antwoord-LLM).

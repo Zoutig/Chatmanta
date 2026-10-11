@@ -69,6 +69,7 @@
     "v1:test-log": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-log.ts",
     "v1:test-limits": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-limits.ts",
     "v1:eval": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-eval-run.ts",
+    "v1:reindex": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-reindex.ts",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "overrides": {
