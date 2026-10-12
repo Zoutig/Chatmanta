@@ -23,7 +23,7 @@
 | Onderdeel | Afspraak |
 |---|---|
 | **Product V1** | Alléén een betrouwbare website-chatbot voor klantvragen: widget + kennisbank (website-crawl + documenten) + klantdashboard + chatlogs + basisstatistiek + veilige "ik weet het niet"-fallback. **Géén** boekingen, betalingen, CRM of complexe flows (dat is V2). |
-| **Eerste klanten** | 3 friends & family-testklanten: **ActionSpeedControl** (vader), **Cleans Reinigingen** (neef), **Maxus Studios** (vriend). Eerste maand gratis, daarna vriendenprijs **€20–30/mnd**, handmatige betaling. *(Bevestigd 5 okt: klopt nog.)* |
+| **Eerste klanten** | 3 friends & family-testklanten: **ActionSpeedControl** (vader), **Cleans Reinigingen** (neef), **Maxus Studios** (vriend). Eerste maand gratis, daarna een vriendenprijs (bedrag in de pilot-afspraak, D5 — bewust niet in deze publieke repo), handmatige betaling. *(Bevestigd 5 okt: klopt nog.)* |
 | **Launch-aanpak** | **Alle 3 tegelijk** *(jouw keuze 5 okt — zie de extra voorzorg in stap E1)*. |
 | **Rollen** | **Sebastiaan** = Product & Tech (alles met code, hosting, kwaliteit). **Niels** = Customer & Launch Lead (klanten, onboarding, verwachtingen, juridisch, support). **Samen** = scope en Go/No-Go. *(Bevestigd: Niels is nog actief.)* |
 | **Go/No-Go-lat** | Per klant **≥ 80% goede antwoorden** en **0 kritieke hallucinaties** (bot verzint geen feiten). |
@@ -163,7 +163,7 @@ Doe dit met de tabel in §4 ernaast. Per dienst: **inloggen → account actief �
 | 1 | Dag-budget **€1/dag** per klant (in juli zei je "$1") — houden? | Houden voor de pilot; ruim genoeg voor F&F-volume, en het beschermt je tegen misbruik. |
 | 2 | Widget-token-geldigheid **30 min** (jij noemde 1 uur) | Houden — veiliger, gebruiker merkt niets (widget vernieuwt zelf). |
 | 3 | Contactverzoeken (lead-capture) per klant aan of uit? | Alleen aan bij klanten die het echt willen — elke "aan" = echte PII = Supabase Pro + retentie relevant. |
-| 4 | Prijs na maand 1: €20 of €30? | Laat Niels per klant beslissen; leg het vast in D5. |
+| 4 | Hoogte van de vriendenprijs na maand 1? | Laat Niels per klant beslissen; leg het vast in D5. |
 
 ---
 
