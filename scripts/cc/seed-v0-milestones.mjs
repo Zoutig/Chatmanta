@@ -231,7 +231,7 @@ const MILESTONES = [
       'Maxus Studios heeft akkoord gegeven als testklant.',
       'Elke klant weet dat het om een V1-test gaat.',
       'Elke klant weet dat de eerste maand gratis is.',
-      'Elke klant weet dat daarna een vriendenprijs van 20-30 euro per maand geldt.',
+      'Elke klant weet dat daarna een vriendenprijs geldt (bedrag: zie de pilot-afspraak).',
       'Elke klant weet dat feedback onderdeel is van de pilot.',
       'Elke klant weet dat ChatManta actief verbeterd wordt tijdens de testfase.',
     ],

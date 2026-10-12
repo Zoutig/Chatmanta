@@ -44,6 +44,8 @@ import {
 import { detectLanguage } from '@/lib/rag/hard-eval-checks';
 import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from '@/lib/rag/source-links';
 import { findMatchingManualQA } from '@/lib/rag/manual-qa';
+import { detectSmalltalk, smalltalkReply } from '@/lib/rag/smalltalk-detect';
+import { needsHistoryResolution } from '@/lib/rag/rag-decision';
 import {
   findUnsupportedPremises,
   historyEntityRefusal,
@@ -1536,13 +1538,46 @@ export async function* runRagQuery(
   let preCacheEmbedCost = 0;
   let offTopicSuspected = false;
 
+  // v0.14f deterministicSmalltalk: een bericht dat in zijn geheel een begroeting,
+  // bedankje of afscheid is, krijgt meteen een vaste reply — geen LLM, geen zoeken.
+  if (bot.deterministicSmalltalk === true) {
+    const stKind = detectSmalltalk(original);
+    if (stKind) {
+      yield {
+        kind: 'smalltalk',
+        response: {
+          botVersion: bot.version,
+          tone,
+          length,
+          generalKnowledgeActual: null,
+          kind: 'smalltalk',
+          answer: smalltalkReply(stKind, tone, persona),
+          preProcessTokens: { in: 0, out: 0 },
+          totalCostUsd: 0,
+        },
+      };
+      return;
+    }
+  }
+  // v0.14f lazyPreprocess: géén LLM-voorbewerking vooraf, behalve bij een vervolgvraag
+  // die naar eerdere context verwijst (needsHistoryResolution). De voorbewerking wordt
+  // alleen nog lui gestart als het zoeken op de ruwe vraag niets boven de drempel vindt
+  // (via speculativeRetryOnEmpty): dan levert hij route + herschreven zoekvraag.
+  const lazyPreprocess =
+    bot.lazyPreprocess === true &&
+    enableRewrite &&
+    (history.length === 0 || bot.noLlmPreprocess === true || !needsHistoryResolution(original));
   // v0.14 deferPreprocess (eerste vraag): de pre-processor hoeft alleen nog te
   // routeren → compacte router-prompt als de bot die heeft.
   const routeOnlyPreprocess =
-    bot.deferPreprocess === true && bot.speculativeRetrieval === true && history.length === 0;
-  const preProcessPromise = enableRewrite
-    ? preProcessInput(original, bot, persona, history, tone, routeOnlyPreprocess)
-    : null;
+    !lazyPreprocess &&
+    bot.deferPreprocess === true &&
+    bot.speculativeRetrieval === true &&
+    history.length === 0;
+  let preProcessPromise: Promise<PreProcessResult> | null =
+    enableRewrite && !lazyPreprocess
+      ? preProcessInput(original, bot, persona, history, tone, routeOnlyPreprocess)
+      : null;
   // cacheActive: alleen embedden als de cache écht gebruikt wordt. Zónder de
   // disableCache-gate hier zou een eval/script (disableCache:true) op een
   // cacheEnabled-bot tóch embedden — een verspilde call die in dat pad nooit
@@ -1567,7 +1602,7 @@ export async function* runRagQuery(
   // cache-embed als die al loopt (zelfde tekst). Default uit.
   type SpecResult = { hits: RetrievedChunk[]; embedTokens: number; embedCost: number };
   const specPromise: Promise<SpecResult> | null =
-    bot.speculativeRetrieval === true && preProcessPromise && history.length === 0
+    bot.speculativeRetrieval === true && (preProcessPromise || lazyPreprocess) && history.length === 0
       ? (async () => {
           const tEmbed = performance.now();
           const ownEmbed = cacheEmbedPromise === null;
@@ -1610,14 +1645,23 @@ export async function* runRagQuery(
   // route (smalltalk/off_topic) wordt pas gecheckt waar hij ertoe doet (cache-
   // hit, nul-treffers, vlak vóór het eerste antwoordtoken).
   const deferPreprocess =
-    bot.deferPreprocess === true && specPromise !== null && preProcessPromise !== null;
-  const ppStartedAt = performance.now();
+    bot.deferPreprocess === true &&
+    specPromise !== null &&
+    (preProcessPromise !== null || lazyPreprocess);
+  let ppStartedAt = performance.now();
   // Paden die eindigen zonder de route nodig te hebben (bv. general-knowledge)
   // awaiten de pre-processor nooit: voorkom een unhandled rejection.
   if (deferPreprocess && preProcessPromise) void preProcessPromise.catch(() => undefined);
   let deferredSettled = false;
-  const settleDeferredPreprocess = async (): Promise<PreProcessResult | null> => {
-    if (!deferPreprocess || deferredSettled || !preProcessPromise) return null;
+  // force: alleen de nul-treffers-retry start in lazyPreprocess-modus de voorbewerking
+  // alsnog; de route-checks bij cache-hit / vóór het eerste token doen dat niet.
+  const settleDeferredPreprocess = async (force = false): Promise<PreProcessResult | null> => {
+    if ((!deferPreprocess && !lazyPreprocess) || deferredSettled) return null;
+    if (!preProcessPromise) {
+      if (!(lazyPreprocess && force) || bot.noLlmPreprocess === true) return null;
+      ppStartedAt = performance.now();
+      preProcessPromise = preProcessInput(original, bot, persona, history, tone, false);
+    }
     deferredSettled = true;
     const pp = await preProcessPromise;
     const end = performance.now();
@@ -1887,6 +1931,12 @@ export async function* runRagQuery(
     querySet.length = 0;
   }
   for (const q of ppSubQueries) querySet.push({ text: q, isHyde: false });
+  // v0.15h noLlmPreprocess: geen herschrijving, dus een vervolgvraag zoekt óók op de vorige
+  // gebruikersvraag + de huidige (de losse vraag blijft er ook in voor een nieuw onderwerp).
+  if (bot.noLlmPreprocess === true) {
+    const lastUser = [...history].reverse().find((t) => t.role === 'user')?.content?.trim();
+    if (lastUser) querySet.push({ text: `${lastUser} ${original}`, isHyde: false });
+  }
 
   // 4. Embed all queries (batched).
   yield { kind: 'status', phase: 'embed' };
@@ -2022,10 +2072,10 @@ export async function* runRagQuery(
   // treffers-pad; off_topic levert de originele vraag terug → geen retry.
   if (
     bot.speculativeRetryOnEmpty === true &&
-    specHits !== null &&
+    (specHits !== null || lazyPreprocess) &&
     !merged.some((c) => c.similarity >= threshold)
   ) {
-    const ppRetry = await settleDeferredPreprocess();
+    const ppRetry = await settleDeferredPreprocess(true);
     if (ppRetry?.kind === 'smalltalk') {
       yield smalltalkEvent(ppRetry);
       return;

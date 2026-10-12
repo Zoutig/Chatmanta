@@ -5,7 +5,9 @@
 // neutrale ingestDocument — dezelfde RAG-behandeling als een geüpload document.
 // Mislukte/lege pagina's krijgen een chunk-loze documents-rij (status failed/excluded,
 // included=false) zodat het dashboard ze toont + kan retry'en. Service-role via de
-// MEEGEGEVEN client (SA-5 DI). Idempotent per knowledge_source (delete-then-insert).
+// MEEGEGEVEN client (SA-5 DI). AANVULLEND per knowledge_source: een crawl vervangt
+// alleen de pagina's die hij opnieuw ophaalt (per source_url delete-then-insert); de
+// overige pagina's van de bron blijven staan. Idempotent per URL.
 
 import 'server-only';
 
@@ -84,10 +86,12 @@ async function ingestOnePage(
 }
 
 /**
- * Idempotente ingest van een afgeronde crawl. Verwijdert eerst alle bestaande
- * website-documents van deze bron (CASCADE ruimt parent_chunks + document_chunks),
- * herbouwt dan de pagina's. Twee keer draaien → geen duplicaten. Job-/bron-status
- * zet de orchestrator, niet hier. Eén answer-cache-purge ná de batch.
+ * Aanvullende, idempotente ingest van een afgeronde crawl. Verwijdert alleen de
+ * bestaande website-documents van deze bron met een URL uit déze crawl (CASCADE ruimt
+ * parent_chunks + document_chunks) en herbouwt die; pagina's uit eerdere crawls blijven
+ * staan. Zo kan een klant in rondes van max. 50 pagina's z'n site opbouwen. Twee keer
+ * draaien → geen duplicaten. Job-/bron-status zet de orchestrator, niet hier. Eén
+ * answer-cache-purge ná de batch.
  */
 export async function ingestCrawlResults(
   sb: Sb,
@@ -96,6 +100,8 @@ export async function ingestCrawlResults(
   chatbotId: string,
   pages: CrawledPage[],
 ): Promise<IngestCrawlResult> {
+  const incomingUrls = Array.from(new Set(pages.map((p) => p.url).filter((u) => u.length > 0)));
+
   // Snapshot welke pagina's de klant had uitgezet (included=false), zodat de
   // delete-then-insert re-crawl die keuze niet stil terugdraait naar de DB-default true.
   const { data: prevDisabled, error: prevErr } = await sb
@@ -105,7 +111,8 @@ export async function ingestCrawlResults(
     .eq('chatbot_id', chatbotId)
     .eq('knowledge_source_id', knowledgeSourceId)
     .eq('source', 'website')
-    .eq('included', false);
+    .eq('included', false)
+    .in('metadata->>source_url', incomingUrls);
   // Fail closed: een gefaalde snapshot zou disabledUrls leeg laten → re-crawl zou een
   // door de klant uitgezette pagina stil terug aanzetten. Liever de crawl falen.
   if (prevErr) throw new Error(`disabled-snapshot: ${prevErr.message}`);
@@ -115,12 +122,14 @@ export async function ingestCrawlResults(
       .filter((u): u is string => !!u),
   );
 
+  // Alleen de opnieuw opgehaalde URLs vervangen — de rest van de bron blijft staan.
   const { error: delErr } = await sb
     .from('documents')
     .delete()
     .eq('organization_id', organizationId)
     .eq('chatbot_id', chatbotId)
-    .eq('knowledge_source_id', knowledgeSourceId);
+    .eq('knowledge_source_id', knowledgeSourceId)
+    .in('metadata->>source_url', incomingUrls);
   if (delErr) throw new Error(`documents cleanup: ${delErr.message}`);
 
   const result: IngestCrawlResult = {

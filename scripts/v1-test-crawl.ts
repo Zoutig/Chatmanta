@@ -2,7 +2,8 @@
 // Bewijst de pages-as-documents ingest end-to-end: ingest een fixture-crawl (1 gecrawld
 // feit + 1 failed + 1 excluded) in de seed-org → het feit is retrievebaar via
 // match_chunks_with_parents MÉT source_url; failed/excluded krijgen een chunk-loze
-// documents-rij (included=false); re-ingest is idempotent (geen duplicaten). Ruimt
+// documents-rij (included=false); re-ingest is idempotent (geen duplicaten); een
+// tweede crawl met andere pagina's vult aan i.p.v. te vervangen. Ruimt
 // alles op in finally. Draai: npm run v1:test-crawl
 
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
@@ -107,7 +108,20 @@ async function main() {
     }
     console.log('✅ re-crawl behoudt de uitgezette pagina (included=false)');
 
-    console.log('\n✅ V1 PR-3b crawler-ingest BEWEZEN (pages-as-documents + source_url + failed/excluded + idempotent + retry + included-preservatie).');
+    // aanvullen: een tweede crawl met ándere pagina's laat de eerdere pagina's staan
+    await ingestCrawlResults(sb, ksId, ORG as string, chatbotId, [
+      { url: `${ROOT}nieuw`, title: 'Nieuwe pagina', markdown: 'Een tweede crawlronde voegt deze pagina toe.', statusCode: 200, error: null },
+    ]);
+    const { data: afterAppend } = await sb.from('documents').select('metadata')
+      .eq('organization_id', ORG as string).eq('chatbot_id', chatbotId).eq('knowledge_source_id', ksId);
+    const appendUrls = (afterAppend ?? []).map((d) => (d.metadata as { source_url?: string }).source_url).sort();
+    const expected = [`${ROOT}feit`, `${ROOT}kapot`, `${ROOT}leeg`, `${ROOT}nieuw`].sort();
+    if (JSON.stringify(appendUrls) !== JSON.stringify(expected)) {
+      throw new Error(`aanvullen klopt niet: ${JSON.stringify(appendUrls)}`);
+    }
+    console.log('✅ tweede crawl vult aan (4 pagina’s, eerdere blijven staan)');
+
+    console.log('\n✅ V1 PR-3b crawler-ingest BEWEZEN (pages-as-documents + source_url + failed/excluded + idempotent + retry + included-preservatie + aanvullen).');
   } finally {
     await sb.from('knowledge_sources').delete().eq('id', ksId);
     console.log('✓ test-knowledge_source + documents (CASCADE) opgeruimd.');

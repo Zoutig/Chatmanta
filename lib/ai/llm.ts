@@ -2,9 +2,9 @@
 // Switching between Claude and OpenAI happens by changing one config value,
 // not by rewriting code (blueprint sectie 18).
 //
-// V1 default model: claude-haiku-4-5. OpenAI is the technical fallback
-// (not customer-visible). Real implementation lands in Fase 4; this file
-// only declares the interface and cost lookup.
+// Status: V0 en V1 draaien op OpenAI gpt-4o-mini en roepen openai() direct aan.
+// Deze provider-abstractie (+ Claude als tweede provider/fallback) is bewust V2;
+// tot dan levert dit bestand alleen de interface en de cost-lookup (MODEL_COSTS_USD).
 
 export type LLMProvider = 'anthropic' | 'openai';
 
