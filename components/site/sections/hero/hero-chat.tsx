@@ -2,6 +2,7 @@
 
 import { useReducedMotion } from '../../ui/motion-hooks';
 import { useEffect, useRef } from 'react';
+import { signalMascotte } from '../../mascotte/bus';
 import { Icon } from '../../ui/icon';
 import { Mark } from '../../ui/logo';
 import { createGate, prefersReducedMotion } from './gate';
@@ -67,18 +68,25 @@ export function HeroChat() {
       reset();
       await gate.wait(400);
       user.classList.add('in');
+      signalMascotte({ lookAt: user, lookMs: 1100 }); // mascotte leest de vraag
       await gate.wait(650);
       typing.classList.add('on');
+      signalMascotte({ mode: 'think' });
       await gate.wait(600 + Math.random() * 300);
       typing.classList.remove('on');
       bot.classList.add('streaming', 'in');
+      signalMascotte({ mode: null, talk: true }); // praat mee met het antwoord
       for (const w of ws) {
         await gate.ready();
         w.classList.add('on');
         await gate.sleep(35 + (/[.,?!]$/.test(w.textContent ?? '') ? 90 : 0));
       }
+      signalMascotte({ talk: false });
       await gate.wait(250);
       chip.classList.add('in');
+      signalMascotte({ lookAt: chip, lookMs: 1300, mode: 'happy' }); // trots op de bronvermelding
+      await gate.wait(1300);
+      signalMascotte({ mode: null });
     };
 
     (async () => {
@@ -94,6 +102,7 @@ export function HeroChat() {
 
     return () => {
       ac.abort();
+      signalMascotte({ talk: false, mode: null });
       // Terug naar de SSR-eindstand: alles zichtbaar.
       log.classList.remove('prep');
       bot.classList.remove('streaming');

@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "mascotte:assets": "node scripts/mascotte-assets.mjs",
     "test:e2e": "playwright test",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "verify": "npm run typecheck && npm run test:unit",

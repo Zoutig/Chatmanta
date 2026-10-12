@@ -1,0 +1,4746 @@
+{
+  "canvas": [
+    1536,
+    1024
+  ],
+  "coordinates": "viewer-left and viewer-right; PNG upper-left placement is place_at",
+  "eyes": {
+    "left": {
+      "name": "links",
+      "c": [
+        696,
+        437
+      ],
+      "angle": -18,
+      "rx": 82,
+      "ry": 90,
+      "p": [
+        716,
+        426,
+        49,
+        54,
+        10
+      ],
+      "box": [
+        578,
+        322,
+        245,
+        236
+      ],
+      "look": [
+        18,
+        14
+      ],
+      "shape": "M624 461 C609 423 633 386 668 375 C713 357 750 373 766 410 C785 449 765 479 730 492 C687 512 638 500 624 461Z"
+    },
+    "right": {
+      "name": "rechts",
+      "c": [
+        1009,
+        333
+      ],
+      "angle": -32,
+      "rx": 55,
+      "ry": 81,
+      "p": [
+        994,
+        331,
+        33,
+        49,
+        -28
+      ],
+      "box": [
+        902,
+        226,
+        204,
+        213
+      ],
+      "look": [
+        12,
+        11
+      ],
+      "shape": "M958 295 C969 273 997 271 1014 292 C1043 311 1061 347 1059 371 C1057 390 1024 395 1004 378 C975 357 947 321 958 295Z"
+    }
+  },
+  "mouth": {
+    "place_at": [
+      777,
+      327
+    ],
+    "canvas": [
+      240,
+      220
+    ],
+    "pivot": [
+      895,
+      421
+    ],
+    "rotation": -18
+  },
+  "assets": [
+    {
+      "name": "oogwit_links",
+      "png": "Onderdelen/oogwit_links.png",
+      "svg": "Onderdelen/oogwit_links.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye_white",
+      "side": "left"
+    },
+    {
+      "name": "pupil_links",
+      "png": "Onderdelen/pupil_links.png",
+      "svg": "Onderdelen/pupil_links.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil",
+      "side": "left"
+    },
+    {
+      "name": "links_00_ooglid",
+      "png": "Knipperen/links_00_ooglid.png",
+      "svg": "Knipperen/links_00_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 1.0,
+      "sequence_index": 0
+    },
+    {
+      "name": "links_00_compleet",
+      "png": "Knipperen/links_00_compleet.png",
+      "svg": "Knipperen/links_00_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 1.0,
+      "sequence_index": 0
+    },
+    {
+      "name": "links_01_ooglid",
+      "png": "Knipperen/links_01_ooglid.png",
+      "svg": "Knipperen/links_01_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.9375,
+      "sequence_index": 1
+    },
+    {
+      "name": "links_01_compleet",
+      "png": "Knipperen/links_01_compleet.png",
+      "svg": "Knipperen/links_01_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.9375,
+      "sequence_index": 1
+    },
+    {
+      "name": "links_02_ooglid",
+      "png": "Knipperen/links_02_ooglid.png",
+      "svg": "Knipperen/links_02_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.875,
+      "sequence_index": 2
+    },
+    {
+      "name": "links_02_compleet",
+      "png": "Knipperen/links_02_compleet.png",
+      "svg": "Knipperen/links_02_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.875,
+      "sequence_index": 2
+    },
+    {
+      "name": "links_03_ooglid",
+      "png": "Knipperen/links_03_ooglid.png",
+      "svg": "Knipperen/links_03_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.8125,
+      "sequence_index": 3
+    },
+    {
+      "name": "links_03_compleet",
+      "png": "Knipperen/links_03_compleet.png",
+      "svg": "Knipperen/links_03_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.8125,
+      "sequence_index": 3
+    },
+    {
+      "name": "links_04_ooglid",
+      "png": "Knipperen/links_04_ooglid.png",
+      "svg": "Knipperen/links_04_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.75,
+      "sequence_index": 4
+    },
+    {
+      "name": "links_04_compleet",
+      "png": "Knipperen/links_04_compleet.png",
+      "svg": "Knipperen/links_04_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.75,
+      "sequence_index": 4
+    },
+    {
+      "name": "links_05_ooglid",
+      "png": "Knipperen/links_05_ooglid.png",
+      "svg": "Knipperen/links_05_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.6875,
+      "sequence_index": 5
+    },
+    {
+      "name": "links_05_compleet",
+      "png": "Knipperen/links_05_compleet.png",
+      "svg": "Knipperen/links_05_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.6875,
+      "sequence_index": 5
+    },
+    {
+      "name": "links_06_ooglid",
+      "png": "Knipperen/links_06_ooglid.png",
+      "svg": "Knipperen/links_06_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.625,
+      "sequence_index": 6
+    },
+    {
+      "name": "links_06_compleet",
+      "png": "Knipperen/links_06_compleet.png",
+      "svg": "Knipperen/links_06_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.625,
+      "sequence_index": 6
+    },
+    {
+      "name": "links_07_ooglid",
+      "png": "Knipperen/links_07_ooglid.png",
+      "svg": "Knipperen/links_07_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.5625,
+      "sequence_index": 7
+    },
+    {
+      "name": "links_07_compleet",
+      "png": "Knipperen/links_07_compleet.png",
+      "svg": "Knipperen/links_07_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.5625,
+      "sequence_index": 7
+    },
+    {
+      "name": "links_08_ooglid",
+      "png": "Knipperen/links_08_ooglid.png",
+      "svg": "Knipperen/links_08_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.5,
+      "sequence_index": 8
+    },
+    {
+      "name": "links_08_compleet",
+      "png": "Knipperen/links_08_compleet.png",
+      "svg": "Knipperen/links_08_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.5,
+      "sequence_index": 8
+    },
+    {
+      "name": "links_09_ooglid",
+      "png": "Knipperen/links_09_ooglid.png",
+      "svg": "Knipperen/links_09_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.4375,
+      "sequence_index": 9
+    },
+    {
+      "name": "links_09_compleet",
+      "png": "Knipperen/links_09_compleet.png",
+      "svg": "Knipperen/links_09_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.4375,
+      "sequence_index": 9
+    },
+    {
+      "name": "links_10_ooglid",
+      "png": "Knipperen/links_10_ooglid.png",
+      "svg": "Knipperen/links_10_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.375,
+      "sequence_index": 10
+    },
+    {
+      "name": "links_10_compleet",
+      "png": "Knipperen/links_10_compleet.png",
+      "svg": "Knipperen/links_10_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.375,
+      "sequence_index": 10
+    },
+    {
+      "name": "links_11_ooglid",
+      "png": "Knipperen/links_11_ooglid.png",
+      "svg": "Knipperen/links_11_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.3125,
+      "sequence_index": 11
+    },
+    {
+      "name": "links_11_compleet",
+      "png": "Knipperen/links_11_compleet.png",
+      "svg": "Knipperen/links_11_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.3125,
+      "sequence_index": 11
+    },
+    {
+      "name": "links_12_ooglid",
+      "png": "Knipperen/links_12_ooglid.png",
+      "svg": "Knipperen/links_12_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.25,
+      "sequence_index": 12
+    },
+    {
+      "name": "links_12_compleet",
+      "png": "Knipperen/links_12_compleet.png",
+      "svg": "Knipperen/links_12_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.25,
+      "sequence_index": 12
+    },
+    {
+      "name": "links_13_ooglid",
+      "png": "Knipperen/links_13_ooglid.png",
+      "svg": "Knipperen/links_13_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.1875,
+      "sequence_index": 13
+    },
+    {
+      "name": "links_13_compleet",
+      "png": "Knipperen/links_13_compleet.png",
+      "svg": "Knipperen/links_13_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.1875,
+      "sequence_index": 13
+    },
+    {
+      "name": "links_14_ooglid",
+      "png": "Knipperen/links_14_ooglid.png",
+      "svg": "Knipperen/links_14_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.125,
+      "sequence_index": 14
+    },
+    {
+      "name": "links_14_compleet",
+      "png": "Knipperen/links_14_compleet.png",
+      "svg": "Knipperen/links_14_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.125,
+      "sequence_index": 14
+    },
+    {
+      "name": "links_15_ooglid",
+      "png": "Knipperen/links_15_ooglid.png",
+      "svg": "Knipperen/links_15_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.0625,
+      "sequence_index": 15
+    },
+    {
+      "name": "links_15_compleet",
+      "png": "Knipperen/links_15_compleet.png",
+      "svg": "Knipperen/links_15_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.0625,
+      "sequence_index": 15
+    },
+    {
+      "name": "links_16_ooglid",
+      "png": "Knipperen/links_16_ooglid.png",
+      "svg": "Knipperen/links_16_ooglid.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eyelid",
+      "side": "left",
+      "openness": 0.0,
+      "sequence_index": 16
+    },
+    {
+      "name": "links_16_compleet",
+      "png": "Knipperen/links_16_compleet.png",
+      "svg": "Knipperen/links_16_compleet.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "left",
+      "openness": 0.0,
+      "sequence_index": 16
+    },
+    {
+      "name": "links_x0_y0",
+      "png": "Kijkrichtingen/links_x0_y0.png",
+      "svg": "Kijkrichtingen/links_x0_y0.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "links_x1_y0",
+      "png": "Kijkrichtingen/links_x1_y0.png",
+      "svg": "Kijkrichtingen/links_x1_y0.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -0.5,
+        -1
+      ]
+    },
+    {
+      "name": "links_x2_y0",
+      "png": "Kijkrichtingen/links_x2_y0.png",
+      "svg": "Kijkrichtingen/links_x2_y0.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0,
+        -1
+      ]
+    },
+    {
+      "name": "links_x3_y0",
+      "png": "Kijkrichtingen/links_x3_y0.png",
+      "svg": "Kijkrichtingen/links_x3_y0.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0.5,
+        -1
+      ]
+    },
+    {
+      "name": "links_x4_y0",
+      "png": "Kijkrichtingen/links_x4_y0.png",
+      "svg": "Kijkrichtingen/links_x4_y0.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        1,
+        -1
+      ]
+    },
+    {
+      "name": "links_x0_y1",
+      "png": "Kijkrichtingen/links_x0_y1.png",
+      "svg": "Kijkrichtingen/links_x0_y1.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -1,
+        -0.5
+      ]
+    },
+    {
+      "name": "links_x1_y1",
+      "png": "Kijkrichtingen/links_x1_y1.png",
+      "svg": "Kijkrichtingen/links_x1_y1.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -0.5,
+        -0.5
+      ]
+    },
+    {
+      "name": "links_x2_y1",
+      "png": "Kijkrichtingen/links_x2_y1.png",
+      "svg": "Kijkrichtingen/links_x2_y1.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0,
+        -0.5
+      ]
+    },
+    {
+      "name": "links_x3_y1",
+      "png": "Kijkrichtingen/links_x3_y1.png",
+      "svg": "Kijkrichtingen/links_x3_y1.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0.5,
+        -0.5
+      ]
+    },
+    {
+      "name": "links_x4_y1",
+      "png": "Kijkrichtingen/links_x4_y1.png",
+      "svg": "Kijkrichtingen/links_x4_y1.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        1,
+        -0.5
+      ]
+    },
+    {
+      "name": "links_x0_y2",
+      "png": "Kijkrichtingen/links_x0_y2.png",
+      "svg": "Kijkrichtingen/links_x0_y2.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "links_x1_y2",
+      "png": "Kijkrichtingen/links_x1_y2.png",
+      "svg": "Kijkrichtingen/links_x1_y2.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "name": "links_x2_y2",
+      "png": "Kijkrichtingen/links_x2_y2.png",
+      "svg": "Kijkrichtingen/links_x2_y2.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "links_x3_y2",
+      "png": "Kijkrichtingen/links_x3_y2.png",
+      "svg": "Kijkrichtingen/links_x3_y2.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0.5,
+        0
+      ]
+    },
+    {
+      "name": "links_x4_y2",
+      "png": "Kijkrichtingen/links_x4_y2.png",
+      "svg": "Kijkrichtingen/links_x4_y2.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "links_x0_y3",
+      "png": "Kijkrichtingen/links_x0_y3.png",
+      "svg": "Kijkrichtingen/links_x0_y3.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -1,
+        0.5
+      ]
+    },
+    {
+      "name": "links_x1_y3",
+      "png": "Kijkrichtingen/links_x1_y3.png",
+      "svg": "Kijkrichtingen/links_x1_y3.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "name": "links_x2_y3",
+      "png": "Kijkrichtingen/links_x2_y3.png",
+      "svg": "Kijkrichtingen/links_x2_y3.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "name": "links_x3_y3",
+      "png": "Kijkrichtingen/links_x3_y3.png",
+      "svg": "Kijkrichtingen/links_x3_y3.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "name": "links_x4_y3",
+      "png": "Kijkrichtingen/links_x4_y3.png",
+      "svg": "Kijkrichtingen/links_x4_y3.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        1,
+        0.5
+      ]
+    },
+    {
+      "name": "links_x0_y4",
+      "png": "Kijkrichtingen/links_x0_y4.png",
+      "svg": "Kijkrichtingen/links_x0_y4.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -1,
+        1
+      ]
+    },
+    {
+      "name": "links_x1_y4",
+      "png": "Kijkrichtingen/links_x1_y4.png",
+      "svg": "Kijkrichtingen/links_x1_y4.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        -0.5,
+        1
+      ]
+    },
+    {
+      "name": "links_x2_y4",
+      "png": "Kijkrichtingen/links_x2_y4.png",
+      "svg": "Kijkrichtingen/links_x2_y4.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "links_x3_y4",
+      "png": "Kijkrichtingen/links_x3_y4.png",
+      "svg": "Kijkrichtingen/links_x3_y4.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "name": "links_x4_y4",
+      "png": "Kijkrichtingen/links_x4_y4.png",
+      "svg": "Kijkrichtingen/links_x4_y4.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_position",
+      "side": "left",
+      "gaze": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "links_00",
+      "png": "Pupilgroottes/links_00.png",
+      "svg": "Pupilgroottes/links_00.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 0.8
+    },
+    {
+      "name": "links_01",
+      "png": "Pupilgroottes/links_01.png",
+      "svg": "Pupilgroottes/links_01.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 0.8500000000000001
+    },
+    {
+      "name": "links_02",
+      "png": "Pupilgroottes/links_02.png",
+      "svg": "Pupilgroottes/links_02.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 0.9
+    },
+    {
+      "name": "links_03",
+      "png": "Pupilgroottes/links_03.png",
+      "svg": "Pupilgroottes/links_03.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 0.9500000000000001
+    },
+    {
+      "name": "links_04",
+      "png": "Pupilgroottes/links_04.png",
+      "svg": "Pupilgroottes/links_04.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 1.0
+    },
+    {
+      "name": "links_05",
+      "png": "Pupilgroottes/links_05.png",
+      "svg": "Pupilgroottes/links_05.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 1.05
+    },
+    {
+      "name": "links_06",
+      "png": "Pupilgroottes/links_06.png",
+      "svg": "Pupilgroottes/links_06.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 1.1
+    },
+    {
+      "name": "links_07",
+      "png": "Pupilgroottes/links_07.png",
+      "svg": "Pupilgroottes/links_07.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 1.1500000000000001
+    },
+    {
+      "name": "links_08",
+      "png": "Pupilgroottes/links_08.png",
+      "svg": "Pupilgroottes/links_08.svg",
+      "canvas": [
+        245,
+        236
+      ],
+      "place_at": [
+        578,
+        322
+      ],
+      "component": "pupil_size",
+      "side": "left",
+      "scale": 1.2000000000000002
+    },
+    {
+      "name": "oogwit_rechts",
+      "png": "Onderdelen/oogwit_rechts.png",
+      "svg": "Onderdelen/oogwit_rechts.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye_white",
+      "side": "right"
+    },
+    {
+      "name": "pupil_rechts",
+      "png": "Onderdelen/pupil_rechts.png",
+      "svg": "Onderdelen/pupil_rechts.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil",
+      "side": "right"
+    },
+    {
+      "name": "rechts_00_ooglid",
+      "png": "Knipperen/rechts_00_ooglid.png",
+      "svg": "Knipperen/rechts_00_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 1.0,
+      "sequence_index": 0
+    },
+    {
+      "name": "rechts_00_compleet",
+      "png": "Knipperen/rechts_00_compleet.png",
+      "svg": "Knipperen/rechts_00_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 1.0,
+      "sequence_index": 0
+    },
+    {
+      "name": "rechts_01_ooglid",
+      "png": "Knipperen/rechts_01_ooglid.png",
+      "svg": "Knipperen/rechts_01_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.9375,
+      "sequence_index": 1
+    },
+    {
+      "name": "rechts_01_compleet",
+      "png": "Knipperen/rechts_01_compleet.png",
+      "svg": "Knipperen/rechts_01_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.9375,
+      "sequence_index": 1
+    },
+    {
+      "name": "rechts_02_ooglid",
+      "png": "Knipperen/rechts_02_ooglid.png",
+      "svg": "Knipperen/rechts_02_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.875,
+      "sequence_index": 2
+    },
+    {
+      "name": "rechts_02_compleet",
+      "png": "Knipperen/rechts_02_compleet.png",
+      "svg": "Knipperen/rechts_02_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.875,
+      "sequence_index": 2
+    },
+    {
+      "name": "rechts_03_ooglid",
+      "png": "Knipperen/rechts_03_ooglid.png",
+      "svg": "Knipperen/rechts_03_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.8125,
+      "sequence_index": 3
+    },
+    {
+      "name": "rechts_03_compleet",
+      "png": "Knipperen/rechts_03_compleet.png",
+      "svg": "Knipperen/rechts_03_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.8125,
+      "sequence_index": 3
+    },
+    {
+      "name": "rechts_04_ooglid",
+      "png": "Knipperen/rechts_04_ooglid.png",
+      "svg": "Knipperen/rechts_04_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.75,
+      "sequence_index": 4
+    },
+    {
+      "name": "rechts_04_compleet",
+      "png": "Knipperen/rechts_04_compleet.png",
+      "svg": "Knipperen/rechts_04_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.75,
+      "sequence_index": 4
+    },
+    {
+      "name": "rechts_05_ooglid",
+      "png": "Knipperen/rechts_05_ooglid.png",
+      "svg": "Knipperen/rechts_05_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.6875,
+      "sequence_index": 5
+    },
+    {
+      "name": "rechts_05_compleet",
+      "png": "Knipperen/rechts_05_compleet.png",
+      "svg": "Knipperen/rechts_05_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.6875,
+      "sequence_index": 5
+    },
+    {
+      "name": "rechts_06_ooglid",
+      "png": "Knipperen/rechts_06_ooglid.png",
+      "svg": "Knipperen/rechts_06_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.625,
+      "sequence_index": 6
+    },
+    {
+      "name": "rechts_06_compleet",
+      "png": "Knipperen/rechts_06_compleet.png",
+      "svg": "Knipperen/rechts_06_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.625,
+      "sequence_index": 6
+    },
+    {
+      "name": "rechts_07_ooglid",
+      "png": "Knipperen/rechts_07_ooglid.png",
+      "svg": "Knipperen/rechts_07_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.5625,
+      "sequence_index": 7
+    },
+    {
+      "name": "rechts_07_compleet",
+      "png": "Knipperen/rechts_07_compleet.png",
+      "svg": "Knipperen/rechts_07_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.5625,
+      "sequence_index": 7
+    },
+    {
+      "name": "rechts_08_ooglid",
+      "png": "Knipperen/rechts_08_ooglid.png",
+      "svg": "Knipperen/rechts_08_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.5,
+      "sequence_index": 8
+    },
+    {
+      "name": "rechts_08_compleet",
+      "png": "Knipperen/rechts_08_compleet.png",
+      "svg": "Knipperen/rechts_08_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.5,
+      "sequence_index": 8
+    },
+    {
+      "name": "rechts_09_ooglid",
+      "png": "Knipperen/rechts_09_ooglid.png",
+      "svg": "Knipperen/rechts_09_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.4375,
+      "sequence_index": 9
+    },
+    {
+      "name": "rechts_09_compleet",
+      "png": "Knipperen/rechts_09_compleet.png",
+      "svg": "Knipperen/rechts_09_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.4375,
+      "sequence_index": 9
+    },
+    {
+      "name": "rechts_10_ooglid",
+      "png": "Knipperen/rechts_10_ooglid.png",
+      "svg": "Knipperen/rechts_10_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.375,
+      "sequence_index": 10
+    },
+    {
+      "name": "rechts_10_compleet",
+      "png": "Knipperen/rechts_10_compleet.png",
+      "svg": "Knipperen/rechts_10_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.375,
+      "sequence_index": 10
+    },
+    {
+      "name": "rechts_11_ooglid",
+      "png": "Knipperen/rechts_11_ooglid.png",
+      "svg": "Knipperen/rechts_11_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.3125,
+      "sequence_index": 11
+    },
+    {
+      "name": "rechts_11_compleet",
+      "png": "Knipperen/rechts_11_compleet.png",
+      "svg": "Knipperen/rechts_11_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.3125,
+      "sequence_index": 11
+    },
+    {
+      "name": "rechts_12_ooglid",
+      "png": "Knipperen/rechts_12_ooglid.png",
+      "svg": "Knipperen/rechts_12_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.25,
+      "sequence_index": 12
+    },
+    {
+      "name": "rechts_12_compleet",
+      "png": "Knipperen/rechts_12_compleet.png",
+      "svg": "Knipperen/rechts_12_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.25,
+      "sequence_index": 12
+    },
+    {
+      "name": "rechts_13_ooglid",
+      "png": "Knipperen/rechts_13_ooglid.png",
+      "svg": "Knipperen/rechts_13_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.1875,
+      "sequence_index": 13
+    },
+    {
+      "name": "rechts_13_compleet",
+      "png": "Knipperen/rechts_13_compleet.png",
+      "svg": "Knipperen/rechts_13_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.1875,
+      "sequence_index": 13
+    },
+    {
+      "name": "rechts_14_ooglid",
+      "png": "Knipperen/rechts_14_ooglid.png",
+      "svg": "Knipperen/rechts_14_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.125,
+      "sequence_index": 14
+    },
+    {
+      "name": "rechts_14_compleet",
+      "png": "Knipperen/rechts_14_compleet.png",
+      "svg": "Knipperen/rechts_14_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.125,
+      "sequence_index": 14
+    },
+    {
+      "name": "rechts_15_ooglid",
+      "png": "Knipperen/rechts_15_ooglid.png",
+      "svg": "Knipperen/rechts_15_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.0625,
+      "sequence_index": 15
+    },
+    {
+      "name": "rechts_15_compleet",
+      "png": "Knipperen/rechts_15_compleet.png",
+      "svg": "Knipperen/rechts_15_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.0625,
+      "sequence_index": 15
+    },
+    {
+      "name": "rechts_16_ooglid",
+      "png": "Knipperen/rechts_16_ooglid.png",
+      "svg": "Knipperen/rechts_16_ooglid.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eyelid",
+      "side": "right",
+      "openness": 0.0,
+      "sequence_index": 16
+    },
+    {
+      "name": "rechts_16_compleet",
+      "png": "Knipperen/rechts_16_compleet.png",
+      "svg": "Knipperen/rechts_16_compleet.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "eye",
+      "note": "complete eye with movable components inside SVG",
+      "side": "right",
+      "openness": 0.0,
+      "sequence_index": 16
+    },
+    {
+      "name": "rechts_x0_y0",
+      "png": "Kijkrichtingen/rechts_x0_y0.png",
+      "svg": "Kijkrichtingen/rechts_x0_y0.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "rechts_x1_y0",
+      "png": "Kijkrichtingen/rechts_x1_y0.png",
+      "svg": "Kijkrichtingen/rechts_x1_y0.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -0.5,
+        -1
+      ]
+    },
+    {
+      "name": "rechts_x2_y0",
+      "png": "Kijkrichtingen/rechts_x2_y0.png",
+      "svg": "Kijkrichtingen/rechts_x2_y0.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0,
+        -1
+      ]
+    },
+    {
+      "name": "rechts_x3_y0",
+      "png": "Kijkrichtingen/rechts_x3_y0.png",
+      "svg": "Kijkrichtingen/rechts_x3_y0.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0.5,
+        -1
+      ]
+    },
+    {
+      "name": "rechts_x4_y0",
+      "png": "Kijkrichtingen/rechts_x4_y0.png",
+      "svg": "Kijkrichtingen/rechts_x4_y0.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        1,
+        -1
+      ]
+    },
+    {
+      "name": "rechts_x0_y1",
+      "png": "Kijkrichtingen/rechts_x0_y1.png",
+      "svg": "Kijkrichtingen/rechts_x0_y1.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -1,
+        -0.5
+      ]
+    },
+    {
+      "name": "rechts_x1_y1",
+      "png": "Kijkrichtingen/rechts_x1_y1.png",
+      "svg": "Kijkrichtingen/rechts_x1_y1.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -0.5,
+        -0.5
+      ]
+    },
+    {
+      "name": "rechts_x2_y1",
+      "png": "Kijkrichtingen/rechts_x2_y1.png",
+      "svg": "Kijkrichtingen/rechts_x2_y1.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0,
+        -0.5
+      ]
+    },
+    {
+      "name": "rechts_x3_y1",
+      "png": "Kijkrichtingen/rechts_x3_y1.png",
+      "svg": "Kijkrichtingen/rechts_x3_y1.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0.5,
+        -0.5
+      ]
+    },
+    {
+      "name": "rechts_x4_y1",
+      "png": "Kijkrichtingen/rechts_x4_y1.png",
+      "svg": "Kijkrichtingen/rechts_x4_y1.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        1,
+        -0.5
+      ]
+    },
+    {
+      "name": "rechts_x0_y2",
+      "png": "Kijkrichtingen/rechts_x0_y2.png",
+      "svg": "Kijkrichtingen/rechts_x0_y2.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "rechts_x1_y2",
+      "png": "Kijkrichtingen/rechts_x1_y2.png",
+      "svg": "Kijkrichtingen/rechts_x1_y2.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "name": "rechts_x2_y2",
+      "png": "Kijkrichtingen/rechts_x2_y2.png",
+      "svg": "Kijkrichtingen/rechts_x2_y2.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "rechts_x3_y2",
+      "png": "Kijkrichtingen/rechts_x3_y2.png",
+      "svg": "Kijkrichtingen/rechts_x3_y2.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0.5,
+        0
+      ]
+    },
+    {
+      "name": "rechts_x4_y2",
+      "png": "Kijkrichtingen/rechts_x4_y2.png",
+      "svg": "Kijkrichtingen/rechts_x4_y2.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "rechts_x0_y3",
+      "png": "Kijkrichtingen/rechts_x0_y3.png",
+      "svg": "Kijkrichtingen/rechts_x0_y3.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -1,
+        0.5
+      ]
+    },
+    {
+      "name": "rechts_x1_y3",
+      "png": "Kijkrichtingen/rechts_x1_y3.png",
+      "svg": "Kijkrichtingen/rechts_x1_y3.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "name": "rechts_x2_y3",
+      "png": "Kijkrichtingen/rechts_x2_y3.png",
+      "svg": "Kijkrichtingen/rechts_x2_y3.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "name": "rechts_x3_y3",
+      "png": "Kijkrichtingen/rechts_x3_y3.png",
+      "svg": "Kijkrichtingen/rechts_x3_y3.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "name": "rechts_x4_y3",
+      "png": "Kijkrichtingen/rechts_x4_y3.png",
+      "svg": "Kijkrichtingen/rechts_x4_y3.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        1,
+        0.5
+      ]
+    },
+    {
+      "name": "rechts_x0_y4",
+      "png": "Kijkrichtingen/rechts_x0_y4.png",
+      "svg": "Kijkrichtingen/rechts_x0_y4.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -1,
+        1
+      ]
+    },
+    {
+      "name": "rechts_x1_y4",
+      "png": "Kijkrichtingen/rechts_x1_y4.png",
+      "svg": "Kijkrichtingen/rechts_x1_y4.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        -0.5,
+        1
+      ]
+    },
+    {
+      "name": "rechts_x2_y4",
+      "png": "Kijkrichtingen/rechts_x2_y4.png",
+      "svg": "Kijkrichtingen/rechts_x2_y4.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "rechts_x3_y4",
+      "png": "Kijkrichtingen/rechts_x3_y4.png",
+      "svg": "Kijkrichtingen/rechts_x3_y4.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "name": "rechts_x4_y4",
+      "png": "Kijkrichtingen/rechts_x4_y4.png",
+      "svg": "Kijkrichtingen/rechts_x4_y4.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_position",
+      "side": "right",
+      "gaze": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "rechts_00",
+      "png": "Pupilgroottes/rechts_00.png",
+      "svg": "Pupilgroottes/rechts_00.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 0.8
+    },
+    {
+      "name": "rechts_01",
+      "png": "Pupilgroottes/rechts_01.png",
+      "svg": "Pupilgroottes/rechts_01.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 0.8500000000000001
+    },
+    {
+      "name": "rechts_02",
+      "png": "Pupilgroottes/rechts_02.png",
+      "svg": "Pupilgroottes/rechts_02.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 0.9
+    },
+    {
+      "name": "rechts_03",
+      "png": "Pupilgroottes/rechts_03.png",
+      "svg": "Pupilgroottes/rechts_03.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 0.9500000000000001
+    },
+    {
+      "name": "rechts_04",
+      "png": "Pupilgroottes/rechts_04.png",
+      "svg": "Pupilgroottes/rechts_04.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 1.0
+    },
+    {
+      "name": "rechts_05",
+      "png": "Pupilgroottes/rechts_05.png",
+      "svg": "Pupilgroottes/rechts_05.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 1.05
+    },
+    {
+      "name": "rechts_06",
+      "png": "Pupilgroottes/rechts_06.png",
+      "svg": "Pupilgroottes/rechts_06.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 1.1
+    },
+    {
+      "name": "rechts_07",
+      "png": "Pupilgroottes/rechts_07.png",
+      "svg": "Pupilgroottes/rechts_07.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 1.1500000000000001
+    },
+    {
+      "name": "rechts_08",
+      "png": "Pupilgroottes/rechts_08.png",
+      "svg": "Pupilgroottes/rechts_08.svg",
+      "canvas": [
+        204,
+        213
+      ],
+      "place_at": [
+        902,
+        226
+      ],
+      "component": "pupil_size",
+      "side": "right",
+      "scale": 1.2000000000000002
+    },
+    {
+      "name": "smile_00",
+      "png": "Mond/smile_00.png",
+      "svg": "Mond/smile_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.0
+    },
+    {
+      "name": "smile_01",
+      "png": "Mond/smile_01.png",
+      "svg": "Mond/smile_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.0625
+    },
+    {
+      "name": "smile_02",
+      "png": "Mond/smile_02.png",
+      "svg": "Mond/smile_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.125
+    },
+    {
+      "name": "smile_03",
+      "png": "Mond/smile_03.png",
+      "svg": "Mond/smile_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.1875
+    },
+    {
+      "name": "smile_04",
+      "png": "Mond/smile_04.png",
+      "svg": "Mond/smile_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.25
+    },
+    {
+      "name": "smile_05",
+      "png": "Mond/smile_05.png",
+      "svg": "Mond/smile_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.3125
+    },
+    {
+      "name": "smile_06",
+      "png": "Mond/smile_06.png",
+      "svg": "Mond/smile_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.375
+    },
+    {
+      "name": "smile_07",
+      "png": "Mond/smile_07.png",
+      "svg": "Mond/smile_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.4375
+    },
+    {
+      "name": "smile_08",
+      "png": "Mond/smile_08.png",
+      "svg": "Mond/smile_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.5
+    },
+    {
+      "name": "smile_09",
+      "png": "Mond/smile_09.png",
+      "svg": "Mond/smile_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.5625
+    },
+    {
+      "name": "smile_10",
+      "png": "Mond/smile_10.png",
+      "svg": "Mond/smile_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.625
+    },
+    {
+      "name": "smile_11",
+      "png": "Mond/smile_11.png",
+      "svg": "Mond/smile_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.6875
+    },
+    {
+      "name": "smile_12",
+      "png": "Mond/smile_12.png",
+      "svg": "Mond/smile_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.75
+    },
+    {
+      "name": "smile_13",
+      "png": "Mond/smile_13.png",
+      "svg": "Mond/smile_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.8125
+    },
+    {
+      "name": "smile_14",
+      "png": "Mond/smile_14.png",
+      "svg": "Mond/smile_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.875
+    },
+    {
+      "name": "smile_15",
+      "png": "Mond/smile_15.png",
+      "svg": "Mond/smile_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 0.9375
+    },
+    {
+      "name": "smile_16",
+      "png": "Mond/smile_16.png",
+      "svg": "Mond/smile_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "smile",
+      "amount": 1.0
+    },
+    {
+      "name": "oh_00",
+      "png": "Mond/oh_00.png",
+      "svg": "Mond/oh_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.0
+    },
+    {
+      "name": "oh_01",
+      "png": "Mond/oh_01.png",
+      "svg": "Mond/oh_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.0625
+    },
+    {
+      "name": "oh_02",
+      "png": "Mond/oh_02.png",
+      "svg": "Mond/oh_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.125
+    },
+    {
+      "name": "oh_03",
+      "png": "Mond/oh_03.png",
+      "svg": "Mond/oh_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.1875
+    },
+    {
+      "name": "oh_04",
+      "png": "Mond/oh_04.png",
+      "svg": "Mond/oh_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.25
+    },
+    {
+      "name": "oh_05",
+      "png": "Mond/oh_05.png",
+      "svg": "Mond/oh_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.3125
+    },
+    {
+      "name": "oh_06",
+      "png": "Mond/oh_06.png",
+      "svg": "Mond/oh_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.375
+    },
+    {
+      "name": "oh_07",
+      "png": "Mond/oh_07.png",
+      "svg": "Mond/oh_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.4375
+    },
+    {
+      "name": "oh_08",
+      "png": "Mond/oh_08.png",
+      "svg": "Mond/oh_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.5
+    },
+    {
+      "name": "oh_09",
+      "png": "Mond/oh_09.png",
+      "svg": "Mond/oh_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.5625
+    },
+    {
+      "name": "oh_10",
+      "png": "Mond/oh_10.png",
+      "svg": "Mond/oh_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.625
+    },
+    {
+      "name": "oh_11",
+      "png": "Mond/oh_11.png",
+      "svg": "Mond/oh_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.6875
+    },
+    {
+      "name": "oh_12",
+      "png": "Mond/oh_12.png",
+      "svg": "Mond/oh_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.75
+    },
+    {
+      "name": "oh_13",
+      "png": "Mond/oh_13.png",
+      "svg": "Mond/oh_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.8125
+    },
+    {
+      "name": "oh_14",
+      "png": "Mond/oh_14.png",
+      "svg": "Mond/oh_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.875
+    },
+    {
+      "name": "oh_15",
+      "png": "Mond/oh_15.png",
+      "svg": "Mond/oh_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 0.9375
+    },
+    {
+      "name": "oh_16",
+      "png": "Mond/oh_16.png",
+      "svg": "Mond/oh_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oh",
+      "amount": 1.0
+    },
+    {
+      "name": "ee_00",
+      "png": "Mond/ee_00.png",
+      "svg": "Mond/ee_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.0
+    },
+    {
+      "name": "ee_01",
+      "png": "Mond/ee_01.png",
+      "svg": "Mond/ee_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.0625
+    },
+    {
+      "name": "ee_02",
+      "png": "Mond/ee_02.png",
+      "svg": "Mond/ee_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.125
+    },
+    {
+      "name": "ee_03",
+      "png": "Mond/ee_03.png",
+      "svg": "Mond/ee_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.1875
+    },
+    {
+      "name": "ee_04",
+      "png": "Mond/ee_04.png",
+      "svg": "Mond/ee_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.25
+    },
+    {
+      "name": "ee_05",
+      "png": "Mond/ee_05.png",
+      "svg": "Mond/ee_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.3125
+    },
+    {
+      "name": "ee_06",
+      "png": "Mond/ee_06.png",
+      "svg": "Mond/ee_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.375
+    },
+    {
+      "name": "ee_07",
+      "png": "Mond/ee_07.png",
+      "svg": "Mond/ee_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.4375
+    },
+    {
+      "name": "ee_08",
+      "png": "Mond/ee_08.png",
+      "svg": "Mond/ee_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.5
+    },
+    {
+      "name": "ee_09",
+      "png": "Mond/ee_09.png",
+      "svg": "Mond/ee_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.5625
+    },
+    {
+      "name": "ee_10",
+      "png": "Mond/ee_10.png",
+      "svg": "Mond/ee_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.625
+    },
+    {
+      "name": "ee_11",
+      "png": "Mond/ee_11.png",
+      "svg": "Mond/ee_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.6875
+    },
+    {
+      "name": "ee_12",
+      "png": "Mond/ee_12.png",
+      "svg": "Mond/ee_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.75
+    },
+    {
+      "name": "ee_13",
+      "png": "Mond/ee_13.png",
+      "svg": "Mond/ee_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.8125
+    },
+    {
+      "name": "ee_14",
+      "png": "Mond/ee_14.png",
+      "svg": "Mond/ee_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.875
+    },
+    {
+      "name": "ee_15",
+      "png": "Mond/ee_15.png",
+      "svg": "Mond/ee_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 0.9375
+    },
+    {
+      "name": "ee_16",
+      "png": "Mond/ee_16.png",
+      "svg": "Mond/ee_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ee",
+      "amount": 1.0
+    },
+    {
+      "name": "sad_00",
+      "png": "Mond/sad_00.png",
+      "svg": "Mond/sad_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.0
+    },
+    {
+      "name": "sad_01",
+      "png": "Mond/sad_01.png",
+      "svg": "Mond/sad_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.0625
+    },
+    {
+      "name": "sad_02",
+      "png": "Mond/sad_02.png",
+      "svg": "Mond/sad_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.125
+    },
+    {
+      "name": "sad_03",
+      "png": "Mond/sad_03.png",
+      "svg": "Mond/sad_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.1875
+    },
+    {
+      "name": "sad_04",
+      "png": "Mond/sad_04.png",
+      "svg": "Mond/sad_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.25
+    },
+    {
+      "name": "sad_05",
+      "png": "Mond/sad_05.png",
+      "svg": "Mond/sad_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.3125
+    },
+    {
+      "name": "sad_06",
+      "png": "Mond/sad_06.png",
+      "svg": "Mond/sad_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.375
+    },
+    {
+      "name": "sad_07",
+      "png": "Mond/sad_07.png",
+      "svg": "Mond/sad_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.4375
+    },
+    {
+      "name": "sad_08",
+      "png": "Mond/sad_08.png",
+      "svg": "Mond/sad_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.5
+    },
+    {
+      "name": "sad_09",
+      "png": "Mond/sad_09.png",
+      "svg": "Mond/sad_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.5625
+    },
+    {
+      "name": "sad_10",
+      "png": "Mond/sad_10.png",
+      "svg": "Mond/sad_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.625
+    },
+    {
+      "name": "sad_11",
+      "png": "Mond/sad_11.png",
+      "svg": "Mond/sad_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.6875
+    },
+    {
+      "name": "sad_12",
+      "png": "Mond/sad_12.png",
+      "svg": "Mond/sad_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.75
+    },
+    {
+      "name": "sad_13",
+      "png": "Mond/sad_13.png",
+      "svg": "Mond/sad_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.8125
+    },
+    {
+      "name": "sad_14",
+      "png": "Mond/sad_14.png",
+      "svg": "Mond/sad_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.875
+    },
+    {
+      "name": "sad_15",
+      "png": "Mond/sad_15.png",
+      "svg": "Mond/sad_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 0.9375
+    },
+    {
+      "name": "sad_16",
+      "png": "Mond/sad_16.png",
+      "svg": "Mond/sad_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "sad",
+      "amount": 1.0
+    },
+    {
+      "name": "ah_00",
+      "png": "Mond/ah_00.png",
+      "svg": "Mond/ah_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.0
+    },
+    {
+      "name": "ah_01",
+      "png": "Mond/ah_01.png",
+      "svg": "Mond/ah_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.0625
+    },
+    {
+      "name": "ah_02",
+      "png": "Mond/ah_02.png",
+      "svg": "Mond/ah_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.125
+    },
+    {
+      "name": "ah_03",
+      "png": "Mond/ah_03.png",
+      "svg": "Mond/ah_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.1875
+    },
+    {
+      "name": "ah_04",
+      "png": "Mond/ah_04.png",
+      "svg": "Mond/ah_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.25
+    },
+    {
+      "name": "ah_05",
+      "png": "Mond/ah_05.png",
+      "svg": "Mond/ah_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.3125
+    },
+    {
+      "name": "ah_06",
+      "png": "Mond/ah_06.png",
+      "svg": "Mond/ah_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.375
+    },
+    {
+      "name": "ah_07",
+      "png": "Mond/ah_07.png",
+      "svg": "Mond/ah_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.4375
+    },
+    {
+      "name": "ah_08",
+      "png": "Mond/ah_08.png",
+      "svg": "Mond/ah_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.5
+    },
+    {
+      "name": "ah_09",
+      "png": "Mond/ah_09.png",
+      "svg": "Mond/ah_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.5625
+    },
+    {
+      "name": "ah_10",
+      "png": "Mond/ah_10.png",
+      "svg": "Mond/ah_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.625
+    },
+    {
+      "name": "ah_11",
+      "png": "Mond/ah_11.png",
+      "svg": "Mond/ah_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.6875
+    },
+    {
+      "name": "ah_12",
+      "png": "Mond/ah_12.png",
+      "svg": "Mond/ah_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.75
+    },
+    {
+      "name": "ah_13",
+      "png": "Mond/ah_13.png",
+      "svg": "Mond/ah_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.8125
+    },
+    {
+      "name": "ah_14",
+      "png": "Mond/ah_14.png",
+      "svg": "Mond/ah_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.875
+    },
+    {
+      "name": "ah_15",
+      "png": "Mond/ah_15.png",
+      "svg": "Mond/ah_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 0.9375
+    },
+    {
+      "name": "ah_16",
+      "png": "Mond/ah_16.png",
+      "svg": "Mond/ah_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "ah",
+      "amount": 1.0
+    },
+    {
+      "name": "oo_00",
+      "png": "Mond/oo_00.png",
+      "svg": "Mond/oo_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.0
+    },
+    {
+      "name": "oo_01",
+      "png": "Mond/oo_01.png",
+      "svg": "Mond/oo_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.0625
+    },
+    {
+      "name": "oo_02",
+      "png": "Mond/oo_02.png",
+      "svg": "Mond/oo_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.125
+    },
+    {
+      "name": "oo_03",
+      "png": "Mond/oo_03.png",
+      "svg": "Mond/oo_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.1875
+    },
+    {
+      "name": "oo_04",
+      "png": "Mond/oo_04.png",
+      "svg": "Mond/oo_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.25
+    },
+    {
+      "name": "oo_05",
+      "png": "Mond/oo_05.png",
+      "svg": "Mond/oo_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.3125
+    },
+    {
+      "name": "oo_06",
+      "png": "Mond/oo_06.png",
+      "svg": "Mond/oo_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.375
+    },
+    {
+      "name": "oo_07",
+      "png": "Mond/oo_07.png",
+      "svg": "Mond/oo_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.4375
+    },
+    {
+      "name": "oo_08",
+      "png": "Mond/oo_08.png",
+      "svg": "Mond/oo_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.5
+    },
+    {
+      "name": "oo_09",
+      "png": "Mond/oo_09.png",
+      "svg": "Mond/oo_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.5625
+    },
+    {
+      "name": "oo_10",
+      "png": "Mond/oo_10.png",
+      "svg": "Mond/oo_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.625
+    },
+    {
+      "name": "oo_11",
+      "png": "Mond/oo_11.png",
+      "svg": "Mond/oo_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.6875
+    },
+    {
+      "name": "oo_12",
+      "png": "Mond/oo_12.png",
+      "svg": "Mond/oo_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.75
+    },
+    {
+      "name": "oo_13",
+      "png": "Mond/oo_13.png",
+      "svg": "Mond/oo_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.8125
+    },
+    {
+      "name": "oo_14",
+      "png": "Mond/oo_14.png",
+      "svg": "Mond/oo_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.875
+    },
+    {
+      "name": "oo_15",
+      "png": "Mond/oo_15.png",
+      "svg": "Mond/oo_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 0.9375
+    },
+    {
+      "name": "oo_16",
+      "png": "Mond/oo_16.png",
+      "svg": "Mond/oo_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "oo",
+      "amount": 1.0
+    },
+    {
+      "name": "fv_00",
+      "png": "Mond/fv_00.png",
+      "svg": "Mond/fv_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.0
+    },
+    {
+      "name": "fv_01",
+      "png": "Mond/fv_01.png",
+      "svg": "Mond/fv_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.0625
+    },
+    {
+      "name": "fv_02",
+      "png": "Mond/fv_02.png",
+      "svg": "Mond/fv_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.125
+    },
+    {
+      "name": "fv_03",
+      "png": "Mond/fv_03.png",
+      "svg": "Mond/fv_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.1875
+    },
+    {
+      "name": "fv_04",
+      "png": "Mond/fv_04.png",
+      "svg": "Mond/fv_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.25
+    },
+    {
+      "name": "fv_05",
+      "png": "Mond/fv_05.png",
+      "svg": "Mond/fv_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.3125
+    },
+    {
+      "name": "fv_06",
+      "png": "Mond/fv_06.png",
+      "svg": "Mond/fv_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.375
+    },
+    {
+      "name": "fv_07",
+      "png": "Mond/fv_07.png",
+      "svg": "Mond/fv_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.4375
+    },
+    {
+      "name": "fv_08",
+      "png": "Mond/fv_08.png",
+      "svg": "Mond/fv_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.5
+    },
+    {
+      "name": "fv_09",
+      "png": "Mond/fv_09.png",
+      "svg": "Mond/fv_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.5625
+    },
+    {
+      "name": "fv_10",
+      "png": "Mond/fv_10.png",
+      "svg": "Mond/fv_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.625
+    },
+    {
+      "name": "fv_11",
+      "png": "Mond/fv_11.png",
+      "svg": "Mond/fv_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.6875
+    },
+    {
+      "name": "fv_12",
+      "png": "Mond/fv_12.png",
+      "svg": "Mond/fv_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.75
+    },
+    {
+      "name": "fv_13",
+      "png": "Mond/fv_13.png",
+      "svg": "Mond/fv_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.8125
+    },
+    {
+      "name": "fv_14",
+      "png": "Mond/fv_14.png",
+      "svg": "Mond/fv_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.875
+    },
+    {
+      "name": "fv_15",
+      "png": "Mond/fv_15.png",
+      "svg": "Mond/fv_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 0.9375
+    },
+    {
+      "name": "fv_16",
+      "png": "Mond/fv_16.png",
+      "svg": "Mond/fv_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "fv",
+      "amount": 1.0
+    },
+    {
+      "name": "l_00",
+      "png": "Mond/l_00.png",
+      "svg": "Mond/l_00.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.0
+    },
+    {
+      "name": "l_01",
+      "png": "Mond/l_01.png",
+      "svg": "Mond/l_01.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.0625
+    },
+    {
+      "name": "l_02",
+      "png": "Mond/l_02.png",
+      "svg": "Mond/l_02.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.125
+    },
+    {
+      "name": "l_03",
+      "png": "Mond/l_03.png",
+      "svg": "Mond/l_03.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.1875
+    },
+    {
+      "name": "l_04",
+      "png": "Mond/l_04.png",
+      "svg": "Mond/l_04.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.25
+    },
+    {
+      "name": "l_05",
+      "png": "Mond/l_05.png",
+      "svg": "Mond/l_05.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.3125
+    },
+    {
+      "name": "l_06",
+      "png": "Mond/l_06.png",
+      "svg": "Mond/l_06.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.375
+    },
+    {
+      "name": "l_07",
+      "png": "Mond/l_07.png",
+      "svg": "Mond/l_07.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.4375
+    },
+    {
+      "name": "l_08",
+      "png": "Mond/l_08.png",
+      "svg": "Mond/l_08.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.5
+    },
+    {
+      "name": "l_09",
+      "png": "Mond/l_09.png",
+      "svg": "Mond/l_09.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.5625
+    },
+    {
+      "name": "l_10",
+      "png": "Mond/l_10.png",
+      "svg": "Mond/l_10.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.625
+    },
+    {
+      "name": "l_11",
+      "png": "Mond/l_11.png",
+      "svg": "Mond/l_11.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.6875
+    },
+    {
+      "name": "l_12",
+      "png": "Mond/l_12.png",
+      "svg": "Mond/l_12.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.75
+    },
+    {
+      "name": "l_13",
+      "png": "Mond/l_13.png",
+      "svg": "Mond/l_13.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.8125
+    },
+    {
+      "name": "l_14",
+      "png": "Mond/l_14.png",
+      "svg": "Mond/l_14.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.875
+    },
+    {
+      "name": "l_15",
+      "png": "Mond/l_15.png",
+      "svg": "Mond/l_15.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 0.9375
+    },
+    {
+      "name": "l_16",
+      "png": "Mond/l_16.png",
+      "svg": "Mond/l_16.svg",
+      "canvas": [
+        240,
+        220
+      ],
+      "place_at": [
+        777,
+        327
+      ],
+      "component": "mouth",
+      "family": "l",
+      "amount": 1.0
+    }
+  ]
+}

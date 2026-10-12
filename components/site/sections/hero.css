@@ -40,6 +40,15 @@
 .site-ui .s-hero .hero-chat-wrap .chat { box-shadow: 0 2px 4px rgba(8, 21, 31, 0.2), 0 30px 70px -20px rgba(8, 21, 31, 0.65); }
 @media (min-width: 640px) and (max-width: 1023px) { .site-ui .s-hero .hero-chat-wrap { margin: 0 auto; } }
 
+/* Mascotte (components/site/mascotte, docs/site/MASCOTTE.md): zwemt boven de chat, rechtsboven
+   op het paneel. De extra padding-top van de stage maakt ruimte zodat hij de chat niet bedekt. */
+.site-ui .s-hero .hero-mascotte { position: absolute; z-index: 2; width: min(70vw, 300px); top: -30px; right: -20px; }
+.site-ui .s-hero .hero-stage { padding-top: 160px; }
+@media (min-width: 1024px) {
+  .site-ui .s-hero .hero-mascotte { width: 420px; top: -64px; right: -70px; }
+  .site-ui .s-hero .hero-stage { padding-top: 200px; }
+}
+
 /* Typ-engine-staten (alleen actief na hydratie + zonder reduced motion; zie hero/hero-chat.tsx).
    Zonder JS / bij reduced motion ontbreken .prep/.streaming ⇒ volledige eindstand zichtbaar. */
 .site-ui .s-hero .prep .msg,
