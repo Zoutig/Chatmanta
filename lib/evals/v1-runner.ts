@@ -24,7 +24,7 @@ export type AnswerRecord = {
   run: number;
   botVersion: string;
   /** Effectieve config op het moment van de run (model/tier kunnen per org verschillen). */
-  config: { chatModel: string; chatServiceTier: string | null; auxModel: string; versionLabel: string };
+  config: { chatModel: string; chatServiceTier: string | null; auxModel: string; versionLabel: string; embeddingModel: string };
   /** 'answer' | 'fallback' | 'smalltalk' | 'injection' | 'paused' | 'gated' */
   kind: string;
   answer: string;
@@ -111,7 +111,7 @@ async function answerOne(
   if (injection) {
     return {
       ...base,
-      config: { chatModel: '-', chatServiceTier: null, auxModel: '-', versionLabel: '-' },
+      config: { chatModel: '-', chatServiceTier: null, auxModel: '-', versionLabel: '-', embeddingModel: '-' },
       kind: 'injection',
       answer: injection.response.answer,
       sources: [],
@@ -160,6 +160,7 @@ async function answerOne(
       chatServiceTier: cfg.chatServiceTier ?? null,
       auxModel: cfg.auxModel ?? cfg.chatModel,
       versionLabel: cfg.version,
+      embeddingModel: cfg.embeddingModel ?? 'text-embedding-3-small',
     },
     kind: final.kind,
     answer: final.answer,

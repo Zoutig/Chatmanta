@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { foldV1FinalResponse, v1InjectionBlock } from '../widget-chat';
-import { V1_RAG_DEFAULTS, v1BotConfig } from '../rag-config';
+import { V1_RAG_DEFAULTS, v1BotConfig, v1RagConfigFor } from '../rag-config';
 import { BOTS, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import type { ChatResponse, StreamEvent } from '@/lib/rag/run-rag-query';
 
@@ -14,6 +14,15 @@ test('V1_RAG_DEFAULTS = v1BotConfig(LATEST) en V1-vlaggen winnen', () => {
   assert.equal(c.hybridSearch, false);
   assert.equal(c.sourceLinksEnabled, false);
   assert.equal(c.generalKnowledgeEnabled, false);
+});
+
+test('v1RagConfigFor: kandidaat-botversie + index-v2-overrides + versielabel van de chatbot', () => {
+  const other = Object.keys(BOTS).find((v) => v !== LATEST_BOT_VERSION)!;
+  const c = v1RagConfigFor({ bot_version: 'v1.0', index_version: 'v2' }, other);
+  assert.equal(c.embeddingModel, 'text-embedding-3-large');
+  assert.equal(c.maxContextChars, 18000);
+  assert.equal(c.version, 'v1.0');
+  assert.deepEqual(v1RagConfigFor({ bot_version: 'v1.0', index_version: 'v1' }), { ...V1_RAG_DEFAULTS, version: 'v1.0' });
 });
 
 test('v1BotConfig gooit bij een onbekende versie (geen stille LATEST-fallback)', () => {
