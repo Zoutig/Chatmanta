@@ -162,3 +162,55 @@ cache-hit (0,8 s; wacht op de route-check van de voorbewerking); "Hoi!" en "Beda
 
 **Na merge:** V1-answer_cache purgen (key `v1.0` verandert niet bij een config-wijziging) via
 `bump_cache_epoch` per org + delete van de `v1.0`-rijen, zoals bij #263/#266/#268.
+
+## v0.14f — is de voorbewerking voor Luna nog nodig? (2026-10-10)
+
+**Vraag (Seb):** heeft Luna de LLM-voorbewerking nog nodig, en kunnen we er meer uit halen?
+In v0.14d2 doet de voorbewerking bij een eerste vraag alleen nog routering (de herschrijving
+wordt niet gebruikt, behalve als vangnet bij nul treffers). Bij vervolgvragen herschrijft hij
+nog steeds, vóór het zoeken (eerste woord p50 ~3,1 s).
+
+**v0.14f** = v0.14d2 + twee vlaggen (default uit, append-only):
+- `deterministicSmalltalk`: een bericht dat in zijn geheel een NL-begroeting, bedankje of
+  afscheid is ("Hoi!", "Bedankt voor de hulp!", "Doei") krijgt meteen een vaste, toon-bewuste
+  reply (`lib/rag/smalltalk-detect.ts`). Geen LLM, geen zoeken, $0.
+- `lazyPreprocess`: géén LLM-voorbewerking vooraf. Alleen als het zoeken op de ruwe vraag niets
+  boven de drempel vindt, start de voorbewerking alsnog (route + herschreven vraag, via de
+  bestaande retry). Vervolgvragen die volgens `needsHistoryResolution` naar eerdere context
+  verwijzen ("en wat kost dat?") houden de herschrijving vooraf.
+
+Latency (dev-set 40 vragen × 2 runs, interleaved, `EVAL_CONCURRENCY=1`, 160 rijen, 0 errors):
+
+| versie | zichtbare TTFT p50 / p90 | 1e vraag p50 / p90 (n=64) | vervolgvraag p50 / p90 (n=16) | totaal p50 / p90 | $/vraag |
+|---|---|---|---|---|---|
+| v0.14d2 | 1,99 / 3,06 s | 1,83 / 2,28 s | 3,06 / 3,40 s | 2,43 / 3,71 s | 0,0020 |
+| **v0.14f** | **1,77 / 2,53 s** | 1,75 / 2,10 s | **2,19** / 3,66 s | 2,34 / 3,07 s | **0,0017** |
+
+Gepaard per vraag (mediaan zichtbare TTFT): f sneller 26 / trager 14 (sign-test p≈0,08).
+Bij een eerste vraag wint f weinig (−0,07 s): in v0.14d2 liep de voorbewerking al parallel,
+de antwoordstream is daar de bottleneck. De winst zit bij vervolgvragen (p50 −0,9 s) en in de
+kosten (−14%, één Luna-call minder per vraag).
+
+Kwaliteit (Claude-judge, gepaard tegen v0.14d2, 40 vragen): **2 beter / 2 slechter / 36 gelijk**.
+- Beter: `globex-planted-gratis-sportintake` (f noemt het tarief en zegt expliciet "niet gratis";
+  d2 zei "weet ik niet"), `v063-hardfact-api-rate-limit` (f beide runs correct; d2 run 2 rommelig).
+- Slechter: `smalltalk-greeting` "Hoi, wat kan je voor mij doen?" → f geeft een inhoudelijk
+  (gegrond) antwoord i.p.v. een begroeting; `werkgebied-dronten-bridge` → f zegt "buiten ons
+  standaard werkgebied" terwijl Flevoland standaard is (zelfde patroon als eerder bij v0.14d).
+- Must-not-hits (4×, `acme-planted-prijs-49`, `initech-planted-spoedlijn-0900`): allemaal
+  ontkennings-false-positives ("€49 per m² klopt niet"), bij beide versies.
+
+Smoke smalltalk/off-topic (acme-corp, v0.14f): "Hoi!" en "Bedankt voor de hulp!" → vaste reply;
+"Hello there!" en "Good morning, how are you?" → geen treffers → luie voorbewerking → smalltalk
+(antwoord in het Nederlands, zoals voorheen); "Wat is de hoofdstad van Frankrijk?" → off-topic-
+fallback. V1-eval met v0.14f-vlaggen: 15/15 (g2-adres via de luie retry), $0,0106.
+
+Hard-eval v0.14f (`eval-out/hard/20261010-044028-report.md`): **63/63, gate JA**, 0 catastrofaal,
+over-/under-refusal 0%, AQ 20/20. (Het v0.14d-veto `ot-acme-ander-bedrijf-01` speelt hier niet.)
+
+**Advies:** v0.14f is een veilige vervolgstap (gelijke kwaliteit, gate JA, goedkoper, sneller bij
+vervolgvragen), maar de winst bij de eerste vraag is klein en de sign-test is niet significant.
+Niet in de lopende promotie-PR proppen; als aparte kleine PR na de soft-launch-gesprekken
+(x8) meten op echte vervolgvragen, waar het verschil het grootst is.
+
+Spend v0.14f-ronde: dev-set $0,30 + hard-eval $0,28 + V1-eval $0,01 + smoke ≈ $0,005 → ≈ $0,60.

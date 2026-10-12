@@ -17,7 +17,7 @@ const V1_OVERRIDES = {
   version: 'v1.0',
   label: 'V1',
   // Luna voor antwoord én hulpstappen, beide op Fast mode, en bij een eerste vraag
-  // zoeken + antwoord-stream starten zonder op de voorbewerking te wachten (= v0.14d2;
+  // zoeken + antwoord-stream starten zonder op de voorbewerking te wachten (= v0.14d2, sinds 12 okt v0.15 = d2 + werkgebied-regel, docs/LUNA_EINDRONDE.md;
   // dev-set 2026-10-10: zichtbare TTFT p50 4,2 → 2,0 s bij gelijke kwaliteit, ~2×
   // LLM-kosten). Zie docs/LUNA_V014_RESULTATEN.md. De Fast-mode-tiers zijn hier de
   // default; per org overschrijfbaar (organizations.fast_mode_enabled, V1-admin).
