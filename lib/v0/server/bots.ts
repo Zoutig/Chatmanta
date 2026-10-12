@@ -1882,6 +1882,23 @@ const V0_15RW: BotConfig = {
   description: 'v0.15r (= V1 live); GEOGRAFIE-regel: noemt de CONTEXT geen werkgebied, dan niet zeggen of een plaats binnen/buiten valt, maar afstemmen via contact.',
   systemPrompt: V0_15W_SYSTEM_PROMPT,
 };
+// v0.15b-experiment (ronde 6, 2026-10-12): de werkgebied-regel van v0.15 lekte naar gevallen
+// mét werkgebied (Lelystad/Flevoland → alleen "even afstemmen" i.p.v. "Flevoland hoort bij ons
+// werkgebied"). Nu als apart vierde geval dat alléén geldt zonder werkgebied in de CONTEXT.
+const V0_15B_SYSTEM_PROMPT = V0_13X7_SYSTEM_PROMPT.replace(
+  'GEOGRAFIE (alleen bij een vraag over werkgebied of plaats), drie gevallen:',
+  'GEOGRAFIE (alleen bij een vraag over werkgebied of plaats), vier gevallen:',
+).replace(
+  'Zeg geen kale "nee" als de CONTEXT "op aanvraag" noemt.\n',
+  'Zeg geen kale "nee" als de CONTEXT "op aanvraag" noemt.\n4. Alléén als de CONTEXT helemaal niets zegt over een werkgebied, regio of afstandsgrens: zeg niet of de plaats binnen of buiten jullie werkgebied ligt, maar dat jullie dat graag even afstemmen, met het contact uit de CONTEXT. Noemt de CONTEXT wél een werkgebied, dan geldt geval 1, 2 of 3 en zeg je dus duidelijk of de plaats (of de provincie waarin die ligt) erbij hoort.\n',
+);
+const V0_15RB: BotConfig = {
+  ...V0_15R,
+  version: 'v0.15rb',
+  label: 'v0.15rb — v0.15r + werkgebied-regel als apart vierde geval (experiment)',
+  description: 'v0.15r (= V1-pad); GEOGRAFIE geval 4: alléén zonder werkgebied in de CONTEXT niet binnen/buiten zeggen; mét werkgebied gevallen 1-3.',
+  systemPrompt: V0_15B_SYSTEM_PROMPT,
+};
 // v0.15 — eindronde-winnaar (2026-10-12): v0.14d2 (hybrid aan voor V0; V1 zet hem uit) met de
 // werkgebied-regel uit v0.15rw. Zie docs/LUNA_EINDRONDE.md.
 const V0_15: BotConfig = {
@@ -1991,6 +2008,7 @@ export const BOTS: Record<string, BotConfig> = {
   [V0_15GT.version]: V0_15GT,
   [V0_15RW.version]: V0_15RW,
   [V0_15.version]: V0_15,
+  [V0_15RB.version]: V0_15RB,
 };
 
 /**
