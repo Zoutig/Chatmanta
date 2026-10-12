@@ -1,19 +1,22 @@
-// Genereert de mascotte-assets voor de marketingsite uit de ChatManta-FaceRig-bronmap.
+// Genereert de mascotte-assets voor de marketingsite uit de face-rig-bron (zie docs/site/MASCOTTE.md).
 //
-//   node scripts/mascotte-assets.mjs "<pad naar ChatManta_FaceRig>"
-//   (default: %USERPROFILE%/Documents/ChatManta_Mascotte/bron/ChatManta_FaceRig)
+//   node scripts/mascotte-assets.mjs            → site-assets + atlas.ts
+//   node scripts/mascotte-assets.mjs --stills   → óók stilstaande expressies in design/mascotte/stills/
+//   (optioneel een ander bronpad als argument; default: design/mascotte/bron)
 //
-// Output (wordt gecommit; de bronmap zelf niet, die staat buiten de repo):
+// Output:
 //   public/site/mascotte/manta-body.png   — lichaam zonder gezicht, halve resolutie
 //   public/site/mascotte/manta-face.png   — atlas: oogwit, pupillen, ooglidstanden, mondstanden
 //   components/site/mascotte/atlas.ts     — rechthoeken in de atlas + plaatsing (canvas-coördinaten 1536×1024)
+//   design/mascotte/stills/*.png          — (met --stills) transparante stills per expressie, 768×512
 // PNG i.p.v. WebP: proxy.ts laat op publieke paden alleen .png/.svg door.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 
-const SRC = process.argv[2] ?? path.join(os.homedir(), 'Documents', 'ChatManta_Mascotte', 'bron', 'ChatManta_FaceRig');
+const args = process.argv.slice(2);
+const STILLS = args.includes('--stills');
+const SRC = args.find((a) => !a.startsWith('--')) ?? path.join('design', 'mascotte', 'bron');
 const S = 0.5; // schaal t.o.v. het 1536×1024-bronvlak; ruim genoeg voor ~400 css-px × 2 dpr
 const FRAMES = [0, 2, 4, 6, 8, 10, 12, 14, 16]; // 9 van de 17 tussenstanden; de engine kiest de dichtstbijzijnde
 const FAMILIES = ['smile', 'ah', 'ee', 'oh', 'oo', 'sad'];
@@ -94,6 +97,47 @@ fs.writeFileSync(
     `export const MANTA_ATLAS = ${JSON.stringify(atlas)} as const;\n\n` +
     `export type MouthFamily = keyof typeof MANTA_ATLAS.mouth.families;\n`,
 );
+
+// 4. Stills (optioneel): volledige compositie per expressie, voor mockups/OG-beelden/mails.
+if (STILLS) {
+  // [naam, mondfamilie, mondstand 0-16, ooglid links 0-16, ooglid rechts 0-16]
+  const EXPR = [
+    ['rust', 'smile', 0, 0, 0],
+    ['blij', 'smile', 9, 1, 1],
+    ['praten', 'ah', 12, 0, 0],
+    ['verrast', 'oh', 14, 0, 0],
+    ['denkt', 'oo', 3, 2, 2],
+    ['bezorgd', 'sad', 6, 3, 3],
+    ['ogen-dicht', 'smile', 2, 16, 16],
+    ['knipoog', 'smile', 6, 16, 0],
+  ];
+  const outDir = path.join('design', 'mascotte', 'stills');
+  fs.mkdirSync(outDir, { recursive: true });
+  const eyeLayer = async (side, lid) => {
+    const e = EYES[side];
+    const white = path.join(SRC, `Onderdelen/oogwit_${e.name}.png`);
+    const eye = await sharp(white)
+      .composite([
+        { input: path.join(SRC, `Onderdelen/pupil_${e.name}.png`), blend: 'atop' }, // pupil binnen het oogwit
+        { input: path.join(SRC, `Knipperen/${e.name}_${pad(lid)}_ooglid.png`) },
+      ])
+      .png()
+      .toBuffer();
+    return { input: eye, left: e.at[0], top: e.at[1] };
+  };
+  for (const [name, fam, m, lidL, lidR] of EXPR) {
+    const full = await sharp(path.join(SRC, 'Basis', 'mascotte_zonder_gezicht.png'))
+      .composite([
+        await eyeLayer('L', lidL),
+        await eyeLayer('R', lidR),
+        { input: path.join(SRC, `Mond/${fam}_${pad(m)}.png`), left: MOUTH.at[0], top: MOUTH.at[1] },
+      ])
+      .png()
+      .toBuffer();
+    await sharp(full).resize(768, 512).png({ compressionLevel: 9, palette: true, quality: 95, effort: 10 }).toFile(path.join(outDir, `${name}.png`));
+  }
+  console.log('stills:', EXPR.map((x) => x[0]).join(', '));
+}
 
 for (const f of ['manta-face.png', 'manta-body.png']) {
   console.log(f, (fs.statSync(path.join(OUT_PUBLIC, f)).size / 1024).toFixed(0), 'KB');
