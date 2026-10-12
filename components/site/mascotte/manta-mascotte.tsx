@@ -27,7 +27,7 @@ function loadImage(src: string) {
  * pauzeert buiten beeld en bij een verborgen tabblad, en staat stil bij reduced motion.
  * Volgt de muis, knippert, en reageert op signalen via `signalMascotte()` (./bus).
  */
-export function MantaMascotte({ className }: { className?: string }) {
+export function MantaMascotte({ className, mode = 'idle' }: { className?: string; /** Basisstemming; signalen met mode: null keren hierheen terug. */ mode?: MantaMode }) {
   const reduce = useReducedMotion();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,6 +64,7 @@ export function MantaMascotte({ className }: { className?: string }) {
       }
       if (!alive) return;
       engine = new MantaEngine(canvas, body, face);
+      engine.setMode(mode);
       const resize = () => {
         engine?.resize(wrap.clientWidth, window.devicePixelRatio || 1);
         kick();
@@ -101,7 +102,7 @@ export function MantaMascotte({ className }: { className?: string }) {
         const d = (ev as CustomEvent<MascotteSignal>).detail;
         if (!engine) return;
         if (d.talk !== undefined) engine.setTalking(d.talk);
-        if (d.mode !== undefined) engine.setMode(d.mode ?? 'idle');
+        if (d.mode !== undefined) engine.setMode(d.mode ?? mode);
         if (d.lookAt) {
           const r = d.lookAt.getBoundingClientRect();
           const [x, y] = toLocal(r.left + r.width / 2, r.top + r.height / 2);
@@ -117,7 +118,7 @@ export function MantaMascotte({ className }: { className?: string }) {
         engine.setMode('happy');
         engine.wink(now());
         window.clearTimeout(restoreTimer);
-        restoreTimer = window.setTimeout(() => engine?.setMode('idle'), 1800);
+        restoreTimer = window.setTimeout(() => engine?.setMode(mode), 1800);
       };
       canvas.addEventListener('click', onClick);
       cleanups.push(() => canvas.removeEventListener('click', onClick));
@@ -135,7 +136,7 @@ export function MantaMascotte({ className }: { className?: string }) {
       engine?.destroy();
       engine = null;
     };
-  }, [reduce]);
+  }, [reduce, mode]);
 
   return (
     <div ref={wrapRef} className={`manta-mascotte${ready ? ' is-ready' : ''}${className ? ` ${className}` : ''}`} aria-hidden="true">

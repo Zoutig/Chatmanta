@@ -2,7 +2,7 @@
 
 Een kleine, cyaan manta met grote ogen. Hij maakt de publieke kant van ChatManta persoonlijker: hij zwemt, kijkt je aan, knippert, denkt na en praat mee met de chat. Dit document is de vaste bron voor iedereen (mens of agent) die iets ontwerpt waar hij in voorkomt.
 
-**Live:** in de hero van chatmanta.nl, boven het voorbeeldgesprek.
+**Live:** in de hero van chatmanta.nl (boven het voorbeeldgesprek), op de 404-pagina (zoekend rondkijken) en op de foutpagina van de site (verrast).
 
 ## Waar staat wat
 
@@ -21,7 +21,8 @@ Een kleine, cyaan manta met grote ogen. Hij maakt de publieke kant van ChatManta
 ```tsx
 import { MantaMascotte } from '@/components/site/mascotte/manta-mascotte';
 
-<MantaMascotte className="mijn-sectie-mascotte" />   // breedte/plek via CSS van de sectie
+<MantaMascotte className="mijn-sectie-mascotte" />              // breedte/plek via CSS van de sectie
+<MantaMascotte mode="lost" className="..." />                 // andere basisstemming
 ```
 
 - Decoratief (`aria-hidden`), laadt pas na hydratie (nooit LCP), pauzeert buiten beeld en bij een verborgen tabblad, staat stil bij `prefers-reduced-motion`, en tekent zonder WebGL een platte versie.
@@ -35,7 +36,7 @@ import { signalMascotte } from '@/components/site/mascotte/bus';
 
 signalMascotte({ talk: true });                 // praten aan (bv. tijdens streamen)
 signalMascotte({ talk: false });
-signalMascotte({ mode: 'think' });              // 'idle' | 'happy' | 'shy' | 'wow' | 'think'; null = terug naar rust
+signalMascotte({ mode: 'think' });              // 'idle' | 'happy' | 'shy' | 'wow' | 'think' | 'lost'; null = terug naar de basisstemming
 signalMascotte({ lookAt: element, lookMs: 1200 }); // even naar een element kijken
 ```
 
@@ -62,4 +63,5 @@ Voorbeeld van een complete choreografie: `components/site/sections/hero/hero-cha
 ## Bekende open punten
 
 - De poses 04–06 (zwaaien, knipoog, nieuwsgierig) uit de 6-posesset hebben een andere lichaamshouding en zijn daarom nog niet bruikbaar in de rig.
-- Mogelijke volgende plekken: 404-pagina (`bezorgd`/`verrast`), live-demo (praten tijdens het echte antwoord), laadstates.
+- Statuspagina's: `StatusPage` (`components/site/status-page.tsx`) heeft een prop `mascotte={mode}` die hem rechts op een navy paneel zet (mobiel erboven). 404 = `lost`, fout = `wow`.
+- Mogelijke volgende plekken: live-demo (praten tijdens het echte antwoord), laadstates.

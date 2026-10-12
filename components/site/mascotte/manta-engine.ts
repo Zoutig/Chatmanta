@@ -15,7 +15,7 @@ import { MANTA_ATLAS as A, type MouthFamily } from './atlas';
  * Coördinaten zijn in het bronvlak van 1536×1024; de atlas staat op schaal A.scale.
  */
 
-export type MantaMode = 'idle' | 'happy' | 'shy' | 'wow' | 'think';
+export type MantaMode = 'idle' | 'happy' | 'shy' | 'wow' | 'think' | 'lost';
 
 const W = 1536;
 const H = 1024;
@@ -31,6 +31,7 @@ const MOTION: Record<MantaMode, { amp: number; flap: number; bob: number; tail: 
   shy: { amp: 0.05, flap: 1.4, bob: 3, tail: 6 },
   wow: { amp: 0.07, flap: 1.8, bob: 4, tail: 8 },
   think: { amp: 0.06, flap: 1.6, bob: 4, tail: 8 },
+  lost: { amp: 0.07, flap: 1.7, bob: 5, tail: 9 },
 };
 // mondfamilie, openheid, pupilgrootte, ooglid-openheid
 const FACE: Record<MantaMode, [MouthFamily, number, number, number]> = {
@@ -39,6 +40,7 @@ const FACE: Record<MantaMode, [MouthFamily, number, number, number]> = {
   shy: ['sad', 0.35, 0.9, 0.8],
   wow: ['oh', 0.85, 0.82, 1],
   think: ['oo', 0.2, 0.95, 0.9],
+  lost: ['sad', 0.3, 1, 0.95], // 404: zoekend rondkijken, licht bezorgd
 };
 const TALK_FAMILIES: MouthFamily[] = ['ah', 'ah', 'ee', 'oh', 'oo', 'smile', 'smile'];
 
@@ -164,10 +166,10 @@ export class MantaEngine {
     if (this.mode === 'shy') { tx = -0.8; ty = 0.8; }
     else if (this.focus && sec < this.focusUntil) { tx = this.focus.x; ty = this.focus.y; }
     else if (this.mode === 'think') { tx = 0.35; ty = -0.9; }
-    else if (this.target && sec - this.lastPointer < 2.5) { tx = this.target.x; ty = this.target.y; }
+    else if (this.target && sec - this.lastPointer < (this.mode === 'lost' ? 1.2 : 2.5)) { tx = this.target.x; ty = this.target.y; }
     else {
       if (sec > this.glance.next) {
-        this.glance = { x: (Math.random() * 2 - 1) * 0.8, y: (Math.random() * 2 - 1) * 0.5, next: sec + 1.2 + Math.random() * 2 };
+        this.glance = { x: (Math.random() * 2 - 1) * 0.8, y: (Math.random() * 2 - 1) * 0.5, next: sec + (this.mode === 'lost' ? 0.5 + Math.random() * 0.7 : 1.2 + Math.random() * 2) };
       }
       tx = this.glance.x; ty = this.glance.y;
     }

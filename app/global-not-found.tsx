@@ -26,6 +26,7 @@ export default function GlobalNotFound() {
             <StatusPage
               label="404"
               title="Deze pagina bestaat niet"
+              mascotte="lost"
               actions={
                 <>
                   <LinkButton href={ROUTES.home}>Naar de startpagina</LinkButton>

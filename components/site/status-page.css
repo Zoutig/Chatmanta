@@ -1,0 +1,18 @@
+/* Statuspagina (404 / fout) met optionele mascotte op een navy paneel, zelfde taal als de hero. */
+.site-ui .s-status.has-mascotte .status-grid { display: grid; gap: 8px; align-items: center; }
+.site-ui .s-status .status-stage {
+  position: relative; border-radius: var(--r-xl); overflow: hidden; isolation: isolate;
+  background: linear-gradient(160deg, var(--navy-hi), var(--ink) 60%);
+  display: grid; place-items: center; padding: 8px 0;
+}
+.site-ui .s-status .status-mascotte { width: min(100%, 360px); }
+/* Mobiel: mascotte boven de tekst, compact */
+@media (max-width: 1023px) {
+  .site-ui .s-status.has-mascotte .status-stage { order: -1; max-width: 420px; }
+  .site-ui .s-status .status-mascotte { width: min(78%, 280px); }
+}
+@media (min-width: 1024px) {
+  .site-ui .s-status.has-mascotte .status-grid { grid-template-columns: 1.05fr 0.95fr; gap: 56px; }
+  .site-ui .s-status .status-stage { min-height: 380px; }
+  .site-ui .s-status .status-mascotte { width: min(100%, 440px); }
+}
