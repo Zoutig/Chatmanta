@@ -4,6 +4,7 @@ import { LinkButton } from '../ui/button';
 import { Icon } from '../ui/icon';
 import { Section } from '../ui/section';
 import { HeroChat } from './hero/hero-chat';
+import { HeroMascotte } from './hero/hero-mascotte';
 import './hero.css';
 
 /**
@@ -79,6 +80,7 @@ export default function Hero() {
           </svg>
           <span className="cut-label label">Fictief bedrijf · ter illustratie</span>
         </div>
+        <HeroMascotte />
         <HeroChat />
       </div>
     </Section>

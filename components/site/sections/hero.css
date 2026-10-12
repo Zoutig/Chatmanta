@@ -40,6 +40,26 @@
 .site-ui .s-hero .hero-chat-wrap .chat { box-shadow: 0 2px 4px rgba(8, 21, 31, 0.2), 0 30px 70px -20px rgba(8, 21, 31, 0.65); }
 @media (min-width: 640px) and (max-width: 1023px) { .site-ui .s-hero .hero-chat-wrap { margin: 0 auto; } }
 
+/* Mascotte op het paneel (components/site/mascotte). TIJDELIJK drie varianten via ?mascotte=. */
+.site-ui .s-hero .hero-mascotte { position: absolute; z-index: 2; }
+/* boven: zwemt boven de chat, rechtsboven op het paneel */
+.site-ui .s-hero .hero-mascotte.v-boven { width: min(52vw, 230px); top: -18px; right: -6px; }
+.site-ui .s-hero:has(.hero-mascotte.v-boven) .hero-stage { padding-top: 118px; }
+/* groot: dezelfde plek, maar prominenter */
+.site-ui .s-hero .hero-mascotte.v-groot { width: min(70vw, 300px); top: -30px; right: -20px; }
+.site-ui .s-hero:has(.hero-mascotte.v-groot) .hero-stage { padding-top: 160px; }
+/* zij: zit klein op de rechterbovenhoek van het chatvenster, alsof hij meeleest */
+.site-ui .s-hero .hero-mascotte.v-zij { width: min(44vw, 190px); top: -14px; right: -26px; }
+.site-ui .s-hero:has(.hero-mascotte.v-zij) .hero-stage { padding-top: 92px; }
+@media (min-width: 1024px) {
+  .site-ui .s-hero .hero-mascotte.v-boven { width: 300px; top: -36px; right: -40px; }
+  .site-ui .s-hero:has(.hero-mascotte.v-boven) .hero-stage { padding-top: 150px; }
+  .site-ui .s-hero .hero-mascotte.v-groot { width: 420px; top: -64px; right: -70px; }
+  .site-ui .s-hero:has(.hero-mascotte.v-groot) .hero-stage { padding-top: 200px; }
+  .site-ui .s-hero .hero-mascotte.v-zij { width: 220px; top: 12px; right: -54px; }
+  .site-ui .s-hero:has(.hero-mascotte.v-zij) .hero-stage { padding-top: 96px; }
+}
+
 /* Typ-engine-staten (alleen actief na hydratie + zonder reduced motion; zie hero/hero-chat.tsx).
    Zonder JS / bij reduced motion ontbreken .prep/.streaming ⇒ volledige eindstand zichtbaar. */
 .site-ui .s-hero .prep .msg,
