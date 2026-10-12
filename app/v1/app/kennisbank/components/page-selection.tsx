@@ -1,23 +1,31 @@
 'use client';
-// Kies welke gevonden pagina's meegaan in de crawl. Logica ongewijzigd t.o.v.
-// de V0-fork (selectie, groepen, max per keer); vormgeving V1.
+// Kies welke gevonden pagina's meegaan in de crawl. Logica als de V0-fork (selectie,
+// groepen, max per keer); vormgeving V1. Een crawl VULT AAN: pagina's die al in de
+// kennisbank staan zijn gemarkeerd en standaard uitgevinkt (aanvinken = verversen).
 import { useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import { groupPagesForDisplay, pathLabel } from '@/lib/v0/klantendashboard/group-pages';
 import { MAX_CRAWL_PAGES } from '@/lib/v1/crawler/limits';
 import { Button } from '@/app/v1/_ui/button';
+import { Badge } from '@/app/v1/_ui/feedback';
 
 export function PageSelection({
-  rootUrl, urls, pending, onStart, onCancel,
+  rootUrl, urls, existingUrls = [], pending, onStart, onCancel,
 }: {
   rootUrl: string; urls: string[]; pending: boolean;
+  /** URLs die al in de kennisbank staan (zelfde domein). */
+  existingUrls?: string[];
   onStart: (selected: string[], maxPages: number) => void; onCancel: () => void;
 }) {
+  // Vergelijk zonder afsluitende slash: '/prijzen' en '/prijzen/' zijn dezelfde pagina.
+  const [existingKeys] = useState(() => new Set(existingUrls.map(urlKey)));
+  const existing = { has: (u: string) => existingKeys.has(urlKey(u)) };
+  const newCount = urls.filter((u) => !existing.has(u)).length;
   const { groups, loose } = groupPagesForDisplay(urls);
   const groupKeys = groups.length > 0 ? [...groups.map((g) => g.key), ...(loose.length ? ['_loose'] : [])] : [];
 
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(urls));
-  const [maxPages, setMaxPages] = useState(Math.min(urls.length, MAX_CRAWL_PAGES));
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(urls.filter((u) => !existing.has(u))));
+  const [maxPages, setMaxPages] = useState(Math.max(1, Math.min(newCount || urls.length, MAX_CRAWL_PAGES)));
   const [query, setQuery] = useState('');
   // Veel pagina's? Groepen starten ingeklapt: je ziet eerst de mappen + aantallen.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(groupKeys));
@@ -50,6 +58,7 @@ export function PageSelection({
       <label className="v1-kb-pick" title={u}>
         <input type="checkbox" className="v1-kb-check" checked={selected.has(u)} onChange={() => toggle(u)} />
         <span>{pathLabel(u)}</span>
+        {existing.has(u) && <span style={{ flex: 'none' }}><Badge tone="ok">Al toegevoegd</Badge></span>}
       </label>
     </li>
   );
@@ -80,7 +89,10 @@ export function PageSelection({
           <h2 className="v1-kb-card-title">Kies welke pagina&apos;s je chatbot mag gebruiken</h2>
           <p className="v1-hint">
             We vonden {urls.length} pagina&apos;s op {host}. Vink uit wat je niet wilt.
-            {urls.length > MAX_CRAWL_PAGES && <> Per keer gaan er maximaal {MAX_CRAWL_PAGES} mee, dus kies de belangrijkste.</>}
+            {urls.length - newCount > 0 && <>
+              {' '}{urls.length - newCount} {urls.length - newCount === 1 ? 'staat' : 'staan'} al in je kennisbank en {urls.length - newCount === 1 ? 'blijft' : 'blijven'} gewoon staan; vink ze aan om ze te verversen.
+            </>}
+            {newCount > MAX_CRAWL_PAGES && <> Per keer gaan er maximaal {MAX_CRAWL_PAGES} mee. Haal daarna gewoon opnieuw op om de rest toe te voegen.</>}
           </p>
         </div>
         <label className="v1-kb-max">
@@ -130,4 +142,8 @@ export function PageSelection({
       </div>
     </section>
   );
+}
+
+function urlKey(u: string): string {
+  return u.replace(/\/+$/, '');
 }
