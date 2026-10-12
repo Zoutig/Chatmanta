@@ -34,6 +34,8 @@ import {
 const arg = (n: string) => process.argv.find((a) => a.startsWith(`--${n}=`))?.split('=').slice(1).join('=');
 const SET = arg('set') ?? 'ts1';
 const ONLY = arg('corpus');
+// --corpora=a,b,c: alleen deze corpora (ook voor assemble), bv. om een deelset te bevriezen.
+const CORPORA = arg('corpora')?.split(',');
 const UNTIL = arg('until');
 const CAP = Number(arg('cap') ?? '25');
 const OPUS = 'claude-opus-5-5';
@@ -89,6 +91,18 @@ async function call<T>(opts: {
  * Een item dat dan nog faalt = harde fout (geen stille gaten in de testset).
  */
 async function callMany<T>(jobs: { id: string; call: JudgeCall<T>; what: string }[]): Promise<Map<string, T>> {
+  // Gemeten 12 okt: bij Opus raakt de Batches-API de prompt-cache van de grote KB niet
+  // (elke request schrijft de cache opnieuw) → per call duurder dan synchroon met cache.
+  // Opus dus synchroon (eerste call warmt de cache, daarna parallel); Sonnet wel batch.
+  if ((jobs[0]?.call.model ?? OPUS) === OPUS) {
+    const out = new Map<string, T>();
+    const one = async (j: (typeof jobs)[number]) => {
+      out.set(j.id, await call<T>({ ...j.call, model: OPUS, what: j.what }));
+    };
+    if (jobs.length) await one(jobs[0]);
+    await pool(jobs.slice(1), 4, one);
+    return out;
+  }
   const res = await runJudgeBatch(transport.client, jobs.map((j) => ({ id: j.id, call: j.call })), {
     pollMs: 20_000,
     onCost: (usd, model) => budget.record(model, usd, true),
@@ -350,7 +364,7 @@ function assemble(all: { c: EvalCorpus; kbHash: string; docs: KbDoc[]; qs: QRow[
 
 async function main() {
   assertRunAllowed({ estimateUsd: Math.min(CAP, 22) });
-  const corpora = EVAL_CORPORA.filter((c) => !ONLY || c.corpus === ONLY);
+  const corpora = EVAL_CORPORA.filter((c) => (!ONLY || c.corpus === ONLY) && (!CORPORA || CORPORA.includes(c.corpus)));
   const all = [];
   for (const c of corpora) {
     console.log(`\n▶ ${c.corpus}`);
