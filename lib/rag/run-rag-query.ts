@@ -1292,6 +1292,18 @@ export async function* runRagQuery(
      */
     includeFullParentContent?: boolean;
     /**
+     * EVAL-ONLY (plan 016): krijgt de exacte prompt van de antwoord-call (system,
+     * user met CONTEXT, history-venster) zodat de judge integraal ziet wat het LLM
+     * zag. Puur observerend; productie geeft dit nooit mee. Niet aangeroepen op het
+     * general-knowledge-pad (in V1 fail-closed uit) en niet bij smalltalk/fallback.
+     */
+    onAnswerPrompt?: (prompt: {
+      systemPrompt: string;
+      userPrompt: string;
+      context: string;
+      history: ChatHistoryTurn[];
+    }) => void;
+    /**
      * Per-query HyDE-modus override (v0.5 evaluatie-toggle). 'auto' of undefined
      * = volg bot-config. Override wint altijd, ook over bots met useHyDE=false.
      */
@@ -2612,6 +2624,12 @@ KRITISCHE FORMAT-REGELS:
   // Voorkomt dat TTFT lineair groeit met gespreks-lengte. DB-history blijft
   // ongewijzigd; alleen het LLM-payload-venster is begrensd.
   const answerHistory = history.slice(-RAG_CHAT_HISTORY_TURNS);
+  input.onAnswerPrompt?.({
+    systemPrompt: styledSystemPrompt,
+    userPrompt,
+    context: context.trim(),
+    history: answerHistory,
+  });
   const createAnswerStream = (signal?: AbortSignal) =>
     openai().chat.completions.create(
       {

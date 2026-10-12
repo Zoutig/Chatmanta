@@ -5,7 +5,7 @@
 
 import type { RagConfig, RagPersona } from '@/lib/rag/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { resolveBot, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
+import { BOTS, LATEST_BOT_VERSION } from '@/lib/v0/server/bots';
 import { isIndexVersion, ragOverridesFor, type IndexVersion } from '@/lib/rag/index-version';
 
 // ponytail: V1's default RAG-config = de bewezen LATEST V0-bot + V1-specifieke
@@ -48,18 +48,32 @@ const V1_OVERRIDES = {
   generalKnowledgeEnabled: false,
 } satisfies Partial<RagConfig>;
 
-export const V1_RAG_DEFAULTS: RagConfig = {
-  ...resolveBot(LATEST_BOT_VERSION),
-  ...V1_OVERRIDES,
-};
+/**
+ * V1-basisconfig voor een V0-botversie: precies wat V1 zou draaien als die versie
+ * LATEST was (V1_OVERRIDES winnen). De eval-suite meet kandidaten hiermee.
+ * Onbekende versie → throw (resolveBot valt stil terug op LATEST; dat mag een
+ * eval nooit ongemerkt doen).
+ */
+export function v1BotConfig(botVersion: string): RagConfig {
+  const bot = BOTS[botVersion];
+  if (!bot) throw new Error(`Onbekende botversie: ${botVersion}`);
+  return { ...bot, ...V1_OVERRIDES };
+}
+
+export const V1_RAG_DEFAULTS: RagConfig = v1BotConfig(LATEST_BOT_VERSION);
 
 /**
  * Volledige V1-config voor één chatbot: defaults + de index-versie-overrides
  * (migr 0030). De zoekvraag MOET met het model van de index geëmbed worden, dus
  * gebruik dit i.p.v. V1_RAG_DEFAULTS rechtstreeks op elk chat-pad.
  */
-export function v1RagConfigFor(chatbot: { bot_version: string; index_version: IndexVersion }): RagConfig {
-  return { ...V1_RAG_DEFAULTS, ...ragOverridesFor(chatbot.index_version), version: chatbot.bot_version };
+export function v1RagConfigFor(
+  chatbot: { bot_version: string; index_version: IndexVersion },
+  /** EVAL-ONLY: meet deze V0-botversie i.p.v. LATEST (zie v1BotConfig). */
+  botVersion?: string,
+): RagConfig {
+  const base = botVersion ? v1BotConfig(botVersion) : V1_RAG_DEFAULTS;
+  return { ...base, ...ragOverridesFor(chatbot.index_version), version: chatbot.bot_version };
 }
 
 /**

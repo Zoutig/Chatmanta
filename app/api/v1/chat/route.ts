@@ -12,27 +12,20 @@
 // daarna de StreamEvents uit runRagQuery.
 
 import { NextResponse, after } from 'next/server';
-import {
-  runRagQuery,
-  type ChatResponse,
-  type ChatHistoryTurn,
-} from '@/lib/rag/run-rag-query';
+import type { ChatResponse, ChatHistoryTurn } from '@/lib/rag/run-rag-query';
 import { logRagQuery } from '@/lib/rag/log-query';
 import { appendTurn } from '@/lib/v1/conversations/write';
 import { toThreadMessageSources } from '@/lib/v1/conversations/sources';
 import { hashIp } from '@/lib/observability/hash-ip';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
-// TODO(V2): graduate detectInjection to a neutral lib/rag detector to drop the lib/v0 import.
-import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
-import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
-import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
-import { v1RagConfigFor, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
-import { getChatbotSettings, buildV1ChatbotInputs } from '@/app/v1/app/instellingen/settings-config';
-import type { ChatbotPromptOverrides } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
-import type { RagPersona } from '@/lib/rag/types';
+import {
+  v1InjectionBlock,
+  prepareV1WidgetChat,
+  foldV1FinalResponse,
+} from '@/app/v1/app/widget-chat';
 
 export const runtime = 'nodejs';
 // Ruim onder de Hobby-cap; één V1-vraag doet tot enkele LLM-calls + retrieval.
@@ -129,12 +122,8 @@ export async function POST(req: Request) {
   //     'fallback' event met INJECTION_BLOCKED_MESSAGE — de widget toont dat als
   //     antwoord (ev.response.answer). Block wordt NIET gelogd (V1 logRagQuery kent
   //     geen blocked-kind; bewust minimaal — geen nieuwe infra).
-  if (detectInjection(question).detected) {
-    return ndjsonOnce(requestId, queryLogId, {
-      kind: 'fallback',
-      response: { kind: 'fallback', answer: INJECTION_BLOCKED_MESSAGE },
-    });
-  }
+  const injectionBlock = v1InjectionBlock(question);
+  if (injectionBlock) return ndjsonOnce(requestId, queryLogId, injectionBlock);
 
   // 4. Resolve org+chatbot uit de GESIGNEERDE slug via service-role.
   const svc = getV1ServiceRoleClient();
@@ -149,86 +138,16 @@ export async function POST(req: Request) {
   }
   const organizationId = org.id as string;
 
-  let chatbot: Awaited<ReturnType<typeof getOrgChatbot>> = null;
-  try {
-    chatbot = await getOrgChatbot(svc, organizationId);
-  } catch {
-    chatbot = null;
-  }
-  if (!chatbot) {
+  // 4a-7. Chatbot, klant-pauze, per-org gate (rate-limit + maand-cap + dag-budget),
+  //       klant-settings, config (bronlinks uit, fast mode) en de runRagQuery-
+  //       generator — gedeeld met de eval-suite (app/v1/app/widget-chat.ts).
+  //       Terminale uitkomsten zijn niet billable (geen pipeline).
+  const chat = await prepareV1WidgetChat(svc, { organizationId, question, history });
+  if (chat.kind === 'no-chatbot') {
     return ndjsonOnce(requestId, queryLogId, { kind: 'error', code: 'INTERNAL', requestId });
   }
-  const activeChatbot = chatbot;
-
-  // 4a. Klant-pauze (chatbots.is_active). Defense in depth naast de embed-render-
-  //     gate (loadV1Embed rendert geen widget bij paused): een al-geladen iframe of
-  //     direct API-verkeer krijgt een vriendelijke terminale fallback, geen pipeline.
-  if (activeChatbot.is_active === false) {
-    return ndjsonOnce(requestId, queryLogId, {
-      kind: 'fallback',
-      response: {
-        kind: 'fallback',
-        answer:
-          'Deze chatbot is tijdelijk gepauzeerd. Probeer het later opnieuw of neem rechtstreeks contact op.',
-      },
-    });
-  }
-
-  // 4b. M-C combined per-ORG gate: per-org rate-limit + maand-cap + dag-budget. De per-IP
-  //     rate-limit (gate #0) blijft staan; dit voegt per-org + kosten/maand toe. Block →
-  //     terminale 'fallback'-NDJSON met de gate-message (zoals de injection-block);
-  //     geen pipeline → niet billable.
-  //     Fast-mode-read parallel (eigen fail-safe → standaard tier bij een fout).
-  const [gate, fastMode] = await Promise.all([
-    checkOrgChatGates(svc, organizationId),
-    getOrgFastMode(svc, organizationId),
-  ]);
-  if (!gate.ok) {
-    return ndjsonOnce(requestId, queryLogId, {
-      kind: 'fallback',
-      response: { kind: 'fallback', answer: gate.message },
-    });
-  }
-
-  // 5. Klant-settings → engine-overrides. Bij een settings-read-fout draaien we door
-  //    op de default-persona zonder overrides (de chat mag niet falen op een
-  //    settings-hapering).
-  let overrides: ChatbotPromptOverrides | undefined;
-  let persona: RagPersona;
-  try {
-    const settings = await getChatbotSettings(svc, activeChatbot.id);
-    ({ overrides, persona } = buildV1ChatbotInputs(settings, activeChatbot.name));
-  } catch {
-    overrides = undefined;
-    persona = buildV1Persona(activeChatbot.name);
-  }
-
-  // 6. Config — widget-override: sourceLinksEnabled UIT (document-only RPC).
-  //    Fast mode per org (organizations.fast_mode_enabled, V1-admin): uit → standaard tier.
-  const config = applyFastMode(
-    {
-      ...v1RagConfigFor(activeChatbot),
-      sourceLinksEnabled: false,
-    },
-    fastMode,
-  );
-
-  // 7. Stream. GK blijft fail-closed (geen enableGeneralKnowledge meegegeven →
-  //    config.generalKnowledgeEnabled=false wint). Cache leest+schrijft via svc.
-  const generator = runRagQuery(svc, {
-    question: question.trim(),
-    threshold: config.similarityThreshold,
-    enableRewrite: config.enableRewriteByDefault,
-    config,
-    persona,
-    organizationId,
-    chatbotId: activeChatbot.id,
-    history,
-    tone: overrides?.tone,
-    length: overrides?.length,
-    chatbotOverrides: overrides,
-    serviceClient: svc,
-  });
+  if (chat.kind === 'terminal') return ndjsonOnce(requestId, queryLogId, chat.event);
+  const { chatbot: activeChatbot, generator } = chat;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -241,29 +160,7 @@ export async function POST(req: Request) {
         for await (const event of generator) {
           // Merge naar finalResponse voor query_log (cost/latency); spiegelt askV1 +
           // app/api/v0/chat. followups-done/metrics-done vullen ná answer-done aan.
-          if (
-            event.kind === 'smalltalk' ||
-            event.kind === 'fallback' ||
-            event.kind === 'answer-done' ||
-            event.kind === 'replacement'
-          ) {
-            finalResponse = event.response;
-          } else if (event.kind === 'followups-done' && finalResponse?.kind === 'answer') {
-            const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
-            finalResponse = {
-              ...fr,
-              chatInputTokens: fr.chatInputTokens + event.inputTokens,
-              chatOutputTokens: fr.chatOutputTokens + event.outputTokens,
-              totalCostUsd: fr.totalCostUsd + event.costUsd,
-              extras: {
-                ...(fr.extras ?? {}),
-                ...(event.followUps.length > 0 ? { followUps: event.followUps } : {}),
-              },
-            };
-          } else if (event.kind === 'metrics-done' && finalResponse?.kind === 'answer') {
-            const fr: Extract<ChatResponse, { kind: 'answer' }> = finalResponse;
-            finalResponse = { ...fr, extras: { ...(fr.extras ?? {}), phaseTimingsMs: event.phaseTimingsMs } };
-          }
+          finalResponse = foldV1FinalResponse(finalResponse, event);
           const enriched = event.kind === 'error' ? { ...event, requestId } : event;
           controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
         }
