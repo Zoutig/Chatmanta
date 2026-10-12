@@ -45,7 +45,9 @@ export function anthropicTransport(): Transport & { client: Anthropic } {
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY ontbreekt');
   if (!workspace) throw new Error('ANTHROPIC_WORKSPACE_ID ontbreekt (user-scoped key → header verplicht)');
   const client = new Anthropic({ apiKey, defaultHeaders: { 'anthropic-workspace-id': workspace }, maxRetries: 4 });
-  return { client, create: (params) => client.messages.create(params) };
+  // Streaming + finalMessage: de SDK weigert niet-streamende calls met een hoge max_tokens
+  // (kunnen >10 min duren); het resultaat is hetzelfde Message-object.
+  return { client, create: (params) => client.messages.stream(params).finalMessage() };
 }
 
 /** Params voor één judge-call — gedeeld door het synchrone pad en Batches. */

@@ -16,6 +16,11 @@ export type EvalCase = {
   organizationId: string;
   question: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /**
+   * Eerdere bezoekersberichten (testset `priorTurns`): de runner speelt ze eerst door de
+   * bot, zodat de laatste vraag een échte gespreksgeschiedenis heeft.
+   */
+  priorTurns?: string[];
 };
 
 export type AnswerRecord = {
@@ -29,6 +34,8 @@ export type AnswerRecord = {
   kind: string;
   answer: string;
   sources: string[];
+  /** Volledige gespreksgeschiedenis vóór de laatste vraag (incl. de door de bot gespeelde beurten). */
+  history: { role: 'user' | 'assistant'; content: string }[];
   /** Exacte CONTEXT van de antwoord-call; null als er geen antwoord-call was. */
   context: string | null;
   systemPromptSha: string | null;
@@ -104,6 +111,25 @@ async function answerOne(
   botVersion: string,
   t0: number,
 ): Promise<AnswerRecord> {
+  const history = [...(c.history ?? [])];
+  let priorCost = 0;
+  for (const [i, turn] of (c.priorTurns ?? []).entries()) {
+    const r = await answerTurn(svc, { ...c, id: `${c.id}~${i}`, question: turn, history: [...history], priorTurns: [] }, run, botVersion, performance.now());
+    history.push({ role: 'user', content: turn }, { role: 'assistant', content: r.answer });
+    priorCost += r.costUsd;
+  }
+  // Latency telt alleen de laatste beurt; kosten tellen het hele gesprek.
+  const rec = await answerTurn(svc, { ...c, history }, run, botVersion, c.priorTurns?.length ? performance.now() : t0);
+  return { ...rec, costUsd: rec.costUsd + priorCost };
+}
+
+async function answerTurn(
+  svc: SupabaseClient,
+  c: EvalCase,
+  run: number,
+  botVersion: string,
+  t0: number,
+): Promise<AnswerRecord> {
   const base = { key: keyOf(c.id, run), caseId: c.id, run, botVersion, ts: new Date().toISOString() };
   const history = c.history ?? [];
 
@@ -115,6 +141,7 @@ async function answerOne(
       kind: 'injection',
       answer: injection.response.answer,
       sources: [],
+      history,
       context: null,
       systemPromptSha: null,
       ttftMs: null,
@@ -164,6 +191,7 @@ async function answerOne(
     },
     kind: final.kind,
     answer: final.answer,
+    history,
     sources: 'sources' in final ? final.sources.map((s) => s.filename ?? 'bron') : [],
     context: captured?.context ?? null,
     systemPromptSha: captured ? sha256(captured.systemPrompt).slice(0, 12) : null,

@@ -1,5 +1,5 @@
 // Plan 016 fase 1: maakt/actualiseert de eval-orgs in V1-prod (lib/evals/eval-orgs.ts) en
-// vult ze via de echte V1-ingest met de fictieve sandbox-KB's — elk corpus één keer op
+// vult ze via de echte V1-ingest met de eval-KB's (lib/evals/eval-orgs.ts) — elk corpus één keer op
 // index v1 (vaste maat + 3-small) en één keer op v2 (kopjes + 3-large).
 //
 // Idempotent: staat de KB al met dezelfde hash + index-versie in de org, dan niets doen;
@@ -9,32 +9,25 @@
 //
 // Run: node --env-file=.env.local --conditions=react-server --import tsx scripts/evals-setup-orgs.ts [--dry-run]
 
-import { readdirSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { ingestDocument } from '../lib/rag/ingest';
-import { EVAL_CORPORA, EVAL_INDEX_VERSIONS, evalOrgSlug } from '../lib/evals/eval-orgs';
-import { sha256 } from '../lib/evals/text';
+import { EVAL_CORPORA, EVAL_INDEX_VERSIONS, companyOf, evalOrgSlug, loadEvalKb, privateKbDir } from '../lib/evals/eval-orgs';
 
 const dryRun = process.argv.includes('--dry-run');
-const FIXTURES = 'scripts/fixtures/sandbox-orgs';
-
-function loadKb(corpus: string) {
-  const dir = join(FIXTURES, corpus);
-  const files = readdirSync(dir)
-    .filter((f) => f.endsWith('.md') && !f.startsWith('_'))
-    .sort()
-    .map((f) => ({ filename: f, text: readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n') }));
-  const kbHash = sha256(JSON.stringify(files.map((f) => [f.filename, f.text]))).slice(0, 16);
-  return { files, kbHash };
-}
 
 async function main() {
   const svc = getV1ServiceRoleClient();
   const manifest: unknown[] = [];
 
   for (const c of EVAL_CORPORA) {
-    const { files, kbHash } = loadKb(c.corpus);
+    if (c.kind === 'snapshot' && !existsSync(join(privateKbDir(c.corpus), 'pages.json'))) {
+      console.log(`- ${c.corpus}: geen snapshot (scripts/evals-snapshot-site.ts) — overgeslagen`);
+      continue;
+    }
+    const { docs: files, kbHash } = loadEvalKb(c);
+    const company = companyOf(c);
     for (const index of EVAL_INDEX_VERSIONS) {
       const slug = evalOrgSlug(c.corpus, index);
       if (!slug.startsWith('eval-')) throw new Error(`weiger: ${slug} is geen eval-slug`);
@@ -51,7 +44,7 @@ async function main() {
       } else {
         const { data, error } = await svc
           .from('organizations')
-          .insert({ name: `EVAL ${c.company} (index ${index})`, slug })
+          .insert({ name: `EVAL ${company} (index ${index})`, slug })
           .select('id')
           .single();
         if (error) throw error;
@@ -75,7 +68,7 @@ async function main() {
         .is('deleted_at', null);
       if (e3) throw e3;
       let upToDate = false;
-      if (bots && bots.length === 1 && bots[0].index_version === index && bots[0].name === c.company) {
+      if (bots && bots.length === 1 && bots[0].index_version === index && bots[0].name === company) {
         const { data: docs, error: e4 } = await svc
           .from('documents')
           .select('metadata, status')
@@ -104,7 +97,7 @@ async function main() {
       if (e5) throw e5;
       const { data: bot, error: e6 } = await svc
         .from('chatbots')
-        .insert({ organization_id: orgId, name: c.company, bot_version: 'v1.0', index_version: index })
+        .insert({ organization_id: orgId, name: company, bot_version: 'v1.0', index_version: index })
         .select('id')
         .single();
       if (e6) throw e6;
@@ -116,9 +109,9 @@ async function main() {
           chatbotId,
           filename: f.filename,
           text: f.text,
-          source: 'v0_local',
+          source: f.source,
           indexVersion: index,
-          metadata: { kb_hash: kbHash, eval_corpus: c.corpus },
+          metadata: { ...f.metadata, kb_hash: kbHash, eval_corpus: c.corpus },
         });
         chunks += r.chunks;
       }
