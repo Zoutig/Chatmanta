@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { embedTexts } from './embeddings';
 import { AppError } from '@/lib/errors/app-error';
 import { chunkParentsAndChildren } from './chunker';
+import { chunkByHeadings, documentTitle } from './chunker-v2';
+import { embedModelFor, isIndexVersion, type IndexVersion } from './index-version';
 
 export type IngestInput = {
   organizationId: string; // verplicht, op elke rij
@@ -18,6 +20,8 @@ export type IngestInput = {
    *  uitgezet te houden i.p.v. stil terug naar de DB-default. */
   included?: boolean;
   metadata?: Record<string, unknown>;
+  /** Index-versie van de chatbot (migr V1 0030). Weggelaten → opgehaald uit chatbots. */
+  indexVersion?: IndexVersion;
 };
 
 export type IngestResult = {
@@ -40,7 +44,8 @@ export async function ingestDocument(
   input: IngestInput,
 ): Promise<IngestResult> {
   const { organizationId, chatbotId, filename, text, source = 'upload', knowledgeSourceId, included, metadata } = input;
-  const { parents, children } = chunkParentsAndChildren(text);
+  const indexVersion = input.indexVersion ?? (await readIndexVersion(client, organizationId, chatbotId));
+  const { parents, children } = chunkForIndex(text, filename, metadata, indexVersion);
   if (children.length === 0) {
     throw new AppError('INGEST_READ_FAILED', { message: 'document is empty after trimming' });
   }
@@ -59,6 +64,7 @@ export async function ingestDocument(
         chars: text.length,
         parent_count: parents.length,
         chunk_count: children.length,
+        index_version: indexVersion,
         ...(metadata ?? {}),
       },
     })
@@ -69,7 +75,7 @@ export async function ingestDocument(
 
   let embed;
   try {
-    embed = await embedTexts(children.map((c) => c.content));
+    embed = await embedTexts(children.map((c) => c.embedText), embedModelFor(indexVersion));
   } catch (err) {
     await client.from('documents').update({ status: 'failed' }).eq('id', documentId);
     if (err instanceof AppError) throw err;
@@ -129,6 +135,57 @@ export async function ingestDocument(
     embedTokens: embed.tokens,
     costUsd: embed.costUsd,
   };
+}
+
+type IndexChunks = {
+  parents: string[];
+  children: { parentIndex: number; content: string; embedText: string }[];
+};
+
+/**
+ * Knip volgens de index-versie. v1 = vaste maten, de vector is de kale child-tekst.
+ * v2 = knippen op kopjes; de vector krijgt het kruimelpad, `content` blijft letterlijk.
+ * Q&A- en quiz-items ("Vraag: … Antwoord: …") krijgen geen titel in het kruimelpad: de
+ * bestandsnaam daar is technisch (qa-….txt) en zou de vector alleen vervuilen.
+ */
+export function chunkForIndex(
+  text: string,
+  filename: string,
+  metadata: Record<string, unknown> | undefined,
+  indexVersion: IndexVersion,
+): IndexChunks {
+  if (indexVersion === 'v1') {
+    const r = chunkParentsAndChildren(text);
+    return { parents: r.parents, children: r.children.map((c) => ({ ...c, embedText: c.content })) };
+  }
+  const origin = metadata?.origin;
+  const sourceTitle = typeof metadata?.source_title === 'string' ? metadata.source_title : '';
+  const title =
+    origin === 'manual_qa' || origin === 'quiz'
+      ? ''
+      : /^#\s+/m.test(text) || !sourceTitle
+        ? documentTitle(text, filename)
+        : sourceTitle;
+  return chunkByHeadings(text, title);
+}
+
+/** chatbots.index_version (migr V1 0030). Fail-closed naar een duidelijke fout: een
+ *  verkeerd gekozen versie zou vectoren in de verkeerde ruimte schrijven. */
+export async function readIndexVersion(
+  client: SupabaseClient,
+  organizationId: string,
+  chatbotId: string,
+): Promise<IndexVersion> {
+  const { data, error } = await client
+    .from('chatbots')
+    .select('index_version')
+    .eq('id', chatbotId)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (error) throw new Error(`chatbots.index_version lookup: ${error.message}`);
+  const v = data?.index_version;
+  if (!isIndexVersion(v)) throw new Error(`chatbot ${chatbotId} heeft geen geldige index_version`);
+  return v;
 }
 
 /**

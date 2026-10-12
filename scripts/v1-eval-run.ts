@@ -12,7 +12,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import { runRagQuery, type ChatResponse } from '../lib/rag/run-rag-query';
-import { V1_RAG_DEFAULTS, getOrgChatbot } from '../app/v1/app/rag-config';
+import { V1_RAG_DEFAULTS, v1RagConfigFor, getOrgChatbot } from '../app/v1/app/rag-config';
+import { ragOverridesFor } from '../lib/rag/index-version';
 import { resolveBot } from '../lib/v0/server/bots';
 import { getChatbotSettings, buildV1ChatbotInputs } from '../app/v1/app/instellingen/settings-config';
 
@@ -54,8 +55,9 @@ async function main() {
         cacheEnabled: V1_RAG_DEFAULTS.cacheEnabled,
         sourceLinksEnabled: false,
         generalKnowledgeEnabled: false,
+        ...ragOverridesFor(chatbot.index_version),
       }
-    : { ...V1_RAG_DEFAULTS, version: chatbot.bot_version };
+    : v1RagConfigFor(chatbot);
   if (candidate) console.log(`kandidaat-config: ${process.env.V1_EVAL_BOT}`);
   const settings = await getChatbotSettings(svc, chatbot.id);
   const { overrides, persona } = buildV1ChatbotInputs(settings, chatbot.name);
