@@ -13,7 +13,8 @@
 // worden ge-update met nieuwe gold_answer/gold_facts/tags/difficulty.
 //
 // Usage:
-//   npm run eval:seed
+//   npm run eval:seed                      (zonder holdout-files)
+//   npm run eval:seed -- --include-holdout (holdout bewust meenemen)
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -94,12 +95,17 @@ if (!url || !key) fail('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROL
 
 // ---------------------------------------------------------------------------
 // Discover seed-files. Patroon: eval-fixtures/seed-questions*.json
+// Holdout-files (seed-questions-holdout-*.json) worden standaard OVERGESLAGEN:
+// eenmaal in eval_questions draait eval:run ze mee en zijn ze geen holdout meer
+// (plan 016 §1.2). Alleen met --include-holdout bewust meenemen.
 // ---------------------------------------------------------------------------
 const FIXTURE_DIR = resolve('eval-fixtures');
+const INCLUDE_HOLDOUT = process.argv.includes('--include-holdout');
 function discoverSeedFiles(): string[] {
   const all = readdirSync(FIXTURE_DIR);
   return all
     .filter((f) => /^seed-questions(-.*)?\.json$/.test(f))
+    .filter((f) => INCLUDE_HOLDOUT || !f.startsWith('seed-questions-holdout-'))
     .sort()
     .map((f) => resolve(FIXTURE_DIR, f));
 }

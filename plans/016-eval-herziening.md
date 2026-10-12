@@ -306,9 +306,12 @@ omlaag als E0 dat toelaat — nooit de toetsset verkleinen onder de MDE-grens.
 
 ---
 
-## 10. Open beslissingen voor Sebastiaan
-1. **Eval-orgs op V1-prod** (fictieve data, geen writes naar logs/tellers) — akkoord? Alternatief (apart
-   staging-project) afgeraden: derde migratie-ledger en drift.
-2. **`eval-fixtures/x7/veen.json`** met echt telefoonnummer/voornamen in de publieke repo — opschonen?
-3. **Twee extra verticals op basis van echte sites** (snapshot buiten de repo) — akkoord, en welke branches?
-4. **Console-limiet** op de workspace instellen (~$90/maand).
+## 10. Beslissingen (Sebastiaan, 12 okt 2026: akkoord op alle vier aanbevelingen)
+1. **Eval-orgs op V1-prod** — JA: fictieve data, geen writes naar logs, antwoordcache of tellers.
+   Geen apart staging-project (derde migratie-ledger en drift).
+2. **`eval-fixtures/x7/veen.json`** — OPGESCHOOND in fase 0a: uit de repo en gitignored; lokale kopie in
+   `~/.chatmanta/eval-private/x7/` (de x7-seeder leest toch uit `eval-out/launch/x7q/`). Anonimiseren
+   viel af: de veen-KB in de DB bevat de echte gegevens, dan klopt de fixture niet meer met de bron.
+   De git-historie bevat het bestand nog (sinds #268); herschrijven = force-push op main → apart besluit.
+3. **Twee extra verticals op basis van echte sites** (snapshot buiten de repo) — JA: installateur + tandarts.
+4. **Console-limiet** op de workspace (~$90/maand) — JA; instellen door Sebastiaan in de Anthropic Console.

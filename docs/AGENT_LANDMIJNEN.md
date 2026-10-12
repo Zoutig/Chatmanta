@@ -457,8 +457,11 @@ edit pas daarna. (memory: eval_cache_and_run_gotchas)
 - Prompt-tuning beweegt "engage"-types (false-premise, ambiguous, injection), maar niet
   pure-weigertypes (out-of-corpus, planted-fact) — die vragen een retrieval-/threshold-/
   verifier-ingreep.
-- Judge-ruis ≈ 0,12 op de overall-score; behandel kleinere delta's als ruis, sub-buckets (n<20)
-  nog meer.
+- "Judge-ruis ≈ 0,12 op de overall-score" was een delta tussen twee botversies, géén gemeten
+  judge-ruis (plan 016 §1.2). De echte ruisvloer is onbekend tot er een A/A-run is (zelfde versie
+  twee keer); behandel kleine delta's en sub-buckets (n<20) tot die tijd als ruis.
+- Het ad-hoc jury-script `eval-out/launch/score.cjs` zet het gewicht van kritieke fouten op 0
+  (`W.kritiek=0`): de kop "gewogen/100" bevat ze níet. Lees kritiek altijd als aparte telling.
 - Geld-hard-facts strikt: een bedrag met €-teken mag niet als bewezen gelden alleen omdat het
   kale getal ergens in de chunks staat (bv. als tabelparameter) → `hardFactNumericFallback: false`.
 (memory: v0_version_history)

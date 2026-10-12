@@ -1,4 +1,4 @@
-// One-off V1 answer-quality + anti-hallucination eval (billable: gpt-4o-mini bot-gen).
+// One-off V1 answer-quality + anti-hallucination eval (billable: OpenAI bot-gen, model per V1_RAG_DEFAULTS = gpt-6-luna).
 // Drives the REAL V1 path (neutral runRagQuery) against the seed-org (Manta) corpus,
 // mirroring askV1 (settings → overrides/persona) but with disableCache:true (askV1 runs
 // cache ON) + includeFullParentContent:true (honest grounding). The service-role client
