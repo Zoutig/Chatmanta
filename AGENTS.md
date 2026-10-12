@@ -28,7 +28,7 @@ Sebastiaan (`@Zoutig`) werkt solo. "Team", "collega" of "teamgenoot" in docs of 
 
 **V1 erft zijn RAG-config van de LATEST V0-bot.** `app/v1/app/rag-config.ts` neemt `resolveBot(LATEST_BOT_VERSION)` uit `lib/v0/server/bots.ts` over, plus V1-overrides. Een nieuwe LATEST promoveren verandert dus het gedrag van V1-productie. Purge daarna de answer-cache (`purgeAnswerCache`), anders blijft V1 oude antwoorden serveren. Botversies zijn append-only: nieuw gedrag = nieuwe versie, een bestaande versie muteer je nooit.
 
-**Stack:** Next.js 16 App Router, React 19, TypeScript, shadcn/ui, Tailwind v4 · Supabase (Postgres + pgvector + Auth + Storage, EU) · Vercel (project `chatmanta-nosp`, regio `dub1`, Cron) · OpenAI: `gpt-4o-mini` voor chat en hulpstappen, `gpt-4o` voor eval-judge en de low-confidence-cascade, `text-embedding-3-small` voor embeddings · Firecrawl (crawler) · Upstash (rate-limit) · Resend (mail) · Sentry · Better Stack (uptime). De Anthropic SDK staat in `package.json` maar de app gebruikt hem niet: een tweede LLM-provider is V2 (`lib/ai/llm.ts` is bewust een stub). Kosten worden in USD gelogd via `MODEL_COSTS_USD` → `query_log.cost_usd`. Doe geen API-aannames uit je geheugen: check de geïnstalleerde versie in `node_modules`.
+**Stack:** Next.js 16 App Router, React 19, TypeScript, shadcn/ui, Tailwind v4 · Supabase (Postgres + pgvector + Auth + Storage, EU) · Vercel (project `chatmanta-nosp`, regio `dub1`, Cron) · OpenAI: `gpt-4o-mini` voor chat en hulpstappen, `gpt-4o` voor eval-judge en de low-confidence-cascade, `text-embedding-3-*` voor embeddings (welk model per index: `lib/rag/embeddings.ts`) · Firecrawl (crawler) · Upstash (rate-limit) · Resend (mail) · Sentry · Better Stack (uptime). De Anthropic SDK staat in `package.json` maar de app gebruikt hem niet: een tweede LLM-provider is V2 (`lib/ai/llm.ts` is bewust een stub). Kosten worden in USD gelogd via `MODEL_COSTS_USD` → `query_log.cost_usd`. Doe geen API-aannames uit je geheugen: check de geïnstalleerde versie in `node_modules`.
 
 ## Hard rules
 
@@ -41,7 +41,7 @@ Afwijken = risico op datalek, AVG-overtreding of kostenexplosie. Wijzig of omzei
 5. **Object-level access (SA-1, V1).** Elke server action of route met een ID van de client roept eerst `requireXxxAccess(id)` aan. RLS alleen is niet genoeg op service-role-paden.
 6. **Vector-search-isolatie.** `orgId` + `chatbotId` zijn verplichte (niet-optionele) parameters, met soft-delete-filter via JOIN.
 7. **Geen secrets naar de client.** Niet in `NEXT_PUBLIC_*`, niet in client components.
-8. **Anti-hallucinatie boven volledigheid.** Een similarity-threshold plus een fallback-pad zonder LLM-call als er geen relevante chunks zijn. De threshold staat empirisch op ≈ 0.4 (0.7 is te streng voor `text-embedding-3-small` + NL). Zulke drempels wijzig je alleen met eval-bewijs.
+8. **Anti-hallucinatie boven volledigheid.** Een similarity-threshold plus een fallback-pad zonder LLM-call als er geen relevante chunks zijn. De threshold staat empirisch op ≈ 0.4 (0.7 is te streng voor `text-embedding-3-small` + NL). Drempels zijn model-gebonden: herkalibreer ze bij een wissel van embedding-model. Zulke drempels wijzig je alleen met eval-bewijs.
 9. **Geen bronlinks in V1** (`sourceLinksEnabled: false` in `app/v1/app/rag-config.ts`, beslissing 2026-06-30; de onderbouwing staat bij die regel).
 10. **De repo is publiek.** Geen secrets, interne prijzen/tarieven (zoals vriendenprijzen) of klant-PII in code, docs, commits of PR-teksten. Prijzen die publiek op de marketingsite staan mogen wel.
 
