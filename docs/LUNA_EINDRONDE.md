@@ -146,6 +146,27 @@ header `anthropic-workspace-id` = `ANTHROPIC_WORKSPACE_ID`). Judge-kosten ≈ $3
 - Controlepass: van de kritieke/ernstige meldingen bleef op de rijschool-subset 11/11 staan — de judge is streng
   maar niet loos.
 
+### Ronde 6 — nameting ernstige fouten + v0.15rb (2026-10-12)
+
+Aanleiding: in ronde 5 had v0.15 meer ernstige fouten (48 vs 39). Nameting 1: de 42 vragen waar r en rw op ernstig
+verschilden, × 4 runs (r 33 / rw 43 ernstig, p=0,36; licht 92 / 78). Nameting 2: 60 vragen (geo-set + die 42 +
+eerdere kritieke vragen) × 4 runs, met **v0.15rb** = werkgebied-regel als apart "geval 4" dat alléén geldt zonder
+werkgebied in de CONTEXT (vermoeden: de v0.15-zin lekte naar Lelystad/Flevoland).
+
+| versie | kritiek (excl. general-klantcontact) | ernstig | licht | gewogen/100 |
+|---|---|---|---|---|
+| v0.15r | 7 (3) | 31 | 93 | 80,1 |
+| v0.15rw (= v0.15 live) | 6 (2) | 41 | 95 | 93,8 |
+| v0.15rb | 5 (1) | 37 | 97 | 88,9 |
+
+- Lelystad ging in nameting 2 bij álle versies goed (0/0/0): het "lek" was grotendeels ruis. rb is niet aantoonbaar
+  beter dan rw (ernstig 25/22, p=0,77) → **niet gepromoveerd**; v0.15rb blijft als experiment in bots.ts.
+- **Gepoold over ronde 5 + beide nametingen** (r vs rw, onafhankelijke runs): ernstig 103 vs 132, gepaard rw beter
+  56 / slechter 81 (p=0,04); kritiek (excl. de dev-org-vraag die in alle versies faalt) 12 vs 4. Een echte, kleine
+  ruil dus: v0.15 verzint minder, maar is iets vaker vaag/misleidend (vooral `misleidend` en
+  `zwakke_premisse_correctie` — "afstemmen"/"kan niet bevestigen" waar een duidelijk antwoord kon).
+- Beslisregel kwaliteit eerst (kritiek = veto) → v0.15 blijft. De vaagheid is een x8-punt, samen met `te_kort`.
+
 ## Conclusie
 
 **Winnaar: v0.15 = v0.14d2 + de werkgebied-regel.** Kwaliteit minstens gelijk op ongeziene vragen (0 vs 2 kritiek,
