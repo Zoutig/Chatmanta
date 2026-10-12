@@ -48,7 +48,7 @@ cost-explosie:
 3. **RLS overal** — elke nieuwe tabel krijgt RLS aan + policies **in dezelfde
    migration**. "Policies later" = bevinding, niet acceptabel.
 4. **Service-role discipline (SA-5)** — `supabaseAdmin` alléén via de wrappers in
-   `lib/supabase/admin.ts`. Een losse `createClient(..., SERVICE_ROLE_KEY)` of
+   `lib/supabase/admin.ts` (V0) en `lib/supabase/v1/service-role.ts` (V1). Een losse `createClient(..., SERVICE_ROLE_KEY)` of
    directe import elders = bevinding.
 5. **Object-level access (SA-1)** — `requireXxxAccess(id)` vóór elke server action
    met client-input-ID. RLS alleen is niet genoeg op service-role-paden. **Geldt
@@ -63,8 +63,13 @@ cost-explosie:
    zónder LLM-call bij geen relevante chunks. Een RAG-wijziging die de fallback
    sloopt of de threshold weghaalt = bevinding.
 
-Bij conflict tussen documenten: V1 Minimal Build Scope > Security Addendum >
-specifieke sectie > Executive Summary.
+9. **Geen bronlinks in V1** — `sourceLinksEnabled` blijft `false` in
+   `app/v1/app/rag-config.ts` (beslissing 2026-06-30). Terugzetten = bevinding.
+10. **De repo is publiek** — secrets, prijzen/tarieven of klant-PII in code, docs,
+   commits of PR-tekst = high-severity.
+
+Bij conflict tussen documenten: code + migraties > "Besliste keuzes" in
+`docs/V1_STATUS_EN_PLAN.md` > `docs/V2_SCOPE_EN_PRINCIPES.md`.
 
 ## 2. False-positive-guards (LEES DIT — hier zit je grootste waarde)
 

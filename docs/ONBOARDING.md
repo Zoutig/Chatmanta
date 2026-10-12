@@ -115,7 +115,7 @@ Bij elke nieuwe tabel hoort RLS aan + policies in dezelfde migration. **Niet lat
 ### 3. Geen secrets in client code
 Alles wat in `NEXT_PUBLIC_*` staat is publiek leesbaar in de browser. API keys, service-role keys, etc. → alleen server-side.
 
-Volledige lijst van hard rules staat in `AGENTS.md` § "Wat NIET ter discussie staat".
+Volledige lijst van hard rules staat in `AGENTS.md` § "Hard rules".
 
 ---
 

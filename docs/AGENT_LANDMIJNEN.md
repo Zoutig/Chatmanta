@@ -28,8 +28,9 @@ Oorzaak: een `.dark`-class-selector gecombineerd met een `[data-style="…"]`-at
 ín een file met `@custom-variant dark (…)` bovenaan — de compiler leest `.dark` als
 Tailwind-variant en botst met de rauwe class-selector.
 Wat te doen: zet zulke scoped overrides in een **aparte CSS-file** (zoals `app/styles/manta.css`
-doet, dat overleeft wél); voor losse properties volstaat de inline-`style`/`<style>`-bypass uit
-AGENTS.md. (memory: tailwind_v4_postcss_quirk)
+doet, dat overleeft wél). Lichtere variant: een **nieuwe property op een bestaande selector** in
+`app/globals.css` verdwijnt soms stil — daar volstaat een inline `style={{…}}` of een lokale
+`<style>`-tag in het component. (memory: tailwind_v4_postcss_quirk)
 
 **Next.js metadata-route-filenames breken `next build` maar niet `next dev`**
 Symptoom: `next dev` rendert prima, `next build` faalt met "Default export is missing in
@@ -168,7 +169,8 @@ Symptoom: twee bestanden `0044_*.sql` (of `0039×2`/`0040×2`) op main.
 Oorzaak: parallelle branches claimen hetzelfde nummer; de migrate-tracker keyt op de **volledige
 bestandsnaam**, dus beide worden los getrackt en toegepast.
 Wat te doen: laat ze staan als ze losse objecten raken; hernoemen desyncet de tracker. Kies wél
-het volgende vrije nummer verder. (PR #156, memory: quiz_kennisbank_pr156)
+het volgende vrije nummer verder. Bekend op V0: `0028`, `0039`, `0040`, `0044` (al op prod).
+(PR #156, memory: quiz_kennisbank_pr156)
 
 **pgvector staat in het `extensions`-schema → RPC's hebben `search_path` nodig**
 Symptoom: een migratie/RPC resolvet `<=>`, `vector(1536)` of `vector_cosine_ops` niet; of de
@@ -495,6 +497,17 @@ project_feedback_system)
 
 ## Widget & embed
 
+**`v0_contact_requests` = echte bezoekers-PII in een niet-geïsoleerde V0**
+Symptoom/oorzaak: de widget-lead-capture (migr 0053, `/api/v0/contact-request`) slaat naam/e-mail/
+telefoon van echte websitebezoekers op. Omdat V0 geen per-org-isolatie heeft, kan een ingelogde
+demo-bezoeker via org-switch de contactverzoeken van een ándere org lezen.
+Bewust geaccepteerd voor de testfase, mét vangrails die je niet mag verzwakken: `consent_given = true`
+CHECK op DB-niveau, service-role-only writes, verplichte `organization_id`-filter op elke query, org
+gebonden aan de gesigneerde slug-claim in het embed-token (geen cross-org-targeting via `?org=`),
+harde verwijdering na 90 dagen.
+Wat te doen: voeg geen nieuwe PII-velden of -tabellen aan V0 toe; echte klant-leads horen in V1
+(SA-1 + membership-check). (PR #206, memory: contactverzoeken_bigship)
+
 **Iframe-viewport ≠ host-viewport (responsive) + cookie/logging-valkuilen**
 Symptoom (alleen op externe sites, niet op de directe `/widget/`-demo): widget denkt altijd
 "mobiel" → fullscreen paneel; gesprekken onzichtbaar in de dashboards; elke beurt een nieuwe
@@ -661,6 +674,16 @@ v0_version_history, crawler_dashboard_plan, v1_launch_ops_progress)
 (memories: vercel_deployment, v1_launch_ops_progress)
 
 ## Git & parallel werk
+
+**Een worktree is geen volledige kopie van je werkomgeving**
+Symptoom: dev-server in een worktree crasht op module-resolutie, LLM-scripts falen op een
+ontbrekende key, of twee dev-servers vechten om poort 3000.
+Oorzaak: `.env.local`, `node_modules` en `.next/` zijn gitignored en dus per worktree; een
+`node_modules`-junction naar de hoofdrepo werkt voor `tsc` maar níet voor Turbopack-dev. CC-memory
+is ook per working-directory.
+Wat te doen: per worktree een echte `npm ci`, `.env.local` kopiëren (check alleen de var-*namen*),
+eigen poort (`next dev -p 3001`). De `ship-feature`-skill doet dit voor je.
+(memories: worktree_node_modules_turbopack, feedback_worktree_env_keys)
 
 **Gestapelde PR's + squash-merge: `--delete-branch` sluit de volgende PR**
 Symptoom: na `gh pr merge <parent> --squash --delete-branch` staat de child-PR op CLOSED en kan niet
