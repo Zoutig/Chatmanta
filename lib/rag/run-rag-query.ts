@@ -1294,7 +1294,8 @@ export async function* runRagQuery(
     /**
      * EVAL-ONLY (plan 016): krijgt de exacte prompt van de antwoord-call (system,
      * user met CONTEXT, history-venster) zodat de judge integraal ziet wat het LLM
-     * zag. Puur observerend; productie geeft dit nooit mee.
+     * zag. Puur observerend; productie geeft dit nooit mee. Niet aangeroepen op het
+     * general-knowledge-pad (in V1 fail-closed uit) en niet bij smalltalk/fallback.
      */
     onAnswerPrompt?: (prompt: {
       systemPrompt: string;

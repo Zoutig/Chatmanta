@@ -66,9 +66,11 @@ export type V1WidgetChatInput = {
   orgGates?: 'enforce' | 'skip';
   /** EVAL-ONLY: meet deze V0-botversie op het V1-pad i.p.v. LATEST (zie v1BotConfig). */
   botVersion?: string;
-  /** EVAL-ONLY: doorgegeven aan runRagQuery (cache uit, volledige bronnen, prompt-capture). */
+  /**
+   * EVAL-ONLY: volledige bronnen + prompt-capture. Zodra dit óf botVersion gezet is,
+   * staat de answer-cache altijd uit (niet uit te zetten).
+   */
   evalOptions?: {
-    disableCache?: boolean;
     includeFullParentContent?: boolean;
     onAnswerPrompt?: Parameters<typeof runRagQuery>[1]['onAnswerPrompt'];
   };
@@ -132,8 +134,20 @@ export async function prepareV1WidgetChat(
   );
 
   // GK blijft fail-closed (geen enableGeneralKnowledge → config wint). Cache
-  // leest+schrijft via svc, tenzij de eval disableCache zet.
+  // leest+schrijft via svc. Eval-pad (botVersion of evalOptions gezet): cache ALTIJD
+  // uit — de cache-sleutel is org+chatbot+version (= de productieversie), dus een
+  // kandidaat- of eval-antwoord zou anders echte bezoekers bereiken (en de eval zou
+  // gecachte productie-antwoorden meten).
+  const isEval = input.botVersion !== undefined || input.evalOptions !== undefined;
+  const ev = input.evalOptions;
   const generator = runRagQuery(svc, {
+    ...(isEval
+      ? {
+          disableCache: true,
+          includeFullParentContent: ev?.includeFullParentContent,
+          onAnswerPrompt: ev?.onAnswerPrompt,
+        }
+      : {}),
     question: input.question.trim(),
     threshold: config.similarityThreshold,
     enableRewrite: config.enableRewriteByDefault,
@@ -146,7 +160,6 @@ export async function prepareV1WidgetChat(
     length: overrides?.length,
     chatbotOverrides: overrides,
     serviceClient: svc,
-    ...input.evalOptions,
   });
 
   return { kind: 'run', chatbot: activeChatbot, config, generator };
