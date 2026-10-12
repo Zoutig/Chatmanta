@@ -76,3 +76,8 @@ skills-lock.json
 
 # Visuele QA-screenshots marketingsite (lokaal)
 .site-qa/
+
+# Fixtures met echte bedrijfsgegevens (telefoon, namen) — nooit in de publieke repo.
+# Lokale kopie: ~/.chatmanta/eval-private/ (plan 016 §10.2)
+/eval-fixtures/x7/veen.json
+/eval-fixtures/private/
