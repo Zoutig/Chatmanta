@@ -159,10 +159,9 @@ export async function extractContactInfoV1Action(): Promise<ActionResult<Extract
 // ---------------------------------------------------------------------------
 
 // V1 slaat gecrawlde pagina's op als documents (source='website'); de inhoud zit
-// in document_chunks. Spiegelt V0's collectContactPagesText maar leest uit de V1-
-// schema's. Lezen via service-role (RLS-bypass), altijd gescoopt op org+chatbot.
-// ponytail: parent-chunks (parent_id IS NULL) geven ~800 chars reconstructed text
-// per pagina-stuk — goed genoeg voor contactextractie.
+// in parent_chunks (de grotere secties waar de zoek-chunks naar wijzen). Spiegelt V0's
+// collectContactPagesText maar leest uit de V1-schema's. Lezen via service-role
+// (RLS-bypass), altijd gescoopt op org+chatbot.
 const CONTACT_RE = /contact|over-?ons|about|colofon|bereik/i;
 
 async function collectV1ContactPagesText(orgId: string, chatbotId: string): Promise<string> {
@@ -187,15 +186,15 @@ async function collectV1ContactPagesText(orgId: string, chatbotId: string): Prom
   });
   const chosen = (preferred.length > 0 ? preferred : docs).slice(0, 5);
 
-  // Lees de parent-chunks (parent_id IS NULL = de ~800-char reconstructed slices).
+  // Lees de eerste parent-secties per pagina, in documentvolgorde.
   const parts: string[] = [];
   for (const doc of chosen) {
     const { data: chunks } = await svc
-      .from('document_chunks')
+      .from('parent_chunks')
       .select('content')
       .eq('document_id', doc.id)
       .eq('organization_id', orgId)
-      .is('parent_id', null)
+      .order('parent_index')
       .limit(5);
     if (!chunks || chunks.length === 0) continue;
     const text = chunks
