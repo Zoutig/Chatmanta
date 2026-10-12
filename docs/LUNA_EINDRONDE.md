@@ -120,6 +120,32 @@ holdout2 (120 ongeziene vragen, 5 bedrijven) × 2 runs, interleaved (480 antwoor
 - **V1-eval** (seed-org, echte V1-pad) met v0.15rw: 15/15 (grounded 6/6, eerlijke weigeringen 4/4, isolatie,
   off-topic en injectie 5/5).
 
+### Ronde 5 — brede controle na de merge, Claude-API-judge (2026-10-12)
+
+Na de merge van #289 (v0.15 live, V1-cache gepurged): alle eval-vragen van de vijf testbedrijven (529 vragen:
+dev-set, seed-sets, holdout 1+2, stress x7, routing r15, werkgebied) × v0.15r en v0.15rw (= v0.15 op het V1-pad)
+× 2 runs = 2.116 antwoorden ($4,09 OpenAI). Beoordeling: **Claude Opus 5.5 via de API** (adaptief denken, effort
+medium), één vraag per call met alle 4 antwoorden geblindeerd en geschud, zelfde rubric als r15. Daarna een
+**controlepass** (effort high): elke kritieke/ernstige melding los opnieuw tegen de bronnen getoetst; alleen
+bevestigde meldingen tellen. Script: `eval-out/r16/judge-api.cjs` (lokaal, eval-out is gitignored; key vereist
+header `anthropic-workspace-id` = `ANTHROPIC_WORKSPACE_ID`). Judge-kosten ≈ $37 (5,3M input- + 0,4M outputtokens).
+
+| versie | n | kritiek | ernstig | licht | gewogen/100 | gepaard vs r (beter/slechter) | TTFT p50 / p90 | $/antw |
+|---|---|---|---|---|---|---|---|---|
+| v0.15r (vorige) | 1058 | **10** | 39 | 384 | 49,0 | — | 1,92 / 2,91 s | 0,0019 |
+| **v0.15 (live)** | 1058 | **2** | 48 | 401 | 53,2 | 125 / 130 (p=0,80) | 1,91 / 2,71 s | 0,0019 |
+
+- **Kritiek 10 → 2.** Weg in v0.15: Leeuwarden "buiten werkgebied" (2×), verzonnen tiende reden in "10 redenen"
+  (2×), rekenfout Starter vs Pro, "inclusief plaatsing" bij lichtkoepel, verzonnen vestiging bij een therapeut.
+  Over in beide: `general-klantcontact` (dev-org: rol "klantcontact-medewerker" die niet in de bronnen staat).
+- **Verder gelijk**: gewogen score en gepaarde vergelijking binnen ruis (p=0,80); de +9 ernstige meldingen zijn
+  losse 0→1-gevallen verspreid over vragen, geen patroon — behalve het bekende werkgebied-randje (Lelystad,
+  Emmeloord, Amsterdam-Oost: te stellig "buiten" of juist te vaag).
+- **Grootste resterende hefboom: te korte antwoorden.** `licht:te_kort` op ~31% van de antwoorden in béide
+  versies (een tweede nuttig feit uit dezelfde bron blijft liggen). Daarna `misleidend` (28) en `opbouw` (43).
+- Controlepass: van de kritieke/ernstige meldingen bleef op de rijschool-subset 11/11 staan — de judge is streng
+  maar niet loos.
+
 ## Conclusie
 
 **Winnaar: v0.15 = v0.14d2 + de werkgebied-regel.** Kwaliteit minstens gelijk op ongeziene vragen (0 vs 2 kritiek,
@@ -134,7 +160,8 @@ maar beide met meer fouten — niet doen vóór de launch.
 Spend: antwoorden genereren $3,74 + hard-eval $0,43 + V1-eval $0,01 + smoke ≈ **$4,20** (budget $10). Jury en
 hard-eval-judge via Claude-subagents ($0).
 
-**Na merge:** V1-answer_cache purgen (key `v1.0` verandert niet bij een config-wijziging) zoals bij #263/#266/#268/#277.
+**Na merge (gedaan 2026-10-12):** #289 gemerged (4b7b52b), productie-deploy READY, V1-answer_cache gepurged
+(was leeg; `bump_cache_epoch` voor alle 6 orgs). Ronde 5 bevestigt de keuze op 529 vragen (kritiek 10 → 2).
 
 **Open voor later (x8, echte gesprekken):** Flevoland-plaatsen niet bij naam; "kan niet bevestigen" i.p.v. stellig
 rechtzetten bij een onbekende medewerker (Mark Visser, Sophie, Geldrop); te korte antwoorden die een tweede nuttig
