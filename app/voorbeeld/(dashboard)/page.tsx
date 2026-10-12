@@ -9,11 +9,12 @@ import { PageHeader } from '@/app/v1/_ui/page-header';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { EmptyState, StatusPill } from '@/app/v1/_ui/feedback';
 import { SectionHead } from '@/app/v1/_ui/list';
-import { OnboardingTour, type TourStep } from '@/app/v0/klantendashboard/components/onboarding-tour';
+import type { TourStep } from '@/app/v0/klantendashboard/components/onboarding-tour';
 import { DEMO_SHELL } from '@/lib/voorbeeld/fixtures/shell';
 import { getFixtureOverviewMetrics } from '@/lib/voorbeeld/fixtures/overzicht';
 import { NextStep } from './_overview/next-step';
 import { TourButton } from './_overview/tour-button';
+import { VoorbeeldTour } from './_overview/voorbeeld-tour';
 import { DemoStats } from './_overview/demo-stats';
 import { OwnActivityCard } from './_overview/own-activity-card';
 import { UnansweredList } from './_overview/unanswered-list';
@@ -157,7 +158,7 @@ export default function V1OverviewPage() {
         </section>
       </div>
 
-      <OnboardingTour tourKey="voorbeeld" autoStart={false} steps={TOUR_STEPS} setupChecklistVisible={showNextStep} />
+      <VoorbeeldTour steps={TOUR_STEPS} setupChecklistVisible={showNextStep} />
     </div>
   );
 }

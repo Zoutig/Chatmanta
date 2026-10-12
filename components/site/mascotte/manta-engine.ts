@@ -44,6 +44,46 @@ const FACE: Record<MantaMode, [MouthFamily, number, number, number]> = {
 };
 const TALK_FAMILIES: MouthFamily[] = ['ah', 'ah', 'ee', 'oh', 'oo', 'smile', 'smile'];
 
+// ---------- "uitspreken": tekst → mondbewegingen ----------
+type Syllable = { t0: number; t1: number; fam: MouthFamily; peak: number };
+type Speech = { syl: Syllable[]; wordStarts: number[]; total: number; start: number | null; fired: number; onWord?: (i: number) => void; onEnd?: () => void };
+
+// Klinkergroep → mondvorm (Nederlands, grof): oe/u/ui/eu → oo, o → oh, a → ah, e/i/ij/ie → ee.
+function mouthFor(v: string): MouthFamily {
+  const s = v.toLowerCase();
+  if (/oe|ui|eu|^u+$|ou|au/.test(s)) return 'oo';
+  if (s.includes('o')) return 'oh';
+  if (s.includes('a')) return 'ah';
+  if (/[eiyéèëï]/.test(s)) return 'ee';
+  return 'smile';
+}
+const PEAK: Record<MouthFamily, number> = { ah: 0.95, oh: 0.85, ee: 0.7, oo: 0.7, smile: 0.5, sad: 0.4 };
+
+/**
+ * Bouwt een tijdlijn van lettergrepen (~0,17 s), korte sluiting tussen woorden en
+ * pauzes bij leestekens. Woorden zijn de witruimte-gescheiden tokens van `text`,
+ * in dezelfde volgorde als waarin de UI ze toont.
+ */
+export function speechTimeline(text: string) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const syl: Syllable[] = [];
+  const wordStarts: number[] = [];
+  let t = 0;
+  for (const w of words) {
+    wordStarts.push(t);
+    const groups = w.match(/ij|[aeiouyàáäâëéèêïíöóôüú]+/gi) ?? ['e'];
+    // ~5 lettergrepen/s, lange klinkergroepen iets langer (prettig voorleestempo)
+    const dur = clamp(0.11 + (0.025 * w.length) / groups.length, 0.11, 0.22);
+    for (const g of groups) {
+      const fam = mouthFor(g);
+      syl.push({ t0: t, t1: t + dur, fam, peak: clamp(PEAK[fam] + (Math.random() - 0.5) * 0.25, 0.2, 1) });
+      t += dur;
+    }
+    t += /[.!?:]$/.test(w) ? 0.38 : /[,;]$/.test(w) ? 0.2 : 0.04;
+  }
+  return { syl, wordStarts, total: t };
+}
+
 const VS = `
 attribute vec2 a_p; uniform vec4 u_rect; uniform float u_ph,u_amp,u_bob,u_tail,u_roll,u_fit; uniform vec2 u_head; varying vec2 v_uv;
 void main(){
@@ -97,6 +137,7 @@ export class MantaEngine {
   private blinkState: Blink | null = null;
   private nextBlink = 2;
   private syl = { start: 0, end: 0, fam: 'smile' as MouthFamily, peak: 0 };
+  private speech: Speech | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -125,6 +166,15 @@ export class MantaEngine {
   lookAt(x: number, y: number, now: number, ms = 1400) { this.focus = { x: clamp(x, -1, 1), y: clamp(y, -1, 1) }; this.focusUntil = now + ms / 1000; }
   blink(now: number) { this.blinkState = { t0: now, wink: false, close: 0.09, hold: 0.04, open: 0.15 }; }
   wink(now: number) { this.blinkState = { t0: now, wink: true, close: 0.12, hold: 0.28, open: 0.2 }; }
+  /** Spreek `text` uit: mond volgt de klinkers; `onWord(i)` vuurt als woord i begint. */
+  speak(text: string, opts: { onWord?: (i: number) => void; onEnd?: () => void } = {}) {
+    this.stopSpeaking();
+    this.speech = { ...speechTimeline(text), start: null, fired: -1, ...opts };
+  }
+  stopSpeaking() {
+    this.speech = null;
+  }
+  isSpeaking() { return this.speech !== null; }
 
   resize(cssWidth: number, dpr: number) {
     const w = clamp(Math.round(cssWidth * dpr), 160, W);
@@ -202,7 +252,25 @@ export class MantaEngine {
     // Mond: praten = lettergrepen; vormwissel pas als de mond (bijna) dicht is
     let fam = faceFam;
     let open = faceOpen;
-    if (this.talking && !still) {
+    const sp = this.speech;
+    if (sp) {
+      if (sp.start === null) sp.start = sec;
+      const t = sec - sp.start;
+      while (sp.fired + 1 < sp.wordStarts.length && t >= sp.wordStarts[sp.fired + 1]) sp.onWord?.(++sp.fired);
+      if (t >= sp.total) {
+        this.speech = null;
+        sp.onEnd?.();
+      } else if (!still) {
+        const s = sp.syl.find((x) => t >= x.t0 && t < x.t1);
+        if (s) {
+          fam = s.fam;
+          open = s.peak * Math.pow(Math.sin((Math.PI * (t - s.t0)) / (s.t1 - s.t0)), 0.6);
+        } else {
+          fam = this.st.family; // pauze: mond dicht, vorm vasthouden
+          open = 0;
+        }
+      }
+    } else if (this.talking && !still) {
       if (sec >= this.syl.end) {
         const pause = Math.random() < 0.18;
         this.syl = {
@@ -219,8 +287,14 @@ export class MantaEngine {
       open = 0.3;
     }
     if (b?.wink) { fam = 'smile'; open = Math.max(open, 0.35); }
-    if (fam !== this.st.family) { open = 0; if (this.st.mouth < 0.07) this.st.family = fam; }
-    this.st.mouth = still ? (fam === this.st.family ? open : 0) : lerp(this.st.mouth, open, k(open > this.st.mouth ? 26 : 18));
+    // Vormwissel alleen als de mond bijna dicht is: de eerste standen van alle families
+    // lijken op elkaar, dus onder ~25% open valt de wissel niet op. Tijdens uitspreken
+    // reageert de mond sneller (korte lettergrepen).
+    const switchAt = sp ? 0.25 : 0.07;
+    if (fam !== this.st.family) { if (this.st.mouth < switchAt) this.st.family = fam; else open = 0; }
+    const up = sp ? 40 : 26;
+    const down = sp ? 30 : 18;
+    this.st.mouth = still ? (fam === this.st.family ? open : 0) : lerp(this.st.mouth, open, k(open > this.st.mouth ? up : down));
     this.st.pupil = lerp(this.st.pupil, pupil, still ? 1 : k(4));
   }
 
