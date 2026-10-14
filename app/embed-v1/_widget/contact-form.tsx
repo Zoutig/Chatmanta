@@ -5,6 +5,7 @@
 // De submit (token, refresh-op-401, route) zit bij de aanroeper.
 
 import { useState } from 'react';
+import { WIDGET_STRINGS, type WidgetStrings } from '@/lib/v1/widget/widget-strings';
 
 export type ContactPayload = {
   name: string;
@@ -20,10 +21,12 @@ export function ContactForm({
   onCancel,
   onSubmit,
   onDone,
+  strings: t = WIDGET_STRINGS.nl,
 }: {
   onCancel: () => void;
   onSubmit: (payload: ContactPayload) => Promise<boolean>;
   onDone: () => void;
+  strings?: WidgetStrings;
 }) {
   const [name, setName] = useState('');
   const [preferred, setPreferred] = useState<'email' | 'call'>('email');
@@ -56,7 +59,7 @@ export function ContactForm({
     });
     setSending(false);
     if (ok) onDone();
-    else setError('Versturen lukte niet. Probeer het zo nog eens.');
+    else setError(t.contactFailed);
   };
 
   return (
@@ -67,7 +70,7 @@ export function ContactForm({
         void submit();
       }}
     >
-      <p className="cmw-contact-title">Persoonlijk contact</p>
+      <p className="cmw-contact-title">{t.contactTitle}</p>
 
       {/* Honeypot: buiten beeld, niet focusbaar met het toetsenbord. */}
       <input
@@ -81,41 +84,41 @@ export function ContactForm({
       />
 
       <label className="cmw-field">
-        Naam
+        {t.contactName}
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={200} autoComplete="name" />
       </label>
 
-      <div className="cmw-choice" role="radiogroup" aria-label="Hoe wil je contact?">
+      <div className="cmw-choice" role="radiogroup" aria-label={t.contactHow}>
         <label>
           <input type="radio" name="cmw-prefer" checked={preferred === 'email'} onChange={() => setPreferred('email')} />
-          E-mail
+          {t.contactEmail}
         </label>
         <label>
           <input type="radio" name="cmw-prefer" checked={preferred === 'call'} onChange={() => setPreferred('call')} />
-          Telefoon
+          {t.contactPhone}
         </label>
       </div>
 
       {preferred === 'email' ? (
         <label className="cmw-field">
-          E-mailadres
+          {t.contactEmailAddress}
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={320} autoComplete="email" />
         </label>
       ) : (
         <label className="cmw-field">
-          Telefoonnummer
+          {t.contactPhoneNumber}
           <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} autoComplete="tel" />
         </label>
       )}
 
       <label className="cmw-field">
-        Bericht (optioneel)
+        {t.contactMessage}
         <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={4000} />
       </label>
 
       <label className="cmw-consent">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        <span>Ik geef toestemming om mijn gegevens te gebruiken om contact met mij op te nemen.</span>
+        <span>{t.contactConsent}</span>
       </label>
 
       {error ? (
@@ -126,10 +129,10 @@ export function ContactForm({
 
       <div className="cmw-form-actions">
         <button type="button" className="cmw-btn-ghost" onClick={onCancel}>
-          Annuleren
+          {t.contactCancel}
         </button>
         <button type="submit" className="cmw-btn-primary" disabled={!valid || sending}>
-          {sending ? 'Versturen…' : 'Versturen'}
+          {sending ? t.contactSending : t.contactSend}
         </button>
       </div>
     </form>

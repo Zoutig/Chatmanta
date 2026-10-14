@@ -42,7 +42,15 @@ import {
   containsCodeOutput,
 } from '@/lib/rag/hard-facts';
 import { detectLanguage } from '@/lib/rag/hard-eval-checks';
-import { buildAllowedUrlSet, sanitizeSourceLinks, stripMarkdownLinks } from '@/lib/rag/source-links';
+import {
+  buildAllowedUrlSet,
+  buildLinkAllowlist,
+  extractSameHostLinks,
+  sanitizeLinksOnRequest,
+  sanitizeSourceLinks,
+  stripMarkdownLinks,
+} from '@/lib/rag/source-links';
+import { cachedAnswerLanguageMismatch } from '@/lib/rag/cache-language';
 import { findMatchingManualQA } from '@/lib/rag/manual-qa';
 import { detectSmalltalk, smalltalkReply } from '@/lib/rag/smalltalk-detect';
 import { needsHistoryResolution } from '@/lib/rag/rag-decision';
@@ -458,6 +466,27 @@ async function retrieveChunksHybrid(
 // (false-hits) snel terug naar 0.95. Hit + miss top-1-sim wordt nu beide
 // gelogd zodat we de optimale waarde later op echte data kunnen bisecten.
 const CACHE_HIT_THRESHOLD = 0.93;
+
+// Linkknoppen-instructie (sourceLinksMode 'on-request', V1 per klant). Bewust het
+// omgekeerde van de V0-bron-links: géén link onder elk antwoord, alleen wanneer de
+// bezoeker iets wil hebben of vinden. De sanitizer is de harde garantie; deze tekst
+// stuurt alleen wanneer en hoe.
+const LINKS_ON_REQUEST_INTRO =
+  'Links (alleen op verzoek): sommige bronnen hierboven hebben een "Bron-URL", en in de brontekst staan links in de vorm [naam](URL), bijvoorbeeld naar handleidingen, datasheets, catalogi, certificaten of software-downloads. ' +
+  'Geef ALLEEN een link als de bezoeker daar duidelijk om vraagt: een document, handleiding, datasheet, catalogus, certificaat, download of software willen hebben, zien of downloaden, of vragen waar iets op de website staat. ' +
+  'Bij alle andere vragen: GEEN link en GEEN URL, ook niet als "voor meer informatie". ' +
+  'Geef je wel links: begin met één korte zin, zet daaronder maximaal 3 links, elk op een eigen regel als lijst-item "- [korte duidelijke omschrijving](URL)" (bijvoorbeeld "- [FRENIC Ace – User Manual (Engels)](URL)"). Geen andere tekst op die regels. ' +
+  'Neem de URL LETTERLIJK over uit de bronnen, teken voor teken (ook %20 en %28); verzin NOOIT een URL of pad en wijzig er niets aan. Schrijf NOOIT een kale URL. ' +
+  'Vraagt de bezoeker algemeen naar "de handleiding" of "de documentatie" van een product: vraag niet eerst door, maar geef direct de belangrijkste documenten (gebruikers- en instructiehandleiding eerst) als links. ' +
+  'Zijn er meerdere versies of talen van hetzelfde document: kies de nieuwste versie, en de taal van de bezoeker als die er is (anders Engels); geef geen documenten in een andere taal, tenzij de bezoeker daarom vraagt. Noem in de omschrijving de taal van het document. ' +
+  'Vraagt de bezoeker om een document dat niet in de bronnen staat: zeg dat eerlijk en geef geen link.\n\n';
+
+function withoutAllowedLinkUrls(extras: V03Extras | undefined): V03Extras {
+  if (!extras) return {};
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { allowedLinkUrls, ...rest } = extras;
+  return rest;
+}
 
 async function lookupCachedAnswer(
   client: SupabaseClient,
@@ -951,6 +980,13 @@ export type V03Extras = {
   followUps?: string[];
   /** Cache hit (geen pipeline gerund)? */
   fromCache?: boolean;
+  /**
+   * Linkknoppen (sourceLinksMode 'on-request'): de toegestane link-URL's van deze
+   * run (Bron-URL's + links op die pagina's). Alleen in de answer_cache-rij, zodat
+   * een cache-hit dezelfde knoppen kan tonen; het hit-pad haalt hem eruit vóór het
+   * antwoord naar de client of query_log gaat.
+   */
+  allowedLinkUrls?: string[];
   /** Gebruikte sub-queries na decomposition. */
   subQueries?: string[];
   /** HyDE hypothetisch document (voor inspectie). */
@@ -1353,7 +1389,14 @@ export async function* runRagQuery(
   // Wordt gebruikt op alle 'kind: fallback' paden in deze functie. Een lege
   // override of de letterlijke engine-default (V1-settings-default) telt als
   // "klant heeft niets ingevuld".
-  const fallbackMessage = resolveFallbackMessage(input.chatbotOverrides?.fallbackMessage, tone);
+  // Linkknoppen: de klant-fallbacktekst gaat niet door de link-sanitizer en kan als
+  // vervangend 'answer' (placeholder-guard) in de widget belanden → markdown-links
+  // eruit, zodat alleen sanitizer-gecontroleerde links ooit klikbaar worden.
+  const fallbackMessageRaw = resolveFallbackMessage(input.chatbotOverrides?.fallbackMessage, tone);
+  const fallbackMessage =
+    bot.sourceLinksEnabled === true && bot.sourceLinksMode === 'on-request'
+      ? stripMarkdownLinks(fallbackMessageRaw)
+      : fallbackMessageRaw;
   const orgId = input.organizationId; // verplicht, geen stille DEV_ORG-fallback meer
   // V0.6 persona-laag: door de caller geresolved en één keer doorgegeven aan de
   // hele pipeline (preProcess, main answer, general-knowledge prompt, off-topic
@@ -1773,7 +1816,7 @@ export async function* runRagQuery(
     preCacheEmbedTokens = cacheEmbed.tokens;
     preCacheEmbedCost = cacheEmbed.costUsd;
     cacheEmbedVector = cacheEmbed.vectors[0];
-    const cached = await lookupCachedAnswer(
+    const cachedRaw = await lookupCachedAnswer(
       client,
       cacheWriteClient,
       cacheEmbedVector,
@@ -1782,6 +1825,15 @@ export async function* runRagQuery(
       bot.version,
       orgId,
     );
+    // Taalspiegeling: een hit in de andere taal (nl↔en) telt als miss, anders
+    // krijgt een Engelse bezoeker een gecacht Nederlands antwoord (en andersom).
+    // Alleen V1 (chatbot-scoped): V0-botversies zijn append-only en houden hun gedrag.
+    const mirrorsLanguage = chatbotScoped && (input.chatbotOverrides?.autoDetectLanguage ?? true);
+    const cached =
+      cachedRaw && mirrorsLanguage && cachedAnswerLanguageMismatch(original, cachedRaw.answer)
+        ? null
+        : cachedRaw;
+    if (cachedRaw && !cached) console.info('[cache] miss — taal van gecacht antwoord wijkt af van de vraag');
     stopCache();
     const ppAtCacheHit = cached ? await settleDeferredPreprocess() : null;
     if (ppAtCacheHit?.kind === 'smalltalk') {
@@ -1816,16 +1868,29 @@ export async function* runRagQuery(
       // zonder url-veld → lege allowlist → alle links naar platte tekst.
       let cacheServed = cached;
       if (bot.sourceLinksEnabled && cached.kind === 'answer') {
-        const cacheAllowed = buildAllowedUrlSet((cached.sources ?? []).map((s) => s.url));
-        const cleaned = sanitizeSourceLinks(cached.answer, cacheAllowed);
-        if (cleaned !== cached.answer) cacheServed = { ...cached, answer: cleaned };
+        const sourceUrls = (cached.sources ?? []).map((s) => s.url);
+        if (bot.sourceLinksMode === 'on-request') {
+          // Linkknoppen: allowlist = bron-URL's + de bij het schrijven mee-gecachte
+          // links van die pagina's. Die lijst blijft in de cache-rij: niet naar de
+          // client en niet in query_log.
+          const cleaned = sanitizeLinksOnRequest(
+            cached.answer,
+            buildLinkAllowlist([...sourceUrls, ...(cached.extras?.allowedLinkUrls ?? [])]),
+          );
+          cacheServed = { ...cached, answer: cleaned };
+        } else {
+          const cacheAllowed = buildAllowedUrlSet(sourceUrls);
+          const cleaned = sanitizeSourceLinks(cached.answer, cacheAllowed);
+          if (cleaned !== cached.answer) cacheServed = { ...cached, answer: cleaned };
+        }
       }
       const baseEnriched =
         cacheServed.kind === 'answer'
           ? {
               ...cacheServed,
               extras: {
-                ...(cacheServed.extras ?? {}),
+                // allowedLinkUrls is cache-intern: nooit naar de client of query_log.
+                ...withoutAllowedLinkUrls(cacheServed.extras),
                 fromCache: true,
                 phaseTimingsMs: cacheHitTimings,
               },
@@ -2489,6 +2554,10 @@ KRITISCHE FORMAT-REGELS:
   // de URLs van de chunks die daadwerkelijk in de context belanden — die set is
   // de allowlist voor de sanitizer (alles daarbuiten = verzonnen → gestript).
   const linkEnabled = bot.sourceLinksEnabled === true;
+  // Linkknoppen (V1, per klant): alleen een link als de bezoeker erom vraagt, en
+  // naast de Bron-URL ook de links die óp die pagina staan (zelfde domein), zoals
+  // PDF-handleidingen. Links in chunks zonder source_url (uploads) tellen nooit.
+  const linksOnRequest = linkEnabled && bot.sourceLinksMode === 'on-request';
   const providedUrls: string[] = [];
   const maxContextChars = bot.maxContextChars ?? RAG_DEFAULTS.MAX_CONTEXT_CHARS;
   const seenParents = new Set<string>();
@@ -2534,10 +2603,20 @@ KRITISCHE FORMAT-REGELS:
     context += block;
     for (const s of candidateShingles) seenShingles.add(s);
     if (linkEnabled && c.source_url) providedUrls.push(c.source_url);
+    if (linksOnRequest && c.source_url) {
+      providedUrls.push(...extractSameHostLinks(`${c.content}\n${c.parent_content ?? ''}`, c.source_url));
+    }
     usedChunks.push(c);
     used++;
   }
   const allowedUrls = buildAllowedUrlSet(providedUrls);
+  const linkAllowlist = linksOnRequest ? buildLinkAllowlist(providedUrls) : null;
+  // Op-verzoek-modus sanitizet ALTIJD (ook zonder URL's in de context): kale of
+  // verzonnen URL's mogen er nooit door. Append-modus: ongewijzigd (alleen als er
+  // Bron-URL's waren → document-only/eval byte-identiek).
+  const sanitizeLinks = linkEnabled && (linksOnRequest || allowedUrls.size > 0);
+  const applyLinkSanitizer = (text: string): string =>
+    linkAllowlist ? sanitizeLinksOnRequest(text, linkAllowlist) : sanitizeSourceLinks(text, allowedUrls);
   // V0.6.1 — kort inline-prefix dat de LLM uitlegt hoe matched-span/surrounding
   // context te gebruiken. Alleen als minstens één chunk in matched-span format
   // gerenderd is. Op andere versies / chunks zonder parent: leeg, dus user-
@@ -2549,7 +2628,9 @@ KRITISCHE FORMAT-REGELS:
   // Document-only orgs / DEV_ORG eval krijgen geen URL → deze intro is leeg →
   // de prompt blijft byte-identiek aan voorheen (geen eval-regressie).
   const sourceLinksIntro =
-    linkEnabled && providedUrls.length > 0
+    linksOnRequest && providedUrls.length > 0
+      ? LINKS_ON_REQUEST_INTRO
+      : linkEnabled && providedUrls.length > 0
       ? 'Bron-links: sommige bronnen hierboven hebben een "Bron-URL". Beantwoord de vraag ALTIJD eerst zelf — geef een kort, op de CONTEXT gebaseerd antwoord (enkele zinnen die samenvatten wat je weet). Gebruik links NOOIT als vervanging van een antwoord: antwoord dus niet met alleen "ik heb geen informatie, kijk op deze links" wanneer de context wél iets relevants bevat. Sluit je antwoord daarna — als er een relevante Bron-URL is — af met een korte doorverwijzing voor wie meer wil lezen: één of enkele markdown-links [korte omschrijving](URL). Gebruik UITSLUITEND exact een van de gegeven Bron-URLs, letterlijk overgenomen — verzin NOOIT zelf een URL of pad en wijzig een gegeven URL niet. Schrijf een URL ALTIJD als markdown-link [tekst](URL): nooit als kale URL, en zonder titel of aanhalingstekens achter de URL. Heb je geen passende Bron-URL? Verwijs dan in woorden, zonder link.\n\n'
       : '';
   // Taal-instelling — afgedwongen in de USER-turn (ná de vraag, hoogste salience).
@@ -2795,8 +2876,8 @@ KRITISCHE FORMAT-REGELS:
   // niet-http(s) URL terug naar platte tekst. Gated op allowedUrls.size>0 zodat
   // document-only orgs / DEV_ORG eval (geen Bron-URL) byte-identiek blijven.
   // Vóór claim-verify zodat die de geschoonde tekst beoordeelt.
-  if (linkEnabled && allowedUrls.size > 0) {
-    finalAnswerText = sanitizeSourceLinks(finalAnswerText, allowedUrls);
+  if (sanitizeLinks) {
+    finalAnswerText = applyLinkSanitizer(finalAnswerText);
   }
 
   // v0.4 claim verification — split antwoord in claims, embed-vergelijk met
@@ -2855,7 +2936,7 @@ KRITISCHE FORMAT-REGELS:
         // op paden zonder echte Bron-URL draait de strip niet → de URL-anti-
         // hallucinatie buiten de bron-link-case blijft byte-identiek.
         answerText:
-          linkEnabled && allowedUrls.size > 0 ? stripMarkdownLinks(finalAnswerText) : finalAnswerText,
+          sanitizeLinks ? stripMarkdownLinks(finalAnswerText) : finalAnswerText,
         chunks: chunkInputs,
         threshold: bot.claimVerificationThreshold,
         hardFactCheck: bot.adaptiveHardFactVerification === true,
@@ -3199,8 +3280,8 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
       const reparsedRegen = parseV03Output(stricter.text);
       activeAnswerText = reparsedRegen.answer || stricter.text.trim();
       // Bron-links ook op de regenerate-poging afdwingen (zelfde gate).
-      if (linkEnabled && allowedUrls.size > 0) {
-        activeAnswerText = sanitizeSourceLinks(activeAnswerText, allowedUrls);
+      if (sanitizeLinks) {
+        activeAnswerText = applyLinkSanitizer(activeAnswerText);
       }
 
       try {
@@ -3213,7 +3294,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
           // Zie verify hierboven: bron-link-URLs uit de tekst halen vóór verify
           // (zelfde gate als sanitizer → byte-identiek buiten de bron-link-case).
           answerText:
-            linkEnabled && allowedUrls.size > 0 ? stripMarkdownLinks(activeAnswerText) : activeAnswerText,
+            sanitizeLinks ? stripMarkdownLinks(activeAnswerText) : activeAnswerText,
           chunks: chunkInputs2,
           threshold: bot.claimVerificationThreshold,
           hardFactCheck: bot.adaptiveHardFactVerification === true,
@@ -3412,6 +3493,7 @@ Je geeft een tweede poging. Beperk je nu STRIKT tot uitspraken die letterlijk of
         ...activeResponse.extras,
         ...(followUps && followUps.length > 0 ? { followUps } : {}),
         phaseTimingsMs: phaseTimingsFinal,
+        ...(linksOnRequest && providedUrls.length > 0 ? { allowedLinkUrls: [...new Set(providedUrls)] } : {}),
       },
     };
     // Epoch-guard (plan 006): een purge (KB/instellingen/Q&A-wijziging) tijdens

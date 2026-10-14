@@ -309,6 +309,35 @@
 }
 .cmw-starter:disabled { opacity: 0.6; }
 
+/* Linkknoppen (organizations.link_buttons_enabled): losse links in een antwoord. */
+.cmw-linkbtns { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 6px 0 4px; }
+.cmw-bubble .cmw-linkbtn,
+.cmw-linkbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(12, 30, 46, 0.12);
+  color: var(--cmw-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  transition: box-shadow 150ms ease, transform 150ms var(--cmw-ease);
+}
+.cmw-linkbtn:hover {
+  box-shadow: 0 0 0 1px var(--cmw-accent), 0 4px 10px rgba(12, 30, 46, 0.06);
+  transform: translateY(-1px);
+}
+.cmw-linkbtn-icon { flex-shrink: 0; color: var(--cmw-accent); }
+.cmw-linkbtn-label { min-width: 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .cmw-linkbtn, .cmw-linkbtn:hover { transition: none; transform: none; }
+}
+
 /* ---- Invoer ------------------------------------------------------------- */
 
 .cmw-foot {

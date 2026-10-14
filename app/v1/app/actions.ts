@@ -11,6 +11,7 @@ import { v1RagConfigFor, getOrgChatbot } from './rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from './instellingen/settings-config';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
+import { getOrgLinkButtons, applyLinkButtons } from '@/lib/v1/org-flags/link-buttons';
 
 export type AskV1Result =
   | { ok: true; answer: string; sources: { title: string }[]; kind: string }
@@ -48,13 +49,15 @@ export async function askV1(question: string, history?: ChatHistoryTurn[]): Prom
     // + dag-budget op de service-role (org-expliciet, geen client-input). Geblokt →
     // geen runRagQuery → niet billable. UI mapt de code naar NL (v1-chat.tsx).
     const svc = getV1ServiceRoleClient();
-    const [gate, fastMode] = await Promise.all([
+    const [gate, fastMode, linkButtons] = await Promise.all([
       checkOrgChatGates(svc, orgId),
       getOrgFastMode(svc, orgId), // per-org Fast mode; fout → standaard tier
+      getOrgLinkButtons(svc, orgId), // per-org Linkknoppen; fout → links uit
     ]);
     if (!gate.ok) return { ok: false, error: gate.code };
 
-    const config = applyFastMode(v1RagConfigFor(chatbot), fastMode);
+    // Zelfde volgorde als de widget (widget-chat.ts): gedeelde answer-cache.
+    const config = applyLinkButtons(applyFastMode(v1RagConfigFor(chatbot), fastMode), linkButtons);
 
     // Klant-settings → engine-overrides. Zonder deze stap negeert askV1 de
     // Instellingen-UI volledig (dode knoppen). Lezen onder de session-client (RLS);

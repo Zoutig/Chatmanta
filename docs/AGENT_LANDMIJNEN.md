@@ -272,6 +272,9 @@ lookup/write in de engine). En: de answer_cache-**write** moet in V1 via de **se
 Symptoom: bronlinks in V1-antwoorden terwijl de document-only RPC geen `source_url` levert.
 Oorzaak: de flag staat sinds v0.9.1 default op true.
 Wat te doen: zet `sourceLinksEnabled:false` in de V1-rag-config (hard rule: bronlinks uit in V1).
+Sinds 2026-10-14 kan het per org aan via Linkknoppen (migr V1-0031). Pas `applyLinkButtons` dan als
+LAATSTE stap toe, op élk V1-chatpad (widget-chat.ts én de preview in actions.ts): ze delen de
+answer-cache, dus een pad zonder de vlag vult de cache met link-loze antwoorden.
 (PR #230/#233, memory: v1_v0_look_restyle_pr230)
 
 ## RAG & evals

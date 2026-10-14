@@ -53,11 +53,17 @@ export function cleanWidgetAnswer(text: string): string {
 // niet door de server-sanitizer gehaald, dus een (mogelijk verzonnen) link mag
 // nog niet klikbaar worden — hij rendert als kale label-tekst tot het
 // answer-done event de geschoonde tekst levert. Voorkomt een klikbare-404-flits.
+//
+// `options.linkButtons` (opt-in, alleen de V1-widget + preview met Linkknoppen aan):
+// een regel of lijst-item dat uit precies één link bestaat, wordt een knop. Alle
+// andere aanroepers (V0, /voorbeeld, gesprekken) zien byte-identieke uitvoer.
 export function renderMarkdownLite(
   text: string,
   linkColor?: string,
   linkify = true,
+  options?: { linkButtons?: boolean },
 ): ReactNode {
+  const buttons = linkify && options?.linkButtons === true;
   const clean = cleanWidgetAnswer(text);
 
   const lines = clean.split('\n');
@@ -84,6 +90,16 @@ export function renderMarkdownLite(
         items.push(lines[i].replace(/^[-*]\s+/, ''));
         i++;
       }
+      // Linkknoppen: een lijst die alleen uit losse links bestaat → knoppen-stapel.
+      const lone = buttons ? items.map(loneLink) : [];
+      if (buttons && lone.every((l) => l !== null)) {
+        blocks.push(
+          <div key={key++} className="cmw-linkbtns">
+            {lone.map((l, idx) => linkButton(l!, idx))}
+          </div>,
+        );
+        continue;
+      }
       blocks.push(
         <ul
           key={key++}
@@ -100,6 +116,18 @@ export function renderMarkdownLite(
           ))}
         </ul>,
       );
+      continue;
+    }
+
+    // Linkknoppen: een regel die alleen uit één link bestaat → knop.
+    const loneLine = buttons ? loneLink(line) : null;
+    if (loneLine) {
+      blocks.push(
+        <div key={key++} className="cmw-linkbtns">
+          {linkButton(loneLine, 0)}
+        </div>,
+      );
+      i++;
       continue;
     }
 
@@ -124,6 +152,82 @@ function isSafeHttpUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Regel die uit precies één veilige link bestaat (optioneel gevolgd door een
+// leesteken). Anders null → gewone inline-weergave.
+const LONE_LINK_RE = /^\s*\[([^\]]+)\]\(([^)\s]+)\)\s*[.,;]?\s*$/;
+
+function loneLink(line: string): { label: string; url: string } | null {
+  const m = LONE_LINK_RE.exec(line);
+  if (!m || !isSafeHttpUrl(m[2])) return null;
+  return { label: m[1].replace(/\*\*/g, ''), url: m[2] };
+}
+
+function linkKind(url: string): 'document' | 'download' | 'page' {
+  let path = '';
+  try {
+    path = new URL(url).pathname.toLowerCase();
+  } catch {
+    return 'page';
+  }
+  if (/\.(pdf|docx?|xlsx?|pptx?|txt)$/.test(path)) return 'document';
+  if (/\.(zip|rar|7z|exe|msi|dmg|tar|gz)$/.test(path)) return 'download';
+  return 'page';
+}
+
+// Kleur via widget.css (--cmw-accent op het icoon, tekst in --cmw-ink): een lichte
+// klantkleur als tekstkleur zou onleesbaar worden.
+function linkButton(l: { label: string; url: string }, key: number): ReactNode {
+  const kind = linkKind(l.url);
+  return (
+    <a
+      key={key}
+      className="cmw-linkbtn"
+      data-kind={kind}
+      href={l.url}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <LinkIcon kind={kind} />
+      <span className="cmw-linkbtn-label">{l.label}</span>
+    </a>
+  );
+}
+
+function LinkIcon({ kind }: { kind: 'document' | 'download' | 'page' }) {
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+    className: 'cmw-linkbtn-icon',
+  };
+  if (kind === 'document') {
+    return (
+      <svg {...common}>
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+        <path d="M14 3v5h5M9 13h6M9 17h6" />
+      </svg>
+    );
+  }
+  if (kind === 'download') {
+    return (
+      <svg {...common}>
+        <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </svg>
+  );
 }
 
 // Inline-parser: **bold** én [tekst](url). Eén regex die beide tokens matcht;

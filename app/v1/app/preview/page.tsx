@@ -11,6 +11,7 @@ import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { toWidgetAppearance } from '@/lib/v1/widget/appearance';
+import { getOrgLinkButtons } from '@/lib/v1/org-flags/link-buttons';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { getOrgChatbot } from '../rag-config';
@@ -39,6 +40,9 @@ export default async function V1PreviewPage() {
   }
   const settings = await getChatbotSettings(supabase, chatbot.id);
   const appearance = toWidgetAppearance(settings, chatbot.name);
+  // Linkknoppen (migr 0031): eigen org leesbaar onder RLS; fout → uit. Zelfde
+  // weergave als de echte widget (askV1 past dezelfde vlag toe).
+  const linkButtons = await getOrgLinkButtons(supabase, orgId);
 
   return (
     <div className="v1-page">
@@ -52,7 +56,7 @@ export default async function V1PreviewPage() {
         }
       />
       <PreviewFrame>
-        <V1PreviewWidget orgId={orgId} chatbotId={chatbot.id} appearance={appearance} />
+        <V1PreviewWidget orgId={orgId} chatbotId={chatbot.id} appearance={appearance} linkButtons={linkButtons} />
       </PreviewFrame>
     </div>
   );

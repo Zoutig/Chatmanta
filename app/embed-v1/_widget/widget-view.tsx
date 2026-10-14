@@ -15,6 +15,7 @@ import './widget.css';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { bestForegroundOn } from '@/lib/widget/contrast';
 import { isFittedLogo, type WidgetAppearance } from '@/lib/v1/widget/appearance';
+import { WIDGET_STRINGS, type WidgetStrings } from '@/lib/v1/widget/widget-strings';
 
 export type WidgetMessage = {
   id: string;
@@ -50,6 +51,8 @@ export type WidgetViewProps = {
   autoFocus?: boolean;
   /** Voorbeeld: invoer en startvragen doen niets. */
   readOnly?: boolean;
+  /** Vaste widget-teksten in de taal van de bezoeker (default Nederlands). */
+  strings?: WidgetStrings;
 };
 
 export function WidgetView({
@@ -67,6 +70,7 @@ export function WidgetView({
   ready = true,
   autoFocus = false,
   readOnly = false,
+  strings: t = WIDGET_STRINGS.nl,
 }: WidgetViewProps) {
   const fg = bestForegroundOn(a.accentColor);
   const titleId = useId();
@@ -161,7 +165,7 @@ export function WidgetView({
               <button
                 type="button"
                 className="cmw-close"
-                aria-label="Chat sluiten"
+                aria-label={t.closeChat}
                 onClick={() => onOpenChange(false)}
               >
                 <CloseIcon size={16} />
@@ -181,7 +185,7 @@ export function WidgetView({
             {messages.map((m) => (
               <div key={m.id} className="cmw-msg" data-role={m.role}>
                 {m.role === 'assistant' && m.streaming && !m.content ? (
-                  <div className="cmw-bubble" data-role="assistant" aria-label="Aan het typen">
+                  <div className="cmw-bubble" data-role="assistant" aria-label={t.typing}>
                     <span className="cmw-typing" aria-hidden="true">
                       <i />
                       <i />
@@ -204,7 +208,7 @@ export function WidgetView({
                       inputRef.current?.focus({ preventScroll: true });
                     }}
                   >
-                    <RetryIcon /> Opnieuw proberen
+                    <RetryIcon /> {t.retry}
                   </button>
                 ) : null}
               </div>
@@ -252,15 +256,15 @@ export function WidgetView({
                     submit();
                   }
                 }}
-                placeholder="Typ je vraag…"
-                aria-label="Je vraag"
+                placeholder={t.inputPlaceholder}
+                aria-label={t.inputLabel}
                 maxLength={2000}
               />
-              <button type="submit" className="cmw-send" disabled={!canSend} aria-label="Versturen">
+              <button type="submit" className="cmw-send" disabled={!canSend} aria-label={t.send}>
                 <SendIcon />
               </button>
             </form>
-            <p className="cmw-credit">Mogelijk gemaakt door ChatManta</p>
+            <p className="cmw-credit">{t.poweredBy}</p>
           </div>
         </section>
       ) : null}
@@ -271,7 +275,7 @@ export function WidgetView({
           type="button"
           className="cmw-launcher"
           data-open={open || undefined}
-          aria-label={open ? 'Chat sluiten' : 'Chat openen'}
+          aria-label={open ? t.closeChat : t.openChat}
           aria-expanded={open}
           onClick={() => onOpenChange(!open)}
         >
