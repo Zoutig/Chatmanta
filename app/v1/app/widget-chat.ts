@@ -19,6 +19,7 @@ import type { RagConfig, RagPersona } from '@/lib/rag/types';
 import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { getOrgFastMode, applyFastMode } from '@/lib/v1/limits/fast-mode';
+import { getOrgLinkButtons, applyLinkButtons } from '@/lib/v1/org-flags/link-buttons';
 import { v1RagConfigFor, getOrgChatbot, buildV1Persona } from '@/app/v1/app/rag-config';
 import { getChatbotSettings, buildV1ChatbotInputs } from '@/app/v1/app/instellingen/settings-config';
 import type { ChatbotPromptOverrides } from '@/lib/v0/klantendashboard/server/build-chatbot-overrides';
@@ -103,11 +104,12 @@ export async function prepareV1WidgetChat(
 
   // Per-org gate (rate-limit + maand-cap + dag-budget) parallel met de fast-mode-read
   // (eigen fail-safe → standaard tier bij een fout).
-  const [gate, fastMode] = await Promise.all([
+  const [gate, fastMode, linkButtons] = await Promise.all([
     input.orgGates === 'skip'
       ? Promise.resolve({ ok: true } as const)
       : checkOrgChatGates(svc, organizationId),
     getOrgFastMode(svc, organizationId),
+    getOrgLinkButtons(svc, organizationId),
   ]);
   if (!gate.ok) {
     return { kind: 'terminal', reason: 'gated', event: terminal(gate.message) };
@@ -125,12 +127,14 @@ export async function prepareV1WidgetChat(
     persona = buildV1Persona(activeChatbot.name);
   }
 
-  // Config — widget-override: sourceLinksEnabled UIT (document-only RPC). Fast mode
-  // per org (organizations.fast_mode_enabled): uit → standaard tier.
-  //    Index-versie per chatbot (migr 0030): de zoekvraag moet met het model van de index.
-  const config = applyFastMode(
-    { ...v1RagConfigFor(activeChatbot, input.botVersion), sourceLinksEnabled: false },
-    fastMode,
+  // Config — Fast mode per org (organizations.fast_mode_enabled): uit → standaard
+  // tier. Index-versie per chatbot (migr 0030): de zoekvraag moet met het model van
+  // de index. Links: hard rule 9 (uit), behalve per org Linkknoppen (migr 0031,
+  // alleen op verzoek). applyLinkButtons is bewust de LAATSTE stap en identiek aan
+  // de dashboard-preview (actions.ts): beide delen de answer-cache.
+  const config = applyLinkButtons(
+    applyFastMode(v1RagConfigFor(activeChatbot, input.botVersion), fastMode),
+    linkButtons,
   );
 
   // GK blijft fail-closed (geen enableGeneralKnowledge → config wint). Cache

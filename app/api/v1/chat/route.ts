@@ -6,7 +6,8 @@
 // UITSLUITEND uit de GESIGNEERDE slug geresolved via de service-role (nooit uit rauwe
 // client-input) en runRagQuery draait met expliciete organizationId+chatbotId. Dat is
 // de isolatie zonder per-user auth (SA-1: de slug-claim in het token is niet te
-// vervalsen). sourceLinksEnabled staat UIT op dit pad (document-only RPC, §1.5-V2).
+// vervalsen). Links staan UIT (hard rule 9), behalve per org Linkknoppen (migr V1 0031,
+// alleen op verzoek) — zie applyLinkButtons in app/v1/app/widget-chat.ts.
 //
 // Format: ndjson — één JSON-object per regel. Eerst {kind:'meta', queryLogId, requestId},
 // daarna de StreamEvents uit runRagQuery.

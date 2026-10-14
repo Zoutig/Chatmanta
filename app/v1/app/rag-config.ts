@@ -43,7 +43,8 @@ const V1_OVERRIDES = {
   // V1 hard rule (AGENTS.md): bronlinks UIT in V1. Ook al dragen website-documents
   // source_url en zou de match-RPC/sanitizer ze veilig kunnen renderen, de bewuste
   // keuze is geen bronlinks in V1 (Seb, 2026-06-30). Zet niet terug op true zonder
-  // die regel opnieuw te wegen.
+  // die regel opnieuw te wegen. Per klant kan het wél: Linkknoppen (migr 0031,
+  // alleen op verzoek) via applyLinkButtons in lib/v1/org-flags/link-buttons.ts.
   sourceLinksEnabled: false,
   generalKnowledgeEnabled: false,
 } satisfies Partial<RagConfig>;

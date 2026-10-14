@@ -425,6 +425,16 @@ export type RagConfig = {
    */
   sourceLinksEnabled?: boolean;
   /**
+   * Hoe bron-links werken als sourceLinksEnabled aan staat.
+   *   'append' (default/undefined) — V0-gedrag: sluit een antwoord af met een
+   *     doorverwijs-link naar een Bron-URL.
+   *   'on-request' — V1-linkknoppen (per klant, 2026-10-14): alleen een link als de
+   *     bezoeker om een document/download/plek op de site vraagt. Allowlist =
+   *     Bron-URL's + links óp die pagina's (zelfde domein); kale URL's worden
+   *     omgezet of verwijderd (lib/rag/source-links.ts → sanitizeLinksOnRequest).
+   */
+  sourceLinksMode?: 'append' | 'on-request';
+  /**
    * v0.7: which LENGTH/STYLE instruction set wordt aangezogen via
    * lib/v0/style.ts → buildSystemPrompt. 'v1' (default/undefined) = bestaande
    * strings; 'v2' = scherpere lengtes (kort=1-2 zinnen, normaal=adaptief,
