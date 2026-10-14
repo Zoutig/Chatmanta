@@ -162,8 +162,8 @@ test('extractSameHostLinks: geen redirect via het pad of dubbel-gecodeerde query
 });
 
 test('"[tekst](geen url)" blijft gewone tekst', () => {
-  const s = 'Zie [optioneel](zie onder) en a[0](1).';
-  assert.equal(sanitizeLinksOnRequest(s, allowed()), s);
+  const s = 'Zie [optioneel](zie onder) en a(1), https-vrij.';
+  assert.equal(sanitizeLinksOnRequest(`${s} ${PDF}`, allowed()).startsWith(s), true);
 });
 
 test('opschonen alleen rond een verwijderde URL, rest van de tekst onaangeroerd', () => {
@@ -177,4 +177,65 @@ test('opschonen alleen rond een verwijderde URL, rest van de tekst onaangeroerd'
 test('twee aaneengeplakte kale URLs: toegestane blijft, vreemde gaat weg', () => {
   const out = sanitizeLinksOnRequest(`${PDF})(https://evil.com`, allowed());
   assert.equal(out, `[Fuji-FRENIC-Ace-User-Manual-English.pdf](${PDF}))(`);
+});
+
+// --- Regressies uit review-ronde 2 ---------------------------------------------
+
+/** Wat de widget-renderer klikbaar zou maken (zelfde regex + http(s)-toets). */
+function clickableUrls(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(/\[([^\]]+)\]\(([^)\s]+)\)/g)) {
+    try {
+      const u = new URL(m[2]);
+      if (u.protocol === 'http:' || u.protocol === 'https:') out.push(m[2]);
+    } catch {
+      // geen link
+    }
+  }
+  return out;
+}
+
+test('controletekens vóór de URL kunnen de scheme-check niet omzeilen', () => {
+  for (const input of [
+    'Zie [handleiding](\u0001HTTPS://evil.com/x) hier.',
+    '- [Handleiding](\u001fhttps:evil.com)',
+    '[x](HTTPS://evil.com)',
+    '[x](https:evil.com)',
+  ]) {
+    assert.deepEqual(clickableUrls(sanitizeLinksOnRequest(input, allowed())), [], input);
+  }
+});
+
+test('tags/citaties die de renderer weghaalt kunnen geen link aaneensmeden', () => {
+  for (const input of [
+    '[handleiding]<thinking></thinking>(https:evil.com)',
+    '- [Download]<thinking></thinking>(https:evil.com)',
+    '[x]<thinking>x</thinking>(HTTPS://evil.com)',
+    '[x] [1](https://evil.com)',
+  ]) {
+    const out = sanitizeLinksOnRequest(input, allowed());
+    assert.deepEqual(clickableUrls(out), [], input);
+  }
+});
+
+test('diep geneste links → nooit een vreemde link (fail-closed)', () => {
+  for (const n of [16, 20, 60]) {
+    for (const scheme of ['https://', 'https:', 'HTTPS://']) {
+      const input = '['.repeat(n) + 'x' + `](${scheme}evil.com)`.repeat(n);
+      assert.deepEqual(clickableUrls(sanitizeLinksOnRequest(input, allowed())), [], `${n} ${scheme}`);
+    }
+  }
+});
+
+test('overschrijffout in een bestandsnaam → hersteld naar de allowlist-URL', () => {
+  const typo = `${SITE}/sites/default/files/product-information/Fuji-FRENIC-Lift-LM2-Catalogues-English.pdf`;
+  assert.equal(sanitizeLinksOnRequest(`[LM2](${typo})`, allowed()), `[LM2](${PDF_SPACE})`);
+  // Zelfde bestandsnaam op een vreemde host: nooit herstellen.
+  const evil = 'https://evil.com/sites/default/files/product-information/Fuji-FRENIC-Lift%20LM2-Catalogues-English.pdf';
+  assert.equal(sanitizeLinksOnRequest(`[LM2](${evil})`, allowed()), 'LM2');
+});
+
+test('toegestane link blijft werken naast al deze vangrails', () => {
+  const out = sanitizeLinksOnRequest(`<answer>Hier:\n- [Ace](${PDF})</answer>`, allowed());
+  assert.deepEqual(clickableUrls(out), [PDF]);
 });

@@ -477,7 +477,8 @@ const LINKS_ON_REQUEST_INTRO =
   'Bij alle andere vragen: GEEN link en GEEN URL, ook niet als "voor meer informatie". ' +
   'Geef je wel links: begin met één korte zin, zet daaronder maximaal 3 links, elk op een eigen regel als lijst-item "- [korte duidelijke omschrijving](URL)" (bijvoorbeeld "- [FRENIC Ace – User Manual (Engels)](URL)"). Geen andere tekst op die regels. ' +
   'Neem de URL LETTERLIJK over uit de bronnen, teken voor teken (ook %20 en %28); verzin NOOIT een URL of pad en wijzig er niets aan. Schrijf NOOIT een kale URL. ' +
-  'Zijn er meerdere versies of talen van hetzelfde document: kies de nieuwste versie, en de taal van de bezoeker als die er is (anders Engels), tenzij de bezoeker iets anders vraagt. Noem in de omschrijving de taal van het document. ' +
+  'Vraagt de bezoeker algemeen naar "de handleiding" of "de documentatie" van een product: vraag niet eerst door, maar geef direct de belangrijkste documenten (gebruikers- en instructiehandleiding eerst) als links. ' +
+  'Zijn er meerdere versies of talen van hetzelfde document: kies de nieuwste versie, en de taal van de bezoeker als die er is (anders Engels); geef geen documenten in een andere taal, tenzij de bezoeker daarom vraagt. Noem in de omschrijving de taal van het document. ' +
   'Vraagt de bezoeker om een document dat niet in de bronnen staat: zeg dat eerlijk en geef geen link.\n\n';
 
 function withoutAllowedLinkUrls(extras: V03Extras | undefined): V03Extras {

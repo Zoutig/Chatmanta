@@ -221,7 +221,7 @@ const TITLE_SUFFIX_RE = /\s+(?:"[^"]*"|'[^']*')\s*$/;
 const SCHEME_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 // Kale URL: één niveau gebalanceerde haakjes toegestaan, verder stopt hij bij
 // witruimte, haakjes, blokhaken en aanhalingstekens.
-const BARE_URL_RE = /https?:\/\/[^\s<>"'()[\]]+(?:\([^\s<>"'()[\]]*\)[^\s<>"'()[\]]*)*/g;
+const BARE_URL_RE = /https?:\/\/[^\s<>"'()[\]]+(?:\([^\s<>"'()[\]]*\)[^\s<>"'()[\]]*)*/gi;
 // Exact de link-regex van lib/widget/render-markdown-lite.tsx (INLINE_RE / LONE_LINK_RE).
 const RENDERER_LINK_RE = /\[([^\]]+)\]\(([^)\s]+)\)/g;
 // Placeholders: ASCII-controletekens, komen in modeluitvoer niet voor.
@@ -263,6 +263,39 @@ function rewriteMarkdownLinks(text: string, fn: (label: string, url: string) => 
   return out + text.slice(i);
 }
 
+/**
+ * Host + genormaliseerde bestandsnaam (alleen voor URL's die op een bestand met
+ * extensie eindigen): kleine letters, zonder spaties/-/_/%20. null = geen bestand.
+ */
+function fileKey(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    return null;
+  }
+  if ((u.protocol !== 'http:' && u.protocol !== 'https:') || u.username || u.password) return null;
+  const last = deepDecode(u.pathname.split('/').pop() ?? '');
+  if (!/\.[a-z0-9]{2,4}$/i.test(last)) return null;
+  const name = last.toLowerCase().replace(/[\s_\-.()]+/g, '');
+  return name.length >= 8 ? `${bareHost(u.host)}|${name}` : null;
+}
+
+/** fileKey → canonieke URL, alleen voor ondubbelzinnige bestandsnamen. */
+function fileIndex(allowed: LinkAllowlist): Map<string, string> {
+  const idx = new Map<string, string>();
+  const dup = new Set<string>();
+  for (const canon of allowed.values()) {
+    const k = fileKey(canon);
+    if (!k || dup.has(k)) continue;
+    if (idx.has(k) && idx.get(k) !== canon) {
+      idx.delete(k);
+      dup.add(k);
+    } else idx.set(k, canon);
+  }
+  return idx;
+}
+
 function bareUrlLabel(canon: string): string {
   const u = new URL(canon);
   const last = u.pathname.split('/').filter(Boolean).pop();
@@ -284,21 +317,33 @@ function bareUrlLabel(canon: string): string {
  *   4. Slotcontrole met de renderer-regex: elke resterende "link" buiten de
  *      allowlist → label. Lege allowlist → geen enkele link of URL overleeft.
  */
-export function sanitizeLinksOnRequest(text: string, allowed: LinkAllowlist): string {
-  if (!/https?:|\]\(/i.test(text)) return text;
+export function sanitizeLinksOnRequest(rawText: string, allowed: LinkAllowlist): string {
+  if (!/https?:|\]\(/i.test(rawText)) return rawText;
+  // Eerst exact wat de widget-renderer vóór het parsen weghaalt (tags, [n]-citaties)
+  // plus onzichtbare controletekens: anders kan die opschoning ná de sanitizer twee
+  // losse stukken alsnog tot één link aaneensmeden ("[x]<thinking></thinking>(url)").
+  const text = normalizeForRenderer(rawText);
+  // Fail-closed bij absurde lengte (kwadratische scans): dan geen enkele link.
+  if (text.length > MAX_SANITIZE_CHARS) return stripAllLinks(text);
   const links: string[] = [];
   const keep = (label: string, canon: string) => {
     links.push(`[${label}](${canon})`);
     return `${PH_OPEN}${links.length - 1}${PH_CLOSE}`;
   };
+  const byFile = fileIndex(allowed);
   const lookup = (url: string): string | undefined => {
     const key = linkMatchKey(url);
-    return key ? allowed.get(key) : undefined;
+    if (!key) return undefined;
+    // Exact, anders herstel van een overschrijffout in een bestandslink (spatie ↔
+    // %20, - ↔ _, hoofdletters): alleen als de bestandsnaam op dezelfde host
+    // ondubbelzinnig bij één allowlist-URL hoort. Uitvoer blijft altijd een
+    // allowlist-URL; een vreemde host matcht nooit.
+    return allowed.get(key) ?? byFile.get(fileKey(url) ?? '') ?? undefined;
   };
 
   // 1.
   let cur = text;
-  for (let round = 0; round < 5; round++) {
+  for (let round = 0; round < MAX_ROUNDS; round++) {
     const next = rewriteMarkdownLinks(cur, (label, url) => {
       const canon = lookup(url);
       return canon ? keep(label, canon) : label;
@@ -335,16 +380,56 @@ export function sanitizeLinksOnRequest(text: string, allowed: LinkAllowlist): st
   return rendererLinkPass(cur, lookup);
 }
 
-/** Elke renderer-link met een scheme die niet exact een allowlist-URL is → label. */
-function rendererLinkPass(text: string, lookup: (url: string) => string | undefined): string {
+const MAX_SANITIZE_CHARS = 20_000;
+const MAX_ROUNDS = 200;
+
+/** Spiegelt cleanWidgetAnswer (lib/widget/render-markdown-lite.tsx) + C0-controletekens weg. */
+function normalizeForRenderer(text: string): string {
+  return text
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<confidence>[\s\S]*?<\/confidence>/gi, '')
+    .replace(/<\/answer>[\s\S]*$/i, '')
+    .replace(/<answer>/gi, '')
+    .replace(/<confidence>[\s\S]*$/i, '')
+    .replace(/\s*\[\d+\](\[\d+\])*/g, '');
+}
+
+/** Zou de renderer van deze URL een klikbare <a> maken? (zelfde toets als isSafeHttpUrl) */
+function rendererWouldLink(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function stripAllLinks(text: string): string {
   let cur = text;
-  for (let round = 0; round < 5; round++) {
-    const next = cur.replace(RENDERER_LINK_RE, (full, label: string, url: string) => {
-      if (!SCHEME_RE.test(url)) return full; // "[0](1)": geen link, renderer maakt er ook geen van
-      return lookup(url) === url ? full : label;
-    });
-    if (next === cur) break;
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const next = cur.replace(RENDERER_LINK_RE, (_full, label: string) => label);
+    if (next === cur) return cur;
     cur = next;
   }
-  return cur;
+  // Nog steeds niet stabiel: dan elke link-syntax kapot maken (fail-closed).
+  return cur.replace(/\]\(/g, '] (');
+}
+
+/**
+ * Elke renderer-link die de renderer klikbaar zou maken en niet exact een
+ * allowlist-URL is → label. Herhaald tot stabiel (elke vervanging maakt de tekst
+ * korter); haalt het de grens niet, dan fail-closed: geen enkele link.
+ */
+function rendererLinkPass(text: string, lookup: (url: string) => string | undefined): string {
+  let cur = text;
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const next = cur.replace(RENDERER_LINK_RE, (full, label: string, url: string) => {
+      if (!rendererWouldLink(url)) return full; // "[0](1)": de renderer maakt er ook geen link van
+      return lookup(url) === url ? full : label;
+    });
+    if (next === cur) return cur;
+    cur = next;
+  }
+  return stripAllLinks(cur);
 }
