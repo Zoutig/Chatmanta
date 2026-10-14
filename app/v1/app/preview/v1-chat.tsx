@@ -102,10 +102,13 @@ export function V1PreviewWidget({
   orgId,
   chatbotId,
   appearance,
+  linkButtons = false,
 }: {
   orgId: string;
   chatbotId: string;
   appearance: WidgetAppearance;
+  /** Linkknoppen aan: links klikbaar/als knop (antwoorden komen al geschoond uit askV1). */
+  linkButtons?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -170,7 +173,7 @@ export function V1PreviewWidget({
       retryable: m.error && !!m.code && RETRYABLE.has(m.code) && isRetryable(messages, m.id),
       content:
         m.role === 'assistant' && m.content && !m.error
-          ? renderMarkdownLite(m.content, appearance.accentColor, false)
+          ? renderMarkdownLite(m.content, appearance.accentColor, linkButtons, { linkButtons })
           : m.content,
     };
   });

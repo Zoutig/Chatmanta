@@ -9,6 +9,8 @@ import { mergeChatbotSettings } from '@/app/v1/app/instellingen/settings-config'
 import { evaluateEmbedAccess } from '@/lib/widget/origin-allowlist';
 import { createEmbedToken } from './embed-token';
 import { toWidgetAppearance } from './appearance';
+import { widgetUiLanguage } from './widget-strings';
+import { getOrgLinkButtons } from '@/lib/v1/org-flags/link-buttons';
 import type { V1WidgetProps } from '@/app/embed-v1/[slug]/v1-widget';
 
 export type EmbedLoadResult =
@@ -71,6 +73,9 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
   // De submit-route is de autoritatieve gate; dit stuurt alleen de UI-zichtbaarheid.
   const contactRequestsEnabled =
     (settings as { contactRequestsEnabled?: unknown }).contactRequestsEnabled === true;
+  // Linkknoppen (migr 0031): eigen read, fout/ontbrekende kolom → false. Nooit in de
+  // org-select hierboven, anders breekt de embed zolang de migratie ontbreekt.
+  const linkButtonsEnabled = await getOrgLinkButtons(svc, org.id);
 
   return {
     kind: 'ok',
@@ -80,6 +85,8 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
       botVersion: chatbot.bot_version,
       appearance,
       contactRequestsEnabled,
+      linkButtonsEnabled,
+      uiLanguage: widgetUiLanguage(settings),
     },
   };
 }

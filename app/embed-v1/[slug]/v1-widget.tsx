@@ -5,13 +5,19 @@
 // loader. De weergave is de gedeelde WidgetView (bord B · Diepzee); hier zit
 // alleen de logica. Bewust geen V0-extra's (thread-drawer, duimpjes, org-skins).
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { getOrCreateVisitorId } from '@/lib/widget/visitor-id';
 import type { WidgetAppearance } from '@/lib/v1/widget/appearance';
 import { cleanHistory, isRetryable, retryTarget, type HistoryTurn } from '@/lib/v1/widget/chat-history';
 import { WidgetView, type WidgetMessage } from '../_widget/widget-view';
 import { ContactForm, type ContactPayload } from '../_widget/contact-form';
+import {
+  WIDGET_STRINGS,
+  resolveWidgetLang,
+  type WidgetLang,
+  type WidgetUiLanguage,
+} from '@/lib/v1/widget/widget-strings';
 
 export type V1WidgetProps = {
   slug: string;
@@ -25,6 +31,14 @@ export type V1WidgetProps = {
    * enkel de UI-zichtbaarheid.
    */
   contactRequestsEnabled?: boolean;
+  /**
+   * Linkknoppen (organizations.link_buttons_enabled, migr 0031). Aan → links in een
+   * door de server geschoond antwoord worden klikbaar, losse links als knop. Default
+   * false = hard rule 9: links blijven platte label-tekst.
+   */
+  linkButtonsEnabled?: boolean;
+  /** Taal van de vaste widget-teksten: 'auto' = browser van de bezoeker. Default 'nl'. */
+  uiLanguage?: WidgetUiLanguage;
 };
 
 type Msg = {
@@ -33,6 +47,12 @@ type Msg = {
   content: string;
   streaming?: boolean;
   error?: boolean;
+  /**
+   * true zodra de tekst uit een terminal event van de server komt (answer-done,
+   * replacement, fallback, smalltalk) en dus door de link-sanitizer is gegaan. Alleen
+   * dan mogen links klikbaar worden; rauwe deltas (ook na een afgebroken stream) nooit.
+   */
+  sanitized?: boolean;
   // queryLogId komt binnen via het 'meta'-event (eerste regel van de stream).
   // De duimpjes zijn bewust verwijderd (soft-launch 2026-10-06); de koppeling
   // blijft staan zodat ze zonder stream-wijziging terug kunnen.
@@ -48,9 +68,9 @@ const PARENT_TARGET = '*';
 const OPEN_MIN_HEIGHT = 200;
 const READY_FALLBACK_MS = 300;
 
-const MSG_UNAVAILABLE = 'Deze chat is even niet beschikbaar.';
-const MSG_FAILED = 'Er ging iets mis. Probeer het zo nog eens.';
-const MSG_DROPPED = 'De verbinding viel weg.';
+
+// Browsertaal verandert niet tijdens een sessie: niets om op te abonneren.
+const subscribeNoop = () => () => {};
 
 function makeId(): string {
   try {
@@ -64,6 +84,17 @@ export function V1Widget(props: V1WidgetProps) {
   const { slug, botVersion, appearance } = props;
   const { accentColor, position, launcherText } = appearance;
   const contactEnabled = props.contactRequestsEnabled === true;
+  const linkButtons = props.linkButtonsEnabled === true;
+  const uiLanguage = props.uiLanguage ?? 'nl';
+
+  // Taal van de vaste teksten. Server-snapshot = de vaste taal (of nl bij 'auto');
+  // op de client de browsertaal. useSyncExternalStore voorkomt een hydration-mismatch.
+  const lang = useSyncExternalStore<WidgetLang>(
+    subscribeNoop,
+    () => resolveWidgetLang(uiLanguage, navigator.languages),
+    () => (uiLanguage === 'auto' ? 'nl' : uiLanguage),
+  );
+  const t = WIDGET_STRINGS[lang];
 
   // Heartbeat: één ping bij mount (V0-embed-parity). host komt uit ?h= dat de
   // loader meegaf; voedt widget_last_seen_at voor Live-status + admin-widgetStatus.
@@ -236,7 +267,7 @@ export function V1Widget(props: V1WidgetProps) {
           if (fresh) res = await postChat(fresh);
         }
         if (!res.ok || !res.body) {
-          patch({ content: MSG_UNAVAILABLE, error: true, streaming: false });
+          patch({ content: t.unavailable, error: true, streaming: false });
           return;
         }
 
@@ -262,10 +293,10 @@ export function V1Widget(props: V1WidgetProps) {
               // Eerste regel van de stream: koppel de query_log-id aan deze bubbel.
               if (typeof ev.queryLogId === 'string') patch({ queryLogId: ev.queryLogId });
             } else if (ev.kind === 'answer-start') {
-              patch({ content: '', streaming: true });
+              patch({ content: '', streaming: true, sanitized: false });
             } else if (ev.kind === 'answer-delta' && typeof ev.text === 'string') {
               const delta = ev.text;
-              patch((m) => ({ content: m.content + delta, streaming: true }));
+              patch((m) => ({ content: m.content + delta, streaming: true, sanitized: false }));
             } else if (
               ev.kind === 'answer-done' ||
               ev.kind === 'smalltalk' ||
@@ -273,10 +304,10 @@ export function V1Widget(props: V1WidgetProps) {
               ev.kind === 'replacement'
             ) {
               const answer = ev.response?.answer;
-              if (typeof answer === 'string') patch({ content: answer, streaming: false });
-              else patch({ streaming: false });
+              if (typeof answer === 'string') patch({ content: answer, streaming: false, sanitized: true });
+              else patch({ streaming: false, sanitized: false });
             } else if (ev.kind === 'error') {
-              patch({ content: MSG_FAILED, error: true, streaming: false });
+              patch({ content: t.failed, error: true, streaming: false, sanitized: false });
             }
           }
         }
@@ -285,17 +316,17 @@ export function V1Widget(props: V1WidgetProps) {
         patch((m) =>
           m.error || m.content.trim()
             ? { streaming: false }
-            : { content: MSG_FAILED, error: true, streaming: false },
+            : { content: t.failed, error: true, streaming: false },
         );
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;
-        patch({ content: MSG_DROPPED, error: true, streaming: false });
+        patch({ content: t.dropped, error: true, streaming: false, sanitized: false });
       } finally {
         setPending(false);
         abortRef.current = null;
       }
     },
-    [slug, botVersion, refreshEmbedToken],
+    [slug, botVersion, refreshEmbedToken, t],
   );
 
   const send = useCallback(
@@ -337,10 +368,12 @@ export function V1Widget(props: V1WidgetProps) {
     retryable: m.error && isRetryable(messages, m.id),
     content:
       m.role === 'assistant' && m.content && !m.error
-        ? // linkify=false ALTIJD: widget-contract = sourceLinksEnabled UIT →
-          // links nooit klikbaar (label → platte tekst), ook niet bij een
-          // gedeelde answer_cache-hit die met sourceLinksEnabled=true schreef.
-          renderMarkdownLite(m.content, accentColor, false)
+        ? // Links alleen klikbaar met Linkknoppen aan ÉN op server-geschoonde tekst
+          // (sanitized). Anders — hard rule 9, of rauwe stream-deltas — blijven
+          // links platte label-tekst.
+          renderMarkdownLite(m.content, accentColor, linkButtons && m.sanitized === true, {
+            linkButtons,
+          })
         : m.content,
   }));
 
@@ -349,12 +382,13 @@ export function V1Widget(props: V1WidgetProps) {
     contactEnabled && messages.length > 0 ? (
       contactDone ? (
         <div className="cmw-thanks" role="status">
-          Bedankt! We nemen zo snel mogelijk contact met je op.
+          {t.contactThanks}
         </div>
       ) : contactOpen ? (
         <ContactForm
           onCancel={() => setContactOpen(false)}
           onSubmit={submitContact}
+          strings={t}
           onDone={() => {
             setContactOpen(false);
             setContactDone(true);
@@ -362,7 +396,7 @@ export function V1Widget(props: V1WidgetProps) {
         />
       ) : (
         <button type="button" className="cmw-soft-btn" onClick={() => setContactOpen(true)}>
-          Liever persoonlijk contact?
+          {t.contactCta}
         </button>
       )
     ) : null;
@@ -382,6 +416,7 @@ export function V1Widget(props: V1WidgetProps) {
       belowMessages={contactSlot}
       ready={ready}
       autoFocus={!isMobile}
+      strings={t}
     />
   );
 }

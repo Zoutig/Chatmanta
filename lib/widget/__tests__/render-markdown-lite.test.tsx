@@ -147,3 +147,63 @@ test('tijdens streaming (linkify=false) blijft een link kale label-tekst', () =>
   assert.doesNotMatch(out, /<a[^>]*href/);
   assert.match(out, /Zie over ons\./);
 });
+
+// --- Linkknoppen (opt-in, V1-widget) -----------------------------------------
+
+const PDF = 'https://www.example-shop.nl/files/Fuji-FRENIC-Mini-%28C2%29-User-manual.pdf';
+const btnHtml = (input: string, linkify = true) =>
+  renderToStaticMarkup(
+    renderMarkdownLite(input, '#0a6', linkify, { linkButtons: true }) as React.ReactElement,
+  );
+
+test('linkknoppen: zonder opt-in blijft de uitvoer exact gelijk', () => {
+  const input = `Hier is hij:\n- [User Manual (EN)](${PDF})`;
+  const plain = renderToStaticMarkup(renderMarkdownLite(input, '#0a6') as React.ReactElement);
+  const explicitOff = renderToStaticMarkup(
+    renderMarkdownLite(input, '#0a6', true, { linkButtons: false }) as React.ReactElement,
+  );
+  assert.equal(plain, explicitOff);
+  assert.doesNotMatch(plain, /cmw-linkbtn/);
+});
+
+test('linkknoppen: lijst met alleen links → knoppen (nieuw tabblad, noopener)', () => {
+  const out = btnHtml(`Hier zijn ze:\n- [User Manual (EN)](${PDF})\n- [Catalogus](https://www.example-shop.nl/files/cat.zip)`);
+  assert.match(out, /class="cmw-linkbtns"/);
+  assert.equal((out.match(/class="cmw-linkbtn"/g) ?? []).length, 2);
+  assert.match(out, /data-kind="document"/);
+  assert.match(out, /data-kind="download"/);
+  assert.match(out, /target="_blank"/);
+  assert.match(out, /rel="noopener noreferrer"/);
+  assert.doesNotMatch(out, /<ul/);
+  assert.match(out, /Hier zijn ze:/);
+});
+
+test('linkknoppen: losse regel met één link → knop', () => {
+  const out = btnHtml(`[FRENIC Ace manual](${PDF})`);
+  assert.match(out, /class="cmw-linkbtn"/);
+});
+
+test('linkknoppen: link midden in een zin blijft een gewone link', () => {
+  const out = btnHtml(`Bekijk de [handleiding](${PDF}) voor details.`);
+  assert.doesNotMatch(out, /cmw-linkbtn/);
+  assert.match(out, /<a[^>]*href=/);
+});
+
+test('linkknoppen: gemengde lijst (tekst + link) blijft een gewone lijst', () => {
+  const out = btnHtml(`- Bel ons op werkdagen\n- [Handleiding](${PDF})`);
+  assert.match(out, /<ul/);
+  assert.doesNotMatch(out, /cmw-linkbtn"/);
+});
+
+test('linkknoppen: tijdens streaming (linkify=false) geen knop en geen link', () => {
+  const out = btnHtml(`- [Handleiding](${PDF})`, false);
+  assert.doesNotMatch(out, /cmw-linkbtn/);
+  assert.doesNotMatch(out, /<a[^>]*href/);
+  assert.match(out, /Handleiding/);
+});
+
+test('linkknoppen: onveilige URL wordt nooit een knop', () => {
+  const out = btnHtml('- [klik](javascript:alert)');
+  assert.doesNotMatch(out, /cmw-linkbtn/);
+  assert.doesNotMatch(out, /href="javascript/);
+});
