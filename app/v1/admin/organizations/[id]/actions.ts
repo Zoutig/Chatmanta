@@ -540,6 +540,65 @@ export async function setOrgFastModeAction(
   });
 }
 
+// ─────────────────────────── Linkknoppen per klant ───────────────────────────
+//
+// organizations.link_buttons_enabled (migr 0031). Aan = de bot geeft links naar
+// documenten/downloads/pagina's van de eigen site, alleen als de bezoeker erom vraagt,
+// als knop in de widget. Uit (default) = hard rule 9. Gate = Jorion-admin (cross-org);
+// write via service-role; daarna de answer-cache van élke chatbot van de org legen
+// (anders serveert de cache antwoorden van vóór de wissel); audit-log.
+
+/** Zet Linkknoppen voor een org aan (enabled=true) of uit. */
+export async function setOrgLinkButtonsAction(
+  orgId: string,
+  enabled: boolean,
+): Promise<ActionResult> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    if (typeof enabled !== 'boolean') fail('INPUT_INVALID', 'Ongeldige waarde.');
+    const svc = getV1ServiceRoleClient();
+
+    const { data: org, error: orgErr } = await svc
+      .from('organizations')
+      .select('id')
+      .eq('id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (orgErr) throw new Error(`org-lookup faalde: ${orgErr.message}`);
+    if (!org) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+
+    const { error } = await svc
+      .from('organizations')
+      .update({ link_buttons_enabled: enabled })
+      .eq('id', orgId);
+    if (error) throw new Error(`Linkknoppen opslaan faalde: ${error.message}`);
+
+    const { data: chatbots, error: cbErr } = await svc
+      .from('chatbots')
+      .select('id')
+      .eq('organization_id', orgId);
+    if (cbErr) throw new Error(`chatbots-lookup faalde: ${cbErr.message}`);
+    for (const cb of chatbots ?? []) {
+      await purgeAnswerCache(svc, orgId, cb.id as string);
+    }
+
+    await writeAuditLog(svc, {
+      organizationId: orgId,
+      userId: actorId,
+      action: enabled ? 'org.link_buttons_on' : 'org.link_buttons_off',
+      targetType: 'organization',
+      targetId: orgId,
+    });
+
+    revalidatePath(`/v1/admin/organizations/${orgId}`);
+    return {};
+  });
+}
+
 // ─────────────────────────── Soft-launch — widget-domeinen ───────────────────────────
 //
 // chatbots.allowed_domains is Jorion-beheerd (de klant ziet 'm read-only). Leeg = de

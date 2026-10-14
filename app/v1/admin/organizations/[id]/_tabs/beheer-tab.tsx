@@ -11,6 +11,7 @@ import { DeleteOrgForm } from '../delete-org-form';
 import { MembersManager } from '../members-manager';
 import { SuspendOrgForm } from '../suspend-org-form';
 import { FastModeForm } from '../fast-mode-form';
+import { LinkButtonsForm } from '../link-buttons-form';
 
 type Props = {
   orgId: string;
@@ -33,6 +34,15 @@ export async function BeheerTab({ orgId, slug, limits, suspendedAt }: Props) {
   const fastMode: boolean | null = fmErr
     ? null
     : (fmRow as { fast_mode_enabled?: boolean | null } | null)?.fast_mode_enabled === true;
+  // Linkknoppen (migr 0031): zelfde losse read als Fast mode.
+  const { data: lbRow, error: lbErr } = await admin
+    .from('organizations')
+    .select('link_buttons_enabled')
+    .eq('id', orgId)
+    .maybeSingle();
+  const linkButtons: boolean | null = lbErr
+    ? null
+    : (lbRow as { link_buttons_enabled?: boolean | null } | null)?.link_buttons_enabled === true;
 
   return (
     <div className="v1-stack">
@@ -75,6 +85,29 @@ export async function BeheerTab({ orgId, slug, limits, suspendedAt }: Props) {
           </span>
         </p>
         {fastMode !== null && <FastModeForm orgId={orgId} enabled={fastMode} />}
+      </section>
+
+      {/* Linkknoppen */}
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title v1-adm-title-row">
+            Linkknoppen
+            <InfoTip text="Vraagt een bezoeker om een handleiding, document, download of pagina, dan geeft de chatbot een knop naar die plek op de eigen website van de klant. Bij andere vragen geeft hij geen links. Links komen alleen uit de gecrawlde pagina's van deze klant." />
+          </h2>
+        </div>
+        <p className="v1-adm-strip v1-adm-muted" style={{ margin: '0 0 12px' }}>
+          <Badge tone={linkButtons ? 'ok' : 'neutral'} dot>
+            {linkButtons === null ? 'Onbekend' : linkButtons ? 'Aan' : 'Uit'}
+          </Badge>
+          <span>
+            {linkButtons === null
+              ? 'De instelling is nog niet beschikbaar op deze omgeving (migratie 0031 ontbreekt). De chatbot geeft geen links.'
+              : linkButtons
+                ? 'Op verzoek een knop naar het juiste document of de juiste pagina. Aan- of uitzetten leegt de antwoord-cache.'
+                : 'Geen links in antwoorden (standaard).'}
+          </span>
+        </p>
+        {linkButtons !== null && <LinkButtonsForm orgId={orgId} enabled={linkButtons} />}
       </section>
 
       {/* Leden */}
