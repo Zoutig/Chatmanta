@@ -100,7 +100,7 @@ test('URL in het label van een afgewezen link verdwijnt ook', () => {
 });
 
 test('lege allowlist → geen link of URL overleeft', () => {
-  const out = sanitizeLinksOnRequest(`[A](${PDF}) en ${PDF}`, new Set());
+  const out = sanitizeLinksOnRequest(`[A](${PDF}) en ${PDF}`, new Map());
   assert.equal(out, 'A en');
 });
 
@@ -126,4 +126,55 @@ test('uitvoer is compatibel met stripMarkdownLinks (verify-pad)', () => {
 test('link tussen haakjes in een zin', () => {
   const out = sanitizeLinksOnRequest(`De handleiding ([Ace manual](${PDF})) staat online.`, allowed());
   assert.equal(out, `De handleiding ([Ace manual](${PDF})) staat online.`);
+});
+
+
+// --- Regressies uit de adversarial review (2026-10-14) ----------------------
+
+test('geneste links kunnen geen nieuwe, ongecontroleerde link vormen', () => {
+  assert.equal(sanitizeLinksOnRequest('[[x](https://evil.com)](https://evil.com)', allowed()), 'x');
+  assert.equal(
+    sanitizeLinksOnRequest('[[Handleiding](https://evil.com/a)](https://evil.com/phish)', allowed()),
+    'Handleiding',
+  );
+  // Ook genest rond een TOEGESTANE link: buitenste (vreemde) link wint nooit.
+  const out = sanitizeLinksOnRequest(`[[Ace](${PDF})](https://evil.com)`, allowed());
+  assert.doesNotMatch(out, /evil\.com/);
+});
+
+test('ongebalanceerde haakjes: renderer-link naar vreemde host wordt platte tekst', () => {
+  assert.equal(sanitizeLinksOnRequest('[klik](https://evil.com/a(b)', allowed()), 'klik');
+  assert.equal(sanitizeLinksOnRequest('- [Handleiding](https://evil.com/x(y)', allowed()), '- Handleiding');
+});
+
+test('uitvoer gebruikt de canonieke allowlist-URL, niet de spelling van het model', () => {
+  const out = sanitizeLinksOnRequest(`[Ace](${PDF.replace('www.example-shop.nl', 'WWW.EXAMPLE-SHOP.NL')}#p2)`, allowed());
+  assert.equal(out, `[Ace](${PDF})`);
+});
+
+test('userinfo in de URL wordt nooit geaccepteerd', () => {
+  assert.equal(sanitizeLinksOnRequest(`[x](https://evil@www.example-shop.nl/fuji-frenic-ace)`, allowed()), 'x');
+});
+
+test('extractSameHostLinks: geen redirect via het pad of dubbel-gecodeerde query', () => {
+  const text = `[a](${SITE}/out/https://evil.com) [b](${SITE}/r?u=https%253A%252F%252Fevil.com) [c](${SITE}/go//evil.com) [d](${SITE}/files/a.pdf)`;
+  assert.deepEqual(extractSameHostLinks(text, PAGE), [`${SITE}/files/a.pdf`]);
+});
+
+test('"[tekst](geen url)" blijft gewone tekst', () => {
+  const s = 'Zie [optioneel](zie onder) en a[0](1).';
+  assert.equal(sanitizeLinksOnRequest(s, allowed()), s);
+});
+
+test('opschonen alleen rond een verwijderde URL, rest van de tekst onaangeroerd', () => {
+  assert.equal(
+    sanitizeLinksOnRequest('Kosten : zie https://evil.com, of bel  ons.', allowed()),
+    'Kosten : zie, of bel  ons.',
+  );
+  assert.equal(sanitizeLinksOnRequest('Wacht ... https://evil.com klaar', allowed()), 'Wacht ... klaar');
+});
+
+test('twee aaneengeplakte kale URLs: toegestane blijft, vreemde gaat weg', () => {
+  const out = sanitizeLinksOnRequest(`${PDF})(https://evil.com`, allowed());
+  assert.equal(out, `[Fuji-FRENIC-Ace-User-Manual-English.pdf](${PDF}))(`);
 });

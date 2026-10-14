@@ -1388,7 +1388,14 @@ export async function* runRagQuery(
   // Wordt gebruikt op alle 'kind: fallback' paden in deze functie. Een lege
   // override of de letterlijke engine-default (V1-settings-default) telt als
   // "klant heeft niets ingevuld".
-  const fallbackMessage = resolveFallbackMessage(input.chatbotOverrides?.fallbackMessage, tone);
+  // Linkknoppen: de klant-fallbacktekst gaat niet door de link-sanitizer en kan als
+  // vervangend 'answer' (placeholder-guard) in de widget belanden → markdown-links
+  // eruit, zodat alleen sanitizer-gecontroleerde links ooit klikbaar worden.
+  const fallbackMessageRaw = resolveFallbackMessage(input.chatbotOverrides?.fallbackMessage, tone);
+  const fallbackMessage =
+    bot.sourceLinksEnabled === true && bot.sourceLinksMode === 'on-request'
+      ? stripMarkdownLinks(fallbackMessageRaw)
+      : fallbackMessageRaw;
   const orgId = input.organizationId; // verplicht, geen stille DEV_ORG-fallback meer
   // V0.6 persona-laag: door de caller geresolved en één keer doorgegeven aan de
   // hele pipeline (preProcess, main answer, general-knowledge prompt, off-topic
@@ -1819,7 +1826,8 @@ export async function* runRagQuery(
     );
     // Taalspiegeling: een hit in de andere taal (nl↔en) telt als miss, anders
     // krijgt een Engelse bezoeker een gecacht Nederlands antwoord (en andersom).
-    const mirrorsLanguage = input.chatbotOverrides?.autoDetectLanguage ?? true;
+    // Alleen V1 (chatbot-scoped): V0-botversies zijn append-only en houden hun gedrag.
+    const mirrorsLanguage = chatbotScoped && (input.chatbotOverrides?.autoDetectLanguage ?? true);
     const cached =
       cachedRaw && mirrorsLanguage && cachedAnswerLanguageMismatch(original, cachedRaw.answer)
         ? null
@@ -2600,13 +2608,14 @@ KRITISCHE FORMAT-REGELS:
     usedChunks.push(c);
     used++;
   }
-  const allowedUrls = linksOnRequest ? buildLinkAllowlist(providedUrls) : buildAllowedUrlSet(providedUrls);
+  const allowedUrls = buildAllowedUrlSet(providedUrls);
+  const linkAllowlist = linksOnRequest ? buildLinkAllowlist(providedUrls) : null;
   // Op-verzoek-modus sanitizet ALTIJD (ook zonder URL's in de context): kale of
   // verzonnen URL's mogen er nooit door. Append-modus: ongewijzigd (alleen als er
   // Bron-URL's waren → document-only/eval byte-identiek).
   const sanitizeLinks = linkEnabled && (linksOnRequest || allowedUrls.size > 0);
   const applyLinkSanitizer = (text: string): string =>
-    linksOnRequest ? sanitizeLinksOnRequest(text, allowedUrls) : sanitizeSourceLinks(text, allowedUrls);
+    linkAllowlist ? sanitizeLinksOnRequest(text, linkAllowlist) : sanitizeSourceLinks(text, allowedUrls);
   // V0.6.1 — kort inline-prefix dat de LLM uitlegt hoe matched-span/surrounding
   // context te gebruiken. Alleen als minstens één chunk in matched-span format
   // gerenderd is. Op andere versies / chunks zonder parent: leeg, dus user-

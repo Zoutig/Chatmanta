@@ -19,6 +19,8 @@ type Message = {
   content: string;
   error?: boolean;
   code?: ErrorCode;
+  /** Linkknoppen: alleen een 'answer'-respons is door de link-sanitizer gegaan. */
+  linkable?: boolean;
 };
 
 // v1 → v2: berichten dragen nu error/code. Oude v1-opslag wordt ingelezen; oude
@@ -140,7 +142,7 @@ export function V1PreviewWidget({
       try {
         const res = await askV1(question, history.slice(-HISTORY_TURNS_FOR_RAG * 2));
         next = res.ok
-          ? { id: pendingId, role: 'assistant', content: res.answer }
+          ? { id: pendingId, role: 'assistant', content: res.answer, linkable: res.kind === 'answer' }
           : { id: pendingId, role: 'assistant', content: errorLabel(res.error), error: true, code: res.error };
       } catch {
         next = { id: pendingId, role: 'assistant', content: errorLabel('THROWN'), error: true, code: 'THROWN' };
@@ -173,7 +175,9 @@ export function V1PreviewWidget({
       retryable: m.error && !!m.code && RETRYABLE.has(m.code) && isRetryable(messages, m.id),
       content:
         m.role === 'assistant' && m.content && !m.error
-          ? renderMarkdownLite(m.content, appearance.accentColor, linkButtons, { linkButtons })
+          ? renderMarkdownLite(m.content, appearance.accentColor, linkButtons && m.linkable === true, {
+              linkButtons,
+            })
           : m.content,
     };
   });

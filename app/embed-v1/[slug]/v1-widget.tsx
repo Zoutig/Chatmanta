@@ -48,9 +48,10 @@ type Msg = {
   streaming?: boolean;
   error?: boolean;
   /**
-   * true zodra de tekst uit een terminal event van de server komt (answer-done,
-   * replacement, fallback, smalltalk) en dus door de link-sanitizer is gegaan. Alleen
-   * dan mogen links klikbaar worden; rauwe deltas (ook na een afgebroken stream) nooit.
+   * true zodra de tekst uit een terminal event van de server komt met een
+   * 'answer'-respons, die door de link-sanitizer is gegaan. Alleen dan mogen links
+   * klikbaar worden; rauwe deltas (ook na een afgebroken stream), smalltalk en
+   * fallback nooit.
    */
   sanitized?: boolean;
   // queryLogId komt binnen via het 'meta'-event (eerste regel van de stream).
@@ -283,7 +284,7 @@ export function V1Widget(props: V1WidgetProps) {
             const line = buffer.slice(0, nl).trim();
             buffer = buffer.slice(nl + 1);
             if (!line) continue;
-            let ev: { kind?: string; text?: string; response?: { answer?: string }; queryLogId?: string };
+            let ev: { kind?: string; text?: string; response?: { answer?: string; kind?: string }; queryLogId?: string };
             try {
               ev = JSON.parse(line);
             } catch {
@@ -304,7 +305,10 @@ export function V1Widget(props: V1WidgetProps) {
               ev.kind === 'replacement'
             ) {
               const answer = ev.response?.answer;
-              if (typeof answer === 'string') patch({ content: answer, streaming: false, sanitized: true });
+              // Alleen een 'answer'-respons is door de link-sanitizer gegaan; smalltalk-
+              // en fallback-teksten nooit → daar blijven links platte tekst.
+              const sanitized = ev.response?.kind === 'answer';
+              if (typeof answer === 'string') patch({ content: answer, streaming: false, sanitized });
               else patch({ streaming: false, sanitized: false });
             } else if (ev.kind === 'error') {
               patch({ content: t.failed, error: true, streaming: false, sanitized: false });
