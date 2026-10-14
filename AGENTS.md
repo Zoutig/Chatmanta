@@ -44,7 +44,7 @@ Afwijken = risico op datalek, AVG-overtreding of kostenexplosie. Wijzig of omzei
 6. **Vector-search-isolatie.** `orgId` + `chatbotId` zijn verplichte (niet-optionele) parameters, met soft-delete-filter via JOIN.
 7. **Geen secrets naar de client.** Niet in `NEXT_PUBLIC_*`, niet in client components.
 8. **Anti-hallucinatie boven volledigheid.** Een similarity-threshold plus een fallback-pad zonder LLM-call als er geen relevante chunks zijn. De threshold staat empirisch op ≈ 0.4 (0.7 is te streng voor `text-embedding-3-small` + NL). Drempels zijn model-gebonden: herkalibreer ze bij een wissel van embedding-model. Zulke drempels wijzig je alleen met eval-bewijs.
-9. **Geen bronlinks in V1** (`sourceLinksEnabled: false` in `app/v1/app/rag-config.ts`, beslissing 2026-06-30; de onderbouwing staat bij die regel).
+9. **Geen bronlinks in V1** (`sourceLinksEnabled: false` in `app/v1/app/rag-config.ts`, beslissing 2026-06-30; de onderbouwing staat bij die regel). Enige uitzondering: per klant **Linkknoppen** (`organizations.link_buttons_enabled`, migr V1-0031, standaard uit, beslissing 2026-10-14): alleen een link als de bezoeker om een document/download/pagina vraagt, alleen URL's van de eigen gecrawlde site, altijd via `applyLinkButtons` + `sanitizeLinksOnRequest`. Breid dat niet uit naar "link onder elk antwoord".
 10. **De repo is publiek.** Geen secrets, interne prijzen/tarieven (zoals vriendenprijzen) of klant-PII in code, docs, commits of PR-teksten. Prijzen die publiek op de marketingsite staan mogen wel.
 
 ### V0 is bewust géén veilige multi-tenant-omgeving

@@ -65,6 +65,10 @@ cost-explosie:
 
 9. **Geen bronlinks in V1** — `sourceLinksEnabled` blijft `false` in
    `app/v1/app/rag-config.ts` (beslissing 2026-06-30). Terugzetten = bevinding.
+   Enige toegestane uitzondering: per-org Linkknoppen (`link_buttons_enabled`, migr
+   V1-0031, default uit) via `applyLinkButtons` → `sourceLinksMode: 'on-request'` +
+   `sanitizeLinksOnRequest`. Links zonder die vlag/sanitizer, of "link onder elk
+   antwoord", blijft een bevinding.
 10. **De repo is publiek** — secrets, prijzen/tarieven of klant-PII in code, docs,
    commits of PR-tekst = high-severity.
 

@@ -58,7 +58,7 @@ Blueprint §1.5 had een bindende lijst "Expliciet NIET in V1". Via V0-pariteit (
 
 | Item | Waarom nog buiten | Doel |
 |---|---|---|
-| Bronvermelding **zichtbaar in de widget** | Bewuste keuze 2026-06-30: `sourceLinksEnabled: false` in `app/v1/app/rag-config.ts` | V2 |
+| Bronvermelding **zichtbaar in de widget** | Bewuste keuze 2026-06-30: `sourceLinksEnabled: false` in `app/v1/app/rag-config.ts`. Uitzondering sinds 2026-10-14: per klant Linkknoppen (migr V1-0031), alleen op verzoek | V2 |
 | `/api/widget/history`-endpoint / 30-dagen-history | Geschiedenis reist mee in de chat-body binnen één sessie; geen server-endpoint | V2 |
 | Klant beheert eigen `allowed_domains` | Read-only in de klant-UI, Jorion beheert (migr `0008`) | V2 |
 | Klant kiest AI-provider/model | Eén model (gpt-4o-mini) | V2 |
@@ -212,7 +212,7 @@ SA-1..SA-5 (object-level authorisatie, SSRF, upload-hardening, LLM-grenzen, serv
 
 **Beslist (eruit):**
 - Chunk size: beslist, parent-child **3200/400 + 800/100 tekens** (`lib/rag/chunker.ts`), niet 500/50 tokens. Blijft een tunable.
-- Bronvermelding in de widget: beslist, **uit in V1** (`sourceLinksEnabled: false`, 2026-06-30). Bronnen zijn alleen zichtbaar in het klantdashboard (migr `0024`).
+- Bronvermelding in de widget: beslist, **uit in V1** (`sourceLinksEnabled: false`, 2026-06-30). Bronnen zijn alleen zichtbaar in het klantdashboard (migr `0024`). Per klant kan een Jorion-admin **Linkknoppen** aanzetten (2026-10-14, migr V1-0031): de bot geeft dan alleen op verzoek een knop naar een document, download of pagina van de eigen site.
 - Reranking: beslist voor nu, **adaptieve LLM-rerank** (gpt-4o-mini) in de v0.10-config. Cohere alleen als de eval winst aantoont.
 - Formaat lead capture: beslist, contactformulier (naam, e-mail/telefoon, voorkeur, onderwerp, bericht, consent), migr `0011`.
 - LLM in V1: beslist, gpt-4o-mini, geen fallback (V1_STATUS "Besliste keuzes" #1/#2).
