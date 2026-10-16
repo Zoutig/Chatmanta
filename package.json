@@ -64,6 +64,7 @@
     "v1:seed:chunks": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-seed-chunks.ts",
     "leads:import": "node --env-file=.env.local --import tsx scripts/leads-import.ts",
     "leads:test-rls": "node --env-file=.env.local --import tsx scripts/leads-test-rls.ts",
+    "leads:test-db": "node --env-file=.env.local --import tsx --conditions=react-server scripts/leads-test-db.ts",
     "v1:test-org-isolation": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-test-org-isolation.ts",
     "voorbeeld:seed": "node --env-file=.env.local --conditions=react-server --import tsx scripts/voorbeeld-seed.ts",
     "v1:ingest": "node --env-file=.env.local --conditions=react-server --import tsx scripts/v1-ingest.ts",
