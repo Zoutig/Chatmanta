@@ -1,5 +1,7 @@
 // Rendert de beelden voor mails naar public/mail/ (3x, voor scherpe weergave):
 //   logo.png        merkteken + "ChatManta" voor een LICHTE achtergrond
+//   knop-*.png      knoppen als beeld: HTML-knoppen worden bij plakken in Outlook
+//                   vervormd (padding en grootte veranderen), een beeld niet
 //   foto.png        rond portret van Sebastiaan voor de handtekening (bron: design/mail/portret.jpg)
 // Mails kunnen geen SVG/CSS-masks of webfonts aan, dus het logo moet een PNG zijn.
 // wordmark.png is ongeschikt: "Chat" is wit en verdwijnt als een mailprogramma
@@ -18,7 +20,7 @@ mkdirSync(out, { recursive: true });
 const url = (p) => `data:image/png;base64,${readFileSync(join(root, p)).toString('base64')}`;
 
 const page = (body) => `<!doctype html><html><head>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&display=block" rel="stylesheet">
 <style>html,body{margin:0;background:transparent}#x{display:inline-block}</style></head><body>${body}</body></html>`;
 
 const ASSETS = [
@@ -34,6 +36,21 @@ const ASSETS = [
     html: page(`<div id="x" style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:url('${url('design/mail/portret.jpg').replace('image/png', 'image/jpeg')}') center/cover"></div>`),
   },
 ];
+
+// Knoppen: gevuld = hoofdknop (navy), omlijnd = rustige tweede keus.
+const KNOPPEN = [
+  ['knop-demo-hoofd', 'Bekijk de demo →', true],
+  ['knop-demo', 'Bekijk de demo', false],
+  ['knop-kennismaking-hoofd', 'Plan een kennismaking →', true],
+  ['knop-kennismaking', 'Plan een kennismaking', false],
+  ['knop-site', 'chatmanta.nl', false],
+];
+for (const [naam, label, vol] of KNOPPEN) {
+  ASSETS.push({
+    file: `${naam}.png`,
+    html: page(`<div id="x" style="display:inline-block;padding:2px"><div style="box-sizing:border-box;height:42px;padding:0 18px;display:flex;align-items:center;border-radius:9px;font-family:'Plus Jakarta Sans';font-weight:600;font-size:14.5px;letter-spacing:-0.005em;white-space:nowrap;${vol ? 'background:#0c1e2e;color:#fff' : 'background:#fff;color:#0c1e2e;border:1.5px solid #c9d4de'}">${label}</div></div>`),
+  });
+}
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ deviceScaleFactor: 3 });
