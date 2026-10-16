@@ -76,25 +76,11 @@ export function emailSignoff(lines: string[]): string {
   return emailParagraph(lines.map(esc).join('<br>'));
 }
 
-/** Rij van knoppen naast elkaar: de eerste gevuld (teal), de rest omlijnd. */
-export function emailButtonRow(buttons: { href: string; label: string }[]): string {
-  const cells = buttons
-    .map((b, i) => {
-      const primary = i === 0;
-      return `<td style="padding:0 10px 10px 0"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${primary ? C.button : C.card}" style="border-radius:10px;${primary ? '' : `border:1px solid ${C.button};`}">
-    <a href="${esc(b.href)}" target="_blank" style="display:inline-block;padding:${primary ? '12px 22px' : '11px 21px'};font-family:${FONT};font-size:15px;font-weight:600;line-height:1;color:${primary ? '#ffffff' : C.button};text-decoration:none;border-radius:10px">${esc(b.label)}</a>
-  </td></tr></table></td>`;
-    })
-    .join('');
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 14px"><tr>${cells}</tr></table>`;
-}
-
 /**
  * De kaart zelf (kopbalk met logo, witte inhoud, footer), zonder pagina eromheen.
- * Los te gebruiken waar de mail in een ander programma geplakt wordt.
  * - `footerNote`: waarom de ontvanger deze mail krijgt (AVG-transparantie).
  */
-export function emailCard(opts: { body: string; footerNote?: string }): string {
+function emailCard(opts: { body: string; footerNote?: string }): string {
   const note = opts.footerNote
     ? `<p style="margin:0 0 8px;font-size:12px;line-height:1.6;color:${C.faint}">${esc(opts.footerNote)}</p>`
     : '';
