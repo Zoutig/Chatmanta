@@ -16,6 +16,7 @@
     "test:unit": "node scripts/run-unit-tests.mjs",
     "verify": "npm run typecheck && npm run test:unit",
     "email:templates": "node --import tsx scripts/render-email-templates.ts",
+    "mail:opvolg": "node --import tsx scripts/opvolgmail.ts",
     "check-env": "node --env-file=.env.local scripts/check-env.mjs",
     "verify-schema": "node --env-file=.env.local scripts/verify-schema.mjs",
     "v0:ingest": "node --env-file=.env.local scripts/v0-ingest.mjs",

@@ -76,17 +76,49 @@ export function emailSignoff(lines: string[]): string {
   return emailParagraph(lines.map(esc).join('<br>'));
 }
 
+/** Rij van knoppen naast elkaar: de eerste gevuld (teal), de rest omlijnd. */
+export function emailButtonRow(buttons: { href: string; label: string }[]): string {
+  const cells = buttons
+    .map((b, i) => {
+      const primary = i === 0;
+      return `<td style="padding:0 10px 10px 0"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${primary ? C.button : C.card}" style="border-radius:10px;${primary ? '' : `border:1px solid ${C.button};`}">
+    <a href="${esc(b.href)}" target="_blank" style="display:inline-block;padding:${primary ? '12px 22px' : '11px 21px'};font-family:${FONT};font-size:15px;font-weight:600;line-height:1;color:${primary ? '#ffffff' : C.button};text-decoration:none;border-radius:10px">${esc(b.label)}</a>
+  </td></tr></table></td>`;
+    })
+    .join('');
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 14px"><tr>${cells}</tr></table>`;
+}
+
+/**
+ * De kaart zelf (kopbalk met logo, witte inhoud, footer), zonder pagina eromheen.
+ * Los te gebruiken waar de mail in een ander programma geplakt wordt.
+ * - `footerNote`: waarom de ontvanger deze mail krijgt (AVG-transparantie).
+ */
+export function emailCard(opts: { body: string; footerNote?: string }): string {
+  const note = opts.footerNote
+    ? `<p style="margin:0 0 8px;font-size:12px;line-height:1.6;color:${C.faint}">${esc(opts.footerNote)}</p>`
+    : '';
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px">
+      <tr><td bgcolor="${C.header}" style="background:${C.header};border-radius:14px 14px 0 0;padding:22px 32px">
+        <a href="${SITE_URL}" target="_blank" style="text-decoration:none"><img src="${LOGO_URL}" width="150" height="30" alt="ChatManta" style="display:block;border:0;outline:none;width:150px;height:30px;color:#ffffff;font-family:${FONT};font-size:20px;font-weight:700"></a>
+      </td></tr>
+      <tr><td bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.line};border-top:0;border-radius:0 0 14px 14px;padding:32px;font-family:${FONT};color:${C.ink}">
+        ${opts.body}
+      </td></tr>
+      <tr><td style="padding:20px 32px 0;font-family:${FONT};text-align:center">
+        ${note}
+        <p style="margin:0;font-size:12px;line-height:1.6;color:${C.faint}">ChatManta · Website-chatbots voor het MKB · <a href="${SITE_URL}" target="_blank" style="color:${C.faint};text-decoration:underline">chatmanta.nl</a></p>
+      </td></tr>
+    </table>`;
+}
+
 /**
  * Volledig HTML-document rond `body`.
  * - `preheader`: de grijze voorvertoningsregel naast het onderwerp in de inbox.
- * - `footerNote`: waarom de ontvanger deze mail krijgt (AVG-transparantie).
  */
 export function emailLayout(opts: { title: string; body: string; preheader?: string; footerNote?: string }): string {
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${esc(opts.preheader)}&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;</div>`
-    : '';
-  const note = opts.footerNote
-    ? `<p style="margin:0 0 8px;font-size:12px;line-height:1.6;color:${C.faint}">${esc(opts.footerNote)}</p>`
     : '';
   return `<!doctype html>
 <html lang="nl">
@@ -101,18 +133,7 @@ export function emailLayout(opts: { title: string; body: string; preheader?: str
 ${preheader}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="${C.page}" style="background:${C.page}">
   <tr><td align="center" style="padding:32px 16px">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px">
-      <tr><td bgcolor="${C.header}" style="background:${C.header};border-radius:14px 14px 0 0;padding:22px 32px">
-        <a href="${SITE_URL}" target="_blank" style="text-decoration:none"><img src="${LOGO_URL}" width="150" height="30" alt="ChatManta" style="display:block;border:0;outline:none;width:150px;height:30px;color:#ffffff;font-family:${FONT};font-size:20px;font-weight:700"></a>
-      </td></tr>
-      <tr><td bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.line};border-top:0;border-radius:0 0 14px 14px;padding:32px;font-family:${FONT};color:${C.ink}">
-        ${opts.body}
-      </td></tr>
-      <tr><td style="padding:20px 32px 0;font-family:${FONT};text-align:center">
-        ${note}
-        <p style="margin:0;font-size:12px;line-height:1.6;color:${C.faint}">ChatManta · Website-chatbots voor het MKB · <a href="${SITE_URL}" target="_blank" style="color:${C.faint};text-decoration:underline">chatmanta.nl</a></p>
-      </td></tr>
-    </table>
+    ${emailCard({ body: opts.body, footerNote: opts.footerNote })}
   </td></tr>
 </table>
 </body>
