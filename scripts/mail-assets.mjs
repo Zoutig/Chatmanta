@@ -1,7 +1,6 @@
 // Rendert de beelden voor mails naar public/mail/ (3x, voor scherpe weergave):
 //   logo.png        merkteken + "ChatManta" voor een LICHTE achtergrond
-//   manta.png       de mascotte (blij), los
-//   avatar.png      de mascotte in een rond teal vlak (avatar zolang er geen foto is)
+//   foto.png        rond portret van Sebastiaan voor de handtekening (bron: design/mail/portret.jpg)
 // Mails kunnen geen SVG/CSS-masks of webfonts aan, dus het logo moet een PNG zijn.
 // wordmark.png is ongeschikt: "Chat" is wit en verdwijnt als een mailprogramma
 // de donkere achtergrond weglaat.
@@ -30,13 +29,9 @@ const ASSETS = [
       <span>Chat<span style="color:#0f766e">Manta</span></span></div>`),
   },
   {
-    file: 'manta.png',
-    html: page(`<img id="x" src="${url('design/mascotte/stills/blij.png')}" style="display:block;width:96px">`),
-  },
-  {
-    file: 'avatar.png',
-    html: page(`<div id="x" style="width:64px;height:64px;border-radius:50%;background:#e7f6f4;overflow:hidden;position:relative">
-      <img src="${url('design/mascotte/stills/blij.png')}" style="position:absolute;width:74px;left:-5px;top:9px"></div>`),
+    // Rond uitgesneden PNG met transparante hoeken: Outlook negeert border-radius.
+    file: 'foto.png',
+    html: page(`<div id="x" style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:url('${url('design/mail/portret.jpg').replace('image/png', 'image/jpeg')}') center/cover"></div>`),
   },
 ];
 
