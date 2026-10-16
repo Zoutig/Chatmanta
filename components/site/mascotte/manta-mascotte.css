@@ -1,4 +1,10 @@
-/* Mascotte-basis. Plaatsing doet de sectie die hem gebruikt (bv. hero.css). */
-.site-ui .manta-mascotte { position: relative; aspect-ratio: 1536 / 1024; opacity: 0; transform: translateY(10px) scale(0.98); transition: opacity 600ms var(--ease), transform 900ms var(--ease); pointer-events: none; }
-.site-ui .manta-mascotte.is-ready { opacity: 1; transform: none; }
-.site-ui .manta-mascotte canvas { display: block; width: 100%; height: 100%; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Mascotte-basis. Bewust niet onder .site-ui: de mascotte draait ook buiten de marketingsite
+   (bv. de rondleiding op /voorbeeld). De klassenaam is uniek genoeg. Plaatsing doet de gebruiker. */
+.manta-mascotte {
+  position: relative; aspect-ratio: 1536 / 1024; opacity: 0; transform: translateY(10px) scale(0.98);
+  transition: opacity 600ms var(--ease, cubic-bezier(0.2, 0.8, 0.2, 1)), transform 900ms var(--ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+  pointer-events: none;
+}
+.manta-mascotte.is-ready { opacity: 1; transform: none; }
+.manta-mascotte canvas { display: block; width: 100%; height: 100%; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: reduce) { .manta-mascotte { transition: none; transform: none; } }

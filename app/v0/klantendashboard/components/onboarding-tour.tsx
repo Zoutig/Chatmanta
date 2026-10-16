@@ -13,7 +13,7 @@
 // - Targets worden op bestaande DOM gevonden via CSS-selector (sidebar-links
 //   bestaan al), dus er is geen wijziging aan de sidebar nodig.
 
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Btn } from './ui/btn';
 
 type Placement = 'right' | 'bottom' | 'center';
@@ -29,6 +29,14 @@ export type TourStep = {
 export const START_TOUR_EVENT = 'klant:start-tour';
 const SEEN_PREFIX = 'klant-tour-seen:';
 const POPOVER_WIDTH = 320;
+/** Ruimte boven de popover voor een verteller (bv. de mascotte) die erop "zit". */
+const NARRATOR_RESERVE = 100;
+
+/** Optionele verteller: vervangt de body-tekst en zet een avatar op de popover. */
+export type TourNarration = (ctx: { step: TourStep; index: number; total: number }) => {
+  avatar: ReactNode;
+  body: ReactNode;
+};
 
 const DEFAULT_STEPS: TourStep[] = [
   {
@@ -71,34 +79,33 @@ function clamp(value: number, min: number, max: number): number {
 function popoverPosition(
   placement: Placement,
   rect: DOMRect | null,
+  width: number,
+  reserve: number,
 ): { top: number; left: number; transform?: string } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
   if (placement === 'center' || !rect) {
-    return { top: vh / 2, left: vw / 2, transform: 'translate(-50%, -50%)' };
+    return { top: vh / 2 + reserve / 2, left: vw / 2, transform: 'translate(-50%, -50%)' };
   }
 
   const margin = 14;
   const estHeight = 200;
+  const minTop = 12 + reserve;
 
-  if (placement === 'bottom') {
-    return {
-      top: clamp(rect.bottom + margin, 12, vh - estHeight - 12),
-      left: clamp(rect.left, 12, vw - POPOVER_WIDTH - 12),
-    };
-  }
+  // Onder de target: met verteller extra ruimte, zodat die de target niet bedekt.
+  const below = () => ({
+    top: clamp(rect.bottom + margin + reserve, minTop, vh - estHeight - 12),
+    left: clamp(rect.left, 12, vw - width - 12),
+  });
+
+  if (placement === 'bottom') return below();
 
   // 'right' (sidebar-items). Valt terug naar onder de target als er rechts geen
   // ruimte is.
-  if (rect.right + margin + POPOVER_WIDTH > vw - 12) {
-    return {
-      top: clamp(rect.bottom + margin, 12, vh - estHeight - 12),
-      left: clamp(rect.left, 12, vw - POPOVER_WIDTH - 12),
-    };
-  }
+  if (rect.right + margin + width > vw - 12) return below();
   return {
-    top: clamp(rect.top, 12, vh - estHeight - 12),
+    top: clamp(rect.top, minTop, vh - estHeight - 12),
     left: rect.right + margin,
   };
 }
@@ -108,6 +115,7 @@ export function OnboardingTour({
   autoStart = true,
   steps = DEFAULT_STEPS,
   setupChecklistVisible = true,
+  narration,
 }: {
   /** Per-org sleutel zodat de seen-flag per werkomgeving geldt. */
   tourKey: string;
@@ -117,6 +125,8 @@ export function OnboardingTour({
    *  voltooid zijn verbergt Overzicht die checklist; dan laten we de bijhorende
    *  tour-stap weg zodat hij niet als losse, doelloze kaart blijft hangen. */
   setupChecklistVisible?: boolean;
+  /** Optionele verteller (avatar + eigen body), bv. de mascotte op /voorbeeld. */
+  narration?: TourNarration;
 }) {
   const tourSteps = setupChecklistVisible
     ? steps
@@ -184,7 +194,9 @@ export function OnboardingTour({
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const spotlightOn = step.placement !== 'center' && !!step.selector && !!rect;
-  const pos = popoverPosition(step.placement, rect);
+  const narrated = narration?.({ step, index, total });
+  const width = narrated ? 340 : POPOVER_WIDTH;
+  const pos = popoverPosition(step.placement, rect, width, narrated ? NARRATOR_RESERVE : 0);
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Rondleiding">
@@ -226,8 +238,10 @@ export function OnboardingTour({
           top: pos.top,
           left: pos.left,
           transform: pos.transform,
-          width: POPOVER_WIDTH,
+          width,
           maxWidth: 'calc(100vw - 24px)',
+          // Met verteller "zwemt" de kaart naar de volgende plek i.p.v. te springen.
+          transition: narrated ? 'top .5s cubic-bezier(.2,.8,.2,1), left .5s cubic-bezier(.2,.8,.2,1)' : undefined,
           zIndex: 1002,
           background: 'var(--klant-surface)',
           border: '1px solid var(--klant-border)',
@@ -237,6 +251,9 @@ export function OnboardingTour({
           pointerEvents: 'auto',
         }}
       >
+        {narrated && (
+          <div style={{ position: 'absolute', left: -14, top: -112, width: 170, pointerEvents: 'auto' }}>{narrated.avatar}</div>
+        )}
         <div
           style={{
             fontSize: 11.5,
@@ -269,7 +286,7 @@ export function OnboardingTour({
             margin: '0 0 16px',
           }}
         >
-          {step.body}
+          {narrated ? narrated.body : step.body}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Btn variant="ghost" size="sm" onClick={finish}>

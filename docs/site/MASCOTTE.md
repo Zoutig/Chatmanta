@@ -2,7 +2,7 @@
 
 Een kleine, cyaan manta met grote ogen. Hij maakt de publieke kant van ChatManta persoonlijker: hij zwemt, kijkt je aan, knippert, denkt na en praat mee met de chat. Dit document is de vaste bron voor iedereen (mens of agent) die iets ontwerpt waar hij in voorkomt.
 
-**Live:** in de hero van chatmanta.nl (boven het voorbeeldgesprek), op de 404-pagina (zoekend rondkijken) en op de foutpagina van de site (verrast).
+**Live:** in de hero van chatmanta.nl (boven het voorbeeldgesprek), op de 404-pagina (zoekend rondkijken), op de foutpagina van de site (verrast) en als verteller van de rondleiding op /voorbeeld (spreekt de uitleg uit).
 
 ## Waar staat wat
 
@@ -41,6 +41,16 @@ signalMascotte({ lookAt: element, lookMs: 1200 }); // even naar een element kijk
 ```
 
 Let op: het signaal gaat naar **alle** mascottes op de pagina. Eén per pagina is de bedoeling.
+
+**Eén specifieke mascotte direct besturen** (bv. laten "uitspreken"):
+
+```tsx
+<MantaMascotte onReady={(api) => setApi(api)} />   // api is null na unmount
+api.speak('Dit is het dashboard.', { onWord: (i) => toonTotWoord(i), onEnd }); // mond volgt de klinkers
+api.lookAt(element, 900); api.setMode('happy'); api.wink(); api.stop();
+```
+
+`speak` maakt een tijdlijn van lettergrepen (~5 per seconde; klinkergroep → mondvorm: a → ah, o → oh, e/i/ij → ee, oe/u/ui/eu → oo) met pauzes bij leestekens. `onWord` vuurt per witruimte-gescheiden woord, dus je kunt de tekst in hetzelfde tempo laten verschijnen. Voorbeeld: de rondleiding op /voorbeeld (`app/voorbeeld/(dashboard)/_overview/voorbeeld-tour.tsx`), via de optionele `narration`-prop van `OnboardingTour`.
 
 Voorbeeld van een complete choreografie: `components/site/sections/hero/hero-chat.tsx` (vraag lezen → nadenken tijdens typen → meepraten met het antwoord → blij naar de bronvermelding kijken).
 

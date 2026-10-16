@@ -12,6 +12,17 @@ const FACE_SRC = '/site/mascotte/manta-face.png';
 const HEAD_X = 0.5 + (830 / 1536 - 0.5) * 0.92;
 const HEAD_Y = 0.5 + (400 / 1024 - 0.5) * 0.92;
 
+/** Directe besturing van één mascotte (via `onReady`), naast het broadcast-kanaal in ./bus. */
+export type MascotteApi = {
+  /** Spreek tekst uit (mond volgt de klinkers). onWord(i) vuurt bij het begin van woord i. */
+  speak: (text: string, opts?: { onWord?: (i: number) => void; onEnd?: () => void }) => void;
+  stop: () => void;
+  /** Even naar een element kijken. */
+  lookAt: (el: Element, ms?: number) => void;
+  setMode: (m: MantaMode | null) => void;
+  wink: () => void;
+};
+
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
@@ -27,7 +38,19 @@ function loadImage(src: string) {
  * pauzeert buiten beeld en bij een verborgen tabblad, en staat stil bij reduced motion.
  * Volgt de muis, knippert, en reageert op signalen via `signalMascotte()` (./bus).
  */
-export function MantaMascotte({ className, mode = 'idle' }: { className?: string; /** Basisstemming; signalen met mode: null keren hierheen terug. */ mode?: MantaMode }) {
+export function MantaMascotte({
+  className,
+  mode = 'idle',
+  onReady,
+}: {
+  className?: string;
+  /** Basisstemming; signalen met mode: null keren hierheen terug. */
+  mode?: MantaMode;
+  /** Krijgt een besturings-API zodra de mascotte geladen is (null bij unmount). */
+  onReady?: (api: MascotteApi | null) => void;
+}) {
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
   const reduce = useReducedMotion();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -122,6 +145,22 @@ export function MantaMascotte({ className, mode = 'idle' }: { className?: string
       };
       canvas.addEventListener('click', onClick);
       cleanups.push(() => canvas.removeEventListener('click', onClick));
+
+      const api: MascotteApi = {
+        speak: (text, opts) => { engine?.speak(text, opts); kick(); },
+        stop: () => engine?.stopSpeaking(),
+        lookAt: (el, ms) => {
+          if (!engine) return;
+          const r = el.getBoundingClientRect();
+          const [x, y] = toLocal(r.left + r.width / 2, r.top + r.height / 2);
+          engine.lookAt(x, y, now(), ms);
+          kick();
+        },
+        setMode: (m) => { engine?.setMode(m ?? mode); kick(); },
+        wink: () => { engine?.wink(now()); kick(); },
+      };
+      onReadyRef.current?.(api);
+      cleanups.push(() => onReadyRef.current?.(null));
 
       engine.frame(now(), reduce);
       setReady(true);
