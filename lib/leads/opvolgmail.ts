@@ -171,7 +171,7 @@ function teksten(v: OpvolgInvoer): Teksten {
           p('Liever even samen doorlopen? Plan dan een kennismaking.', `margin:0 0 10px;color:${MUTED}`),
         ],
         knoppen: [
-          [v.link || '#', 'testbot-hoofd'],
+          [v.link.startsWith('https://') ? v.link : '#', 'testbot-hoofd'],
           [MAIL_URL.kennismaking, 'kennismaking'],
         ],
       };
@@ -211,7 +211,9 @@ function naarTekst(html: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')
-    .replace(/[ \t]+\n/g, '\n')
+    .split('\n')
+    .map((r) => r.trim())
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -234,7 +236,7 @@ export function bouwOpvolgmail(invoer: OpvolgInvoer, afz: Afzender): Opvolgmail 
     `<td style="padding-bottom:14px"><a href="${MAIL_URL.site}" target="_blank"><img src="${IMG}logo.png?v=2" width="142" height="24" alt="ChatManta" style="display:block;width:142px;height:24px;border:0"></a></td></tr>` +
     '<tr><td height="3" bgcolor="#2dd4bf" style="height:3px;line-height:3px;font-size:0;background:#2dd4bf">&nbsp;</td></tr></table>';
   const telDigits = afz.telefoon.replace(/[^\d+]/g, '');
-  const foto = afz.fotoUrl
+  const foto = afz.fotoUrl?.startsWith('https://')
     ? `<td width="70" style="width:70px;padding-top:16px;vertical-align:middle"><img src="${esc(afz.fotoUrl)}" width="56" height="56" alt="${esc(afz.naam)}" style="display:block;width:56px;height:56px;border:0"></td>`
     : '';
   const handtekening =
@@ -247,15 +249,14 @@ export function bouwOpvolgmail(invoer: OpvolgInvoer, afz: Afzender): Opvolgmail 
     ` &nbsp;·&nbsp; <a href="mailto:${esc(afz.email)}" style="color:${TEAL};text-decoration:none">${esc(afz.email)}</a></div></td>` +
     '</tr></table>';
   const ps = v.ps ? p(`P.S. ${esc(v.ps.replace(/^p\.?\s*s\.?:?\s*/i, ''))}`, 'margin:16px 0 0') : '';
-  const html =
-    `<div style="${F};color:${INK};max-width:560px">` +
-    (s.kaal ? '' : kop) +
+  const inhoud =
     p(aanhef) +
     s.tekst.join('') +
     (s.knoppen.length ? knoppen(s.knoppen) : '') +
     p(`Groet,<br>${esc(afz.voornaam)}`, 'margin:22px 0 0') +
     ps +
-    handtekening +
-    '</div>';
-  return { onderwerp: s.onderwerp, html, tekst: naarTekst(html), ontbreekt: ontbreekt(v) };
+    handtekening;
+  const omhulsel = (binnen: string) => `<div style="${F};color:${INK};max-width:560px">${binnen}</div>`;
+  const html = omhulsel((s.kaal ? '' : kop) + inhoud);
+  return { onderwerp: s.onderwerp, html, tekst: naarTekst(omhulsel(inhoud)), ontbreekt: ontbreekt(v) };
 }

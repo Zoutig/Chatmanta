@@ -88,3 +88,30 @@ test('P.S. krijgt geen dubbel "P.S."', () => {
   assert.match(m.html, /P\.S\. mooie foto’s/);
   assert.doesNotMatch(m.html, /P\.S\. P\.S\./);
 });
+
+test('alle situaties x je/u: geen placeholders bij ingevulde velden, onderwerp gevuld', () => {
+  for (const situatie of ['info', 'test', 'kennis', 'klaar', 'herinnering'] as const) {
+    for (const vorm of ['je', 'u'] as const) {
+      const m = bouwOpvolgmail({ ...basis, situatie, vorm, link: 'https://x.example/bot', haakje: 'planning' }, AFZ);
+      assert.ok(m.onderwerp.trim().length > 0, `${situatie}/${vorm} onderwerp`);
+      assert.doesNotMatch(m.html, /\[naam\]|\[bedrijfsnaam\]/, `${situatie}/${vorm} html`);
+      assert.doesNotMatch(m.tekst, /\[naam\]|\[bedrijfsnaam\]/, `${situatie}/${vorm} tekst`);
+      assert.deepEqual(m.ontbreekt, [], `${situatie}/${vorm} ontbreekt`);
+    }
+  }
+});
+
+test('onveilige link en fotoUrl worden genegeerd', () => {
+  const m = bouwOpvolgmail(
+    { ...basis, situatie: 'klaar', link: 'javascript:alert(1)' },
+    { ...AFZ, fotoUrl: 'javascript:alert(1)' },
+  );
+  assert.doesNotMatch(m.html, /javascript:/);
+  assert.match(m.html, /href="#"/);
+  assert.doesNotMatch(m.html, /width="56"/);
+});
+
+test('platte tekst begint met de aanhef, zonder logo-link of nbsp', () => {
+  const m = bouwOpvolgmail(basis, AFZ);
+  assert.ok(m.tekst.startsWith('Hoi Jan,'), m.tekst.slice(0, 40));
+});

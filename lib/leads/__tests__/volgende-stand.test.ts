@@ -84,6 +84,29 @@ test('interesse alleen mail → mail "info"; zonder keuze is fout', () => {
   assert.throws(() => volgendeStand(open, { uitkomst: 'interesse', mail: false, kennismakingOp: null }, VR_1030));
 });
 
+test('interesse met kennismaking in het verleden is fout', () => {
+  assert.throws(
+    () => volgendeStand(open, { uitkomst: 'interesse', mail: true, kennismakingOp: '2026-10-16T07:00:00Z' }, VR_1030),
+    /toekomst/,
+  );
+});
+
+test('pogingen_niet_opgenomen gaat naar 0 bij elke uitkomst behalve niet_opgenomen', () => {
+  const twee: Stand = { ...open, pogingen_niet_opgenomen: 2 };
+  assert.equal(volgendeStand(twee, { uitkomst: 'terugbellen', op: '2026-10-19T12:00:00Z' }, VR_1030).stand.pogingen_niet_opgenomen, 0);
+  assert.equal(volgendeStand(twee, { uitkomst: 'wil_mail' }, VR_1030).stand.pogingen_niet_opgenomen, 0);
+  assert.equal(
+    volgendeStand(twee, { uitkomst: 'interesse', mail: true, kennismakingOp: null }, VR_1030).stand.pogingen_niet_opgenomen,
+    0,
+  );
+  assert.equal(
+    volgendeStand(twee, { uitkomst: 'geen_interesse', bezwaar: null, opnieuwOver3Maanden: true }, VR_1030).stand.pogingen_niet_opgenomen,
+    0,
+  );
+  assert.equal(volgendeStand(twee, { uitkomst: 'niet_bellen', reden: 'verkeerd_nummer' }, VR_1030).stand.pogingen_niet_opgenomen, 0);
+  assert.equal(volgendeStand(open, { uitkomst: 'niet_opgenomen' }, VR_1030).stand.pogingen_niet_opgenomen, 1);
+});
+
 test('interesse alleen kennismaking → geen mail', () => {
   const r = volgendeStand(open, { uitkomst: 'interesse', mail: false, kennismakingOp: '2026-10-20T08:00:00Z' }, VR_1030);
   assert.equal(r.opentMail, null);

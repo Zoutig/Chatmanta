@@ -39,12 +39,14 @@ export function volgendeStand(huidig: Stand, o: UitkomstOpties, nu: Date): Overg
     laatste_poging_op: nu.toISOString(),
     volgende_actie_notitie: null,
     status_reden: null,
+    // Elke uitkomst behalve niet_opgenomen betekent contact: teller terug naar 0.
+    pogingen_niet_opgenomen: 0,
   };
   const zonder = { opentMail: null, kennismaking: false } as const;
 
   switch (o.uitkomst) {
     case 'niet_opgenomen': {
-      const poging = huidig.pogingen_niet_opgenomen + 1;
+      const poging = huidig.pogingen_niet_opgenomen + 1; // uit huidig: basis zet de teller op 0
       const details = { voicemail: Boolean(o.voicemail), poging };
       if (poging >= MAX_POGINGEN) {
         if (o.naDerde === 'mail') {
@@ -99,9 +101,12 @@ export function volgendeStand(huidig: Stand, o: UitkomstOpties, nu: Date): Overg
 
     case 'interesse': {
       if (!o.mail && !o.kennismakingOp) throw new Error('Kies mail sturen, kennismaking of allebei.');
-      const km = o.kennismakingOp
-        ? geldigeDatum(o.kennismakingOp, 'Ongeldige datum voor de kennismaking.').toISOString()
-        : null;
+      let km: string | null = null;
+      if (o.kennismakingOp) {
+        const d = geldigeDatum(o.kennismakingOp, 'Ongeldige datum voor de kennismaking.');
+        if (d.getTime() <= nu.getTime()) throw new Error('Kies een moment in de toekomst.');
+        km = d.toISOString();
+      }
       return {
         stand: {
           ...basis,

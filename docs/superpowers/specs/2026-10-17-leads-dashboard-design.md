@@ -108,12 +108,14 @@ Claim van 10 minuten bij openen; elke 2 minuten verlengd zolang de pagina open e
 |---|---|---|
 | 1 | Niet opgenomen | `pogingen_niet_opgenomen + 1`. Optie "voicemail ingesproken". Volgende actie: volgende werkdag, in het andere dagdeel dan deze poging (vóór 12:00 → morgen 13:00, anders → morgen 9:00). Bij de 3e poging vraagt hij: "Mail sturen" (→ status `opvolgen`, mail-pop-up) of "Archiveren" (→ `archief`, reden `3x niet opgenomen`). |
 | 2 | Terugbellen | Snelkeuze: over 2 uur · morgen · volgende week · over 3 maanden · eigen datum/tijd, plus notitie. → `terugbellen`. |
-| 3 | Wil een mail | Mail-pop-up met situatie "interesse". → `opvolgen`, volgende actie +3 werkdagen. |
+| 3 | Wil een mail | Mail-pop-up met situatie "info". → `opvolgen`, volgende actie +3 werkdagen. |
 | 4 | Interesse | Venster met twee vinkjes: "Mail sturen" en "Kennismaking gepland" (datum + tijd). → `kans`. Met kennismaking: `kennismaking_op` en volgende actie = die datum, plus knop "Zet in agenda" (downloadt een `.ics` met bedrijfsnaam, telefoon en notitie). Alleen mail: volgende actie +3 werkdagen. Met mail opent daarna de pop-up (situatie "kennis" als er een kennismaking is, anders "info"). |
 | 5 | Geen interesse | Optioneel bezwaar (chips): geen interesse · chatbots irritant · heeft al een chatbot · klanten willen een mens · te duur · te klein · te ingewikkeld · vertrouwt AI niet · bel volgende maand. Keuze "weg" (→ `geen_interesse`) of "over 3 maanden opnieuw" (→ `terugbellen`, +3 maanden). |
 | 6 | Niet bellen | Reden (chips): verkeerd nummer · geen doelgroep · al klant · bestaat niet meer · heeft al een chatbot. → `niet_bellen` (bij "heeft al een chatbot": `heeft_chatbot`). |
 | S | Overslaan | Niets vastleggen; volgende actie +2 uur; claim vrij. |
 | Ctrl+Z | Ongedaan maken | Toast van 10 seconden na elke uitkomst: zet de lead terug uit `vorige_staat` en zet `ongedaan_op` op de activiteit. |
+
+Bij elke uitkomst behalve Niet opgenomen gaat de teller pogingen_niet_opgenomen terug naar 0 (er was contact).
 
 Elke uitkomst legt een `lead_activiteiten`-regel vast en springt door naar de volgende lead. Alle regels voor "wat gebeurt er na uitkomst X" staan in één pure functie `volgendeStand(lead, uitkomst, opties, nu)` in `lib/leads/`, met unit-tests; de server action past alleen het resultaat toe.
 

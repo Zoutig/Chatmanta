@@ -6,6 +6,7 @@ import {
   normaliseerTelefoon,
   toonTelefoon,
   isGeldigEmail,
+  schoonEmail,
   telLink,
 } from '../normaliseren';
 
@@ -58,4 +59,30 @@ test('isGeldigEmail', () => {
   assert.equal(isGeldigEmail('jan@jansen'), false);
   assert.equal(isGeldigEmail('jan @jansen.nl'), false);
   assert.equal(isGeldigEmail('afbeelding@2x.png'), false);
+});
+
+test('alleen http(s): andere schemes geven null', () => {
+  assert.equal(schoneWebsiteUrl('javascript://x.nl/%0aalert(1)'), null);
+  assert.equal(normaliseerDomein('javascript://x.nl/%0aalert(1)'), null);
+  assert.equal(normaliseerDomein('data://x.nl'), null);
+  assert.equal(schoneWebsiteUrl('ftp://x.nl/a'), null);
+  assert.equal(schoneWebsiteUrl('http://x.nl/a?b=1'), 'http://x.nl/a');
+});
+
+test('isGeldigEmail: mailto: is ongeldig; schoonEmail haalt het eraf', () => {
+  assert.equal(isGeldigEmail('mailto:info@x.nl'), false);
+  assert.equal(schoonEmail(' MAILTO:Info@X.nl?subject=hoi '), 'info@x.nl');
+  assert.equal(schoonEmail('Info@X.nl'), 'info@x.nl');
+  assert.equal(schoonEmail('mailto:geen-email'), null);
+  assert.equal(schoonEmail('logo@x.nl.png'), null);
+  assert.equal(schoonEmail(null), null);
+});
+
+test('0800/0900-nummers met 8 of 11 cijfers', () => {
+  assert.equal(normaliseerTelefoon('0800-1234'), '+318001234');
+  assert.equal(normaliseerTelefoon('0800-1234567'), '+318001234567');
+  assert.equal(normaliseerTelefoon('0900-1234567'), '+319001234567');
+  assert.equal(normaliseerTelefoon('0612-3456'), null);
+  assert.equal(toonTelefoon('+318001234'), '0800 1234');
+  assert.equal(toonTelefoon('+318001234567'), '0800 1234567');
 });
