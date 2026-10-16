@@ -72,6 +72,7 @@ export type ImportRapport = {
   gelezen: number;
   leads: number;
   adresgids: number;
+  uitGids: number;
   zonderSleutel: number;
   dubbelDomein: number;
   samengevoegdTelefoon: number;
@@ -106,10 +107,15 @@ export const ADRESGIDSEN = new Set([
   'vhg.org',
 ]);
 
+/** Kloon-gids-vermelding van één bedrijf: pad /details/<naam>-ChIJ… (op elk domein). */
+export function isKloonBedrijf(url: string): boolean {
+  return new RegExp('/details/[^/]+-ChIJ', 'i').test(url);
+}
+
 /** Gids als het domein bekend is, of de URL het kloon-patroon /details/<naam>-ChIJ… heeft. */
 export function isAdresgids(url: string, domein: string | null): boolean {
   if (domein && ADRESGIDSEN.has(domein)) return true;
-  return new RegExp('/details/[^/]+-ChIJ', 'i').test(url);
+  return isKloonBedrijf(url);
 }
 
 const NICHE_WOORDEN = ['dakdekker', 'hovenier', 'installateur', 'installatiebedrijf', 'schoonmaak', 'schoonmaakbedrijf', 'loodgieter', 'aannemer', 'tuinman'];
@@ -166,6 +172,7 @@ export function verwerkImport(
     gelezen: ruw.length,
     leads: 0,
     adresgids: 0,
+    uitGids: 0,
     zonderSleutel: 0,
     dubbelDomein: 0,
     samengevoegdTelefoon: 0,
@@ -175,21 +182,36 @@ export function verwerkImport(
     statusOvergenomen: 0,
   };
 
+  // Kloon-gids-vermeldingen per gids-domein: de CSV-map is op dat domein gekeyd en dus alleen
+  // eenduidig als er maar één vermelding op staat (anders zou elk bedrijf hetzelfde nummer krijgen).
+  const gidsTelling = new Map<string, number>();
+  for (const n of ruw) {
+    const d = normaliseerDomein(n.url);
+    if (d && isKloonBedrijf(n.url)) gidsTelling.set(d, (gidsTelling.get(d) ?? 0) + 1);
+  }
+
   // 1. per lead schoonmaken; dubbel domein: eerste wint
   const opDomein = new Map<string, ImportLead>();
   const zonderDomein: ImportLead[] = [];
   for (const n of ruw) {
-    const domein = normaliseerDomein(n.url);
-    if (isAdresgids(n.url, domein)) {
+    const urlDomein = normaliseerDomein(n.url);
+    // Kloon-gids met een bedrijfsvermelding: bedrijf behouden, maar zonder domein/website
+    // (die horen bij de gids, niet bij het bedrijf). Alleen het telefoonnummer is bruikbaar.
+    const uitGids = isAdresgids(n.url, urlDomein) && isKloonBedrijf(n.url);
+    if (isAdresgids(n.url, urlDomein) && !uitGids) {
       rapport.adresgids++;
       continue;
     }
+    const domein = uitGids ? null : urlDomein;
     if (domein && opDomein.has(domein)) {
       rapport.dubbelDomein++;
       continue;
     }
     const telefoons = [
-      ...(domein && opties.googleTelefoon?.get(domein) ? [opties.googleTelefoon.get(domein)!] : []),
+      // CSV-map is op het domein van de URL gekeyd (bij een gids-vermelding: het gids-domein).
+      ...(urlDomein && (!uitGids || gidsTelling.get(urlDomein) === 1) && opties.googleTelefoon?.get(urlDomein)
+        ? [opties.googleTelefoon.get(urlDomein)!]
+        : []),
       ...(n.telefoons ?? []),
     ]
       .map((t) => normaliseerTelefoon(t))
@@ -200,13 +222,14 @@ export function verwerkImport(
       rapport.zonderSleutel++;
       continue;
     }
+    if (uitGids) rapport.uitGids++;
     const emails = n.emails ?? [];
     const geldig = emails
       .map((e) => schoonEmail(e))
       .filter((e): e is string => e !== null)
       .filter((e, i, a) => a.indexOf(e) === i);
     rapport.emailsAfgekeurd += emails.length - geldig.length;
-    const website = schoneWebsiteUrl(n.url);
+    const website = uitGids ? null : schoneWebsiteUrl(n.url);
     const lead: ImportLead = {
       domein,
       telefoon,
