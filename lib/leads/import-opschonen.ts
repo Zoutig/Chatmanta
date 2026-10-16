@@ -92,7 +92,25 @@ export const ADRESGIDSEN = new Set([
   'trustoo.nl',
   'homedeal.nl',
   'bouwbedrijven.nl',
+  // Kloon-gidsen die Google-Maps-vermeldingen kopieren (pad /details/<naam>-ChIJ…, 8 woorden)
+  'nlmapway.org',
+  'nlzoommap.org',
+  'nlmapzone.top',
+  'nlmapzone.org',
+  'nlmapview.top',
+  'nlatlas.org',
+  'holdetails.org',
+  'netdetails.org',
+  'nlnavii.org',
+  // Brancheorganisatie, geen bedrijf
+  'vhg.org',
 ]);
+
+/** Gids als het domein bekend is, of de URL het kloon-patroon /details/<naam>-ChIJ… heeft. */
+export function isAdresgids(url: string, domein: string | null): boolean {
+  if (domein && ADRESGIDSEN.has(domein)) return true;
+  return new RegExp('/details/[^/]+-ChIJ', 'i').test(url);
+}
 
 const NICHE_WOORDEN = ['dakdekker', 'hovenier', 'installateur', 'installatiebedrijf', 'schoonmaak', 'schoonmaakbedrijf', 'loodgieter', 'aannemer', 'tuinman'];
 
@@ -162,7 +180,7 @@ export function verwerkImport(
   const zonderDomein: ImportLead[] = [];
   for (const n of ruw) {
     const domein = normaliseerDomein(n.url);
-    if (domein && ADRESGIDSEN.has(domein)) {
+    if (isAdresgids(n.url, domein)) {
       rapport.adresgids++;
       continue;
     }

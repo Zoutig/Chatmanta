@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { verwerkImport, leesCsv, type NielsLead } from '../import-opschonen';
+import { isAdresgids, verwerkImport, leesCsv, type NielsLead } from '../import-opschonen';
 
 const L = (x: Partial<NielsLead>): NielsLead => ({
   url: 'https://jansen-bouw.nl/',
@@ -126,4 +126,11 @@ test('status.json: uitkomsten en activiteiten', () => {
 test('leesCsv: kop + komma-gescheiden + aanhalingstekens', () => {
   const rijen = leesCsv('url,niche,bedrijfsnaam,telefoon\nhttps://a.nl,hovenier,"Groen, en Zo",06 11111111\n');
   assert.deepEqual(rijen, [{ url: 'https://a.nl', niche: 'hovenier', bedrijfsnaam: 'Groen, en Zo', telefoon: '06 11111111' }]);
+});
+
+test('kloon-gidsen worden herkend, ook op een onbekend domein', () => {
+  assert.equal(isAdresgids('https://nlmapway.org/details/x-hoveniers-ChIJabc', 'nlmapway.org'), true);
+  assert.equal(isAdresgids('https://nieuwe-kloon.example/details/x-hoveniers-ChIJabc', 'nieuwe-kloon.example'), true);
+  assert.equal(isAdresgids('https://vhg.org/', 'vhg.org'), true);
+  assert.equal(isAdresgids('https://jansen-bouw.nl/contact', 'jansen-bouw.nl'), false);
 });
