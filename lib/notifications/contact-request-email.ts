@@ -4,6 +4,7 @@
 // lib/notifications/contact-request-notify.ts. Spiegel van feedback-email.ts.
 
 import type { ContactRequest, PreferredContact } from '@/lib/v0/klantendashboard/types';
+import { emailButton, emailDetails, emailHeading, emailLayout, emailQuote } from '@/lib/notifications/email-layout';
 
 const PREFERRED_LABELS: Record<PreferredContact, string> = {
   call: 'Bellen',
@@ -25,14 +26,6 @@ export function isValidContactEmail(email: string | null | undefined): email is 
 export function contactRequestsDashboardUrl(): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.chatmanta.nl').replace(/\/+$/, '');
   return `${base}/v0/klantendashboard/contactverzoeken`;
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export type BuiltEmail = { subject: string; html: string; text: string };
@@ -69,18 +62,15 @@ export function buildContactRequestOperatorEmail(
   ]
     .filter((l) => l !== '')
     .join('\n');
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px">
-      <h2 style="margin:0 0 12px;font-size:17px">Nieuw contactverzoek · ${esc(opts.orgName)}</h2>
-      <table style="border-collapse:collapse;font-size:13px;margin-bottom:14px">
-        ${rows.map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#666">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}
-      </table>
-      ${
-        req.toelichting
-          ? `<div style="font-weight:600;margin-bottom:4px">Toelichting</div><div style="white-space:pre-wrap;background:#f6f6f6;border-radius:8px;padding:10px 12px;margin-bottom:16px">${esc(req.toelichting)}</div>`
-          : ''
-      }
-      <a href="${esc(opts.dashboardUrl)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;font-size:13px">Contactverzoek bekijken →</a>
-    </div>`.trim();
+  const html = emailLayout({
+    title: subject,
+    preheader: `${req.name} wil ${preferredLabel === 'Bellen' ? 'gebeld' : 'gemaild'} worden${req.subject ? ` · ${req.subject}` : ''}`,
+    body: [
+      emailHeading(`Nieuw contactverzoek · ${opts.orgName}`),
+      emailDetails(rows),
+      req.toelichting ? emailQuote('Toelichting', req.toelichting) : '',
+      emailButton(opts.dashboardUrl, 'Contactverzoek bekijken'),
+    ].join('\n'),
+  });
   return { subject, html, text };
 }

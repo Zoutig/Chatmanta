@@ -9,6 +9,16 @@
 // dezelfde code.
 
 import type { TierId } from './pricing';
+import {
+  emailButton,
+  emailDetails,
+  emailHeading,
+  emailLayout,
+  emailParagraph,
+  emailQuote,
+  emailSignoff,
+  esc,
+} from '@/lib/notifications/email-layout';
 
 // ---------- Velden & opties ----------
 
@@ -291,15 +301,6 @@ export function fallbackMailto(to: string = SITE_LEADS_DEFAULT_TO): string {
 
 export type BuiltEmail = { subject: string; html: string; text: string };
 
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 /** Interne notificatie naar info@chatmanta.com. Bevat de aanvraag (nodig om contact op te nemen). */
 export function buildLeadNotificationEmail(d: KennismakingData): BuiltEmail {
   const subject = `[ChatManta] Kennismaking · ${d.naam} · ${d.bedrijf}`;
@@ -320,19 +321,16 @@ export function buildLeadNotificationEmail(d: KennismakingData): BuiltEmail {
     '',
     'Beantwoorden kan direct: Reply-To staat op de aanvrager.',
   ].join('\n');
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#0c1e2e;max-width:560px">
-      <h2 style="margin:0 0 12px;font-size:17px">Nieuwe kennismakingsaanvraag</h2>
-      <table style="border-collapse:collapse;font-size:13px;margin-bottom:14px">
-        ${rows.map(([k, v]) => `<tr><td style="padding:3px 14px 3px 0;color:#4d6074;vertical-align:top">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}
-      </table>
-      ${
-        d.bericht
-          ? `<div style="font-weight:600;margin-bottom:4px">Bericht</div><div style="white-space:pre-wrap;background:#f3f6f9;border-radius:8px;padding:10px 12px;margin-bottom:16px">${esc(d.bericht)}</div>`
-          : ''
-      }
-      <p style="color:#4d6074;font-size:12px;margin:0">Antwoorden op deze mail gaat direct naar de aanvrager.</p>
-    </div>`.trim();
+  const html = emailLayout({
+    title: subject,
+    preheader: `${d.naam} · ${d.bedrijf} · ${pakketLabel(d.pakket)}`,
+    body: [
+      emailHeading('Nieuwe kennismakingsaanvraag'),
+      emailDetails(rows),
+      d.bericht ? emailQuote('Bericht', d.bericht) : '',
+      emailParagraph('Antwoorden op deze mail gaat direct naar de aanvrager.', { muted: true }),
+    ].join('\n'),
+  });
   return { subject, html, text };
 }
 
@@ -358,14 +356,20 @@ export function buildLeadConfirmationEmail(d: KennismakingData, opts: { replyTo:
     'Sebastiaan en Niels',
     'ChatManta',
   ];
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#0c1e2e;max-width:560px">
-      <p style="margin:0 0 12px">${esc(greet)}</p>
-      <p style="margin:0 0 12px">Bedankt voor je aanvraag. We nemen binnen 1 werkdag contact op om een moment voor de kennismaking te plannen.</p>
-      <p style="margin:0 0 18px">In 20 minuten kijken we samen naar je site en wat ChatManta voor je kan doen. Geen verplichtingen.</p>
-      <p style="margin:0 0 18px"><a href="${esc(opts.demoUrl)}" style="display:inline-block;background:#0c1e2e;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px">Open de live demo →</a></p>
-      <p style="margin:0 0 12px;color:#4d6074;font-size:14px">Vragen? Antwoord op deze mail of mail naar <a href="mailto:${esc(opts.replyTo)}" style="color:#0f766e">${esc(opts.replyTo)}</a>.</p>
-      <p style="margin:0;color:#4d6074;font-size:14px">Groet,<br>Sebastiaan en Niels<br>ChatManta</p>
-    </div>`.trim();
+  const html = emailLayout({
+    title: subject,
+    preheader: 'We nemen binnen 1 werkdag contact op om een moment te plannen.',
+    body: [
+      emailParagraph(esc(greet)),
+      emailParagraph('Bedankt voor je aanvraag. We nemen binnen 1 werkdag contact op om een moment voor de kennismaking te plannen.'),
+      emailParagraph('In 20 minuten kijken we samen naar je site en wat ChatManta voor je kan doen. Geen verplichtingen.'),
+      emailButton(opts.demoUrl, 'Open de live demo'),
+      emailParagraph(
+        `Vragen? Antwoord op deze mail of mail naar <a href="mailto:${esc(opts.replyTo)}" style="color:#0f766e">${esc(opts.replyTo)}</a>.`,
+        { muted: true },
+      ),
+      emailSignoff(['Groet,', 'Sebastiaan en Niels', 'ChatManta']),
+    ].join('\n'),
+  });
   return { subject, html, text: lines.join('\n') };
 }

@@ -5,6 +5,16 @@
 
 import type { FeedbackItem } from '@/lib/controlroom/types';
 import {
+  emailButton,
+  emailDetails,
+  emailHeading,
+  emailLayout,
+  emailParagraph,
+  emailQuote,
+  emailSignoff,
+  esc,
+} from '@/lib/notifications/email-layout';
+import {
   FEEDBACK_STATUS_LABELS,
   FEEDBACK_TYPE_LABELS,
   FEEDBACK_URGENCY_LABELS,
@@ -21,14 +31,6 @@ export function isValidFeedbackEmail(email: string | null | undefined): email is
 export function feedbackAdminUrl(id: string): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.chatmanta.nl').replace(/\/+$/, '');
   return `${base}/v0/admindashboard/feedback/${id}`;
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 function truncate(s: string, n: number): string {
@@ -64,17 +66,17 @@ export function buildOperatorEmail(item: FeedbackItem, opts: { orgName: string; 
   ]
     .filter((l) => l !== '')
     .join('\n');
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px">
-      <h2 style="margin:0 0 12px;font-size:17px">Nieuwe melding · ${esc(opts.orgName)}</h2>
-      <table style="border-collapse:collapse;font-size:13px;margin-bottom:14px">
-        ${rows.map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#666">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}
-      </table>
-      <div style="font-weight:600;margin-bottom:4px">Beschrijving</div>
-      <div style="white-space:pre-wrap;background:#f6f6f6;border-radius:8px;padding:10px 12px;margin-bottom:${item.question ? '10px' : '16px'}">${esc(item.description)}</div>
-      ${item.question ? `<div style="font-weight:600;margin-bottom:4px">Gestelde vraag</div><div style="background:#f6f6f6;border-radius:8px;padding:10px 12px;margin-bottom:16px">${esc(item.question)}</div>` : ''}
-      <a href="${esc(opts.adminUrl)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;font-size:13px">Melding behandelen →</a>
-    </div>`.trim();
+  const html = emailLayout({
+    title: subject,
+    preheader: `${typeLabel} · ${FEEDBACK_URGENCY_LABELS[item.urgency]} · ${truncate(item.description, 80)}`,
+    body: [
+      emailHeading(`Nieuwe melding · ${opts.orgName}`),
+      emailDetails(rows),
+      emailQuote('Beschrijving', item.description),
+      item.question ? emailQuote('Gestelde vraag', item.question) : '',
+      emailButton(opts.adminUrl, 'Melding behandelen'),
+    ].join('\n'),
+  });
   return { subject, html, text };
 }
 
@@ -100,13 +102,16 @@ export function buildFeedbackReplyEmail(
     '',
     footer,
   ].join('\n');
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px">
-      <p>${esc(greeting)}</p>
-      <div style="white-space:pre-wrap;line-height:1.5">${esc(replyText.trim())}</div>
-      <p style="margin-top:16px">Met vriendelijke groet,<br/>Team ChatManta</p>
-      <p style="color:#888;font-size:12px;margin-top:18px;border-top:1px solid #eee;padding-top:10px">${esc(footer)}</p>
-    </div>`.trim();
+  const html = emailLayout({
+    title: subject,
+    preheader: truncate(replyText.trim(), 100),
+    footerNote: footer,
+    body: [
+      emailParagraph(esc(greeting)),
+      `<div style="margin:0 0 16px;font-size:15px;line-height:1.6;white-space:pre-wrap;word-break:break-word">${esc(replyText.trim())}</div>`,
+      emailSignoff(['Met vriendelijke groet,', 'Team ChatManta']),
+    ].join('\n'),
+  });
   return { subject, html, text };
 }
 
@@ -128,14 +133,16 @@ export function buildSubmitterEmail(item: FeedbackItem): BuiltEmail {
     'Met vriendelijke groet,',
     'Team ChatManta',
   ].join('\n');
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px">
-      <p>${esc(greeting)}</p>
-      <p>Bedankt voor je melding. We hebben hem ontvangen en <strong>Niels</strong> bekijkt hem zo snel mogelijk.</p>
-      <div style="font-weight:600;margin:14px 0 4px">Samenvatting van je melding</div>
-      <div style="white-space:pre-wrap;background:#f6f6f6;border-radius:8px;padding:10px 12px">${esc(summary)}</div>
-      <p style="color:#666;margin-top:14px">Je hoeft verder niets te doen. We nemen contact met je op zodra we je melding hebben bekeken.</p>
-      <p style="margin-top:16px">Met vriendelijke groet,<br/>Team ChatManta</p>
-    </div>`.trim();
+  const html = emailLayout({
+    title: subject,
+    preheader: 'Bedankt voor je melding. We bekijken hem zo snel mogelijk.',
+    body: [
+      emailParagraph(esc(greeting)),
+      emailParagraph('Bedankt voor je melding. We hebben hem ontvangen en <strong>Niels</strong> bekijkt hem zo snel mogelijk.'),
+      emailQuote('Samenvatting van je melding', summary),
+      emailParagraph('Je hoeft verder niets te doen. We nemen contact met je op zodra we je melding hebben bekeken.', { muted: true }),
+      emailSignoff(['Met vriendelijke groet,', 'Team ChatManta']),
+    ].join('\n'),
+  });
   return { subject, html, text };
 }
