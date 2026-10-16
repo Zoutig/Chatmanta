@@ -1,0 +1,101 @@
+/* Leads-dashboard (/v1/leads). Prefix ld- : nooit bestaande v1-/v1-adm-klassen herdefiniëren. */
+
+.ld-schil { min-height: 100dvh; background: var(--v1-bg); color: var(--v1-ink); font-family: var(--v1-font); }
+.ld-kop {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 24px;
+  padding: 12px 24px; background: var(--v1-navy); color: var(--v1-on-navy);
+}
+.ld-merk { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: inherit; text-decoration: none; }
+.ld-merk-tag { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 6px; background: rgba(45, 212, 191, 0.18); color: #5eead4; }
+.ld-nav { display: flex; gap: 4px; overflow-x: auto; }
+.ld-nav-item { padding: 7px 12px; border-radius: var(--v1-r-sm); color: var(--v1-on-navy-2); text-decoration: none; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.ld-nav-item:hover { color: var(--v1-on-navy); background: rgba(255, 255, 255, 0.06); }
+.ld-nav-item[aria-current='page'] { color: var(--v1-on-navy); background: rgba(255, 255, 255, 0.12); }
+.ld-main { max-width: 1280px; margin: 0 auto; padding: 24px; display: grid; gap: 20px; }
+@media (max-width: 700px) {
+  .ld-kop { padding: 10px 16px; gap: 12px; }
+  .ld-main { padding: 16px; }
+}
+
+/* Filterbalk en lijst */
+.ld-balk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ld-balk .v1-input { width: auto; min-width: 140px; }
+.ld-balk-zoek { flex: 1 1 240px; }
+.ld-rij-link { color: var(--v1-ink); font-weight: 600; text-decoration: none; }
+.ld-rij-link:hover { text-decoration: underline; }
+.ld-sub { display: block; font-size: 12px; color: var(--v1-muted); font-weight: 400; }
+.ld-label { display: inline-block; margin: 2px 4px 0 0; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--v1-surface-2); color: var(--v1-ink-2); }
+.ld-label[data-tone='warn'] { background: var(--v1-warn-soft); color: var(--v1-warn); }
+.ld-label[data-tone='ok'] { background: var(--v1-ok-soft); color: var(--v1-ok); }
+.ld-bulk { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-radius: var(--v1-r-md); background: var(--v1-surface); box-shadow: var(--v1-shadow-1); }
+.ld-paginering { display: flex; gap: 8px; align-items: center; justify-content: flex-end; font-size: 13px; color: var(--v1-muted); }
+
+/* Belmodus */
+.ld-bel { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.8fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .ld-bel { grid-template-columns: 1fr; } }
+.ld-kaart { background: var(--v1-surface); border-radius: var(--v1-r-lg); box-shadow: var(--v1-shadow-1); padding: 20px; display: grid; gap: 12px; }
+.ld-bedrijf { margin: 0; font-size: 24px; line-height: 1.2; }
+.ld-nummer { font-size: 30px; font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: var(--v1-ink); text-decoration: none; }
+.ld-qr { width: 200px; height: 200px; margin: 0 auto; background: #fff; border-radius: var(--v1-r-md); padding: 8px; }
+.ld-qr svg { width: 100%; height: 100%; display: block; }
+@media (pointer: coarse), (max-width: 700px) { .ld-qr { display: none; } }
+.ld-qr-tip { margin: 0; text-align: center; font-size: 12px; color: var(--v1-muted); }
+@media (pointer: coarse), (max-width: 700px) { .ld-qr-tip { display: none; } }
+.ld-teller { display: flex; gap: 16px; font-size: 14px; color: var(--v1-ink-2); }
+.ld-teller b { font-size: 18px; color: var(--v1-ink); }
+.ld-knoppen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 700px) { .ld-knoppen { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ld-uitkomst { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px; min-height: 64px; border: 0; border-radius: var(--v1-r-md); background: var(--v1-surface-2); color: var(--v1-ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.ld-uitkomst:hover { box-shadow: inset 0 0 0 2px var(--v1-line-strong); }
+.ld-uitkomst:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.ld-uitkomst kbd { font: 600 11px var(--v1-font); color: var(--v1-muted); }
+.ld-uitkomst[data-tone='ok'] { background: var(--v1-ok-soft); }
+.ld-uitkomst[data-tone='danger'] { background: var(--v1-danger-soft); }
+.ld-tijdlijn { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 13px; }
+.ld-tijdlijn li { border-left: 2px solid var(--v1-line); padding-left: 10px; }
+.ld-tijdlijn time { color: var(--v1-muted); }
+.ld-tijdlijn [data-ongedaan] { opacity: 0.45; text-decoration: line-through; }
+.ld-spiek summary { cursor: pointer; font-weight: 600; }
+.ld-spiek ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.ld-leeg { text-align: center; padding: 48px 16px; color: var(--v1-muted); }
+.ld-ongedaan { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; display: flex; gap: 12px; align-items: center; padding: 10px 14px; border-radius: var(--v1-r-md); background: var(--v1-navy); color: var(--v1-on-navy); box-shadow: var(--v1-shadow-pop); }
+
+/* Dialogen */
+.ld-dialoog { border: 0; border-radius: var(--v1-r-lg); padding: 0; box-shadow: var(--v1-shadow-pop); width: min(520px, calc(100vw - 32px)); color: var(--v1-ink); }
+.ld-dialoog::backdrop { background: rgba(12, 30, 46, 0.45); }
+.ld-dialoog-inhoud { padding: 20px; display: grid; gap: 14px; }
+.ld-dialoog h2 { margin: 0; font-size: 18px; }
+.ld-dialoog-voet { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.ld-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ld-chip { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--v1-line-strong); background: var(--v1-surface); font: inherit; font-size: 13px; cursor: pointer; }
+.ld-chip[aria-pressed='true'] { background: var(--v1-navy); border-color: var(--v1-navy); color: #fff; }
+
+/* Mail-pop-up */
+.ld-mail { position: fixed; inset: 0; z-index: 50; background: rgba(12, 30, 46, 0.45); display: grid; place-items: center; padding: 16px; }
+.ld-mail-venster { width: min(1180px, 100%); max-height: calc(100dvh - 32px); overflow: auto; background: var(--v1-bg); border-radius: var(--v1-r-xl); box-shadow: var(--v1-shadow-pop); display: grid; grid-template-columns: 360px 1fr; gap: 20px; padding: 20px; }
+@media (max-width: 900px) { .ld-mail-venster { grid-template-columns: 1fr; } }
+.ld-mail-form { background: var(--v1-surface); border-radius: var(--v1-r-lg); padding: 16px; display: grid; gap: 12px; align-content: start; }
+.ld-mail-rechts { display: grid; gap: 12px; align-content: start; }
+.ld-mail-balk { background: var(--v1-surface); border-radius: var(--v1-r-lg); padding: 14px; display: grid; gap: 10px; }
+.ld-mail-voorbeeld { background: #fff; border-radius: var(--v1-r-lg); padding: 28px 22px; display: flex; justify-content: center; }
+.ld-mail-voorbeeld[data-smal] { background: #f6f8fb; }
+.ld-mail-voorbeeld > div { width: 100%; max-width: 600px; outline: none; }
+.ld-mail-voorbeeld[data-smal] > div { max-width: 360px; }
+.ld-mist { box-shadow: inset 0 0 0 1px #f59e0b !important; background: #fffbeb !important; }
+.ld-fout { box-shadow: inset 0 0 0 1px var(--v1-danger) !important; }
+.ld-melding { margin: 0; padding: 10px 12px; border-radius: var(--v1-r-sm); background: var(--v1-warn-soft); font-size: 13px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+
+/* Inzicht */
+.ld-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .ld-raster { grid-template-columns: 1fr; } }
+.ld-trechter { display: grid; gap: 8px; }
+.ld-trechter-rij { display: grid; grid-template-columns: 120px 1fr 90px; gap: 10px; align-items: center; font-size: 14px; }
+.ld-trechter-balk { height: 26px; border-radius: 6px; background: var(--v1-accent); min-width: 2px; }
+.ld-trechter-rij span:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--v1-ink-2); }
+.ld-staven { display: grid; gap: 6px; font-size: 13px; }
+.ld-staaf { display: grid; grid-template-columns: 170px 1fr 40px; gap: 8px; align-items: center; }
+.ld-staaf div { height: 14px; border-radius: 4px; background: var(--v1-navy-2); }
+.ld-heat { display: grid; grid-template-columns: 40px repeat(10, minmax(0, 1fr)); gap: 3px; font-size: 11px; }
+.ld-heat span { display: grid; place-items: center; height: 26px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.ld-heat .ld-heat-kop { color: var(--v1-muted); }
+.ld-periode { display: flex; flex-wrap: wrap; gap: 6px; }
