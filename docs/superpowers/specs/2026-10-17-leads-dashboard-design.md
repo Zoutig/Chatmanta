@@ -183,7 +183,7 @@ Opschoning (pure functies in `lib/leads/import-opschonen.ts`, met unit-tests):
 - Score: Niels' `score`/`max_score`/`redenen` overnemen met `score_voorlopig = true`.
 - Leads zonder telefoon en zonder domein: overslaan (in het rapport).
 
-`status.json` (als Niels hem levert, per domein): `gebeld` → `belpoging`-activiteit (uitkomst onbekend, met datum); `mail_verstuurd` → `mail`-activiteit; uitkomst `geen interesse` → `geen_interesse`; `interesse`/`demo gepland` → `kans`; `klant` → `klant`; `niet_benaderen` → `niet_bellen`; `notitie` → `notitie`.
+`status.json` (als Niels hem levert, per domein): `gebeld` en `mail_verstuurd` → één `import`-activiteit met die datums (telt niet mee in de cijfers, want de uitkomst is onbekend); uitkomst `geen interesse` → `geen_interesse`; `interesse`/`demo gepland` → `kans`; `klant` → `klant`; `niet_benaderen` → `niet_bellen`; `notitie` → `notitie`.
 
 Het rapport van de proefrun gaat eerst naar Sebastiaan; `--toepassen` op productie pas na zijn akkoord.
 
