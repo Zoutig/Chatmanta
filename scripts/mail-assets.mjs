@@ -26,9 +26,11 @@ const page = (body) => `<!doctype html><html><head>
 const ASSETS = [
   {
     file: 'logo.png',
-    html: page(`<div id="x" style="display:inline-flex;align-items:center;gap:9px;padding:2px;font-family:'Plus Jakarta Sans';font-weight:700;font-size:22px;letter-spacing:-0.02em;color:#0c1e2e;line-height:1">
+    // Dunne witte rand: onzichtbaar op wit, maar houdt het donkere "Chat" leesbaar als een
+    // mailprogramma in donkere modus de achtergrond donker maakt.
+    html: page(`<div id="x" style="display:inline-flex;align-items:center;gap:9px;padding:3px;font-family:'Plus Jakarta Sans';font-weight:700;font-size:22px;letter-spacing:-0.02em;color:#0c1e2e;line-height:1">
       <span style="display:block;width:36px;aspect-ratio:270/148;background:#0d9488;-webkit-mask:url('${url('public/logo/mono-mark.png')}') center/contain no-repeat"></span>
-      <span>Chat<span style="color:#0f766e">Manta</span></span></div>`),
+      <span><span style="filter:drop-shadow(0 0 .7px #fff) drop-shadow(0 0 .7px #fff) drop-shadow(0 0 .7px #fff)">Chat</span><span style="color:#0f766e">Manta</span></span></div>`),
   },
   {
     // Rond uitgesneden PNG met transparante hoeken: Outlook negeert border-radius.
@@ -44,6 +46,7 @@ const KNOPPEN = [
   ['knop-kennismaking-hoofd', 'Plan een kennismaking →', true],
   ['knop-kennismaking', 'Plan een kennismaking', false],
   ['knop-site', 'chatmanta.nl', false],
+  ['knop-testbot-hoofd', 'Probeer de chatbot →', true],
 ];
 for (const [naam, label, vol] of KNOPPEN) {
   ASSETS.push({
