@@ -50,6 +50,16 @@ function revalidate(id?: string) {
   if (id) revalidatePath(`/v1/leads/${id}`);
 }
 
+/**
+ * Voor belmodus-acties: alleen de lijstpagina en de detailpagina van deze lead. De belmodus zelf
+ * houdt zijn stand in de client; de layout (force-dynamic) hoeft niet opnieuw. Claim verlengen of
+ * vrijgeven verandert niets wat een pagina toont en revalideert dus niet.
+ */
+function revalidateBel(id: string) {
+  revalidatePath('/v1/leads');
+  revalidatePath(`/v1/leads/${id}`);
+}
+
 export type BelKaart = {
   lead: Lead;
   tijdlijn: (Activiteit & { door: string | null })[];
@@ -163,7 +173,7 @@ export async function uitkomstAction(
         bijActiviteit: activiteitId,
       });
     }
-    revalidate(id);
+    revalidateBel(id);
     return { activiteitId, opentMail: overgang.opentMail, lead: { ...lead, ...overgang.stand } };
   }, META);
 }
@@ -180,6 +190,7 @@ export async function overslaanAction(id: string): Promise<ActionResult> {
       .eq('id', id)
       .eq('geclaimd_door', c.userId);
     if (error) throw new AppError('INTERNAL', { message: `overslaan faalde: ${error.message}` });
+    revalidateBel(id);
     return {};
   }, META);
 }
@@ -190,7 +201,7 @@ export async function ongedaanAction(activiteitId: string): Promise<ActionResult
   return actionTry(async () => {
     const leadId = await dbl.maakOngedaan(c.db, uuid(activiteitId));
     const lead = await dbl.claimLead(c.db, c.userId, leadId);
-    revalidate(leadId);
+    revalidateBel(leadId);
     return { kaart: lead ? await kaart(c, lead) : null };
   }, META);
 }
