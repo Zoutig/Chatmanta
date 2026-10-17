@@ -26,6 +26,9 @@ import { UitkomstDialogen, type DialoogSoort } from './uitkomst-dialogen';
 import { MailPopup } from './mail-popup';
 
 type Focus = { niche: string | null; plaats: string | null };
+const VERLENG_MS = 120_000;
+const CLAIM_PLAFOND_MS = 30 * 60_000;
+
 type KnopUitkomst = 'niet_opgenomen' | 'terugbellen' | 'wil_mail' | 'interesse' | 'geen_interesse' | 'niet_bellen';
 
 /** Fout omdat de lead intussen veranderd/weg is of van een ander: niet blijven hangen, volgende lead. */
@@ -92,19 +95,56 @@ export function Belmodus({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // claim verlengen zolang de pagina zichtbaar is
+  // Laatste focus en laadVolgende voor het claim-effect (dat alleen opnieuw draait bij een andere lead).
+  const focusRef = useRef(focus);
+  const laadVolgendeRef = useRef(laadVolgende);
+  useEffect(() => {
+    focusRef.current = focus;
+    laadVolgendeRef.current = laadVolgende;
+  });
+
+  // Claim verlengen: elke 2 min, ook als de pagina verborgen is (bellen, website in een ander
+  // tabblad), tot 30 min na het openen van de lead; en meteen bij terugkeer naar het tabblad.
+  // Is de claim intussen van een ander: melden en door naar de volgende lead.
   const leadId = kaart?.lead.id;
   useEffect(() => {
     if (!leadId) return;
-    const t = setInterval(() => {
-      if (document.visibilityState === 'visible') void verlengClaimAction(leadId);
-    }, 120_000);
-    const weg = () => void geefVrijAction(leadId);
+    const id = leadId;
+    const geopend = Date.now();
+    let actief = true;
+    async function verleng() {
+      if (!actief || bezig.current || Date.now() - geopend > CLAIM_PLAFOND_MS) return;
+      const r = await verlengClaimAction(id);
+      // Intussen een andere lead, of een lopende actie die de claim zelf vrijgeeft: negeren.
+      if (!actief || bezig.current) return;
+      const kwijt = r.ok ? !r.nogVanMij : isVerouderd(r);
+      if (!kwijt) return;
+      actief = false;
+      toast.error('Een ander heeft deze lead overgenomen.');
+      setDialoog(null);
+      setMail(null);
+      setOngedaan(null);
+      await laadVolgendeRef.current(focusRef.current);
+    }
+    const t = setInterval(() => void verleng(), VERLENG_MS);
+    const zichtbaar = () => {
+      if (document.visibilityState === 'visible') void verleng();
+    };
+    const weg = () => void geefVrijAction(id);
+    document.addEventListener('visibilitychange', zichtbaar);
     window.addEventListener('pagehide', weg);
     return () => {
+      actief = false;
       clearInterval(t);
+      document.removeEventListener('visibilitychange', zichtbaar);
       window.removeEventListener('pagehide', weg);
+      // Ook bij navigeren binnen de app (dan vuurt pagehide niet) en bij een andere lead.
+      // Gaf een uitkomst hem al vrij, dan is dit een onschuldige herhaling; geefVrijAction
+      // raakt alleen de eigen claim.
+      void geefVrijAction(id);
     };
+    // toast is stabiel; focus en laadVolgende lopen via refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId]);
 
   function toonOngedaan(id: string, tekst: string) {
@@ -144,7 +184,7 @@ export function Belmodus({
   }
 
   function knop(u: KnopUitkomst) {
-    if (!kaart || mail || laden || dialoog) return;
+    if (!kaart || mail || laden || dialoog || bezig.current) return;
     if (u === 'niet_opgenomen') {
       if (isLaatstePoging(kaart.lead)) setDialoog('niet_opgenomen_laatste');
       else void kies({ uitkomst: 'niet_opgenomen' });
@@ -235,8 +275,13 @@ export function Belmodus({
         size="sm"
         onClick={async () => {
           if (bezig.current || mail) return;
-          if (kaart) await geefVrijAction(kaart.lead.id);
-          await laadVolgende(focus);
+          bezig.current = true;
+          try {
+            if (kaart) await geefVrijAction(kaart.lead.id);
+            await laadVolgende(focus);
+          } finally {
+            bezig.current = false;
+          }
         }}
       >
         Focus toepassen
@@ -345,8 +390,13 @@ export function Belmodus({
           onKlaar={async () => {
             const id = mail.lead.id;
             setMail(null);
-            await geefVrijAction(id);
-            await laadVolgende(focus);
+            bezig.current = true;
+            try {
+              await geefVrijAction(id);
+              await laadVolgende(focus);
+            } finally {
+              bezig.current = false;
+            }
           }}
         />
       ) : null}
