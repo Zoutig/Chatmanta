@@ -217,14 +217,20 @@ export async function werkVeldenBijAction(id: string, patch: Partial<Record<Bewe
         if (w && !e) ongeldig('Dit e-mailadres klopt niet.');
         schoon.email = e;
       } else if (k === 'website_url') {
-        schoon.website_url = schoneWebsiteUrl(w);
-        schoon.domein = normaliseerDomein(w);
+        const domein = normaliseerDomein(w);
+        if (w && !domein) ongeldig('Deze website klopt niet.');
+        schoon.website_url = domein ? schoneWebsiteUrl(w) : null;
+        schoon.domein = domein;
       } else if (k === 'bedrijfsnaam') {
         if (!w) ongeldig('Bedrijfsnaam mag niet leeg zijn.');
         schoon[k] = w;
       } else schoon[k] = w || null;
     }
     const lead = await dbl.haalLead(c.db, uuid(id));
+    // Website (domein) en telefoon zijn de sleutelvelden: minstens één moet blijven staan.
+    const domeinNa = 'domein' in schoon ? schoon.domein : lead.domein;
+    const telefoonNa = 'telefoon' in schoon ? schoon.telefoon : lead.telefoon;
+    if (!domeinNa && !telefoonNa) ongeldig('Een lead heeft minstens een website of telefoonnummer nodig.');
     const nieuw = await dbl.werkVeldenBij(c.db, lead.id, schoon as Partial<Lead>);
     // Een gewijzigd e-mailadres komt ook in de lijst van gevonden adressen.
     if (typeof schoon.email === 'string' && !nieuw.emails_gevonden.includes(schoon.email)) {
