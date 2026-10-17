@@ -76,6 +76,13 @@ async function main() {
     eis(lijst.totaal === 2 && lijst.leads[0].id === hoogId, 'lijstLeads: 2 resultaten, hoogste score eerst');
     const kwaad = await dbl.lijstLeads(db, { tab: 'vandaag', zoek: 'x,id.eq.1)(%' });
     eis(Array.isArray(kwaad.leads), 'lijstLeads overleeft een zoekterm met filter-tekens');
+
+    // filter op beller (view leads_overzicht)
+    await dbl.logActiviteit(db, { leadId: laagId, userId, soort: 'belpoging', details: {} });
+    const opNaam = await dbl.lijstLeads(db, { tab: 'vandaag', niche: NICHE, zoek: 'e2e', beller: userId });
+    eis(opNaam.totaal === 1 && opNaam.leads[0].id === laagId && opNaam.leads[0].gebeld_door.includes(userId), 'lijstLeads: filter op beller vindt alleen de lead die hij belde');
+    const anders = await dbl.lijstLeads(db, { tab: 'vandaag', niche: NICHE, zoek: 'e2e', beller: '00000000-0000-4000-8000-000000000000' });
+    eis(anders.totaal === 0, 'lijstLeads: filter op een andere beller vindt niets');
     const t = await dbl.tellers(db);
     eis(t.vandaag >= 2, 'tellers.vandaag telt de testleads mee');
     const opt = await dbl.filterOpties(db);

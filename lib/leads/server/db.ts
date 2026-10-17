@@ -12,6 +12,9 @@ export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID
 export const PAGINA_GROOTTE = 50;
 export const CLAIM_MINUTEN = 10;
 
+/** Een lead in de lijst, met de gebruikers die hem gebeld hebben (view leads_overzicht). */
+export type LijstLead = Lead & { gebeld_door: string[] };
+
 export type Tab = 'vandaag' | 'terugbellen' | 'opvolgen' | 'kansen' | 'chatbot' | 'archief';
 export const TABS: Tab[] = ['vandaag', 'terugbellen', 'opvolgen', 'kansen', 'chatbot', 'archief'];
 
@@ -22,6 +25,8 @@ export type LijstFilter = {
   plaats?: string;
   minScore?: number;
   reden?: string;
+  /** Alleen leads die deze gebruiker (uuid) heeft gebeld. */
+  beller?: string;
   sort?: 'bedrijfsnaam' | 'score' | 'volgende_actie_op' | 'laatste_poging_op' | 'plaats';
   richting?: 'asc' | 'desc';
   pagina?: number;
@@ -58,7 +63,7 @@ export function veiligeZoekterm(q: string): string {
 
 /** Tab + zoek + filters op een leads-query (zonder sortering/paginering). */
 function gefilterd(db: SupabaseClient, f: LijstFilter, nu: Date, head: boolean) {
-  let q = db.from('leads').select('*', { count: 'exact', head });
+  let q = db.from('leads_overzicht').select('*', { count: 'exact', head });
   q = filterTab(q, f.tab, nu);
   if (f.zoek) {
     const z = veiligeZoekterm(f.zoek);
@@ -71,6 +76,7 @@ function gefilterd(db: SupabaseClient, f: LijstFilter, nu: Date, head: boolean) 
   if (f.plaats) q = q.eq('plaats', f.plaats);
   if (f.minScore !== undefined) q = q.gte('score', f.minScore);
   if (f.reden) q = q.eq('status_reden', f.reden);
+  if (f.beller && isUuid(f.beller)) q = q.contains('gebeld_door', [f.beller]);
   return q;
 }
 
@@ -98,7 +104,7 @@ export async function lijstLeads(db: SupabaseClient, f: LijstFilter, nu = new Da
     ({ data, count, error } = await haal(pagina));
   }
   if (error) fout(`leads ophalen faalde: ${error.message}`, error);
-  return { leads: (data ?? []) as Lead[], totaal: count ?? 0, pagina };
+  return { leads: (data ?? []) as LijstLead[], totaal: count ?? 0, pagina };
 }
 
 /**
@@ -120,14 +126,14 @@ async function lijstOpvolgen(db: SupabaseClient, f: LijstFilter, nu: Date) {
   const totaal = aantalNog + aantalGemaild;
   const pagina = begrensPagina(f.pagina ?? 1, totaal, PAGINA_GROOTTE);
   const delen = verdeelPagina((pagina - 1) * PAGINA_GROOTTE, PAGINA_GROOTTE, aantalNog);
-  const haal = async (gemaild: boolean, r: [number, number] | null): Promise<Lead[]> => {
+  const haal = async (gemaild: boolean, r: [number, number] | null): Promise<LijstLead[]> => {
     if (!r) return [];
     const { data, error } = await groep(gefilterd(db, f, nu, false), gemaild)
       .order(sort, { ascending: asc, nullsFirst: false })
       .order('id')
       .range(r[0], r[1]);
     if (error) fout(`leads ophalen faalde: ${error.message}`, error);
-    return (data ?? []) as Lead[];
+    return (data ?? []) as LijstLead[];
   };
   const [nog, gemaild] = await Promise.all([haal(false, delen.eerste), haal(true, delen.tweede)]);
   return { leads: [...nog, ...gemaild], totaal, pagina };

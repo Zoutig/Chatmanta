@@ -5,7 +5,8 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { LinkTabs } from '@/app/v1/_ui/tabs';
 import { buttonClass } from '@/app/v1/_ui/button';
-import { filterOpties, haalAfzender, laatsteUitkomsten, lijstLeads, misschienOpschonen, tellers, TABS, PAGINA_GROOTTE, type Tab, type LijstFilter } from '@/lib/leads/server/db';
+import { filterOpties, haalAfzender, isUuid, laatsteUitkomsten, lijstLeads, misschienOpschonen, tellers, voornamen, TABS, PAGINA_GROOTTE, type Tab, type LijstFilter } from '@/lib/leads/server/db';
+import { bellers } from '@/lib/leads/server/inzicht';
 import { ARCHIEF_REDENEN, type Lead } from '@/lib/leads/types';
 import { herinneringNodig } from '@/lib/leads/werkdagen';
 import { LeadTabel } from './_ui/lead-tabel';
@@ -46,18 +47,22 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     plaats: sp.plaats || undefined,
     minScore: getal(sp.min),
     reden: sp.reden || undefined,
+    beller: isUuid(sp.beller) ? sp.beller : undefined,
     sort: (SORTS as readonly string[]).includes(sp.sort ?? '') ? (sp.sort as LijstFilter['sort']) : undefined,
     richting: sp.dir === 'asc' || sp.dir === 'desc' ? sp.dir : undefined,
     pagina: Math.max(1, getal(sp.p) ?? 1),
   };
   await misschienOpschonen(db);
-  const [lijst, aantallen, opties, afzender] = await Promise.all([
+  const [lijst, aantallen, opties, afzender, lijstBellers] = await Promise.all([
     lijstLeads(db, filter),
     tellers(db),
     filterOpties(db),
     tab === 'opvolgen' ? haalAfzender(db, user.id) : Promise.resolve(null),
+    bellers(db),
   ]);
   const uitkomsten = await laatsteUitkomsten(db, lijst.leads.map((l) => l.id));
+  const namen = await voornamen(db, [...new Set(lijst.leads.flatMap((l) => l.gebeld_door))]);
+  const gebeldDoor = Object.fromEntries(lijst.leads.map((l) => [l.id, l.gebeld_door.map((u) => namen.get(u) ?? 'onbekend').join(', ')]));
   const herinneringIds = tab === 'opvolgen' ? herinneringVoor(lijst.leads) : [];
   const qs = (extra: Record<string, string | undefined>) => {
     const u = new URLSearchParams();
@@ -100,6 +105,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <option value="">Alle plaatsen</option>
           {opties.plaatsen.map((p) => <option key={p}>{p}</option>)}
         </select>
+        <select className="v1-input" name="beller" defaultValue={sp.beller ?? ''} aria-label="Gebeld door">
+          <option value="">Gebeld door: iedereen</option>
+          {lijstBellers.map((b) => <option key={b.id} value={b.id}>{b.naam}</option>)}
+        </select>
         <input className="v1-input" name="min" type="number" min={0} max={20} defaultValue={sp.min ?? ''} placeholder="Min. score" style={{ width: 110 }} />
         {tab === 'archief' ? (
           <select className="v1-input" name="reden" defaultValue={sp.reden ?? ''} aria-label="Reden">
@@ -110,7 +119,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         <button className={buttonClass({ variant: 'secondary', size: 'sm' })} type="submit">Filter</button>
         <Link className={buttonClass({ variant: 'ghost', size: 'sm' })} href={`/v1/leads?tab=${tab}`}>Wissen</Link>
       </form>
-      <LeadTabel leads={lijst.leads} tab={tab} laatsteUitkomst={uitkomsten} afzender={afzender} herinneringIds={herinneringIds} sortHrefs={Object.fromEntries(SORTS.map((s) => [s, qs({ sort: s, dir: filter.sort === s && filter.richting !== 'desc' ? 'desc' : 'asc', p: undefined })]))} />
+      <LeadTabel leads={lijst.leads} tab={tab} laatsteUitkomst={uitkomsten} gebeldDoor={gebeldDoor} afzender={afzender} herinneringIds={herinneringIds} sortHrefs={Object.fromEntries(SORTS.map((s) => [s, qs({ sort: s, dir: filter.sort === s && filter.richting !== 'desc' ? 'desc' : 'asc', p: undefined })]))} />
       <div className="ld-paginering">
         <span>{lijst.totaal} {lijst.totaal === 1 ? 'lead' : 'leads'} · pagina {lijst.pagina} van {paginas}</span>
         {lijst.pagina > 1 ? <Link href={qs({ p: String(lijst.pagina - 1) })}>Vorige</Link> : null}
