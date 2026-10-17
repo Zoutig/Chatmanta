@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DataTable, NumCell } from '@/app/v1/admin/_ui/data-table';
 import { Button } from '@/app/v1/_ui/button';
 import { useToast } from '@/app/v1/_ui/toast';
-import { STATUS_LABEL, type Lead } from '@/lib/leads/types';
+import { STATUS_LABEL, archiefRedenLabel, type Lead } from '@/lib/leads/types';
 import { toonTelefoon, telLink } from '@/lib/leads/normaliseren';
 import { toonMoment } from '@/lib/leads/werkdagen';
 import type { Tab } from '@/lib/leads/server/db';
@@ -80,7 +80,7 @@ export function LeadTabel({ leads, tab, sortHrefs }: { leads: Lead[]; tab: Tab; 
             <td>{l.telefoon ? <a href={telLink(l.telefoon)}>{toonTelefoon(l.telefoon)}</a> : ''}</td>
             <NumCell>{l.score ?? '–'}</NumCell>
             <td>{volgendeActie(l)}{l.volgende_actie_notitie ? <span className="ld-sub">{l.volgende_actie_notitie}</span> : null}</td>
-            <td>{l.laatste_poging_op ? toonMoment(l.laatste_poging_op) : ''}{tab === 'archief' && l.status_reden ? <span className="ld-sub">{l.status_reden}</span> : null}</td>
+            <td>{l.laatste_poging_op ? toonMoment(l.laatste_poging_op) : ''}{tab === 'archief' && l.status_reden ? <span className="ld-sub">{archiefRedenLabel(l.status_reden)}</span> : null}</td>
             <NumCell>{l.pogingen_niet_opgenomen}</NumCell>
             <td><StatusKnoppen lead={l} compact /></td>
           </tr>

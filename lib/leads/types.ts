@@ -87,6 +87,23 @@ export const NIET_BELLEN_LABEL: Record<NietBellenReden, string> = {
   heeft_chatbot: 'Heeft al een chatbot',
 };
 
+/** Bekende waarden van `status_reden` in het archief, met leesbaar label (voor het filter). */
+export const ARCHIEF_REDENEN: { waarde: string; label: string }[] = (() => {
+  const m = new Map<string, string>();
+  for (const r of NIET_BELLEN_REDENEN) m.set(r, `Niet bellen: ${NIET_BELLEN_LABEL[r].toLowerCase()}`);
+  for (const b of BEZWAREN) if (!m.has(b)) m.set(b, `Bezwaar: ${BEZWAAR_LABEL[b].toLowerCase()}`);
+  m.set('3x niet opgenomen', '3x niet opgenomen');
+  m.set('bulk', 'Bulk gearchiveerd');
+  m.set('handmatig', 'Handmatig op niet bellen');
+  m.set('afgehaakt', 'Afgehaakt na kans');
+  m.set('niet benaderen (Niels)', 'Niet benaderen (Niels)');
+  return [...m].map(([waarde, label]) => ({ waarde, label }));
+})();
+
+export function archiefRedenLabel(r: string): string {
+  return ARCHIEF_REDENEN.find((x) => x.waarde === r)?.label ?? r;
+}
+
 export const OPVOLG_SITUATIES = ['info', 'test', 'kennis', 'klaar', 'herinnering'] as const;
 export type OpvolgSituatie = (typeof OPVOLG_SITUATIES)[number];
 

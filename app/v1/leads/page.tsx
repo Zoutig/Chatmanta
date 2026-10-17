@@ -6,6 +6,7 @@ import { PageHeader } from '@/app/v1/_ui/page-header';
 import { LinkTabs } from '@/app/v1/_ui/tabs';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { filterOpties, lijstLeads, misschienOpschonen, tellers, TABS, PAGINA_GROOTTE, type Tab, type LijstFilter } from '@/lib/leads/server/db';
+import { ARCHIEF_REDENEN } from '@/lib/leads/types';
 import { LeadTabel } from './_ui/lead-tabel';
 import { NieuweLead } from './_ui/nieuwe-lead';
 
@@ -88,7 +89,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </select>
         <input className="v1-input" name="min" type="number" min={0} max={20} defaultValue={sp.min ?? ''} placeholder="Min. score" style={{ width: 110 }} />
         {tab === 'archief' ? (
-          <input className="v1-input" name="reden" defaultValue={sp.reden ?? ''} placeholder="Reden" />
+          <select className="v1-input" name="reden" defaultValue={sp.reden ?? ''} aria-label="Reden">
+            <option value="">Alle redenen</option>
+            {ARCHIEF_REDENEN.map((r) => <option key={r.waarde} value={r.waarde}>{r.label}</option>)}
+          </select>
         ) : null}
         <button className={buttonClass({ variant: 'secondary', size: 'sm' })} type="submit">Filter</button>
         <Link className={buttonClass({ variant: 'ghost', size: 'sm' })} href={`/v1/leads?tab=${tab}`}>Wissen</Link>
