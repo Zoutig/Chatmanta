@@ -4,7 +4,7 @@ import { AppError } from '@/lib/errors/app-error';
 import type { Activiteit, Afzender, BewerkbaarVeld, Lead, LeadStatus, Stand, Uitkomst, ActiviteitSoort } from '../types';
 import { pakStand } from '../types';
 import { beginVanMorgen } from '../werkdagen';
-import { begrensPagina, leesAllePaginas } from '../pagineren';
+import { begrensPagina, leesAllePaginas, verdeelPagina } from '../pagineren';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID_RE.test(x);
@@ -79,6 +79,7 @@ function gefilterd(db: SupabaseClient, f: LijstFilter, nu: Date, head: boolean) 
  * laatste pagina; de pagina in het antwoord is dus altijd 1..aantal pagina's.
  */
 export async function lijstLeads(db: SupabaseClient, f: LijstFilter, nu = new Date()) {
+  if (f.tab === 'opvolgen') return lijstOpvolgen(db, f, nu);
   const sort = f.sort ?? (f.tab === 'vandaag' ? 'score' : 'volgende_actie_op');
   const asc = (f.richting ?? (sort === 'score' ? 'desc' : 'asc')) === 'asc';
   const haal = (pagina: number) =>
@@ -98,6 +99,59 @@ export async function lijstLeads(db: SupabaseClient, f: LijstFilter, nu = new Da
   }
   if (error) fout(`leads ophalen faalde: ${error.message}`, error);
   return { leads: (data ?? []) as Lead[], totaal: count ?? 0, pagina };
+}
+
+/**
+ * Tab Opvolgen in twee groepen achter elkaar: eerst "mail nog sturen" (opvolgmail_gestuurd_op
+ * leeg), dan "gemaild, nabellen". Elke groep apart gesorteerd (standaard op volgende_actie_op),
+ * de paginering loopt over de twee groepen samen.
+ */
+async function lijstOpvolgen(db: SupabaseClient, f: LijstFilter, nu: Date) {
+  const sort = f.sort ?? 'volgende_actie_op';
+  const asc = (f.richting ?? (sort === 'score' ? 'desc' : 'asc')) === 'asc';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const groep = (q: any, gemaild: boolean) => (gemaild ? q.not('opvolgmail_gestuurd_op', 'is', null) : q.is('opvolgmail_gestuurd_op', null));
+  const tel = async (gemaild: boolean) => {
+    const { count, error } = await groep(gefilterd(db, f, nu, true), gemaild);
+    if (error) fout(`leads tellen faalde: ${error.message}`, error);
+    return (count ?? 0) as number;
+  };
+  const [aantalNog, aantalGemaild] = await Promise.all([tel(false), tel(true)]);
+  const totaal = aantalNog + aantalGemaild;
+  const pagina = begrensPagina(f.pagina ?? 1, totaal, PAGINA_GROOTTE);
+  const delen = verdeelPagina((pagina - 1) * PAGINA_GROOTTE, PAGINA_GROOTTE, aantalNog);
+  const haal = async (gemaild: boolean, r: [number, number] | null): Promise<Lead[]> => {
+    if (!r) return [];
+    const { data, error } = await groep(gefilterd(db, f, nu, false), gemaild)
+      .order(sort, { ascending: asc, nullsFirst: false })
+      .order('id')
+      .range(r[0], r[1]);
+    if (error) fout(`leads ophalen faalde: ${error.message}`, error);
+    return (data ?? []) as Lead[];
+  };
+  const [nog, gemaild] = await Promise.all([haal(false, delen.eerste), haal(true, delen.tweede)]);
+  return { leads: [...nog, ...gemaild], totaal, pagina };
+}
+
+/** Laatste niet-ongedane belpoging-uitkomst per lead, in één query voor de leads van een pagina. */
+export async function laatsteUitkomsten(db: SupabaseClient, ids: string[]): Promise<Record<string, Uitkomst>> {
+  if (!ids.length) return {};
+  const rijen = await leesAllePaginas(async (van, tot) => {
+    const { data, error } = await db
+      .from('lead_activiteiten')
+      .select('lead_id, uitkomst, created_at')
+      .in('lead_id', ids)
+      .eq('soort', 'belpoging')
+      .is('ongedaan_op', null)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(van, tot);
+    if (error) fout(`laatste uitkomsten ophalen faalde: ${error.message}`, error);
+    return (data ?? []) as { lead_id: string; uitkomst: Uitkomst | null }[];
+  });
+  const uit: Record<string, Uitkomst> = {};
+  for (const r of rijen) if (r.uitkomst && !(r.lead_id in uit)) uit[r.lead_id] = r.uitkomst;
+  return uit;
 }
 
 export async function tellers(db: SupabaseClient, nu = new Date()): Promise<Record<Tab, number>> {

@@ -12,6 +12,7 @@ import {
   beginVanWeek,
   beginVanMaand,
   dagdeelVoorMail,
+  herinneringNodig,
 } from '../werkdagen';
 
 // 2026-10-16 is een vrijdag. Zomertijd (UTC+2) tot zondag 2026-10-25 03:00.
@@ -59,4 +60,16 @@ test('dagdeelVoorMail', () => {
   assert.equal(dagdeelVoorMail(new Date('2026-10-15T13:00:00Z'), VR_1500), 'gisteren');
   assert.equal(dagdeelVoorMail(new Date('2026-10-10T13:00:00Z'), VR_1500), 'vandaag');
   assert.equal(dagdeelVoorMail(null, VR_1500), 'vandaag');
+});
+
+test('herinneringNodig: vanaf de 3e werkdag na de mail', () => {
+  const ma = new Date('2026-10-12T08:00:00Z'); // ma 10:00
+  assert.equal(herinneringNodig(ma, new Date('2026-10-14T21:59:00Z')), false); // wo 23:59
+  assert.equal(herinneringNodig(ma, new Date('2026-10-14T22:00:00Z')), true); // do 0:00
+  const vr = new Date('2026-10-16T13:00:00Z'); // vr 15:00
+  assert.equal(herinneringNodig(vr, new Date('2026-10-20T10:00:00Z')), false); // di
+  assert.equal(herinneringNodig(vr, new Date('2026-10-21T08:00:00Z')), true); // wo
+  assert.equal(herinneringNodig(null, new Date()), false);
+  assert.equal(herinneringNodig('geen datum', new Date()), false);
+  assert.equal(herinneringNodig(ma.toISOString(), new Date('2026-10-15T08:00:00Z')), true);
 });

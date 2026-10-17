@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { leesAllePaginas, LEES_PAGINA, eerste, begrensPagina, enkel } from '../pagineren';
+import { leesAllePaginas, LEES_PAGINA, eerste, begrensPagina, enkel, verdeelPagina } from '../pagineren';
 
 function bron(n: number) {
   const rijen = Array.from({ length: n }, (_, i) => i);
@@ -58,4 +58,13 @@ test('begrensPagina houdt de pagina binnen 1..aantal pagina\'s', () => {
 
 test('enkel maakt van elke queryparameter een losse string', () => {
   assert.deepEqual(enkel({ q: ['a', 'b'], tab: 'opvolgen', p: undefined }), { q: 'a', tab: 'opvolgen', p: undefined });
+});
+
+test('verdeelPagina verdeelt een pagina over twee groepen', () => {
+  assert.deepEqual(verdeelPagina(0, 50, 10), { eerste: [0, 9], tweede: [0, 39] });
+  assert.deepEqual(verdeelPagina(0, 50, 0), { eerste: null, tweede: [0, 49] });
+  assert.deepEqual(verdeelPagina(0, 50, 50), { eerste: [0, 49], tweede: null });
+  assert.deepEqual(verdeelPagina(0, 50, 70), { eerste: [0, 49], tweede: null });
+  assert.deepEqual(verdeelPagina(50, 50, 70), { eerste: [50, 69], tweede: [0, 29] });
+  assert.deepEqual(verdeelPagina(100, 50, 70), { eerste: null, tweede: [30, 79] });
 });

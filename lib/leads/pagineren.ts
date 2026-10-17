@@ -32,3 +32,18 @@ export function begrensPagina(gevraagd: number, totaal: number, grootte: number)
 export function enkel(sp: Record<string, string | string[] | undefined>): Record<string, string | undefined> {
   return Object.fromEntries(Object.entries(sp).map(([k, v]) => [k, eerste(v)]));
 }
+
+/**
+ * Een pagina [offset, offset+grootte) over twee groepen achter elkaar (eerst `aantalEerste` rijen
+ * van groep 1, dan groep 2). Geeft per groep het inclusieve bereik voor `.range()`, of null.
+ */
+export function verdeelPagina(
+  offset: number,
+  grootte: number,
+  aantalEerste: number,
+): { eerste: [number, number] | null; tweede: [number, number] | null } {
+  const eind = offset + grootte; // exclusief
+  const eerste: [number, number] | null = offset < aantalEerste ? [offset, Math.min(eind, aantalEerste) - 1] : null;
+  const tweede: [number, number] | null = eind > aantalEerste ? [Math.max(0, offset - aantalEerste), eind - aantalEerste - 1] : null;
+  return { eerste, tweede };
+}

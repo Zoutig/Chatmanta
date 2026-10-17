@@ -5,8 +5,9 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { LinkTabs } from '@/app/v1/_ui/tabs';
 import { buttonClass } from '@/app/v1/_ui/button';
-import { filterOpties, lijstLeads, misschienOpschonen, tellers, TABS, PAGINA_GROOTTE, type Tab, type LijstFilter } from '@/lib/leads/server/db';
-import { ARCHIEF_REDENEN } from '@/lib/leads/types';
+import { filterOpties, haalAfzender, laatsteUitkomsten, lijstLeads, misschienOpschonen, tellers, TABS, PAGINA_GROOTTE, type Tab, type LijstFilter } from '@/lib/leads/server/db';
+import { ARCHIEF_REDENEN, type Lead } from '@/lib/leads/types';
+import { herinneringNodig } from '@/lib/leads/werkdagen';
 import { LeadTabel } from './_ui/lead-tabel';
 import { NieuweLead } from './_ui/nieuwe-lead';
 
@@ -28,8 +29,13 @@ function getal(s: string | undefined): number | undefined {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
 }
 
+/** Leads waarvan de opvolgmail lang genoeg geleden is voor een herinnering. */
+function herinneringVoor(leads: Lead[], nu = new Date()): string[] {
+  return leads.filter((l) => herinneringNodig(l.opvolgmail_gestuurd_op, nu)).map((l) => l.id);
+}
+
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireJorionAdmin();
+  const user = await requireJorionAdmin();
   const db = getV1ServiceRoleClient();
   const sp = enkel(await searchParams);
   const tab = (TABS as string[]).includes(sp.tab ?? '') ? (sp.tab as Tab) : 'vandaag';
@@ -45,7 +51,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     pagina: Math.max(1, getal(sp.p) ?? 1),
   };
   await misschienOpschonen(db);
-  const [lijst, aantallen, opties] = await Promise.all([lijstLeads(db, filter), tellers(db), filterOpties(db)]);
+  const [lijst, aantallen, opties, afzender] = await Promise.all([
+    lijstLeads(db, filter),
+    tellers(db),
+    filterOpties(db),
+    tab === 'opvolgen' ? haalAfzender(db, user.id) : Promise.resolve(null),
+  ]);
+  const uitkomsten = await laatsteUitkomsten(db, lijst.leads.map((l) => l.id));
+  const herinneringIds = tab === 'opvolgen' ? herinneringVoor(lijst.leads) : [];
   const qs = (extra: Record<string, string | undefined>) => {
     const u = new URLSearchParams();
     for (const [k, v] of Object.entries({ ...sp, ...extra })) if (v) u.set(k, v);
@@ -97,7 +110,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         <button className={buttonClass({ variant: 'secondary', size: 'sm' })} type="submit">Filter</button>
         <Link className={buttonClass({ variant: 'ghost', size: 'sm' })} href={`/v1/leads?tab=${tab}`}>Wissen</Link>
       </form>
-      <LeadTabel leads={lijst.leads} tab={tab} sortHrefs={Object.fromEntries(SORTS.map((s) => [s, qs({ sort: s, dir: filter.sort === s && filter.richting !== 'desc' ? 'desc' : 'asc', p: undefined })]))} />
+      <LeadTabel leads={lijst.leads} tab={tab} laatsteUitkomst={uitkomsten} afzender={afzender} herinneringIds={herinneringIds} sortHrefs={Object.fromEntries(SORTS.map((s) => [s, qs({ sort: s, dir: filter.sort === s && filter.richting !== 'desc' ? 'desc' : 'asc', p: undefined })]))} />
       <div className="ld-paginering">
         <span>{lijst.totaal} {lijst.totaal === 1 ? 'lead' : 'leads'} · pagina {lijst.pagina} van {paginas}</span>
         {lijst.pagina > 1 ? <Link href={qs({ p: String(lijst.pagina - 1) })}>Vorige</Link> : null}

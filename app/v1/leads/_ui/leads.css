@@ -111,3 +111,7 @@
   .ld-trechter-rij { grid-template-columns: 90px 1fr 80px; }
 }
 .ld-main { grid-template-columns: minmax(0, 1fr); }
+
+/* Opvolgen: groepen in de lijst, acties per rij */
+.ld-groep-kop th { text-align: left; font-size: 13px; font-weight: 700; color: var(--v1-ink); background: var(--v1-surface-2); padding: 8px 12px; }
+.ld-rij-acties { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }

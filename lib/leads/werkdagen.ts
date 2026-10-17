@@ -134,3 +134,11 @@ export function toonMoment(iso: string | null, nu: Date = new Date()): string {
   const datum = new Intl.DateTimeFormat('nl-NL', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' }).format(d);
   return `${datum} ${tijd}`;
 }
+
+/** Herinnering sturen? Ja vanaf het begin (0:00) van de 3e werkdag na de opvolgmail. */
+export function herinneringNodig(gestuurdOp: string | Date | null, nu: Date): boolean {
+  if (!gestuurdOp) return false;
+  const g = new Date(gestuurdOp);
+  if (Number.isNaN(g.getTime())) return false;
+  return nu.getTime() >= plusWerkdagenOm(g, 3, 0).getTime();
+}
