@@ -41,6 +41,8 @@ async function resetLeads() {
       geclaimd_tot: null,
       volgende_actie_op: null,
       pogingen_niet_opgenomen: 0,
+      opvolgmail_gestuurd_op: null,
+      opvolgmail_situatie: null,
     })
     .eq('bron', 'test');
   if (error) throw error;
@@ -186,5 +188,34 @@ test.describe.serial('leads-dashboard', () => {
     } finally {
       await a.close();
     }
+  });
+
+  test('opvolgen: twee groepen en een herinneringsknop na 3 werkdagen', async ({ page }) => {
+    await resetLeads();
+    const weekGeleden = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
+    const { error: e1 } = await db.from('leads').update({ status: 'opvolgen', volgende_actie_op: weekGeleden }).eq('domein', 'e2e-alfa.invalid');
+    const { error: e2 } = await db
+      .from('leads')
+      .update({ status: 'opvolgen', opvolgmail_gestuurd_op: weekGeleden, opvolgmail_situatie: 'info', volgende_actie_op: weekGeleden })
+      .eq('domein', 'e2e-beta.invalid');
+    expect(e1).toBeNull();
+    expect(e2).toBeNull();
+    await login(page, 'member@example.com', MEMBER_PW);
+    await page.goto(`/v1/leads?tab=opvolgen&niche=${NICHE}`);
+    const tabel = page.getByRole('table', { name: 'Leads' });
+    await expect(tabel.getByRole('columnheader', { name: /Mail nog sturen/ })).toBeVisible();
+    await expect(tabel.getByRole('columnheader', { name: /Gemaild, nabellen/ })).toBeVisible();
+    // Alfa (nog geen mail) staat boven Beta (gemaild); alleen Beta krijgt de herinneringsknop.
+    const rijen = tabel.getByRole('row');
+    const namen = await rijen.getByRole('link', { name: /E2E Bouw/ }).allTextContents();
+    expect(namen).toEqual(['E2E Bouw Alfa', 'E2E Bouw Beta']);
+    await expect(tabel.getByRole('button', { name: 'Herinnering sturen' })).toHaveCount(1);
+    await expect(rijen.filter({ hasText: 'E2E Bouw Beta' }).getByRole('button', { name: 'Herinnering sturen' })).toBeVisible();
+    await tabel.getByRole('button', { name: 'Herinnering sturen' }).click();
+    const popup = page.getByRole('dialog', { name: /Opvolgmail/ });
+    await expect(popup).toBeVisible();
+    await expect(popup.getByRole('button', { name: 'Korte herinnering' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Escape');
+    await expect(popup).toHaveCount(0);
   });
 });
