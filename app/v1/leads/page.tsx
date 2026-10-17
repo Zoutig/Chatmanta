@@ -94,7 +94,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       </form>
       <LeadTabel leads={lijst.leads} tab={tab} sortHrefs={Object.fromEntries(SORTS.map((s) => [s, qs({ sort: s, dir: filter.sort === s && filter.richting !== 'desc' ? 'desc' : 'asc', p: undefined })]))} />
       <div className="ld-paginering">
-        <span>{lijst.totaal} leads · pagina {lijst.pagina} van {paginas}</span>
+        <span>{lijst.totaal} {lijst.totaal === 1 ? 'lead' : 'leads'} · pagina {lijst.pagina} van {paginas}</span>
         {lijst.pagina > 1 ? <Link href={qs({ p: String(lijst.pagina - 1) })}>Vorige</Link> : null}
         {lijst.pagina < paginas ? <Link href={qs({ p: String(lijst.pagina + 1) })}>Volgende</Link> : null}
       </div>

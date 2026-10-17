@@ -31,7 +31,7 @@
 .ld-paginering { display: flex; gap: 8px; align-items: center; justify-content: flex-end; font-size: 13px; color: var(--v1-muted); }
 
 /* Belmodus */
-.ld-bel { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.8fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ld-bel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr) minmax(0, 0.9fr); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .ld-bel { grid-template-columns: 1fr; } }
 .ld-kaart { background: var(--v1-surface); border-radius: var(--v1-r-lg); box-shadow: var(--v1-shadow-1); padding: 20px; display: grid; gap: 12px; }
 .ld-bedrijf { margin: 0; font-size: 24px; line-height: 1.2; }
@@ -45,7 +45,7 @@
 .ld-teller b { font-size: 18px; color: var(--v1-ink); }
 .ld-knoppen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 700px) { .ld-knoppen { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ld-uitkomst { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px; min-height: 64px; border: 0; border-radius: var(--v1-r-md); background: var(--v1-surface-2); color: var(--v1-ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.ld-uitkomst { display: flex; min-width: 0; overflow-wrap: break-word; hyphens: manual; font-size: 13px; line-height: 1.2; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 10px; min-height: 64px; border: 0; border-radius: var(--v1-r-md); background: var(--v1-surface-2); color: var(--v1-ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
 .ld-uitkomst:hover { box-shadow: inset 0 0 0 2px var(--v1-line-strong); }
 .ld-uitkomst:focus-visible { outline: none; box-shadow: var(--v1-focus); }
 .ld-uitkomst kbd { font: 600 11px var(--v1-font); color: var(--v1-muted); }

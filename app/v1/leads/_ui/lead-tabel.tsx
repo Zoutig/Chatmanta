@@ -38,7 +38,7 @@ export function LeadTabel({ leads, tab, sortHrefs }: { leads: Lead[]; tab: Tab; 
     const r = await bulkArchiveerAction([...gekozen]);
     setBezig(false);
     if (!r.ok) return toast.error(r.error);
-    toast.success(`${r.aantal} leads gearchiveerd.`);
+    toast.success(`${r.aantal} ${r.aantal === 1 ? 'lead' : 'leads'} gearchiveerd.`);
     setGekozen(new Set());
     router.refresh();
   }
