@@ -16,6 +16,7 @@ import {
   Inbox,
   LayoutDashboard,
   ListChecks,
+  PhoneCall,
   Settings2,
   TriangleAlert,
   Workflow,
@@ -78,6 +79,10 @@ export function AdminSidebar({
       </nav>
 
       <div className="v1-sidebar-foot">
+        <a href="/v1/leads" target="_blank" rel="noopener" className="v1-nav-item v1-nav-item--quiet">
+          <PhoneCall size={16} strokeWidth={1.8} aria-hidden="true" />
+          Leads ↗
+        </a>
         <Link href="/v1/app" className="v1-nav-item v1-nav-item--quiet" onClick={() => onNavigate?.()}>
           <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
           Naar klantendashboard
