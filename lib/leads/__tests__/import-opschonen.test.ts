@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isAdresgids, verwerkImport, leesCsv, type NielsLead } from '../import-opschonen';
+import { isAdresgids, verwerkImport, leesCsv, besluitHerimport, SCAN_VELDEN, type NielsLead, type BestaandeLead } from '../import-opschonen';
 
 const L = (x: Partial<NielsLead>): NielsLead => ({
   url: 'https://jansen-bouw.nl/',
@@ -183,4 +183,39 @@ test('kloon-gids-CSV-nummer wordt niet gedeeld door meerdere vermeldingen op het
   );
   assert.equal(r.leads.length, 0);
   assert.equal(r.rapport.zonderSleutel, 2);
+});
+
+// ── herimport ───────────────────────────────────────────────────────────
+
+const importLead = () => verwerkImport([L({})]).leads[0];
+/** Bestaande rij zoals de database hem teruggeeft: zelfde scanvelden, jsonb-sleutels in andere volgorde. */
+function bestaand(x: Partial<BestaandeLead> = {}): BestaandeLead {
+  const l = importLead();
+  const scan = Object.fromEntries(SCAN_VELDEN.map((k) => [k, l[k]]));
+  const bd = l.bron_data;
+  return { id: 'x', status: 'open', bedrijfsnaam: l.bedrijfsnaam, ...scan, bron_data: { knockout: bd.knockout, url: bd.url }, ...x };
+}
+
+test('herimport: niets veranderd → ongewijzigd (geen update, bewaarklok blijft)', () => {
+  assert.deepEqual(besluitHerimport(bestaand(), importLead(), false), { soort: 'ongewijzigd' });
+});
+
+test('herimport: alleen echt gewijzigde scanvelden in de patch', () => {
+  const b = besluitHerimport(bestaand({ score: 3, labels: ['oud'] }), importLead(), false);
+  assert.equal(b.soort, 'bijwerken');
+  assert.deepEqual(b.soort === 'bijwerken' && Object.keys(b.patch).sort(), ['labels', 'score']);
+});
+
+test('herimport: afgesloten of geanonimiseerde leads blijven onaangeroerd', () => {
+  for (const status of ['niet_bellen', 'geen_interesse', 'archief'] as const) {
+    assert.deepEqual(besluitHerimport(bestaand({ status, score: 1 }), importLead(), false), { soort: 'overslaan' });
+  }
+  assert.deepEqual(besluitHerimport(bestaand({ bedrijfsnaam: '(verwijderd)', score: 1 }), importLead(), false), { soort: 'overslaan' });
+});
+
+test('herimport: niet benaderen zet een bestaande lead op niet_bellen, behalve als hij dat al is', () => {
+  for (const status of ['open', 'kans', 'archief', 'geen_interesse'] as const) {
+    assert.deepEqual(besluitHerimport(bestaand({ status }), importLead(), true), { soort: 'niet_bellen' });
+  }
+  assert.deepEqual(besluitHerimport(bestaand({ status: 'niet_bellen' }), importLead(), true), { soort: 'overslaan' });
 });

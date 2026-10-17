@@ -343,3 +343,59 @@ export function leesCsv(tekst: string): Record<string, string>[] {
   if (!kop) return [];
   return rest.map((r) => Object.fromEntries(kop.map((k, i) => [k.trim(), (r[i] ?? '').trim()])));
 }
+
+// ── herimport: wat doen we met een lead die al in de database staat? ─────────
+
+/** Scan-/bronvelden die een herimport mag bijwerken. Status- en belvelden nooit. */
+export const SCAN_VELDEN = [
+  'google_rating',
+  'google_reviews',
+  'heeft_chatbot',
+  'chatbot_naam',
+  'platform',
+  'woorden',
+  'score',
+  'score_max',
+  'score_redenen',
+  'labels',
+  'bron_data',
+] as const satisfies readonly (keyof ImportLead)[];
+export type ScanVeld = (typeof SCAN_VELDEN)[number];
+
+/** Statussen waarvan een bestaande lead bij herimport helemaal met rust wordt gelaten. */
+const AFGESLOTEN: readonly LeadStatus[] = ['niet_bellen', 'geen_interesse', 'archief'];
+export const NIET_BENADEREN_REDEN = 'niet benaderen (Niels)';
+
+export type BestaandeLead = { id: string; status: LeadStatus; bedrijfsnaam: string } & Partial<Record<ScanVeld, unknown>>;
+
+export type HerimportBesluit =
+  | { soort: 'overslaan' }
+  | { soort: 'ongewijzigd' }
+  | { soort: 'niet_bellen' }
+  | { soort: 'bijwerken'; patch: Partial<Record<ScanVeld, unknown>> };
+
+/** JSON met gesorteerde object-sleutels (jsonb geeft sleutels in een eigen volgorde terug). */
+function stabielJson(x: unknown): string {
+  return JSON.stringify(x, (_k, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, (v as Record<string, unknown>)[k]]))
+      : v,
+  );
+}
+
+/**
+ * Beslist wat een herimport met een bestaande lead doet.
+ * - niet_benaderen (status.json) en nog niet niet_bellen → op niet_bellen zetten (rest ongemoeid).
+ * - afgesloten (niet_bellen/geen_interesse/archief) of geanonimiseerd → overslaan
+ *   (geen update = de AVG-bewaarklok op updated_at loopt door, niets wordt teruggevuld).
+ * - anders alleen bijwerken als minstens één scanveld echt anders is (anders reset updated_at onnodig).
+ */
+export function besluitHerimport(bestaand: BestaandeLead, nieuw: ImportLead, nietBenaderen: boolean): HerimportBesluit {
+  if (nietBenaderen && bestaand.status !== 'niet_bellen') return { soort: 'niet_bellen' };
+  if (AFGESLOTEN.includes(bestaand.status) || bestaand.bedrijfsnaam === '(verwijderd)') return { soort: 'overslaan' };
+  const patch: Partial<Record<ScanVeld, unknown>> = {};
+  for (const k of SCAN_VELDEN) {
+    if (stabielJson(bestaand[k] ?? null) !== stabielJson(nieuw[k] ?? null)) patch[k] = nieuw[k];
+  }
+  return Object.keys(patch).length ? { soort: 'bijwerken', patch } : { soort: 'ongewijzigd' };
+}

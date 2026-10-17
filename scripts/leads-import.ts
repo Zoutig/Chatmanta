@@ -1,13 +1,26 @@
 // Import van Niels' ChatbotScanner-data naar V1 (tabel leads).
 //   npm run leads:import -- <leads.json> [--status <status.json>] [--csv-map <map met gevonden_*.csv>] [--toepassen]
 // Standaard een PROEFRUN (schrijft niets). Bestanden staan buiten de repo.
-// Idempotent: upsert op domein; status- en belvelden van bestaande leads worden nooit overschreven.
+// Idempotent: upsert op domein; status- en belvelden van bestaande leads worden nooit overschreven,
+// behalve 'niet benaderen' uit status.json (→ niet_bellen). Afgesloten of geanonimiseerde leads en
+// leads zonder echte scanwijziging blijven onaangeroerd (updated_at = AVG-bewaarklok).
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { verwerkImport, leesCsv, type NielsLead, type NielsStatus, type ImportLead } from '../lib/leads/import-opschonen';
+import {
+  verwerkImport,
+  leesCsv,
+  besluitHerimport,
+  SCAN_VELDEN,
+  NIET_BENADEREN_REDEN,
+  type NielsLead,
+  type NielsStatus,
+  type BestaandeLead,
+} from '../lib/leads/import-opschonen';
 import { normaliseerDomein } from '../lib/leads/normaliseren';
+import { leesAllePaginas } from '../lib/leads/pagineren';
+import { pakStand, STAND_KOLOMMEN, type Stand } from '../lib/leads/types';
 
 function arg(naam: string): string | undefined {
   const i = process.argv.indexOf(naam);
@@ -50,23 +63,46 @@ async function main() {
     auth: { persistSession: false },
   });
 
-  // Bestaande leads: alleen scan/bronvelden bijwerken, nooit status/belvelden.
-  const { data: bestaand, error: be } = await db.from('leads').select('id, domein, telefoon').limit(20000);
-  if (be) throw be;
-  const opDomein = new Map((bestaand ?? []).filter((b) => b.domein).map((b) => [b.domein as string, b.id as string]));
-  const opTelefoon = new Map((bestaand ?? []).filter((b) => b.telefoon).map((b) => [b.telefoon as string, b.id as string]));
+  // Bestaande leads lezen, in blokken: PostgREST kapt een antwoord af op max_rows.
+  const kolommen = ['id', 'domein', 'telefoon', 'bedrijfsnaam', ...STAND_KOLOMMEN, ...SCAN_VELDEN].join(', ');
+  type Rij = BestaandeLead & Stand & { domein: string | null; telefoon: string | null };
+  const bestaand = await leesAllePaginas(async (van, tot) => {
+    const { data, error } = await db.from('leads').select(kolommen).order('id').range(van, tot);
+    if (error) throw error;
+    return (data ?? []) as unknown as Rij[];
+  });
+  const opDomein = new Map(bestaand.filter((b) => b.domein).map((b) => [b.domein as string, b]));
+  const opTelefoon = new Map(bestaand.filter((b) => b.telefoon).map((b) => [b.telefoon as string, b]));
 
-  let nieuw = 0;
-  let bijgewerkt = 0;
-  const SCAN_VELDEN: (keyof ImportLead)[] = ['google_rating', 'google_reviews', 'heeft_chatbot', 'chatbot_naam', 'platform', 'woorden', 'score', 'score_max', 'score_redenen', 'labels', 'bron_data'];
+  const telling = { nieuw: 0, bijgewerkt: 0, ongewijzigd: 0, overgeslagen: 0, naarNietBellen: 0 };
 
   for (const l of leads) {
-    const id = (l.domein && opDomein.get(l.domein)) || (l.telefoon && opTelefoon.get(l.telefoon)) || null;
-    if (id) {
-      const patch = Object.fromEntries(SCAN_VELDEN.map((k) => [k, l[k]]));
-      const { error } = await db.from('leads').update(patch).eq('id', id);
-      if (error) throw error;
-      bijgewerkt++;
+    const b = (l.domein && opDomein.get(l.domein)) || (l.telefoon && opTelefoon.get(l.telefoon)) || null;
+    if (b) {
+      const nietBenaderen = !!(l.domein && status?.[l.domein]?.niet_benaderen);
+      const besluit = besluitHerimport(b, l, nietBenaderen);
+      if (besluit.soort === 'overslaan') telling.overgeslagen++;
+      else if (besluit.soort === 'ongewijzigd') telling.ongewijzigd++;
+      else if (besluit.soort === 'bijwerken') {
+        // Alleen scanvelden; status en belvelden nooit.
+        const { error } = await db.from('leads').update(besluit.patch).eq('id', b.id);
+        if (error) throw error;
+        telling.bijgewerkt++;
+      } else {
+        const { error } = await db
+          .from('leads')
+          .update({ status: 'niet_bellen', status_reden: NIET_BENADEREN_REDEN, volgende_actie_op: null, volgende_actie_notitie: null })
+          .eq('id', b.id);
+        if (error) throw error;
+        const { error: ae } = await db.from('lead_activiteiten').insert({
+          lead_id: b.id,
+          soort: 'status',
+          details: { van: b.status, naar: 'niet_bellen', reden: NIET_BENADEREN_REDEN, bron: 'import' },
+          vorige_staat: pakStand(b),
+        });
+        if (ae) throw ae;
+        telling.naarNietBellen++;
+      }
       continue;
     }
     const { data, error } = await db.from('leads').insert(l).select('id').single();
@@ -74,14 +110,17 @@ async function main() {
       console.error(`Overgeslagen (${l.domein ?? l.telefoon}): ${error.message}`);
       continue;
     }
-    nieuw++;
+    telling.nieuw++;
     const acts = l.domein ? activiteiten.get(l.domein) : undefined;
     if (acts?.length) {
       const { error: ae } = await db.from('lead_activiteiten').insert(acts.map((a) => ({ lead_id: data.id, soort: a.soort, details: a.details })));
       if (ae) throw ae;
     }
   }
-  console.log(`\nKlaar: ${nieuw} nieuw, ${bijgewerkt} bijgewerkt.`);
+  console.log(
+    `\nKlaar: ${telling.nieuw} nieuw, ${telling.bijgewerkt} bijgewerkt, ${telling.ongewijzigd} ongewijzigd, ` +
+      `${telling.overgeslagen} overgeslagen (afgesloten/verwijderd), ${telling.naarNietBellen} naar niet_bellen (niet benaderen).`,
+  );
 }
 
 main().catch((e) => {
