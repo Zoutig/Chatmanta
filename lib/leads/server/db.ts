@@ -4,6 +4,7 @@ import { AppError } from '@/lib/errors/app-error';
 import type { Activiteit, Afzender, BewerkbaarVeld, Lead, LeadStatus, Stand, Uitkomst, ActiviteitSoort } from '../types';
 import { pakStand } from '../types';
 import { beginVanMorgen } from '../werkdagen';
+import { leesAllePaginas } from '../pagineren';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID_RE.test(x);
@@ -91,11 +92,14 @@ export async function tellers(db: SupabaseClient, nu = new Date()): Promise<Reco
 }
 
 export async function filterOpties(db: SupabaseClient): Promise<{ niches: string[]; plaatsen: string[] }> {
-  const { data, error } = await db.from('leads').select('niche, plaats').limit(10000);
-  if (error) fout(`filters ophalen faalde: ${error.message}`, error);
+  const data = await leesAllePaginas(async (van, tot) => {
+    const { data, error } = await db.from('leads').select('niche, plaats').order('id').range(van, tot);
+    if (error) fout(`filters ophalen faalde: ${error.message}`, error);
+    return (data ?? []) as { niche: string | null; plaats: string | null }[];
+  });
   const niches = new Set<string>();
   const plaatsen = new Set<string>();
-  for (const r of data ?? []) {
+  for (const r of data) {
     if (r.niche) niches.add(r.niche);
     if (r.plaats) plaatsen.add(r.plaats);
   }
@@ -190,7 +194,25 @@ export async function geefVrij(db: SupabaseClient, userId: string, id: string): 
 
 // ── schrijven ────────────────────────────────────────────────────────────
 
-/** Nieuwe stand toepassen + activiteit loggen. Geeft de activiteit-id terug (voor ongedaan maken). */
+export const GEWIJZIGD_DOOR_ANDER = 'Deze lead is intussen door een ander gewijzigd. Herlaad en probeer opnieuw.';
+
+/** Eén nullable kolom gelijk aan de gelezen waarde (null → `is null`, anders `eq`). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function gelijkOfNull(q: any, kolom: string, waarde: string | null) {
+  return waarde === null ? q.is(kolom, null) : q.eq(kolom, waarde);
+}
+
+/**
+ * Nieuwe stand toepassen + activiteit loggen. Geeft de activiteit-id terug (voor ongedaan maken).
+ *
+ * De update is voorwaardelijk (optimistic concurrency): hij raakt de lead alleen als de stand nog
+ * gelijk is aan wat `o.lead` las, én de lead niet door een ander geclaimd is (claim leeg, verlopen,
+ * of van `userId` zelf). Anders INPUT_INVALID met GEWIJZIGD_DOOR_ANDER. Daardoor wist `vrijgeven`
+ * ook alleen de eigen of een verlopen claim.
+ *
+ * Bekend en geaccepteerd: update en activiteit-insert lopen NIET in één transactie. Faalt de insert,
+ * dan staat de nieuwe stand wel maar zonder activiteit (en dus zonder ongedaan-maken-knop).
+ */
 export async function pasStandToe(
   db: SupabaseClient,
   o: {
@@ -202,15 +224,30 @@ export async function pasStandToe(
     details?: Record<string, unknown>;
     vrijgeven?: boolean;
     extraVelden?: Partial<Lead>;
+    nu?: Date;
   },
 ): Promise<string> {
+  // userId komt uit de sessie; toch eerst het formaat checken, want hij gaat een or()-string in.
+  if (!isUuid(o.userId)) fout('ongeldige gebruiker');
+  const nu = (o.nu ?? new Date()).toISOString();
   const patch: Record<string, unknown> = { ...o.nieuw, ...(o.extraVelden ?? {}) };
   if (o.vrijgeven) {
     patch.geclaimd_door = null;
     patch.geclaimd_tot = null;
   }
-  const { error: upErr } = await db.from('leads').update(patch).eq('id', o.lead.id);
+  let q = db
+    .from('leads')
+    .update(patch)
+    .eq('id', o.lead.id)
+    .eq('status', o.lead.status)
+    .eq('pogingen_niet_opgenomen', o.lead.pogingen_niet_opgenomen);
+  q = gelijkOfNull(q, 'laatste_poging_op', o.lead.laatste_poging_op);
+  q = gelijkOfNull(q, 'opvolgmail_gestuurd_op', o.lead.opvolgmail_gestuurd_op);
+  // Alleen sessie-userId (uuid-gecheckt) en een ISO-datum in deze or()-string.
+  q = q.or(`geclaimd_door.is.null,geclaimd_tot.lt.${nu},geclaimd_door.eq.${o.userId}`);
+  const { data: geraakt, error: upErr } = await q.select('id');
   if (upErr) fout(`lead bijwerken faalde: ${upErr.message}`, upErr);
+  if ((geraakt ?? []).length !== 1) throw new AppError('INPUT_INVALID', { message: GEWIJZIGD_DOOR_ANDER });
   const { data, error } = await db
     .from('lead_activiteiten')
     .insert({
@@ -230,11 +267,30 @@ export async function pasStandToe(
 export async function logActiviteit(
   db: SupabaseClient,
   o: { leadId: string; userId: string; soort: ActiviteitSoort; details?: Record<string, unknown> },
-): Promise<void> {
-  const { error } = await db
+): Promise<string> {
+  const { data, error } = await db
     .from('lead_activiteiten')
-    .insert({ lead_id: o.leadId, user_id: o.userId, soort: o.soort, details: o.details ?? {} });
+    .insert({ lead_id: o.leadId, user_id: o.userId, soort: o.soort, details: o.details ?? {} })
+    .select('id')
+    .single();
   if (error) fout(`activiteit loggen faalde: ${error.message}`, error);
+  return data.id as string;
+}
+
+/**
+ * Losse 'kennismaking'-activiteit bij een belpoging. `details.bij_activiteit` wijst naar die
+ * belpoging, zodat maakOngedaan ze samen terugdraait (en de kennismaking niet als "later" telt).
+ */
+export async function logKennismaking(
+  db: SupabaseClient,
+  o: { leadId: string; userId: string; op: string | null; bijActiviteit: string },
+): Promise<string> {
+  return logActiviteit(db, {
+    leadId: o.leadId,
+    userId: o.userId,
+    soort: 'kennismaking',
+    details: { op: o.op, bij_activiteit: o.bijActiviteit },
+  });
 }
 
 export const ONGEDAAN_VENSTER_MS = 15 * 60_000;
@@ -249,26 +305,30 @@ export async function maakOngedaan(db: SupabaseClient, activiteitId: string, nu 
   if (!a.vorige_staat) throw new AppError('INPUT_INVALID', { message: 'Deze actie kan niet ongedaan worden gemaakt.' });
   if (nu.getTime() - new Date(a.created_at).getTime() > ONGEDAAN_VENSTER_MS)
     throw new AppError('INPUT_INVALID', { message: 'Te lang geleden om ongedaan te maken.' });
-  const { data: later } = await db
+  // Is er daarna nog iets gebeurd? Activiteiten die bij déze actie horen (bij_activiteit) tellen niet.
+  // a.id komt uit de database (uuid), dus veilig in de or()-string.
+  const { data: later, error: le } = await db
     .from('lead_activiteiten')
     .select('id')
     .eq('lead_id', a.lead_id)
     .is('ongedaan_op', null)
     .gt('created_at', a.created_at)
+    .or(`details->>bij_activiteit.is.null,details->>bij_activiteit.neq.${a.id}`)
     .limit(1);
+  if (le) fout(`latere acties ophalen faalde: ${le.message}`, le);
   if ((later ?? []).length) throw new AppError('INPUT_INVALID', { message: 'Er is daarna al iets anders met deze lead gebeurd.' });
   const { error: e1 } = await db.from('leads').update(a.vorige_staat).eq('id', a.lead_id);
   if (e1) fout(`terugzetten faalde: ${e1.message}`, e1);
   const { error: e2 } = await db.from('lead_activiteiten').update({ ongedaan_op: nu.toISOString() }).eq('id', a.id);
   if (e2) fout(`markeren als ongedaan faalde: ${e2.message}`, e2);
-  // Een kennismaking-activiteit die bij deze uitkomst hoorde (zelfde lead, binnen 5 s) ook ongedaan maken.
-  await db
+  // De activiteiten die bij deze actie hoorden (bv. de kennismaking) ook ongedaan maken.
+  const { error: e3 } = await db
     .from('lead_activiteiten')
     .update({ ongedaan_op: nu.toISOString() })
     .eq('lead_id', a.lead_id)
-    .eq('soort', 'kennismaking')
-    .is('ongedaan_op', null)
-    .gte('created_at', new Date(new Date(a.created_at).getTime() - 5000).toISOString());
+    .eq('details->>bij_activiteit', a.id)
+    .is('ongedaan_op', null);
+  if (e3) fout(`bijbehorende acties markeren faalde: ${e3.message}`, e3);
   return a.lead_id;
 }
 
@@ -315,17 +375,25 @@ export async function zetStatusVoorVeel(
 ): Promise<number> {
   const { data: leads, error } = await db.from('leads').select('*').in('id', ids);
   if (error) fout(`leads ophalen faalde: ${error.message}`, error);
+  let aantal = 0;
   for (const l of (leads ?? []) as Lead[]) {
-    await pasStandToe(db, {
-      lead: l,
-      userId,
-      nieuw: { ...pakStand(l), status: naar, status_reden: reden, volgende_actie_op: null, volgende_actie_notitie: null },
-      soort: 'status',
-      details: { van: l.status, naar, reden, bulk: true },
-      vrijgeven: true,
-    });
+    try {
+      await pasStandToe(db, {
+        lead: l,
+        userId,
+        nieuw: { ...pakStand(l), status: naar, status_reden: reden, volgende_actie_op: null, volgende_actie_notitie: null },
+        soort: 'status',
+        details: { van: l.status, naar, reden, bulk: true },
+        vrijgeven: true,
+      });
+      aantal++;
+    } catch (e) {
+      // Een lead die een ander nu belt of net wijzigde slaan we over; de rest gaat door.
+      if (e instanceof AppError && e.code === 'INPUT_INVALID') continue;
+      throw e;
+    }
   }
-  return (leads ?? []).length;
+  return aantal;
 }
 
 // ── afzender ─────────────────────────────────────────────────────────────

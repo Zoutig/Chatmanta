@@ -156,11 +156,11 @@ export async function uitkomstAction(
       vrijgeven: overgang.opentMail === null,
     });
     if (overgang.kennismaking) {
-      await dbl.logActiviteit(c.db, {
+      await dbl.logKennismaking(c.db, {
         leadId: id,
         userId: c.userId,
-        soort: 'kennismaking',
-        details: { op: overgang.stand.kennismaking_op },
+        op: overgang.stand.kennismaking_op,
+        bijActiviteit: activiteitId,
       });
     }
     revalidate(id);
@@ -246,12 +246,13 @@ export async function zetStatusAction(id: string, naar: HandmatigeStatus, reden:
   return actionTry(async () => {
     if (!HANDMATIG.includes(naar)) ongeldig('Ongeldige status.');
     const lead = await dbl.haalLead(c.db, uuid(id));
+    const schoneReden = reden ? String(reden).slice(0, 200) : null;
     const activiteitId = await dbl.pasStandToe(c.db, {
       lead,
       userId: c.userId,
-      nieuw: handmatigeStatus(pakStand(lead), naar, reden ? String(reden).slice(0, 200) : null),
+      nieuw: handmatigeStatus(pakStand(lead), naar, schoneReden),
       soort: 'status',
-      details: { van: lead.status, naar, reden },
+      details: { van: lead.status, naar, reden: schoneReden },
       vrijgeven: true,
     });
     revalidate(id);

@@ -3,7 +3,8 @@
 // Draaien: npm run leads:test-db  (db.ts importeert 'server-only' → --conditions=react-server)
 import { getV1ServiceRoleClient } from '../lib/supabase/v1/service-role';
 import * as dbl from '../lib/leads/server/db';
-import { pakStand } from '../lib/leads/types';
+import { pakStand, type Lead } from '../lib/leads/types';
+import { AppError } from '../lib/errors/app-error';
 import { volgendeStand } from '../lib/leads/volgende-stand';
 
 const NICHE = 'e2e-db-test';
@@ -80,6 +81,82 @@ async function main() {
     const opt = await dbl.filterOpties(db);
     eis(opt.niches.includes(NICHE), 'filterOpties bevat de testniche');
     eis(!!(await dbl.zoekDubbel(db, 'e2e-laag.invalid', null)) && laagId.length > 0, 'zoekDubbel vindt een bestaand domein');
+
+    // interesse + kennismaking → ongedaan maken draait beide activiteiten terug
+    {
+      const l0 = await dbl.haalLead(db, laagId);
+      const voorKm = pakStand(l0);
+      const km = new Date(Date.now() + 3 * 24 * 3600_000).toISOString();
+      const o = volgendeStand(voorKm, { uitkomst: 'interesse', mail: false, kennismakingOp: km }, new Date());
+      eis(o.kennismaking, 'interesse met datum plant een kennismaking');
+      const belId = await dbl.pasStandToe(db, { lead: l0, userId, nieuw: o.stand, soort: 'belpoging', uitkomst: 'interesse', details: o.details, vrijgeven: true });
+      const kmId = await dbl.logKennismaking(db, { leadId: laagId, userId, op: o.stand.kennismaking_op, bijActiviteit: belId });
+      await dbl.maakOngedaan(db, belId);
+      const { data: acts, error: ae } = await db.from('lead_activiteiten').select('id, ongedaan_op').in('id', [belId, kmId]);
+      if (ae) throw new Error(ae.message);
+      eis(acts?.length === 2 && acts.every((r) => r.ongedaan_op !== null), 'belpoging én kennismaking staan op ongedaan');
+      eis(JSON.stringify(pakStand(await dbl.haalLead(db, laagId))) === JSON.stringify(voorKm), 'stand na ongedaan kennismaking weer identiek');
+
+      // Een écht latere activiteit (zonder bij_activiteit) blokkeert ongedaan maken nog steeds.
+      const l1 = await dbl.haalLead(db, laagId);
+      const o2 = volgendeStand(pakStand(l1), { uitkomst: 'interesse', mail: false, kennismakingOp: km }, new Date());
+      const bel2 = await dbl.pasStandToe(db, { lead: l1, userId, nieuw: o2.stand, soort: 'belpoging', uitkomst: 'interesse', details: o2.details, vrijgeven: true });
+      await dbl.logKennismaking(db, { leadId: laagId, userId, op: o2.stand.kennismaking_op, bijActiviteit: bel2 });
+      await dbl.logActiviteit(db, { leadId: laagId, userId, soort: 'notitie', details: { tekst: 'test' } });
+      let geblokt = false;
+      try {
+        await dbl.maakOngedaan(db, bel2);
+      } catch (e) {
+        geblokt = e instanceof AppError && /daarna al iets anders/.test(e.message);
+      }
+      eis(geblokt, 'een latere notitie blokkeert ongedaan maken');
+    }
+
+    // pasStandToe weigert bij een claim van een ander en bij een verouderde stand
+    {
+      const { data: o, error: oe } = await db.from('users').select('id').eq('email', 'outsider@example.com').single();
+      if (oe || !o) throw new Error(`outsider niet gevonden: ${oe?.message}`);
+      const outsiderId = o.id as string;
+      /** True als pasStandToe precies met de "door een ander gewijzigd"-fout weigert. */
+      const weigert = async (opts: Parameters<typeof dbl.pasStandToe>[1]) => {
+        try {
+          await dbl.pasStandToe(db, opts);
+          return false;
+        } catch (e) {
+          return e instanceof AppError && e.code === 'INPUT_INVALID' && e.message === dbl.GEWIJZIGD_DOOR_ANDER;
+        }
+      };
+      const stap = (l: Lead) => ({
+        lead: l,
+        userId,
+        nieuw: volgendeStand(pakStand(l), { uitkomst: 'niet_opgenomen', voicemail: false, naDerde: 'archief' }, new Date()).stand,
+        soort: 'belpoging' as const,
+        uitkomst: 'niet_opgenomen' as const,
+        vrijgeven: true,
+      });
+      const zetClaim = async (door: string | null, tot: string | null) => {
+        const { error } = await db.from('leads').update({ geclaimd_door: door, geclaimd_tot: tot }).eq('id', laagId);
+        if (error) throw new Error(error.message);
+      };
+
+      await zetClaim(outsiderId, new Date(Date.now() + 10 * 60_000).toISOString());
+      const geclaimdeLead = await dbl.haalLead(db, laagId);
+      eis(await weigert(stap(geclaimdeLead)), 'pasStandToe faalt als een ander de lead geclaimd heeft');
+      const naWeigering = await dbl.haalLead(db, laagId);
+      eis(naWeigering.geclaimd_door === outsiderId && naWeigering.pogingen_niet_opgenomen === geclaimdeLead.pogingen_niet_opgenomen, 'claim en stand van de ander blijven staan');
+
+      await zetClaim(outsiderId, new Date(Date.now() - 60_000).toISOString());
+      const verlopen = await dbl.haalLead(db, laagId);
+      await dbl.pasStandToe(db, stap(verlopen));
+      eis((await dbl.haalLead(db, laagId)).geclaimd_door === null, 'verlopen claim van een ander: toegestaan en vrijgegeven');
+
+      const oud = await dbl.haalLead(db, laagId);
+      const { error: se } = await db.from('leads').update({ pogingen_niet_opgenomen: oud.pogingen_niet_opgenomen + 1 }).eq('id', laagId);
+      if (se) throw new Error(se.message);
+      eis(await weigert(stap(oud)), 'pasStandToe faalt als de stand intussen gewijzigd is');
+      const vers = await dbl.haalLead(db, laagId);
+      eis(await weigert(stap({ ...vers, status: 'kans' })), 'pasStandToe faalt bij een andere status');
+    }
 
     console.log('ALLE CHECKS GESLAAGD');
   } finally {
