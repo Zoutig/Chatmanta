@@ -158,6 +158,37 @@ async function main() {
       eis(await weigert(stap({ ...vers, status: 'kans' })), 'pasStandToe faalt bij een andere status');
     }
 
+    // leads_inzicht: tellingen over directe testactiviteiten (alleen de testniche + dit testuur)
+    {
+      const van = new Date(Date.now() - 3600_000);
+      const tot = new Date(Date.now() + 3600_000);
+      const voor = (await db.rpc('leads_inzicht', { p_van: van.toISOString(), p_tot: tot.toISOString(), p_user: userId })).data;
+      const rij = (soort: string, uitkomst: string | null, details: object = {}, ongedaan = false) => ({
+        lead_id: laagId, user_id: userId, soort, uitkomst, details, ongedaan_op: ongedaan ? new Date().toISOString() : null,
+      });
+      const { error: ie } = await db.from('lead_activiteiten').insert([
+        rij('belpoging', 'niet_opgenomen'),
+        rij('belpoging', 'geen_interesse', { bezwaar: 'e2e_bezwaar' }),
+        rij('belpoging', 'interesse'),
+        rij('belpoging', 'interesse', {}, true), // ongedaan: telt niet
+        rij('import', null), // import: telt niet
+        rij('kennismaking', null),
+        rij('status', null, { naar: 'klant' }),
+      ]);
+      if (ie) throw new Error(ie.message);
+      const na = (await db.rpc('leads_inzicht', { p_van: van.toISOString(), p_tot: tot.toISOString(), p_user: userId })).data;
+      eis(na.belpogingen - voor.belpogingen === 3, 'leads_inzicht: 3 belpogingen erbij (ongedaan telt niet)');
+      eis(na.opgenomen - voor.opgenomen === 2, 'leads_inzicht: 2 opgenomen erbij');
+      eis(na.interesse - voor.interesse === 1, 'leads_inzicht: 1 interesse erbij');
+      eis(na.kennismakingen - voor.kennismakingen === 1 && na.klanten - voor.klanten === 1, 'leads_inzicht: kennismaking en klant geteld');
+      const niche = (na.per_niche as { naam: string; belletjes: number; interesse: number; voorraad: number }[]).find((n) => n.naam === NICHE);
+      eis(!!niche && niche.belletjes >= 3 && niche.interesse >= 1, 'leads_inzicht: per_niche telt de testniche');
+      eis((na.bezwaren as { bezwaar: string }[]).some((b) => b.bezwaar === 'e2e_bezwaar'), 'leads_inzicht: bezwaar zichtbaar');
+      eis(typeof na.pijplijn === 'object' && Array.isArray(na.heatmap), 'leads_inzicht: pijplijn en heatmap aanwezig');
+      const anders = (await db.rpc('leads_inzicht', { p_van: van.toISOString(), p_tot: tot.toISOString(), p_user: '00000000-0000-0000-0000-000000000000' })).data;
+      eis(anders.belpogingen === 0, 'leads_inzicht: p_user filtert op beller');
+    }
+
     console.log('ALLE CHECKS GESLAAGD');
   } finally {
     if (ids.length) {
