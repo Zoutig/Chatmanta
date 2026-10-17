@@ -89,6 +89,22 @@ async function main() {
     eis(opt.niches.includes(NICHE), 'filterOpties bevat de testniche');
     eis(!!(await dbl.zoekDubbel(db, 'e2e-laag.invalid', null)) && laagId.length > 0, 'zoekDubbel vindt een bestaand domein');
 
+    // test-terugdraaien: buiten het 15-minutenvenster alleen met zonderVenster; wisAlleActies zet alles terug
+    {
+      await db.from('lead_activiteiten').delete().eq('lead_id', laagId).is('vorige_staat', null); // losse belpoging van de beller-check
+      const l0 = await dbl.haalLead(db, laagId);
+      const voor0 = pakStand(l0);
+      const o = volgendeStand(voor0, { uitkomst: 'niet_opgenomen', voicemail: false }, new Date());
+      const oud = await dbl.pasStandToe(db, { lead: l0, userId, nieuw: o.stand, soort: 'belpoging', uitkomst: 'niet_opgenomen', details: o.details, vrijgeven: true });
+      await db.from('lead_activiteiten').update({ created_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', oud);
+      let geweigerd = false;
+      try { await dbl.maakOngedaan(db, oud); } catch { geweigerd = true; }
+      eis(geweigerd, 'maakOngedaan weigert na 15 minuten');
+      const n = await dbl.wisAlleActies(db, laagId);
+      eis(n >= 1, 'wisAlleActies draait de oude actie terug');
+      eis(JSON.stringify(pakStand(await dbl.haalLead(db, laagId))) === JSON.stringify(voor0), 'lead staat na wisAlleActies weer zoals ervoor');
+    }
+
     // interesse + kennismaking → ongedaan maken draait beide activiteiten terug
     {
       const l0 = await dbl.haalLead(db, laagId);

@@ -206,6 +206,29 @@ export async function ongedaanAction(activiteitId: string): Promise<ActionResult
   }, META);
 }
 
+/** "Dit was een test": één actie zonder tijdslimiet terugdraaien (alleen de nieuwste van de lead). */
+export async function terugdraaienAction(activiteitId: string): Promise<ActionResult> {
+  const c = await ctx();
+  if (isFail(c)) return c;
+  return actionTry(async () => {
+    const leadId = await dbl.maakOngedaan(c.db, uuid(activiteitId), new Date(), true);
+    revalidate(leadId);
+    return {};
+  }, META);
+}
+
+/** "Dit was een test": alle acties van deze lead terugdraaien, lead weer als vóór het bellen. */
+export async function wisActiesAction(leadId: string): Promise<ActionResult<{ aantal: number }>> {
+  const c = await ctx();
+  if (isFail(c)) return c;
+  return actionTry(async () => {
+    await dbl.haalLead(c.db, uuid(leadId));
+    const aantal = await dbl.wisAlleActies(c.db, leadId);
+    revalidate(leadId);
+    return { aantal };
+  }, META);
+}
+
 // ── velden, status, nieuw ────────────────────────────────────────────────
 
 export async function werkVeldenBijAction(id: string, patch: Partial<Record<BewerkbaarVeld, string>>): Promise<ActionResult<{ lead: Lead }>> {

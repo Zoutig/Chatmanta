@@ -375,15 +375,18 @@ export async function logKennismaking(
 
 export const ONGEDAAN_VENSTER_MS = 15 * 60_000;
 
-/** Zet de lead terug naar `vorige_staat` van de LAATSTE niet-ongedane activiteit. */
-export async function maakOngedaan(db: SupabaseClient, activiteitId: string, nu = new Date()): Promise<string> {
+/**
+ * Zet de lead terug naar `vorige_staat` van de LAATSTE niet-ongedane activiteit. Normaal alleen binnen
+ * ONGEDAAN_VENSTER_MS; `zonderVenster` is voor "dit was een test" op de detailpagina.
+ */
+export async function maakOngedaan(db: SupabaseClient, activiteitId: string, nu = new Date(), zonderVenster = false): Promise<string> {
   const { data: act, error } = await db.from('lead_activiteiten').select('*').eq('id', activiteitId).maybeSingle();
   if (error) fout(`activiteit ophalen faalde: ${error.message}`, error);
   if (!act) throw new AppError('NOT_FOUND', { message: 'Deze actie bestaat niet.' });
   const a = act as Activiteit;
   if (a.ongedaan_op) throw new AppError('INPUT_INVALID', { message: 'Deze actie is al ongedaan gemaakt.' });
   if (!a.vorige_staat) throw new AppError('INPUT_INVALID', { message: 'Deze actie kan niet ongedaan worden gemaakt.' });
-  if (nu.getTime() - new Date(a.created_at).getTime() > ONGEDAAN_VENSTER_MS)
+  if (!zonderVenster && nu.getTime() - new Date(a.created_at).getTime() > ONGEDAAN_VENSTER_MS)
     throw new AppError('INPUT_INVALID', { message: 'Te lang geleden om ongedaan te maken.' });
   // Is er daarna nog iets gebeurd? Activiteiten die bij déze actie horen (bij_activiteit) tellen niet.
   // a.id komt uit de database (uuid), dus veilig in de or()-string.
@@ -410,6 +413,27 @@ export async function maakOngedaan(db: SupabaseClient, activiteitId: string, nu 
     .is('ongedaan_op', null);
   if (e3) fout(`bijbehorende acties markeren faalde: ${e3.message}`, e3);
   return a.lead_id;
+}
+
+/** Alle niet-ongedane acties van een lead terugdraaien, nieuwste eerst ("dit was een test"). Geeft het aantal. */
+export async function wisAlleActies(db: SupabaseClient, leadId: string): Promise<number> {
+  let n = 0;
+  for (let i = 0; i < 100; i++) {
+    const { data, error } = await db
+      .from('lead_activiteiten')
+      .select('id')
+      .eq('lead_id', leadId)
+      .is('ongedaan_op', null)
+      .not('vorige_staat', 'is', null)
+      .neq('soort', 'import')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) fout(`acties ophalen faalde: ${error.message}`, error);
+    if (!data?.length) break;
+    await maakOngedaan(db, data[0].id as string, new Date(), true);
+    n++;
+  }
+  return n;
 }
 
 export async function werkVeldenBij(db: SupabaseClient, id: string, patch: Partial<Pick<Lead, BewerkbaarVeld>>): Promise<Lead> {
