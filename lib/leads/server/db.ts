@@ -4,7 +4,7 @@ import { AppError } from '@/lib/errors/app-error';
 import type { Activiteit, Afzender, BewerkbaarVeld, Lead, LeadStatus, Stand, Uitkomst, ActiviteitSoort } from '../types';
 import { pakStand } from '../types';
 import { beginVanMorgen } from '../werkdagen';
-import { leesAllePaginas } from '../pagineren';
+import { begrensPagina, leesAllePaginas } from '../pagineren';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID_RE.test(x);
@@ -56,9 +56,9 @@ export function veiligeZoekterm(q: string): string {
   return q.replace(/[,()%*\\]/g, ' ').trim().slice(0, 80);
 }
 
-export async function lijstLeads(db: SupabaseClient, f: LijstFilter, nu = new Date()) {
-  const pagina = Math.max(1, f.pagina ?? 1);
-  let q = db.from('leads').select('*', { count: 'exact' });
+/** Tab + zoek + filters op een leads-query (zonder sortering/paginering). */
+function gefilterd(db: SupabaseClient, f: LijstFilter, nu: Date, head: boolean) {
+  let q = db.from('leads').select('*', { count: 'exact', head });
   q = filterTab(q, f.tab, nu);
   if (f.zoek) {
     const z = veiligeZoekterm(f.zoek);
@@ -71,11 +71,31 @@ export async function lijstLeads(db: SupabaseClient, f: LijstFilter, nu = new Da
   if (f.plaats) q = q.eq('plaats', f.plaats);
   if (f.minScore !== undefined) q = q.gte('score', f.minScore);
   if (f.reden) q = q.eq('status_reden', f.reden);
+  return q;
+}
+
+/**
+ * Eén pagina van de lijst. Een pagina voorbij het einde (PostgREST: 416 / PGRST103) wordt de
+ * laatste pagina; de pagina in het antwoord is dus altijd 1..aantal pagina's.
+ */
+export async function lijstLeads(db: SupabaseClient, f: LijstFilter, nu = new Date()) {
   const sort = f.sort ?? (f.tab === 'vandaag' ? 'score' : 'volgende_actie_op');
   const asc = (f.richting ?? (sort === 'score' ? 'desc' : 'asc')) === 'asc';
-  q = q.order(sort, { ascending: asc, nullsFirst: false }).order('id');
-  q = q.range((pagina - 1) * PAGINA_GROOTTE, pagina * PAGINA_GROOTTE - 1);
-  const { data, count, error } = await q;
+  const haal = (pagina: number) =>
+    gefilterd(db, f, nu, false)
+      .order(sort, { ascending: asc, nullsFirst: false })
+      .order('id')
+      .range((pagina - 1) * PAGINA_GROOTTE, pagina * PAGINA_GROOTTE - 1);
+
+  let pagina = Math.max(1, Math.floor(f.pagina ?? 1));
+  let { data, count, error } = await haal(pagina);
+  const voorbij = pagina > 1 && (error?.code === 'PGRST103' || (!error && !(data ?? []).length && (count ?? 0) > 0));
+  if (voorbij) {
+    const { count: totaal, error: e } = await gefilterd(db, f, nu, true);
+    if (e) fout(`leads tellen faalde: ${e.message}`, e);
+    pagina = begrensPagina(pagina, totaal ?? 0, PAGINA_GROOTTE);
+    ({ data, count, error } = await haal(pagina));
+  }
   if (error) fout(`leads ophalen faalde: ${error.message}`, error);
   return { leads: (data ?? []) as Lead[], totaal: count ?? 0, pagina };
 }

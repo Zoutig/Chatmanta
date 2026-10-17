@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { enkel } from '@/lib/leads/pagineren';
 import { requireJorionAdmin } from '@/lib/auth';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { PageHeader } from '@/app/v1/_ui/page-header';
@@ -26,10 +27,10 @@ function getal(s: string | undefined): number | undefined {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
 }
 
-export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireJorionAdmin();
   const db = getV1ServiceRoleClient();
-  const sp = await searchParams;
+  const sp = enkel(await searchParams);
   const tab = (TABS as string[]).includes(sp.tab ?? '') ? (sp.tab as Tab) : 'vandaag';
   const filter: LijstFilter = {
     tab,

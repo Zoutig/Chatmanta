@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import { enkel } from '@/lib/leads/pagineren';
 import Link from 'next/link';
 import { requireJorionAdmin } from '@/lib/auth';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
@@ -64,10 +65,10 @@ function Uitsplitsing({ rijen, titel }: { rijen: Inzicht['per_niche']; titel: st
   );
 }
 
-export default async function InzichtPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function InzichtPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireJorionAdmin();
   const db = getV1ServiceRoleClient();
-  const sp = await searchParams;
+  const sp = enkel(await searchParams);
   const periode = (PERIODES.map((p) => p.id) as string[]).includes(sp.periode ?? '') ? (sp.periode as Periode) : 'week';
   const lijst = await bellers(db);
   const beller = lijst.some((b) => b.id === sp.beller) ? sp.beller! : null;

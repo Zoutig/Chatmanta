@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { leesAllePaginas, LEES_PAGINA } from '../pagineren';
+import { leesAllePaginas, LEES_PAGINA, eerste, begrensPagina, enkel } from '../pagineren';
 
 function bron(n: number) {
   const rijen = Array.from({ length: n }, (_, i) => i);
@@ -36,4 +36,26 @@ test('leesAllePaginas: lege tabel', async () => {
 
 test('leesAllePaginas geeft een fout van haal door', async () => {
   await assert.rejects(leesAllePaginas(async () => Promise.reject(new Error('stuk'))), /stuk/);
+});
+
+test('eerste neemt bij een array de eerste waarde', () => {
+  assert.equal(eerste(undefined), undefined);
+  assert.equal(eerste('a'), 'a');
+  assert.equal(eerste(['a', 'b']), 'a');
+  assert.equal(eerste([]), undefined);
+});
+
+test('begrensPagina houdt de pagina binnen 1..aantal pagina\'s', () => {
+  assert.equal(begrensPagina(1, 0, 50), 1);
+  assert.equal(begrensPagina(5, 0, 50), 1);
+  assert.equal(begrensPagina(0, 120, 50), 1);
+  assert.equal(begrensPagina(-3, 120, 50), 1);
+  assert.equal(begrensPagina(2, 120, 50), 2);
+  assert.equal(begrensPagina(99, 120, 50), 3);
+  assert.equal(begrensPagina(3, 100, 50), 2);
+  assert.equal(begrensPagina(Number.NaN, 100, 50), 1);
+});
+
+test('enkel maakt van elke queryparameter een losse string', () => {
+  assert.deepEqual(enkel({ q: ['a', 'b'], tab: 'opvolgen', p: undefined }), { q: 'a', tab: 'opvolgen', p: undefined });
 });
