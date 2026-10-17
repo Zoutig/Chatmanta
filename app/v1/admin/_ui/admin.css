@@ -153,3 +153,18 @@
 .v1-ui .v1-adm-dot[data-tone='danger'] { background: var(--v1-danger); }
 /* sr-only-kolomkoppen (absolute) mogen niet buiten de scrollcontainer de pagina verbreden. */
 .v1-ui .v1-adm-table-wrap { position: relative; }
+
+/* ---- Ingelogd account (zijbalk-voet) ---- */
+.v1-adm-account {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.v1-adm-account-label { font-size: 11px; color: var(--v1-on-navy-3); }
+.v1-adm-account-name { font-size: 13px; font-weight: 600; color: var(--v1-on-navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v1-adm-account-email { font-size: 12px; color: var(--v1-on-navy-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

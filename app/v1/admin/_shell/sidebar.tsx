@@ -30,10 +30,17 @@ const ICON = { size: 18, strokeWidth: 1.8, 'aria-hidden': true } as const;
 export function AdminSidebar({
   quizCount,
   feedbackCount,
+  accountName,
+  accountEmail,
+  hasOrg,
   onNavigate,
 }: {
   quizCount: number;
   feedbackCount: number;
+  accountName: string;
+  accountEmail: string;
+  /** Alleen een admin die ook lid is van een klant-org heeft een klantendashboard. */
+  hasOrg: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -83,10 +90,17 @@ export function AdminSidebar({
           <PhoneCall size={16} strokeWidth={1.8} aria-hidden="true" />
           Leads ↗
         </a>
-        <Link href="/v1/app" className="v1-nav-item v1-nav-item--quiet" onClick={() => onNavigate?.()}>
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-          Naar klantendashboard
-        </Link>
+        {hasOrg && (
+          <Link href="/v1/app" className="v1-nav-item v1-nav-item--quiet" onClick={() => onNavigate?.()}>
+            <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+            Naar klantendashboard
+          </Link>
+        )}
+        <div className="v1-adm-account" title={accountEmail}>
+          <span className="v1-adm-account-label">Ingelogd als</span>
+          <span className="v1-adm-account-name">{accountName}</span>
+          <span className="v1-adm-account-email">{accountEmail}</span>
+        </div>
         <SignOutButton />
       </div>
     </aside>
