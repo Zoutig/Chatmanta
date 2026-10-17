@@ -6,6 +6,7 @@ export const SITE_URL = 'https://www.chatmanta.nl';
 export const ROUTES = {
   home: '/',
   kennismaking: '/kennismaking',
+  contact: '/contact',
   login: '/v1/login',
   demo: '/voorbeeld',
   privacy: '/privacy',

@@ -1,7 +1,7 @@
 // Next.js 16 proxy (was middleware in Next.js <16).
 //
 // Single job: gate ALL pages behind the V0 demo password except /v0/login itself,
-// the public marketing-site paths (/, /kennismaking, /voorwaarden, …; see matcher)
+// the public marketing-site paths (/, /kennismaking, /contact, /voorwaarden, …; see matcher)
 // and Next.js' internals (deny-by-default: alles wat niet expliciet in de matcher
 // is uitgezonderd, valt achter de gate). Server actions also re-check via requireAuth() in
 // app/actions/_auth.ts — never rely on the proxy alone (defense in depth).
@@ -96,7 +96,7 @@ export const config = {
   //   - `$` direct na de openings-`/` = EXACT de root `/` (lege rest). Zonder dit
   //     alternatief matcht de negatieve lookahead de root gewoon en valt `/` achter de
   //     gate. Raakt geen enkel ander pad (die hebben altijd een niet-lege rest).
-  //   - kennismaking, voorwaarden: segment-geankerd (`(?:/|$)`), zodat een toekomstig
+  //   - kennismaking, contact, voorwaarden: segment-geankerd (`(?:/|$)`), zodat een toekomstig
   //     /kennismakingen o.i.d. niet meelift.
   //   - api/site: de formulier-API (/api/site/kennismaking, M4) — beveiligt zichzelf
   //     (validatie + honeypot + per-IP rate-limit). Segment-geankerd.
@@ -108,6 +108,6 @@ export const config = {
   // Assets van de site (/logo/*.png, next/font onder /_next/static) vallen al onder
   // bestaande uitzonderingen. V0 server actions checken zelf requireAuth() (defense in depth).
   matcher: [
-    '/((?!$|kennismaking(?:/|$)|voorwaarden(?:/|$)|api/site(?:/|$)|sitemap\\.xml$|robots\\.txt$|opengraph-image(?:-\\w+)?$|v0/login(?:/|$)|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|_vercel/|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
+    '/((?!$|kennismaking(?:/|$)|contact(?:/|$)|voorwaarden(?:/|$)|api/site(?:/|$)|sitemap\\.xml$|robots\\.txt$|opengraph-image(?:-\\w+)?$|v0/login(?:/|$)|privacy(?:/|$)|voorbeeld(?:/|$)|api/voorbeeld(?:/|$)|embed|crawl-eval(?:/|$)|api/v0/cron|api/v0/chat|api/v0/feedback|api/v0/client-error(?:/|$)|api/v0/contact-request(?:/|$)|api/v0/widget|api/v1/chat|api/v1/widget|api/v1/cron(?:/|$)|api/v1/contact-request(?:/|$)|api/v1/client-error(?:/|$)|api/v1/pdf(?:/|$)|widget\\.js$|widget-v1\\.js$|_next/static|_next/image|_vercel/|favicon\\.ico|.*\\.png$|.*\\.svg$).*)',
   ],
 };
