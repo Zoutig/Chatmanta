@@ -32,12 +32,20 @@ export function SetPasswordForm() {
     setBusy(true);
     const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    setBusy(false);
     if (updateError) {
+      setBusy(false);
       setError(authErrorMessage(updateError.message));
       return;
     }
-    router.push('/v1/app');
+    // Een Jorion-admin (uitgenodigd zonder klant-org) hoort in het admin-dashboard,
+    // niet in het klantendashboard waar hij "Geen toegang" krijgt. Eigen rij, net als
+    // de admin-check in v1-sign-in-card.
+    const { data: auth } = await supabase.auth.getUser();
+    const { data: profile } = auth.user
+      ? await supabase.from('users').select('is_jorion_admin').eq('id', auth.user.id).maybeSingle()
+      : { data: null };
+    setBusy(false);
+    router.push(profile?.is_jorion_admin ? '/v1/admin' : '/v1/app');
     router.refresh();
   }
 
