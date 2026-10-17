@@ -99,3 +99,13 @@
 .ld-heat span { display: grid; place-items: center; height: 26px; border-radius: 4px; font-variant-numeric: tabular-nums; }
 .ld-heat .ld-heat-kop { color: var(--v1-muted); }
 .ld-periode { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Inzicht: smalle schermen */
+.ld-nav { min-width: 0; }
+.ld-raster > * { min-width: 0; }
+@media (max-width: 600px) {
+  .ld-kop { padding: 10px 14px; gap: 12px; }
+  .ld-staaf { grid-template-columns: 110px 1fr 32px; }
+  .ld-trechter-rij { grid-template-columns: 90px 1fr 80px; }
+}
+.ld-main { grid-template-columns: minmax(0, 1fr); }

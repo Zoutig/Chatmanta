@@ -123,17 +123,15 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
             ))}
           </div>
         </Panel>
-        <Panel title="Belletjes per dag">
-          <div style={{ padding: 16 }}>
-            <LineChart
-              title="Belletjes per dag"
-              points={d.per_dag.map((p) => ({ date: p.dag, label: p.dag.slice(8), value: p.belletjes }))}
-              formatValue={(n: number) => `${n}`}
-              emptyText="Nog geen belletjes in deze periode."
-            />
-            <p className="v1-hint">Opgenomen: {d.per_dag.reduce((s, p) => s + p.opgenomen, 0)} · Interesse: {d.per_dag.reduce((s, p) => s + p.interesse, 0)}</p>
-          </div>
-        </Panel>
+        <div>
+          <LineChart
+            title="Belletjes per dag"
+            points={d.per_dag.map((p) => ({ date: p.dag, label: p.dag.slice(8), value: p.belletjes }))}
+            formatValue={(n: number) => `${n}`}
+            emptyText="Nog geen belletjes in deze periode."
+            footnote={`Opgenomen: ${d.per_dag.reduce((s, p) => s + p.opgenomen, 0)} · Interesse: ${d.per_dag.reduce((s, p) => s + p.interesse, 0)}`}
+          />
+        </div>
         <Panel title="Beste beltijd (opneemratio in %)">
           <div style={{ padding: 16 }}>
             {d.belpogingen < 10 ? <p className="v1-hint">Nog te weinig gegevens.</p> : <Heatmap data={d.heatmap} />}
@@ -170,15 +168,14 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
             </DataTable>
           </div>
         </Panel>
-        <Panel title="Pijplijn nu">
-          <div style={{ padding: 16 }}>
-            <MetricGrid>
-              {(['open', 'terugbellen', 'opvolgen', 'kans', 'klant'] as LeadStatus[]).map((s) => (
-                <Metric key={s} label={STATUS_LABEL[s]} value={d.pijplijn[s] ?? 0} />
-              ))}
-            </MetricGrid>
-          </div>
-        </Panel>
+        <div>
+          <h2 className="v1-section-title" style={{ marginBottom: 12 }}>Pijplijn nu</h2>
+          <MetricGrid>
+            {(['open', 'terugbellen', 'opvolgen', 'kans', 'klant'] as LeadStatus[]).map((s) => (
+              <Metric key={s} label={STATUS_LABEL[s]} value={d.pijplijn[s] ?? 0} />
+            ))}
+          </MetricGrid>
+        </div>
       </div>
     </>
   );
