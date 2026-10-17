@@ -8,6 +8,7 @@ function omschrijving(a: Activiteit): string {
   switch (a.soort) {
     case 'belpoging': {
       let t = a.uitkomst ? UITKOMST_LABEL[a.uitkomst] : 'Gebeld';
+      if (d.inkomend) t = `Belde ons terug: ${t}`;
       if (a.uitkomst === 'niet_opgenomen' && d.voicemail) t += ' (voicemail)';
       if (a.uitkomst === 'terugbellen' && d.op) t += ` → ${toonMoment(String(d.op))}`;
       if (a.uitkomst === 'geen_interesse' && d.bezwaar) t += `: ${BEZWAAR_LABEL[d.bezwaar as Bezwaar] ?? d.bezwaar}`;

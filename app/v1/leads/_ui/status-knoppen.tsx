@@ -35,6 +35,9 @@ export function StatusKnoppen({ lead, compact = false }: { lead: Lead; compact?:
       {s === 'open' || s === 'terugbellen' || s === 'opvolgen' ? (
         <Link className="v1-btn v1-btn--secondary v1-btn--sm" href={`/v1/leads/bellen?lead=${lead.id}`}>Bel nu</Link>
       ) : null}
+      {s !== 'niet_bellen' && !compact ? (
+        <Link className="v1-btn v1-btn--ghost v1-btn--sm" href={`/v1/leads/bellen?lead=${lead.id}&inkomend=1`}>Belde ons terug</Link>
+      ) : null}
       {knoppen.map((k) => (
         <Button key={k.naar} size="sm" variant="ghost" loading={bezig === k.naar} onClick={() => zet(k.naar, k.reden ?? null)}>
           {k.label}

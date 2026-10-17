@@ -24,6 +24,7 @@ import { LeadLabels } from './labels';
 import { LeadVelden, BEL_VELDEN } from './lead-velden';
 import { UitkomstDialogen, type DialoogSoort } from './uitkomst-dialogen';
 import { MailPopup } from './mail-popup';
+import { TerugbelZoeker } from './terugbel-zoeker';
 
 type Focus = { niche: string | null; plaats: string | null };
 const VERLENG_MS = 120_000;
@@ -42,12 +43,14 @@ export function Belmodus({
   plaatsen,
   beginFocus,
   beginLeadId,
+  beginInkomend,
 }: {
   afzender: Afzender | null;
   niches: string[];
   plaatsen: string[];
   beginFocus: Focus;
   beginLeadId: string | null;
+  beginInkomend: boolean;
 }) {
   const toast = useToast();
   const [focus, setFocus] = useState<Focus>(beginFocus);
@@ -59,6 +62,9 @@ export function Belmodus({
   const [ongedaan, setOngedaan] = useState<{ id: string; tekst: string } | null>(null);
   const ongedaanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [voicemail, setVoicemail] = useState(false);
+  // Terugbelverzoek: de lead op het scherm belde ons (toets 7); de uitkomst wordt als inkomend gelogd.
+  const [inkomend, setInkomend] = useState(false);
+  const [zoeker, setZoeker] = useState(false);
   // Voorkomt dubbele acties (dubbel indrukken van een toets of knop terwijl de server nog bezig is).
   const bezig = useRef(false);
 
@@ -74,6 +80,7 @@ export function Belmodus({
       setKaart(r.kaart);
       setLeeg(r.kaart === null);
       setVoicemail(false);
+      setInkomend(false);
     },
     [toast],
   );
@@ -85,6 +92,7 @@ export function Belmodus({
         const r = await claimLeadAction(beginLeadId);
         if (r.ok && r.kaart) {
           setKaart(r.kaart);
+          setInkomend(beginInkomend);
           setLaden(false);
           return;
         }
@@ -160,7 +168,7 @@ export function Belmodus({
       const vorigeDialoog = dialoog;
       setDialoog(null);
       const opties = o.uitkomst === 'niet_opgenomen' ? { ...o, voicemail } : o;
-      const r = await uitkomstAction(kaart.lead.id, opties);
+      const r = await uitkomstAction(kaart.lead.id, opties, inkomend);
       if (!r.ok) {
         toast.error(r.error);
         if (isVerouderd(r)) {
@@ -184,12 +192,40 @@ export function Belmodus({
   }
 
   function knop(u: KnopUitkomst) {
-    if (!kaart || mail || laden || dialoog || bezig.current) return;
-    if (u === 'niet_opgenomen') {
+    if (!kaart || mail || laden || dialoog || zoeker || bezig.current) return;
+    if (u === 'niet_opgenomen' && inkomend) {
+      toast.error('Ze belden ons terug, dus ze hebben opgenomen. Kies een andere uitkomst.');
+    } else if (u === 'niet_opgenomen') {
       if (isLaatstePoging(kaart.lead)) setDialoog('niet_opgenomen_laatste');
       else void kies({ uitkomst: 'niet_opgenomen' });
     } else if (u === 'wil_mail') void kies({ uitkomst: 'wil_mail' });
     else setDialoog(u);
+  }
+
+  /** Toets 7: een bedrijf zoeken dat ons terugbelde en dat op het scherm zetten. */
+  function openTerugbel() {
+    if (mail || laden || dialoog || bezig.current) return;
+    setZoeker(true);
+  }
+
+  async function kiesTerugbel(id: string) {
+    if (bezig.current) return;
+    bezig.current = true;
+    setZoeker(false);
+    try {
+      if (kaart && kaart.lead.id !== id) await geefVrijAction(kaart.lead.id);
+      const r = await claimLeadAction(id);
+      if (!r.ok || !r.kaart) {
+        toast.error(r.ok ? 'Een ander is deze lead nu aan het bellen.' : r.error);
+        return;
+      }
+      setKaart(r.kaart);
+      setLeeg(false);
+      setVoicemail(false);
+      setInkomend(true);
+    } finally {
+      bezig.current = false;
+    }
   }
 
   async function overslaan() {
@@ -229,7 +265,7 @@ export function Belmodus({
   useEffect(() => {
     function toets(e: KeyboardEvent) {
       // Niet tijdens typen, en niet als een dialoog of de mail-pop-up open is.
-      if (dialoog || mail || laden) return;
+      if (dialoog || mail || laden || zoeker) return;
       const doel = e.target instanceof Element ? e.target : null;
       if (doel?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], dialog[open], [role="dialog"]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -248,7 +284,10 @@ export function Belmodus({
         '5': 'geen_interesse',
         '6': 'niet_bellen',
       };
-      if (map[e.key]) {
+      if (e.key === '7') {
+        e.preventDefault();
+        openTerugbel();
+      } else if (map[e.key]) {
         e.preventDefault();
         knop(map[e.key]);
       } else if (e.key.toLowerCase() === 's') {
@@ -305,6 +344,7 @@ export function Belmodus({
           <h2>Niets meer te bellen voor deze focus</h2>
           <p>Kijk bij <Link href="/v1/leads?tab=terugbellen">Terugbellen</Link> of <Link href="/v1/leads?tab=opvolgen">Opvolgen</Link>, of kies een andere focus.</p>
         </div>
+        <TerugbelZoeker open={zoeker} onSluit={() => setZoeker(false)} onKies={kiesTerugbel} />
       </>
     );
   }
@@ -341,6 +381,7 @@ export function Belmodus({
             <div className="ld-sub">Ook: {l.telefoons_extra.map((t) => <a key={t} href={telLink(t)} style={{ marginRight: 8 }}>{toonTelefoon(t)}</a>)}</div>
           ) : null}
           {l.email ? <div className="ld-sub">{l.email}</div> : null}
+          {inkomend ? <div className="ld-label">Belde ons terug: kies de uitkomst</div> : null}
           <div className="ld-sub">Poging {l.pogingen_niet_opgenomen + 1} van 3{l.volgende_actie_notitie ? ` · ${l.volgende_actie_notitie}` : ''}</div>
           <label className="ld-sub" style={{ display: 'inline-flex', gap: 6, justifyContent: 'center' }}>
             <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail ingesproken
@@ -353,6 +394,7 @@ export function Belmodus({
             <button type="button" className="ld-uitkomst" onClick={() => knop('geen_interesse')}><kbd>5</kbd>Geen interesse</button>
             <button type="button" className="ld-uitkomst" data-tone="danger" onClick={() => knop('niet_bellen')}><kbd>6</kbd>Niet bellen</button>
           </div>
+          <button type="button" className="ld-uitkomst" data-tone="ok" onClick={openTerugbel}><kbd>7</kbd>Belde ons terug</button>
           <Button variant="ghost" size="sm" onClick={overslaan}>Overslaan (S)</Button>
         </section>
 
@@ -381,6 +423,8 @@ export function Belmodus({
         onSluit={() => setDialoog(null)}
         onKies={kies}
       />
+
+      <TerugbelZoeker open={zoeker} onSluit={() => setZoeker(false)} onKies={kiesTerugbel} />
 
       {mail ? (
         <MailPopup

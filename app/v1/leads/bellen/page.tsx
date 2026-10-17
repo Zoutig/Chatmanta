@@ -16,6 +16,7 @@ export default async function BellenPage({ searchParams }: { searchParams: Promi
       plaatsen={plaatsen}
       beginFocus={{ niche: sp.niche ?? null, plaats: sp.plaats ?? null }}
       beginLeadId={isUuid(sp.lead) ? sp.lead : null}
+      beginInkomend={sp.inkomend === '1'}
     />
   );
 }
