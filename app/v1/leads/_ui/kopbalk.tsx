@@ -11,7 +11,7 @@ const ITEMS = [
   { href: '/v1/leads/instellingen', label: 'Instellingen' },
 ];
 
-export function Kopbalk() {
+export function Kopbalk({ naam }: { naam: string }) {
   const pad = usePathname();
   return (
     <header className="ld-kop">
@@ -29,6 +29,9 @@ export function Kopbalk() {
           );
         })}
       </nav>
+      <Link href="/v1/leads/instellingen" className="ld-kop-naam" title="Je afzendergegevens">
+        {naam}
+      </Link>
     </header>
   );
 }

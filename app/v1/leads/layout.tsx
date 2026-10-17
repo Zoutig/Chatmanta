@@ -8,6 +8,8 @@ import { requireJorionAdmin } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { ToastProvider } from '@/app/v1/_ui/toast';
+import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
+import { naamVoorKop } from '@/lib/leads/server/db';
 import { Kopbalk } from './_ui/kopbalk';
 
 export const metadata: Metadata = {
@@ -19,8 +21,9 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function LeadsLayout({ children }: { children: React.ReactNode }) {
+  let user: Awaited<ReturnType<typeof requireJorionAdmin>>;
   try {
-    await requireJorionAdmin();
+    user = await requireJorionAdmin();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
@@ -31,10 +34,11 @@ export default async function LeadsLayout({ children }: { children: React.ReactN
     }
     throw e;
   }
+  const naam = await naamVoorKop(getV1ServiceRoleClient(), user.id, user.email ?? null);
   return (
     <ToastProvider>
       <div className="ld-schil">
-        <Kopbalk />
+        <Kopbalk naam={naam} />
         <main className="ld-main">{children}</main>
       </div>
     </ToastProvider>

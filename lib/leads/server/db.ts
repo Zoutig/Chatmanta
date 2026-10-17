@@ -432,6 +432,14 @@ export async function haalAfzender(db: SupabaseClient, userId: string): Promise<
   };
 }
 
+/** Naam in de kopbalk: voornaam uit het afzenderprofiel, anders het voorvoegsel van het e-mailadres. */
+export async function naamVoorKop(db: SupabaseClient, userId: string, email: string | null): Promise<string> {
+  const { data, error } = await db.from('lead_afzenders').select('voornaam').eq('user_id', userId).maybeSingle();
+  if (error) console.error('[leads] voornaam ophalen faalde:', error.message);
+  const voornaam = typeof data?.voornaam === 'string' ? data.voornaam.trim() : '';
+  return voornaam || (email ? email.split('@')[0] : 'Ingelogd');
+}
+
 export async function bewaarAfzender(db: SupabaseClient, userId: string, a: Afzender): Promise<void> {
   const { error } = await db.from('lead_afzenders').upsert({
     user_id: userId,
