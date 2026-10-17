@@ -18,7 +18,7 @@ const UREN = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 function Heatmap({ data }: { data: Inzicht['heatmap'] }) {
   const cel = (dow: number, uur: number) => data.find((h) => h.dow === dow && h.uur === uur);
   return (
-    <div className="ld-heat" role="table" aria-label="Opneemratio per dag en uur">
+    <div className="ld-heat" role="group" aria-label="Opneemratio in procent per weekdag (ma-vr) en uur (8-17u); lege vakjes hebben minder dan 3 belletjes">
       <span className="ld-heat-kop" />
       {UREN.map((u) => <span key={u} className="ld-heat-kop">{u}u</span>)}
       {[1, 2, 3, 4, 5].map((d) => (

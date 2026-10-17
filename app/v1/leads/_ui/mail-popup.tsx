@@ -40,6 +40,52 @@ async function kopieerRijk(html: string, tekst: string, el: HTMLElement | null):
   if (!ok) throw new Error('Kopiëren lukte niet.');
 }
 
+const FOCUSBAAR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [contenteditable="true"], [contenteditable=""], [tabindex]:not([tabindex="-1"])';
+
+/** Modaal gedrag: Esc sluit, beginfocus op het eerste veld, Tab blijft binnen de pop-up. */
+function useModaal(ref: React.RefObject<HTMLDivElement | null>, onSluit: () => void, beginFocus?: React.RefObject<HTMLElement | null>) {
+  const sluitRef = useRef(onSluit);
+  useEffect(() => {
+    sluitRef.current = onSluit;
+  });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const terug = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const eerste = beginFocus?.current ?? el.querySelector<HTMLElement>(FOCUSBAAR);
+    eerste?.focus();
+    function toets(e: KeyboardEvent) {
+      if (!el) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        sluitRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = [...el.querySelectorAll<HTMLElement>(FOCUSBAAR)].filter((x) => x.offsetParent !== null || x === document.activeElement);
+      if (!items.length) return;
+      const eerst = items[0];
+      const laatst = items[items.length - 1];
+      const actief = document.activeElement;
+      if (e.shiftKey && (actief === eerst || !el.contains(actief))) {
+        e.preventDefault();
+        laatst.focus();
+      } else if (!e.shiftKey && (actief === laatst || !el.contains(actief))) {
+        e.preventDefault();
+        eerst.focus();
+      }
+    }
+    document.addEventListener('keydown', toets);
+    return () => {
+      document.removeEventListener('keydown', toets);
+      if (terug?.isConnected) terug.focus();
+    };
+    // eenmalig bij openen; onSluit via ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 export function MailPopup({
   lead,
   afzender,
@@ -68,6 +114,10 @@ export function MailPopup({
   const [fase, setFase] = useState<'maken' | 'verstuurd?'>('maken');
   const [bezig, setBezig] = useState(false);
   const mailRef = useRef<HTMLDivElement>(null);
+  const vensterRef = useRef<HTMLDivElement>(null);
+  const naamRef = useRef<HTMLInputElement>(null);
+  const kopId = `mail-kop-${lead.id}`;
+  useModaal(vensterRef, () => onKlaar(false), afzender ? naamRef : undefined);
 
   const mail = useMemo(() => (afzender ? bouwOpvolgmail(v, afzender) : null), [v, afzender]);
 
@@ -77,10 +127,10 @@ export function MailPopup({
 
   if (!afzender) {
     return (
-      <div className="ld-mail" role="dialog" aria-modal="true" aria-label="Opvolgmail">
+      <div className="ld-mail" role="dialog" aria-modal="true" aria-labelledby={kopId} ref={vensterRef}>
         <div className="ld-mail-venster" style={{ gridTemplateColumns: '1fr', maxWidth: 520 }}>
           <div className="ld-mail-form">
-            <h2 style={{ margin: 0 }}>Eerst je afzender invullen</h2>
+            <h2 id={kopId} style={{ margin: 0 }}>Eerst je afzender invullen</h2>
             <p>Je naam, functie, telefoon en foto komen in de handtekening. Vul ze één keer in bij Instellingen.</p>
             <div className="ld-dialoog-voet">
               <Button variant="secondary" onClick={() => onKlaar(false)}>Sluiten</Button>
@@ -135,13 +185,13 @@ export function MailPopup({
   }
 
   return (
-    <div className="ld-mail" role="dialog" aria-modal="true" aria-label="Opvolgmail">
+    <div className="ld-mail" role="dialog" aria-modal="true" aria-labelledby={kopId} ref={vensterRef}>
       <div className="ld-mail-venster">
         <form className="ld-mail-form" onSubmit={(e) => e.preventDefault()} autoComplete="off">
-          <h2 style={{ margin: 0, fontSize: 18 }}>Opvolgmail · {lead.bedrijfsnaam}</h2>
+          <h2 id={kopId} style={{ margin: 0, fontSize: 18 }}>Opvolgmail · {lead.bedrijfsnaam}</h2>
           <div className="v1-field">
             <span className="v1-label">Welke mail?</span>
-            <div className="ld-chips" role="radiogroup" aria-label="Situatie">
+            <div className="ld-chips" role="group" aria-label="Situatie">
               {OPVOLG_SITUATIES.map((s) => (
                 <button key={s} type="button" className="ld-chip" aria-pressed={v.situatie === s} onClick={() => zet('situatie', s)} title={OPVOLG_SITUATIE_LABEL[s].uitleg}>
                   {OPVOLG_SITUATIE_LABEL[s].titel}
@@ -151,7 +201,7 @@ export function MailPopup({
           </div>
           <div className="v1-field">
             <span className="v1-label">Aanspreken met</span>
-            <div className="ld-chips">
+            <div className="ld-chips" role="group" aria-label="Aanspreekvorm">
               {(['je', 'u'] as const).map((f) => (
                 <button key={f} type="button" className="ld-chip" aria-pressed={v.vorm === f} onClick={() => zet('vorm', f)}>{f}</button>
               ))}
@@ -159,7 +209,7 @@ export function MailPopup({
           </div>
           <label className="v1-field">
             <span className="v1-label">Naam</span>
-            <input className={`v1-input ${mist.has('naam') ? 'ld-mist' : ''}`} value={v.naam} onChange={(e) => zet('naam', e.target.value)} placeholder="Jan (bij u: meneer Jansen)" />
+            <input ref={naamRef} className={`v1-input ${mist.has('naam') ? 'ld-mist' : ''}`} value={v.naam} onChange={(e) => zet('naam', e.target.value)} placeholder="Jan (bij u: meneer Jansen)" />
           </label>
           <label className="v1-field">
             <span className="v1-label">Gesproken</span>
@@ -241,7 +291,7 @@ export function MailPopup({
             </div>
           </div>
           <div className="ld-mail-voorbeeld" data-smal={smal ? '' : undefined}>
-            <div ref={mailRef} contentEditable suppressContentEditableWarning spellCheck onInput={() => setBewerkt(true)} />
+            <div ref={mailRef} contentEditable suppressContentEditableWarning spellCheck aria-label="Voorbeeld van de mail (bewerkbaar)" onInput={() => setBewerkt(true)} />
           </div>
         </div>
       </div>
