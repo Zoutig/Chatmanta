@@ -27,6 +27,7 @@ export function Footer() {
             <h2 id="foot-bedrijf">Bedrijf</h2>
             <ul>
               <li><Link href={ROUTES.kennismaking}>Kennismaking</Link></li>
+              <li><Link href={ROUTES.contact}>Contact</Link></li>
               <li><a href={`mailto:${SITE_COMPANY.email}`}>{SITE_COMPANY.email}</a></li>
             </ul>
           </nav>

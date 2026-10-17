@@ -428,3 +428,10 @@ body:has(.site-ui) {
     scroll-behavior: auto !important;
   }
 }
+
+.site-ui .contact-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 28px; }
+.site-ui .contact-person { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--sh-1); padding: clamp(20px, 3vw, 32px); }
+.site-ui .contact-person h2 { font-size: 1.35rem; }
+.site-ui .contact-person .role { margin-top: 4px; color: var(--muted); }
+.site-ui .contact-person ul { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.site-ui .contact-person a { color: var(--teal-ink); font-weight: 600; text-underline-offset: 3px; }
