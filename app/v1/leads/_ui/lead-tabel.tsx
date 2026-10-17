@@ -26,7 +26,7 @@ function Sorteer({ href, children }: { href: string; children: React.ReactNode }
   return <Link href={href}>{children}</Link>;
 }
 
-export function LeadTabel({ leads, tab, sortHref }: { leads: Lead[]; tab: Tab; sortHref: (s: string) => string }) {
+export function LeadTabel({ leads, tab, sortHrefs }: { leads: Lead[]; tab: Tab; sortHrefs: Record<string, string> }) {
   const [gekozen, setGekozen] = useState<Set<string>>(new Set());
   const [bezig, setBezig] = useState(false);
   const toast = useToast();
@@ -58,12 +58,12 @@ export function LeadTabel({ leads, tab, sortHref }: { leads: Lead[]; tab: Tab; s
         label="Leads"
         columns={[
           { label: <input type="checkbox" aria-label="Alles kiezen" checked={gekozen.size === leads.length} onChange={(e) => setGekozen(e.target.checked ? new Set(leads.map((l) => l.id)) : new Set())} />, width: '1%' },
-          { label: <Sorteer href={sortHref('bedrijfsnaam')}>Bedrijf</Sorteer> },
+          { label: <Sorteer href={sortHrefs.bedrijfsnaam}>Bedrijf</Sorteer> },
           { label: 'Branche' },
           { label: 'Telefoon' },
-          { label: <Sorteer href={sortHref('score')}>Score</Sorteer>, num: true },
-          { label: <Sorteer href={sortHref('volgende_actie_op')}>Volgende actie</Sorteer> },
-          { label: <Sorteer href={sortHref('laatste_poging_op')}>Laatste</Sorteer> },
+          { label: <Sorteer href={sortHrefs.score}>Score</Sorteer>, num: true },
+          { label: <Sorteer href={sortHrefs.volgende_actie_op}>Volgende actie</Sorteer> },
+          { label: <Sorteer href={sortHrefs.laatste_poging_op}>Laatste</Sorteer> },
           { label: 'Pogingen', num: true },
           { label: '', width: '1%' },
         ]}
