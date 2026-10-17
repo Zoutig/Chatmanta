@@ -136,14 +136,17 @@ function valideerOpties(o: UitkomstOpties): UitkomstOpties {
   }
 }
 
+/** `inkomend`: de lead belde ons terug (details.inkomend); "niet opgenomen" kan dan niet. */
 export async function uitkomstAction(
   id: string,
   opties: UitkomstOpties,
+  inkomend = false,
 ): Promise<ActionResult<{ activiteitId: string; opentMail: OpvolgSituatie | null; lead: Lead }>> {
   const c = await ctx();
   if (isFail(c)) return c;
   return actionTry(async () => {
     const o = valideerOpties(opties);
+    if (inkomend && o.uitkomst === 'niet_opgenomen') ongeldig('Een terugbelverzoek kan niet "niet opgenomen" zijn.');
     const lead = await dbl.haalLead(c.db, uuid(id));
     if (lead.geclaimd_door && lead.geclaimd_door !== c.userId && lead.geclaimd_tot && new Date(lead.geclaimd_tot) > new Date())
       ongeldig('Een ander is deze lead nu aan het bellen.');
@@ -161,7 +164,7 @@ export async function uitkomstAction(
       nieuw: overgang.stand,
       soort: 'belpoging',
       uitkomst: o.uitkomst,
-      details: overgang.details,
+      details: inkomend ? { ...overgang.details, inkomend: true } : overgang.details,
       // Opent er een mail, dan blijft de claim staan tot de pop-up dicht is.
       vrijgeven: overgang.opentMail === null,
     });
@@ -176,6 +179,12 @@ export async function uitkomstAction(
     revalidateBel(id);
     return { activiteitId, opentMail: overgang.opentMail, lead: { ...lead, ...overgang.stand } };
   }, META);
+}
+
+export async function zoekLeadsAction(zoek: string): Promise<ActionResult<{ leads: dbl.ZoekLead[] }>> {
+  const c = await ctx();
+  if (isFail(c)) return c;
+  return actionTry(async () => ({ leads: await dbl.zoekLeads(c.db, String(zoek ?? '')) }), META);
 }
 
 export async function overslaanAction(id: string): Promise<ActionResult> {

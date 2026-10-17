@@ -111,6 +111,7 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
           sub={[`${d.interesse} van de opgenomen gesprekken`, verschilPunten({ teller: d.interesse, noemer: d.opgenomen }, v ? { teller: v.interesse, noemer: v.opgenomen } : undefined)].filter(Boolean).join(' · ')}
           tone="ok"
         />
+        <Metric label="Belden ons terug" value={d.terugbel ?? 0} sub={verschil(d.terugbel ?? 0, v?.terugbel)} tone="ok" />
         <Metric label="Kennismakingen" value={d.kennismakingen} sub={verschil(d.kennismakingen, v?.kennismakingen)} tone="accent" />
         <Metric label="Klanten" value={d.klanten} sub={verschil(d.klanten, v?.klanten)} tone="ok" />
         <Metric label="Opvolgmails" value={d.mails} sub={[`${d.mail_naar_kans} binnen 7 dagen tot kans`, verschil(d.mails, v?.mails)].filter(Boolean).join(' · ')} />

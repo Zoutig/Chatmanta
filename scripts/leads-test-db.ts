@@ -83,6 +83,8 @@ async function main() {
     eis(opNaam.totaal === 1 && opNaam.leads[0].id === laagId && opNaam.leads[0].gebeld_door.includes(userId), 'lijstLeads: filter op beller vindt alleen de lead die hij belde');
     const anders = await dbl.lijstLeads(db, { tab: 'vandaag', niche: NICHE, zoek: 'e2e', beller: '00000000-0000-4000-8000-000000000000' });
     eis(anders.totaal === 0, 'lijstLeads: filter op een andere beller vindt niets');
+    eis((await dbl.zoekLeads(db, 'e2e-')).some((l) => l.id === laagId), 'zoekLeads vindt een testlead op naam of domein');
+    eis((await dbl.zoekLeads(db, 'x')).length === 0, 'zoekLeads: te korte zoekterm geeft niets');
     const t = await dbl.tellers(db);
     eis(t.vandaag >= 2, 'tellers.vandaag telt de testleads mee');
     const opt = await dbl.filterOpties(db);
@@ -197,10 +199,12 @@ async function main() {
         rij('import', null), // import: telt niet
         rij('kennismaking', null),
         rij('status', null, { naar: 'klant' }),
+        rij('belpoging', 'interesse', { inkomend: true }), // terugbelverzoek: apart geteld, niet als belpoging
       ]);
       if (ie) throw new Error(ie.message);
       const na = (await db.rpc('leads_inzicht', { p_van: van.toISOString(), p_tot: tot.toISOString(), p_user: userId })).data;
       eis(na.belpogingen - voor.belpogingen === 3, 'leads_inzicht: 3 belpogingen erbij (ongedaan telt niet)');
+      eis(na.terugbel - voor.terugbel === 1, 'leads_inzicht: terugbelverzoek apart geteld');
       eis(na.opgenomen - voor.opgenomen === 2, 'leads_inzicht: 2 opgenomen erbij');
       eis(na.interesse - voor.interesse === 1, 'leads_inzicht: 1 interesse erbij');
       eis(na.kennismakingen - voor.kennismakingen === 1 && na.klanten - voor.klanten === 1, 'leads_inzicht: kennismaking en klant geteld');

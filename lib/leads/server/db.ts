@@ -160,6 +160,20 @@ export async function laatsteUitkomsten(db: SupabaseClient, ids: string[]): Prom
   return uit;
 }
 
+export type ZoekLead = Pick<Lead, 'id' | 'bedrijfsnaam' | 'plaats' | 'telefoon' | 'domein' | 'status'>;
+
+/** Snel zoeken (naam, website, telefoon) over alle leads, voor "belde ons terug". Max 8. */
+export async function zoekLeads(db: SupabaseClient, zoek: string): Promise<ZoekLead[]> {
+  const z = veiligeZoekterm(zoek);
+  if (z.length < 2) return [];
+  const cijfers = z.replace(/\D/g, '');
+  const delen = [`bedrijfsnaam.ilike.%${z}%`, `domein.ilike.%${z}%`];
+  if (cijfers.length >= 4) delen.push(`telefoon.ilike.%${cijfers.replace(/^0/, '')}%`);
+  const { data, error } = await db.from('leads').select('id, bedrijfsnaam, plaats, telefoon, domein, status').or(delen.join(',')).order('bedrijfsnaam').limit(8);
+  if (error) fout(`leads zoeken faalde: ${error.message}`, error);
+  return (data ?? []) as ZoekLead[];
+}
+
 export async function tellers(db: SupabaseClient, nu = new Date()): Promise<Record<Tab, number>> {
   const uit = await Promise.all(
     TABS.map(async (t) => {
@@ -546,6 +560,7 @@ export async function tellerVandaag(db: SupabaseClient, userId: string, sinds: D
     .eq('user_id', userId)
     .eq('soort', 'belpoging')
     .is('ongedaan_op', null)
+    .or('details->>inkomend.is.null,details->>inkomend.neq.true') // terugbelverzoeken tellen niet als gebeld
     .gte('created_at', sinds.toISOString());
   if (error) fout(`teller ophalen faalde: ${error.message}`, error);
   const rijen = data ?? [];

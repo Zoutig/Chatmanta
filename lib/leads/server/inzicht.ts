@@ -13,6 +13,7 @@ export type Inzicht = {
   bedrijven: number;
   opgenomen: number;
   interesse: number;
+  terugbel: number;
   kennismakingen: number;
   klanten: number;
   mails: number;
