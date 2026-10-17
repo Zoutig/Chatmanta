@@ -1,6 +1,7 @@
 import type { Activiteit } from '@/lib/leads/types';
 import { BEZWAAR_LABEL, NIET_BELLEN_LABEL, STATUS_LABEL, UITKOMST_LABEL, OPVOLG_SITUATIE_LABEL, type Bezwaar, type LeadStatus, type NietBellenReden, type OpvolgSituatie } from '@/lib/leads/types';
 import { toonMoment } from '@/lib/leads/werkdagen';
+import { TerugKnop, WisAllesKnop } from './terugdraaien';
 
 function omschrijving(a: Activiteit): string {
   const d = a.details as Record<string, unknown>;
@@ -34,15 +35,21 @@ function omschrijving(a: Activiteit): string {
 
 export function Tijdlijn({ items }: { items: (Activiteit & { door: string | null })[] }) {
   if (!items.length) return <p className="v1-hint">Nog niets gebeurd met deze lead.</p>;
+  const terugbaar = (a: Activiteit) => !a.ongedaan_op && !!a.vorige_staat && a.soort !== 'import';
+  const nieuwste = items.find(terugbaar);
   return (
+    <>
+    {nieuwste ? <WisAllesKnop leadId={nieuwste.lead_id} /> : null}
     <ul className="ld-tijdlijn">
       {items.map((a) => (
         <li key={a.id} data-ongedaan={a.ongedaan_op ? '' : undefined}>
           <time dateTime={a.created_at}>{toonMoment(a.created_at)}</time>
           {a.door ? ` · ${a.door}` : ''}
           <div>{omschrijving(a)}</div>
+          {nieuwste?.id === a.id ? <TerugKnop id={a.id} /> : null}
         </li>
       ))}
     </ul>
+    </>
   );
 }

@@ -32,6 +32,7 @@ export function LeadTabel({
   tab,
   sortHrefs,
   laatsteUitkomst,
+  gebeldDoor,
   afzender,
   herinneringIds,
 }: {
@@ -40,6 +41,8 @@ export function LeadTabel({
   sortHrefs: Record<string, string>;
   /** Laatste niet-ongedane belpoging-uitkomst per lead-id (alleen de leads van deze pagina). */
   laatsteUitkomst: Partial<Record<string, Uitkomst>>;
+  /** Voornamen van wie de lead gebeld heeft, per lead-id. */
+  gebeldDoor: Record<string, string>;
   /** Voor de knop "Herinnering sturen" in Opvolgen. */
   afzender: Afzender | null;
   /** Leads in Opvolgen waarvan de opvolgmail 3+ werkdagen oud is (server-side bepaald). */
@@ -72,6 +75,7 @@ export function LeadTabel({
     { label: <Sorteer href={sortHrefs.score}>Score</Sorteer>, num: true },
     { label: <Sorteer href={sortHrefs.volgende_actie_op}>Volgende actie</Sorteer> },
     ...(kansen ? [{ label: 'Kennismaking' }, { label: 'Mail' }] : []),
+    { label: 'Gebeld door' },
     { label: <Sorteer href={sortHrefs.laatste_poging_op}>Laatste uitkomst</Sorteer> },
     { label: 'Pogingen', num: true },
     { label: '', width: '1%' },
@@ -98,6 +102,7 @@ export function LeadTabel({
             <td>{l.opvolgmail_gestuurd_op ? <>ja<span className="ld-sub">{toonMoment(l.opvolgmail_gestuurd_op)}</span></> : 'nee'}</td>
           </>
         ) : null}
+        <td>{gebeldDoor[l.id] ?? ''}</td>
         <td>
           {uitkomst ? UITKOMST_LABEL[uitkomst] : ''}
           {l.laatste_poging_op ? <span className="ld-sub">{toonMoment(l.laatste_poging_op)}</span> : null}

@@ -76,11 +76,34 @@ async function main() {
     eis(lijst.totaal === 2 && lijst.leads[0].id === hoogId, 'lijstLeads: 2 resultaten, hoogste score eerst');
     const kwaad = await dbl.lijstLeads(db, { tab: 'vandaag', zoek: 'x,id.eq.1)(%' });
     eis(Array.isArray(kwaad.leads), 'lijstLeads overleeft een zoekterm met filter-tekens');
+
+    // filter op beller (view leads_overzicht)
+    await dbl.logActiviteit(db, { leadId: laagId, userId, soort: 'belpoging', details: {} });
+    const opNaam = await dbl.lijstLeads(db, { tab: 'vandaag', niche: NICHE, zoek: 'e2e', beller: userId });
+    eis(opNaam.totaal === 1 && opNaam.leads[0].id === laagId && opNaam.leads[0].gebeld_door.includes(userId), 'lijstLeads: filter op beller vindt alleen de lead die hij belde');
+    const anders = await dbl.lijstLeads(db, { tab: 'vandaag', niche: NICHE, zoek: 'e2e', beller: '00000000-0000-4000-8000-000000000000' });
+    eis(anders.totaal === 0, 'lijstLeads: filter op een andere beller vindt niets');
     const t = await dbl.tellers(db);
     eis(t.vandaag >= 2, 'tellers.vandaag telt de testleads mee');
     const opt = await dbl.filterOpties(db);
     eis(opt.niches.includes(NICHE), 'filterOpties bevat de testniche');
     eis(!!(await dbl.zoekDubbel(db, 'e2e-laag.invalid', null)) && laagId.length > 0, 'zoekDubbel vindt een bestaand domein');
+
+    // test-terugdraaien: buiten het 15-minutenvenster alleen met zonderVenster; wisAlleActies zet alles terug
+    {
+      await db.from('lead_activiteiten').delete().eq('lead_id', laagId).is('vorige_staat', null); // losse belpoging van de beller-check
+      const l0 = await dbl.haalLead(db, laagId);
+      const voor0 = pakStand(l0);
+      const o = volgendeStand(voor0, { uitkomst: 'niet_opgenomen', voicemail: false }, new Date());
+      const oud = await dbl.pasStandToe(db, { lead: l0, userId, nieuw: o.stand, soort: 'belpoging', uitkomst: 'niet_opgenomen', details: o.details, vrijgeven: true });
+      await db.from('lead_activiteiten').update({ created_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', oud);
+      let geweigerd = false;
+      try { await dbl.maakOngedaan(db, oud); } catch { geweigerd = true; }
+      eis(geweigerd, 'maakOngedaan weigert na 15 minuten');
+      const n = await dbl.wisAlleActies(db, laagId);
+      eis(n >= 1, 'wisAlleActies draait de oude actie terug');
+      eis(JSON.stringify(pakStand(await dbl.haalLead(db, laagId))) === JSON.stringify(voor0), 'lead staat na wisAlleActies weer zoals ervoor');
+    }
 
     // interesse + kennismaking → ongedaan maken draait beide activiteiten terug
     {
