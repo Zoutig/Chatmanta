@@ -8,14 +8,9 @@ import { Panel } from '@/app/v1/_ui/panel';
 import { MetricGrid, Metric } from '@/app/v1/admin/_ui/metric';
 import { LineChart } from '@/app/v1/admin/_ui/line-chart';
 import { DataTable, NumCell } from '@/app/v1/admin/_ui/data-table';
-import { haalInzicht, bellers, pct, PERIODES, type Periode, type Inzicht } from '@/lib/leads/server/inzicht';
+import { haalInzicht, bellers, type Inzicht } from '@/lib/leads/server/inzicht';
+import { pct, PERIODES, verschilAantal as verschil, verschilPunten, type Periode } from '@/lib/leads/periode';
 import { BEZWAAR_LABEL, STATUS_LABEL, type Bezwaar, type LeadStatus } from '@/lib/leads/types';
-
-function verschil(nu: number, vorige: number | undefined): string | undefined {
-  if (vorige === undefined) return undefined;
-  const d = nu - vorige;
-  return d === 0 ? 'gelijk aan vorige periode' : `${d > 0 ? '+' : ''}${d} t.o.v. vorige periode`;
-}
 
 const DAGEN = ['', 'ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const UREN = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
@@ -105,11 +100,20 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
       <MetricGrid>
         <Metric label="Cold calls" value={d.belpogingen} sub={verschil(d.belpogingen, v?.belpogingen)} />
         <Metric label="Bedrijven gebeld" value={d.bedrijven} sub={verschil(d.bedrijven, v?.bedrijven)} />
-        <Metric label="Opneemratio" value={pct(d.opgenomen, d.belpogingen)} sub={`${d.opgenomen} opgenomen`} />
-        <Metric label="Interesse" value={pct(d.interesse, d.opgenomen)} sub={`${d.interesse} van de opgenomen gesprekken`} tone="ok" />
+        <Metric
+          label="Opneemratio"
+          value={pct(d.opgenomen, d.belpogingen)}
+          sub={[`${d.opgenomen} opgenomen`, verschilPunten({ teller: d.opgenomen, noemer: d.belpogingen }, v ? { teller: v.opgenomen, noemer: v.belpogingen } : undefined)].filter(Boolean).join(' · ')}
+        />
+        <Metric
+          label="Interesse"
+          value={pct(d.interesse, d.opgenomen)}
+          sub={[`${d.interesse} van de opgenomen gesprekken`, verschilPunten({ teller: d.interesse, noemer: d.opgenomen }, v ? { teller: v.interesse, noemer: v.opgenomen } : undefined)].filter(Boolean).join(' · ')}
+          tone="ok"
+        />
         <Metric label="Kennismakingen" value={d.kennismakingen} sub={verschil(d.kennismakingen, v?.kennismakingen)} tone="accent" />
         <Metric label="Klanten" value={d.klanten} sub={verschil(d.klanten, v?.klanten)} tone="ok" />
-        <Metric label="Opvolgmails" value={d.mails} sub={`${d.mail_naar_kans} binnen 7 dagen tot kans`} />
+        <Metric label="Opvolgmails" value={d.mails} sub={[`${d.mail_naar_kans} binnen 7 dagen tot kans`, verschil(d.mails, v?.mails)].filter(Boolean).join(' · ')} />
       </MetricGrid>
 
       <div className="ld-raster">
@@ -119,7 +123,7 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
               <div key={t.label} className="ld-trechter-rij">
                 <span>{t.label}</span>
                 <div className="ld-trechter-balk" style={{ width: `${(t.n / max) * 100}%` }} />
-                <span>{t.n}{i > 0 ? ` · ${pct(t.n, trechter[i - 1].n, 5)}` : ''}</span>
+                <span>{t.n}{i > 0 ? ` · ${pct(t.n, trechter[i - 1].n)}` : ''}</span>
               </div>
             ))}
           </div>
@@ -156,6 +160,7 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
       <div className="ld-raster">
         <Panel title="Per beller">
           <div style={{ padding: 16 }}>
+            {d.per_beller.length === 0 ? <p className="v1-hint">Nog geen belletjes in deze periode.</p> : (
             <DataTable label="Per beller" columns={[{ label: 'Beller' }, { label: 'Belletjes', num: true }, { label: 'Opneemratio', num: true }, { label: 'Interesse', num: true }, { label: 'Kennismakingen', num: true }]}>
               {d.per_beller.map((b) => (
                 <tr key={b.user_id}>
@@ -167,6 +172,7 @@ export default async function InzichtPage({ searchParams }: { searchParams: Prom
                 </tr>
               ))}
             </DataTable>
+            )}
           </div>
         </Panel>
         <div>
