@@ -19,10 +19,9 @@ function maak(key: string): Client {
   return createClient(url, key, { auth: { persistSession: false } }) as Client;
 }
 
-// Kolom die in elke rij van de tabel gevuld is (voor de "alle rijen"-filter bij update/delete).
-const SLEUTEL: Record<string, string> = { leads: 'id', lead_activiteiten: 'id', lead_afzenders: 'user_id' };
+const TABELLEN = ['leads', 'lead_activiteiten', 'lead_afzenders'] as const;
 
-async function check(label: string, client: Client, leadId: string, userId: string): Promise<number> {
+async function check(label: string, client: Client, leadId: string, userId: string, outsiderId: string): Promise<number> {
   let fouten = 0;
   const fout = (m: string) => {
     console.error(`FOUT ${label}: ${m}`);
@@ -46,7 +45,16 @@ async function check(label: string, client: Client, leadId: string, userId: stri
     lead_afzenders: { naam: 'gehackt' },
   };
 
+  // Update/delete-probes raken ALLEEN de eigen testrijen: bij een RLS-regressie mag een probe
+  // nooit echte prod-data wijzigen of wissen.
+  const eigenRij: Record<string, [string, string]> = {
+    leads: ['id', leadId],
+    lead_activiteiten: ['lead_id', leadId],
+    lead_afzenders: ['user_id', outsiderId],
+  };
+
   for (const [t, payload] of Object.entries(inserts)) {
+    const [kolom, waarde] = eigenRij[t];
     const r = await client.from(t).select('*').limit(1);
     if (r.data && r.data.length > 0) fout(`kan ${t} lezen (${r.data.length} rij)`);
 
@@ -54,10 +62,10 @@ async function check(label: string, client: Client, leadId: string, userId: stri
     if (!w.error) fout(`kan in ${t} schrijven`);
     else if (!isRlsFout(w.error)) fout(`insert ${t} faalde niet op RLS: ${w.error.code} ${w.error.message}`);
 
-    const u = await client.from(t).update(updates[t]).not(SLEUTEL[t], 'is', null).select();
+    const u = await client.from(t).update(updates[t]).eq(kolom, waarde).select();
     if (u.data && u.data.length > 0) fout(`kan ${t} updaten (${u.data.length} rij)`);
 
-    const d = await client.from(t).delete().not(SLEUTEL[t], 'is', null).select();
+    const d = await client.from(t).delete().eq(kolom, waarde).select();
     if (d.data && d.data.length > 0) fout(`kan ${t} verwijderen (${d.data.length} rij)`);
   }
 
@@ -116,12 +124,12 @@ async function main() {
       if (f.error) throw new Error(`testafzender aanmaken faalde: ${f.error.message}`);
       afzenderAangemaakt = true;
     }
-    for (const t of Object.keys(SLEUTEL)) {
+    for (const t of TABELLEN) {
       const c = await service.from(t).select('*', { count: 'exact', head: true });
       if (!c.count) throw new Error(`service-role ziet geen rijen in ${t}`);
     }
 
-    fouten += await check('anon', maak(anonKey), leadId, outsiderId);
+    fouten += await check('anon', maak(anonKey), leadId, outsiderId, outsiderId);
 
     const user = maak(anonKey);
     const li = await user.auth.signInWithPassword({
@@ -129,7 +137,7 @@ async function main() {
       password: process.env.V1_SEED_OUTSIDER_PW!,
     });
     if (li.error) throw new Error(`login outsider faalde: ${li.error.message}`);
-    fouten += await check('authenticated (niet-admin)', user, leadId, li.data.user.id);
+    fouten += await check('authenticated (niet-admin)', user, leadId, li.data.user.id, outsiderId);
 
     // Ook een admin-sessie mag via de gewone client niets: toegang loopt alleen via service-role.
     const admin = maak(anonKey);
@@ -138,7 +146,7 @@ async function main() {
       password: process.env.V1_SEED_MEMBER_PW!,
     });
     if (la.error) throw new Error(`login member faalde: ${la.error.message}`);
-    fouten += await check('authenticated (admin, zonder service-role)', admin, leadId, la.data.user.id);
+    fouten += await check('authenticated (admin, zonder service-role)', admin, leadId, la.data.user.id, outsiderId);
   } catch (e) {
     console.error(`FOUT: ${e instanceof Error ? e.message : String(e)}`);
     fouten++;
