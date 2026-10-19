@@ -9,6 +9,7 @@ import { Fraunces, Inter } from 'next/font/google';
 import { ForceLight } from '@/app/v1/_ui/force-light';
 import { DemoWidgetMount } from '@/app/voorbeeld/_widget/demo-widget-mount';
 import { DEMO_CONTACT_HREF } from '@/lib/voorbeeld/demo-defaults';
+import { ROUTES } from '@/lib/site/navigation';
 import {
   COMPANY,
   MAIN_NAV,
@@ -64,21 +65,35 @@ export default function VoorbeeldWebsiteLayout({ children }: { children: React.R
           Naar de inhoud
         </a>
 
-        <div className="dh-demobar" role="note">
-          <div className="dh-container dh-demobar-inner">
-            <p>Dit is een voorbeeldwebsite van een fictief bedrijf. De chatbot rechtsonder is ChatManta.</p>
-            <span className="dh-demobar-links">
-              <a href={DEMO_CONTACT_HREF} className="dh-demobar-link">
-                Ook voor jouw website?
-              </a>
-              <Link href="/voorbeeld" className="dh-demobar-link">
-                ← Terug naar het dashboard
-              </Link>
-            </span>
+        {/* Demobalk + header samen sticky (één wrapper, dus geen twee losse sticky
+            lagen en geen layout-sprong): de weg terug naar chatmanta.nl blijft altijd
+            in beeld. Mobiel een korte zin, zodat de balk één regel blijft. */}
+        <div className="dh-top">
+          <div className="dh-demobar" role="note">
+            <div className="dh-container dh-demobar-inner">
+              <p>
+                <span className="dh-demobar-long">
+                  Dit is een voorbeeldwebsite van een fictief bedrijf. De chatbot rechtsonder is ChatManta.
+                </span>
+                <span className="dh-demobar-short">Fictief voorbeeld</span>
+              </p>
+              <span className="dh-demobar-links">
+                <a href={ROUTES.home} className="dh-demobar-link">
+                  ← Naar chatmanta.nl
+                </a>
+                <a href={DEMO_CONTACT_HREF} className="dh-demobar-link dh-demobar-link--wide">
+                  Ook voor jouw website?
+                </a>
+                <Link href="/voorbeeld" className="dh-demobar-link">
+                  <span className="dh-demobar-long">Naar het dashboard</span>
+                  <span className="dh-demobar-short">Dashboard</span>
+                </Link>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <SiteHeader nav={nav} bookHref={pathFor('boeken-en-betalen')} homeHref={pathFor('')} />
+          <SiteHeader nav={nav} bookHref={pathFor('boeken-en-betalen')} homeHref={pathFor('')} />
+        </div>
 
         <main id="dh-main" className="dh-main">
           {children}

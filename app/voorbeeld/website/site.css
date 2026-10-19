@@ -25,6 +25,9 @@
   --dh-shadow: 0 1px 2px rgba(20, 48, 42, 0.06), 0 8px 24px rgba(20, 48, 42, 0.08);
   --dh-serif: var(--dh-font-serif), Georgia, 'Times New Roman', serif;
   --dh-sans: var(--dh-font-sans), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Hoogte van de sticky .dh-top (demobalk 34px + header 72px + 1px rand).
+     Eén bron voor menu-hoogte, scroll-margin en de sticky zijkolom. */
+  --dh-top-h: 107px;
 
   min-height: 100vh;
   background: var(--dh-sand-50);
@@ -158,12 +161,40 @@
   color: #bfe3e0;
 }
 
+.dh-site .dh-demobar-link:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Mobiel: korte zin en geen contactlink, zodat de sticky balk klein blijft. */
+.dh-demobar-short {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .dh-demobar-long,
+  .dh-site .dh-demobar-link--wide {
+    display: none;
+  }
+  .dh-demobar-short {
+    display: inline;
+  }
+  .dh-demobar-links {
+    gap: 4px 14px;
+  }
+}
+
 /* ---------- Header ---------- */
 
-.dh-header {
+/* Demobalk + header samen sticky (was alleen .dh-header). */
+.dh-top {
   position: sticky;
   top: 0;
   z-index: 40;
+}
+
+.dh-header {
   background: rgba(251, 247, 240, 0.92);
   backdrop-filter: saturate(1.4) blur(10px);
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
@@ -264,7 +295,8 @@
 .dh-mobile-menu {
   border-top: 1px solid var(--dh-line);
   background: var(--dh-sand-50);
-  max-height: calc(100vh - 72px);
+  max-height: calc(100vh - var(--dh-top-h));
+  max-height: calc(100dvh - var(--dh-top-h));
   overflow-y: auto;
 }
 
@@ -931,7 +963,7 @@
   padding-bottom: 36px;
   margin-bottom: 36px;
   border-bottom: 1px solid var(--dh-line);
-  scroll-margin-top: 96px;
+  scroll-margin-top: calc(var(--dh-top-h) + 25px); /* sticky demobalk + header */
 }
 
 .dh-section:last-child {
@@ -940,7 +972,7 @@
 }
 
 .dh-section h2 {
-  scroll-margin-top: 96px;
+  scroll-margin-top: calc(var(--dh-top-h) + 25px); /* sticky demobalk + header */
 }
 
 .dh-list {
@@ -1069,7 +1101,7 @@
 @media (min-width: 1000px) {
   .dh-aside {
     position: sticky;
-    top: 96px;
+    top: calc(var(--dh-top-h) + 25px); /* onder de sticky demobalk + header */
     align-self: start;
   }
 }

@@ -342,7 +342,7 @@
 
 .cmw-foot {
   flex-shrink: 0;
-  padding: 12px 14px 10px;
+  padding: 12px 14px 6px; /* onderkant 6px: de credit-link heeft zelf 4px padding */
   background: #fff;
   border-top: 1px solid var(--cmw-line);
   display: flex;
@@ -389,7 +389,36 @@
 }
 .cmw-send:active:not(:disabled) { transform: scale(0.94); }
 .cmw-send:disabled { opacity: 0.4; }
-.cmw-credit { margin: 0; text-align: center; font-size: 11px; color: #8796a5; }
+/* Credit = link naar chatmanta.nl. --cmw-ink-3 (#5b6b7b) haalt ~5,5:1 op wit (was
+   #8796a5, ~3:1). Eigen focusring in navy: de globale ring gebruikt de klantkleur,
+   die op wit te licht kan zijn. Padding maakt het klikdoel 24px hoog (WCAG 2.5.8).
+   Om de foot even hoog te houden als vóór de link (16px tekst + 10px onder = 26px):
+   margin-top -4px vangt de bovenste link-padding op en de .cmw-foot-padding onderaan
+   is 4px kleiner (24 - 4 + 6 = 26). vertical-align: top voorkomt extra regelhoogte
+   door baseline-uitlijning. .cmw .cmw-credit-link (0,2,0) wint van a-regels uit de
+   dashboard-css waarin de previews draaien. */
+.cmw-credit { margin: -4px 0 0; text-align: center; font-size: 11px; line-height: 16px; color: var(--cmw-ink-3); }
+.cmw .cmw-credit-link {
+  display: inline-block;
+  vertical-align: top;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.cmw .cmw-credit-link:hover { color: var(--cmw-ink-2); text-decoration: underline; text-underline-offset: 2px; }
+.cmw .cmw-credit-link:focus-visible { outline: 2px solid var(--cmw-ink); outline-offset: 1px; color: var(--cmw-ink); }
+.cmw-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ---- Contactformulier --------------------------------------------------- */
 

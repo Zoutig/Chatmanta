@@ -38,6 +38,8 @@ export type WidgetStrings = {
   typing: string;
   retry: string;
   poweredBy: string;
+  /** Toevoeging bij de credit-link voor schermlezer en tooltip. */
+  opensNewTab: string;
   unavailable: string;
   failed: string;
   dropped: string;
@@ -68,6 +70,7 @@ export const WIDGET_STRINGS: Record<WidgetLang, WidgetStrings> = {
     typing: 'Aan het typen',
     retry: 'Opnieuw proberen',
     poweredBy: 'Mogelijk gemaakt door ChatManta',
+    opensNewTab: 'opent in een nieuw tabblad',
     unavailable: 'Deze chat is even niet beschikbaar.',
     failed: 'Er ging iets mis. Probeer het zo nog eens.',
     dropped: 'De verbinding viel weg.',
@@ -96,6 +99,7 @@ export const WIDGET_STRINGS: Record<WidgetLang, WidgetStrings> = {
     typing: 'Typing',
     retry: 'Try again',
     poweredBy: 'Powered by ChatManta',
+    opensNewTab: 'opens in a new tab',
     unavailable: 'This chat is temporarily unavailable.',
     failed: 'Something went wrong. Please try again in a moment.',
     dropped: 'The connection was lost.',

@@ -24,7 +24,7 @@ export default function SiteError({ error, reset }: { error: Error & { digest?: 
     <StatusPage
       label="Fout"
       title="Er ging iets onverwachts mis"
-      mascotte="wow"
+      mascotte="shy"
       actions={
         <>
           <button type="button" className="btn btn-primary" onClick={reset}>
