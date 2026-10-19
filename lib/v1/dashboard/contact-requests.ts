@@ -72,13 +72,16 @@ function rowToContactRequest(r: Record<string, unknown>): V1ContactRequest {
 export async function listContactRequests(
   client: SupabaseClient,
   orgId: string,
+  /** Optioneel: alleen verzoeken vanaf dit moment (admin-weergave: 90-dagengrens). */
+  opts: { sinceIso?: string } = {},
 ): Promise<V1ContactRequest[]> {
-  const { data, error } = await client
+  let q = client
     .from('contact_requests')
     .select(SELECT_COLS)
     .eq('organization_id', orgId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+    .is('deleted_at', null);
+  if (opts.sinceIso) q = q.gte('created_at', opts.sinceIso);
+  const { data, error } = await q.order('created_at', { ascending: false });
   if (error) throw new Error(`listContactRequests: ${error.message}`);
   return (data ?? []).map((r) => rowToContactRequest(r as Record<string, unknown>));
 }

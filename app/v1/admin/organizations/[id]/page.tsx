@@ -1,8 +1,8 @@
 // V1 admin — klant deep-dive (tabbed).
 //
-// ?tab=-navigatie met tien tabs:
-//   Overzicht · Notities · Onboarding · Privacy en data · Gesprekken · Bronnen ·
-//   Botinstellingen · Widget · Gebruik · Beheer
+// ?tab=-navigatie met elf tabs:
+//   Overzicht · Notities · Onboarding · Privacy en data · Gesprekken ·
+//   Contactverzoeken (alleen lezen) · Bronnen · Botinstellingen · Widget · Gebruik · Beheer
 //
 // Beheer-tab bewaart de bestaande budget-editor, delete-org-form en export-link
 // (actions.ts + export/route.ts zijn ongewijzigd). Alle admin-overlay-logica
@@ -37,6 +37,7 @@ import { BronnenTab } from './_tabs/bronnen-tab';
 import { InstellingenTab } from './_tabs/instellingen-tab';
 import { WidgetTab } from './_tabs/widget-tab';
 import { UsageTab } from './_tabs/usage-tab';
+import { ContactTab } from './_tabs/contact-tab';
 import { AttentionPanel } from './_components/attention-panel';
 import { getAdminKlantAttention } from '@/lib/v1/admin/klant-attention';
 
@@ -48,6 +49,7 @@ const TABS = [
   { key: 'onboarding', label: 'Onboarding' },
   { key: 'privacy', label: 'Privacy en data' },
   { key: 'gesprekken', label: 'Gesprekken' },
+  { key: 'contact', label: 'Contactverzoeken' },
   { key: 'bronnen', label: 'Bronnen' },
   { key: 'instellingen', label: 'Botinstellingen' },
   { key: 'widget', label: 'Widget' },
@@ -169,6 +171,7 @@ export default async function OrgDeepDivePage({
       {tab === 'onboarding' && <OnboardingTab orgId={id} />}
       {tab === 'privacy' && <PrivacyTab orgId={id} />}
       {tab === 'gesprekken' && <GesprekkenTab orgId={id} />}
+      {tab === 'contact' && <ContactTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'bronnen' && <BronnenTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'instellingen' && <InstellingenTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'widget' && <WidgetTab orgId={id} chatbotId={chatbotId} />}
