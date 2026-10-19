@@ -10,7 +10,8 @@
 // alleen op verzoek) — zie applyLinkButtons in app/v1/app/widget-chat.ts.
 //
 // Format: ndjson — één JSON-object per regel. Eerst {kind:'meta', queryLogId, requestId},
-// daarna de StreamEvents uit runRagQuery.
+// daarna de StreamEvents uit runRagQuery, gefilterd door lib/v1/widget/stream-whitelist
+// (geen chunks, kosten, threshold of botversie naar de bezoeker).
 
 import { NextResponse, after } from 'next/server';
 import type { ChatResponse, ChatHistoryTurn } from '@/lib/rag/run-rag-query';
@@ -22,6 +23,8 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
+import { publicStreamLine } from '@/lib/v1/widget/stream-whitelist';
+import { checkVisitorDayLimit } from '@/lib/v1/limits/visitor-day-limit';
 import {
   v1InjectionBlock,
   prepareV1WidgetChat,
@@ -63,9 +66,11 @@ const NDJSON_HEADERS = (requestId: string) =>
   });
 
 /** Eén NDJSON-event als complete response (voor de error-/no-chatbot-paden). */
-function ndjsonOnce(requestId: string, queryLogId: string, event: object): Response {
+function ndjsonOnce(requestId: string, queryLogId: string, event: { kind: string; [k: string]: unknown }): Response {
+  // Ook terminale/gate-events via de whitelist (fail-closed): een later toegevoegd
+  // veld op zo'n event gaat nooit ongefilterd naar de bezoeker.
   const body =
-    JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n' + JSON.stringify(event) + '\n';
+    JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n' + publicStreamLine(event, requestId);
   return new Response(body, { status: 200, headers: NDJSON_HEADERS(requestId) });
 }
 
@@ -139,7 +144,17 @@ export async function POST(req: Request) {
   }
   const organizationId = org.id as string;
 
-  // 4a-7. Chatbot, klant-pauze, per-org gate (rate-limit + maand-cap + dag-budget),
+  // 4a. Daglimiet per bezoeker (org + gehasht IP): één script mag de dag-/maand-
+  //     limiet van de klant niet in minuten opmaken (audit 2026-10 #4).
+  const visitorDay = await checkVisitorDayLimit(organizationId, getClientIp(req));
+  if (!visitorDay.ok) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: { kind: 'fallback', answer: visitorDay.message },
+    });
+  }
+
+  // 4b-7. Chatbot, klant-pauze, per-org gate (rate-limit + maand-cap + dag-budget),
   //       klant-settings, config (bronlinks uit, fast mode) en de runRagQuery-
   //       generator — gedeeld met de eval-suite (app/v1/app/widget-chat.ts).
   //       Terminale uitkomsten zijn niet billable (geen pipeline).
@@ -162,8 +177,10 @@ export async function POST(req: Request) {
           // Merge naar finalResponse voor query_log (cost/latency); spiegelt askV1 +
           // app/api/v0/chat. followups-done/metrics-done vullen ná answer-done aan.
           finalResponse = foldV1FinalResponse(finalResponse, event);
-          const enriched = event.kind === 'error' ? { ...event, requestId } : event;
-          controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
+          // Naar de bezoeker alleen de whitelist (geen chunks/kosten/threshold/
+          // botversie); finalResponse hierboven blijft volledig voor de logging.
+          const line = publicStreamLine(event, requestId);
+          if (line) controller.enqueue(encoder.encode(line));
         }
       } catch (err) {
         console.error('[v1/chat stream]', requestId, err instanceof Error ? err.message : err);

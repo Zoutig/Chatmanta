@@ -57,9 +57,11 @@ export class InMemoryRateLimiter implements RateLimiter {
   private readonly limit: number;
   private readonly windowMs: number;
 
-  constructor(opts?: { maxRequestsPerMin?: number }) {
+  /** `windowSec` (default 60): venster-lengte. `maxRequestsPerMin` is dan het
+   *  maximum per venster (de naam is historisch; voor een dagbucket = per dag). */
+  constructor(opts?: { maxRequestsPerMin?: number; windowSec?: number }) {
     this.limit = opts?.maxRequestsPerMin ?? DEFAULT_MAX_REQUESTS_PER_MIN;
-    this.windowMs = 60_000;
+    this.windowMs = (opts?.windowSec ?? 60) * 1000;
   }
 
   async check(key: string): Promise<RateLimitVerdict> {
@@ -114,15 +116,16 @@ export class UpstashRateLimiter implements RateLimiter {
   private readonly fallback: InMemoryRateLimiter;
   private lastAlarmAtMs = 0;
 
-  constructor(opts: { maxRequestsPerMin: number; prefix: string; redis: Redis }) {
+  constructor(opts: { maxRequestsPerMin: number; prefix: string; redis: Redis; windowSec?: number }) {
+    const windowSec = opts.windowSec ?? 60;
     this.limitValue = opts.maxRequestsPerMin;
     this.ratelimit = new Ratelimit({
       redis: opts.redis,
-      limiter: Ratelimit.slidingWindow(opts.maxRequestsPerMin, '60 s'),
+      limiter: Ratelimit.slidingWindow(opts.maxRequestsPerMin, `${windowSec} s`),
       analytics: false,
       prefix: opts.prefix,
     });
-    this.fallback = new InMemoryRateLimiter({ maxRequestsPerMin: opts.maxRequestsPerMin });
+    this.fallback = new InMemoryRateLimiter({ maxRequestsPerMin: opts.maxRequestsPerMin, windowSec });
   }
 
   check(key: string): Promise<RateLimitVerdict> {
@@ -180,7 +183,7 @@ let _orgInstance: RateLimiter | null = null;
 let _clientErrorInstance: RateLimiter | null = null;
 let _upstashWarned = false;
 
-function readEnvLimit(envName: string, fallback: number): number {
+export function readEnvLimit(envName: string, fallback: number): number {
   const raw = Number(process.env[envName]);
   return Number.isFinite(raw) && raw > 0 ? raw : fallback;
 }
@@ -190,7 +193,7 @@ function readEnvLimit(envName: string, fallback: number): number {
  * staan; anders InMemoryRateLimiter (fail-safe, met one-shot console.warn als
  * USE_UPSTASH wel gevraagd was maar config ontbrak).
  */
-function buildLimiter(opts: { limit: number; prefix: string }): RateLimiter {
+function buildLimiter(opts: { limit: number; prefix: string; windowSec?: number }): RateLimiter {
   const useUpstash = process.env.USE_UPSTASH === 'true';
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -201,6 +204,7 @@ function buildLimiter(opts: { limit: number; prefix: string }): RateLimiter {
       maxRequestsPerMin: opts.limit,
       prefix: opts.prefix,
       redis,
+      windowSec: opts.windowSec,
     });
   }
 
@@ -212,7 +216,7 @@ function buildLimiter(opts: { limit: number; prefix: string }): RateLimiter {
     );
   }
 
-  return new InMemoryRateLimiter({ maxRequestsPerMin: opts.limit });
+  return new InMemoryRateLimiter({ maxRequestsPerMin: opts.limit, windowSec: opts.windowSec });
 }
 
 export function getRateLimiter(): RateLimiter {
@@ -270,6 +274,29 @@ export function getClientErrorRateLimiter(): RateLimiter {
     prefix: '@chatmanta/rl-clienterr',
   });
   return _clientErrorInstance;
+}
+
+const _dayInstances = new Map<string, RateLimiter>();
+
+/**
+ * Dagbucket (sliding window van 24 uur) voor publieke V1-paden (security-audit
+ * 2026-10, #4/#5). De andere limiters tellen per minuut; zonder daggrens kan één
+ * script de daglimiet van een klant in minuten opmaken of de klant met
+ * contactmails bestoken. Eén Upstash-prefix per `bucket` (bv. 'org-ip-chat'), zodat
+ * de tellers los van elkaar staan. De limieten zelf staan bij de aanroeper
+ * (lib/v1/limits/visitor-day-limit.ts). Zelfde fail-safe als de andere limiters
+ * (Upstash-storing → per-instance in-memory, nooit een 500).
+ */
+export function getDayRateLimiter(bucket: string, limitPerDay: number): RateLimiter {
+  const existing = _dayInstances.get(bucket);
+  if (existing) return existing;
+  const limiter = buildLimiter({
+    limit: limitPerDay,
+    prefix: `@chatmanta/rl-day-${bucket}`,
+    windowSec: 24 * 60 * 60,
+  });
+  _dayInstances.set(bucket, limiter);
+  return limiter;
 }
 
 const _firecrawlInstances = new Map<string, RateLimiter>();

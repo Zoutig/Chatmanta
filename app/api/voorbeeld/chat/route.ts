@@ -29,6 +29,8 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
+import { publicStreamLine } from '@/lib/v1/widget/stream-whitelist';
+import { checkVoorbeeldDayLimit } from '@/lib/v1/limits/visitor-day-limit';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { v1RagConfigFor, getOrgChatbot } from '@/app/v1/app/rag-config';
 import {
@@ -92,9 +94,11 @@ const NDJSON_HEADERS = (requestId: string) =>
     'X-Request-Id': requestId,
   });
 
-function ndjsonOnce(requestId: string, queryLogId: string, event: object): Response {
+function ndjsonOnce(requestId: string, queryLogId: string, event: { kind: string; [k: string]: unknown }): Response {
+  // Ook terminale/gate-events via de whitelist (fail-closed): een later toegevoegd
+  // veld op zo'n event gaat nooit ongefilterd naar de bezoeker.
   const body =
-    JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n' + JSON.stringify(event) + '\n';
+    JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n' + publicStreamLine(event, requestId);
   return new Response(body, { status: 200, headers: NDJSON_HEADERS(requestId) });
 }
 
@@ -163,6 +167,16 @@ export async function POST(req: Request) {
     });
   }
 
+  // Daglimiet per bezoeker (org + gehasht IP), zodat één script de demo niet voor
+  // iedereen platlegt (audit 2026-10 #4). Eigen, ruimere demo-bucket (sales-demo's vanaf één IP).
+  const visitorDay = await checkVoorbeeldDayLimit(organizationId, getClientIp(req));
+  if (!visitorDay.ok) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: { kind: 'fallback', answer: visitorDay.message },
+    });
+  }
+
   const gate = await checkOrgChatGates(svc, organizationId);
   if (!gate.ok) {
     return ndjsonOnce(requestId, queryLogId, {
@@ -223,8 +237,10 @@ export async function POST(req: Request) {
               totalCostUsd: fr.totalCostUsd + event.costUsd,
             };
           }
-          const enriched = event.kind === 'error' ? { ...event, requestId } : event;
-          controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
+          // Whitelist: geen chunks/kosten/threshold naar de bezoeker; alleen de
+          // brontitels die de demo-bronnenlijst toont.
+          const line = publicStreamLine(event, requestId, { includeSourceTitles: true });
+          if (line) controller.enqueue(encoder.encode(line));
         }
       } catch (err) {
         console.error('[voorbeeld/chat stream]', requestId, err instanceof Error ? err.message : err);

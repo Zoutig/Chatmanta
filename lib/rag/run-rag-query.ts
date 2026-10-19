@@ -26,6 +26,7 @@ import type {
 } from '@/lib/rag/types';
 import { embedTexts } from '@/lib/rag/embeddings';
 import { readCacheEpoch, shouldSkipCacheWrite } from '@/lib/rag/cache-epoch';
+import { shouldBypassAnswerCache } from '@/lib/rag/cache-pii';
 import { stripQuotes, parsePreProcessOutput, parseSubQueries } from '@/lib/rag/preprocess-parse';
 import { buildSystemPrompt } from '@/lib/rag/style';
 import { DEFAULT_LENGTH, DEFAULT_TONE, type Length, type Tone } from '@/lib/rag/style-types';
@@ -1643,7 +1644,11 @@ export async function* runRagQuery(
   // lookup/write zou een antwoord uit een ánder gesprek kunnen serveren
   // (launch-onderzoek 2026-10-07). Met gebruikers-history: cache overslaan.
   const hasUserHistory = (input.history ?? []).some((t) => t.role === 'user');
-  const cacheActive = bot.cacheEnabled && input.disableCache !== true && !hasUserHistory;
+  // PII of een zelfintroductie in de vraag: geen lookup én geen write (audit 2026-10
+  // #13), anders kan het antwoord aan bezoeker A ("Hoi Jan") bij bezoeker B landen.
+  // cacheActive=false → geen cache-embed → lookup en write slaan allebei over.
+  const cacheActive =
+    bot.cacheEnabled && input.disableCache !== true && !hasUserHistory && !shouldBypassAnswerCache(original);
   const cacheEmbedPromise = cacheActive ? embedTexts([original], bot.embeddingModel) : null;
   // Epoch-snapshot bij pipeline-start (plan 006): parallel met de embed, geen
   // wall-clock-impact. readCacheEpoch kan niet rejecten (vangt alles → null),

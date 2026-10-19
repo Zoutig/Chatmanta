@@ -24,6 +24,7 @@ import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/error
 import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
 import { verifyMagicBytes } from '@/lib/rag/file-signature';
+import { isOwnUploadPath } from '@/lib/v1/documents/upload-path';
 import { getOrgChatbot } from '../rag-config';
 import { getOrgRateLimiter } from '@/lib/v0/server/rate-limit';
 import { validateCrawlUrl } from '@/lib/v1/crawler/validateCrawlUrl';
@@ -389,7 +390,8 @@ export async function processUploadedDocAction(
     if (!isAllowedDocExt(ext)) fail('INGEST_TYPE', 'Alleen PDF, DOCX, TXT of MD worden ondersteund.');
     // Het pad MOET in de eigen org/chatbot-namespace liggen (server-gegenereerd in
     // stap 1 — een afwijking = geknutseld). Service-role bypast RLS, dus dit is de guard.
-    if (!path.startsWith(`${orgId}/${chatbotId}/`)) fail('AUTH_FORBIDDEN', 'Pad buiten je eigen namespace.');
+    // Strikt formaat i.p.v. startsWith: geen '../' of '%2e%2e' (audit 2026-10 #9).
+    if (!isOwnUploadPath(path, orgId, chatbotId)) fail('AUTH_FORBIDDEN', 'Pad buiten je eigen namespace.');
 
     const { data: blob, error: dlErr } = await sb.storage.from(DOC_BUCKET).download(path);
     if (dlErr || !blob) fail('NOT_FOUND', `Upload niet gevonden: ${dlErr?.message ?? 'geen bestand'}`);

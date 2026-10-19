@@ -11,6 +11,13 @@ import { Button } from '@/app/v1/_ui/button';
 import { Field, Switch } from '@/app/v1/_ui/controls';
 import '../org-forms.css';
 
+// Audit 2026-10 #14: bewaartermijnen, volledige logging en PII-redactie worden wel
+// opgeslagen, maar geen enkel V1-codepad leest ze (alleen V0's retentie-cron doet dat).
+// Daarom staat er "nog niet actief in V1" bij, zodat niemand ze in een
+// verwerkersovereenkomst belooft. Niet verwijderd: de velden blijven bewaard voor
+// wanneer V1-retentie per klant gebouwd wordt.
+const NOT_ACTIVE_V1 = 'Nog niet actief in V1: wordt opgeslagen, maar nog door geen enkel proces toegepast.';
+
 export function PrivacyForm({ orgId, privacy }: { orgId: string; privacy: PrivacySettings }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -51,26 +58,35 @@ export function PrivacyForm({ orgId, privacy }: { orgId: string; privacy: Privac
 
   return (
     <div className="v1-form">
+      <p
+        className="v1-alert"
+        role="note"
+        style={{ background: 'var(--v1-warn-soft)', color: 'var(--v1-warn)' }}
+      >
+        Let op: de bewaartermijnen, volledige gesprekslogging en PII-redactie hieronder zijn
+        nog niet actief in V1. Beloof ze niet aan een klant (bijvoorbeeld in een
+        verwerkersovereenkomst). De drie vinkjes onderaan zijn alleen een administratie.
+      </p>
       <div className="v1-edit-grid">
-        <Field label="Gesprekken bewaren (dagen)">
+        <Field label="Gesprekken bewaren (dagen)" hint={NOT_ACTIVE_V1}>
           {(id) => (
             <input id={id} className="v1-input" type="number" min={1} max={365} value={chatDays} onChange={(e) => setChatDays(Number(e.target.value))} />
           )}
         </Field>
-        <Field label="Issue-gesprekken bewaren (dagen)">
+        <Field label="Issue-gesprekken bewaren (dagen)" hint={NOT_ACTIVE_V1}>
           {(id) => (
             <input id={id} className="v1-input" type="number" min={1} max={730} value={issueDays} onChange={(e) => setIssueDays(Number(e.target.value))} />
           )}
         </Field>
-        <Field label="Metadata bewaren (maanden)">
+        <Field label="Metadata bewaren (maanden)" hint={NOT_ACTIVE_V1}>
           {(id) => (
             <input id={id} className="v1-input" type="number" min={1} max={60} value={metaMonths} onChange={(e) => setMetaMonths(Number(e.target.value))} />
           )}
         </Field>
       </div>
 
-      <Switch label="Volledige gesprekslogging aan" checked={fullLogging} onChange={setFullLogging} />
-      <Switch label="PII-redactie aan" checked={pii} onChange={setPii} />
+      <Switch label="Volledige gesprekslogging aan" description={NOT_ACTIVE_V1} checked={fullLogging} onChange={setFullLogging} />
+      <Switch label="PII-redactie aan" description={NOT_ACTIVE_V1} checked={pii} onChange={setPii} />
       <Switch label="Verwerkersovereenkomst getekend" checked={dpa} onChange={setDpa} />
       <Switch label="Privacytekst gedeeld met klant" checked={privacyText} onChange={setPrivacyText} />
       <Switch label="Informatie over subverwerkers gedeeld" checked={subproc} onChange={setSubproc} />

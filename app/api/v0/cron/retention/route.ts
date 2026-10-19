@@ -25,7 +25,13 @@ export async function GET(req: NextRequest) {
   const dryRun = new URL(req.url).searchParams.get('dryRun') === '1';
   try {
     const results = await runRetentionCleanup({ apply: !dryRun });
-    return NextResponse.json({ ok: true, applied: !dryRun, orgs: results });
+    // Een gefaalde anonimiseer-/delete-stap → ok:false + 500 (audit 2026-10), zodat
+    // de cron-monitor het ziet i.p.v. een stille ok:true.
+    const failed = results.some((r) => r.failed === true);
+    return NextResponse.json(
+      { ok: !failed, applied: !dryRun, orgs: results },
+      { status: failed ? 500 : 200 },
+    );
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : String(err) },

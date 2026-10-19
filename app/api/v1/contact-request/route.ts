@@ -26,6 +26,8 @@ import { getOrgChatbot } from '@/app/v1/app/rag-config';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import { validateContactBody } from '@/lib/v1/widget/contact-validate';
 import { notifyNewV1ContactRequest } from '@/lib/notifications/v1-contact-request-notify';
+import { allowOrgContactMailToday, allowVisitorContactToday } from '@/lib/v1/limits/visitor-day-limit';
+import { captureError } from '@/lib/v1/observability/error-capture';
 
 export const runtime = 'nodejs';
 
@@ -102,6 +104,11 @@ export async function POST(req: Request) {
   }
   const { name, email, phone, preferredContact, subject, message } = v.value;
 
+  // 7b. Daglimiet per bezoeker (org + gehasht IP): tegen mailbommen (audit 2026-10 #5).
+  if (!(await allowVisitorContactToday(organizationId, getClientIp(req)))) {
+    return new NextResponse(null, { status: 429 });
+  }
+
   // 8. Insert via service-role. org+chatbot server-bepaald; consent hard true.
   try {
     const { error: insErr } = await svc.from('contact_requests').insert({
@@ -124,14 +131,31 @@ export async function POST(req: Request) {
 
     // DB = bron-van-waarheid; mail = best-effort via after() (nooit-throw, gated op
     // RESEND_API_KEY). Blokkeert de 201 naar de bezoeker niet.
-    after(() =>
-      notifyNewV1ContactRequest(svc, {
+    // Dagcap op mails per org (audit #5): daarboven komt de lead wél binnen (dashboard),
+    // alleen de mail vervalt.
+    after(async () => {
+      if (!(await allowOrgContactMailToday(organizationId))) {
+        console.warn('[v1/contact-request] mail-dagcap bereikt, geen notificatie voor org', organizationId);
+        // Niet stil: één gegroepeerde melding (fingerprint per org+code) in de admin-
+        // Issues-tab, zodat wij de klant kunnen wijzen op de leads in zijn dashboard.
+        captureError({
+          surface: 'api',
+          severity: 'warning',
+          code: 'CONTACT_MAIL_CAP',
+          title: 'Mail-dagcap contactverzoeken bereikt',
+          message: 'Notificatiemails voor deze org overgeslagen; verzoeken staan wel in het dashboard.',
+          organizationId,
+          enforceCap: true,
+        });
+        return;
+      }
+      await notifyNewV1ContactRequest(svc, {
         organizationId,
         orgName,
         notificationEmail,
         request: { name, email, phone, preferredContact, subject, message },
-      }),
-    );
+      });
+    });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     console.error('[v1/contact-request] onverwachte fout:', err instanceof Error ? err.message : err);

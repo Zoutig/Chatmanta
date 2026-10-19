@@ -33,8 +33,8 @@ Active corpus: 176 cases (legacy uitgesloten: 10). ⚠ Labels = triage, geen waa
   - A: ChatManta verwacht V2 uit te brengen in **Q2 van 2026** [1].
   - judge: Het antwoord noemt een specifiek kwartaal voor de release van V2, wat niet in de bronnen te vinden is en tegenstrijdig is met de gold_facts. De gold_facts dat V
 - **v063-hardfact-tarief-per-gesprek** [dev-org/out_of_corpus] C=0 G=0
-  - A: Een individueel gesprek bij ChatManta kost **€0,07** per gesprek als je het aantal inbegrepen gesprekken overschrijdt in de **standard** tier [1].
-  - judge: Het bot-antwoord noemt een specifiek bedrag van €0,07 per gesprek, wat niet in de bronnen te vinden is en tegen de gold_answer ingaat. Er is geen meta-talk aanw
+  - A: Een individueel gesprek bij ChatManta kost **[intern bedrag]** per gesprek als je het aantal inbegrepen gesprekken overschrijdt in de **standard** tier [1].
+  - judge: Het bot-antwoord noemt een specifiek bedrag van [intern bedrag] per gesprek, wat niet in de bronnen te vinden is en tegen de gold_answer ingaat. Er is geen meta-talk aanw
 - **v063-hardfact-max-doc-size** [dev-org/out_of_corpus] C=0 G=0
   - A: De maximale bestandsgrootte voor een document-upload is **10 MB** [2].
   - judge: Het antwoord noemt een maximale bestandsgrootte van 10 MB, wat niet in de bronnen te vinden is en tegen de gold_answer ingaat. Er is geen meta-talk aanwezig. De
@@ -48,7 +48,7 @@ Active corpus: 176 cases (legacy uitgesloten: 10). ⚠ Labels = triage, geen waa
   - A: Ik weet niet precies wanneer de beta-periode van ChatManta eindigt, maar het project is momenteel in de "pre-build" fase en de lancering is gepland voor **2026-
   - judge: Het antwoord geeft een verzonnen einddatum voor de beta-periode, wat niet in de documentatie te vinden is. Er is geen meta-talk aanwezig. De route is incorrect 
 - **v063-hardfact-basis-licentie-eur** [dev-org/out_of_corpus] C=0 G=0
-  - A: De basis-licentie, de **Standard** tier, kost **gratis** voor v1-testklanten. Boven de inbegrepen 300 gesprekken betaal je **€0,07 per extra gesprek** [1].
+  - A: De basis-licentie, de **Standard** tier, kost **gratis** voor v1-testklanten. Boven de inbegrepen 300 gesprekken betaal je **[intern bedrag] per extra gesprek** [1].
   - judge: Het bot-antwoord noemt een specifieke prijs voor de basis-licentie, wat niet in de gold_facts staat en niet ondersteund wordt door de bronnen. Er is geen meta-t
 - **v063-hardfact-api-rate-limit** [dev-org/out_of_corpus] C=0 G=0
   - A: Voor API-calls per minuut zijn de volgende limieten van toepassing:  - **100 config-calls** per minuut per `chatbot_public_id` — dit voorkomt token-mining. - **
@@ -294,7 +294,7 @@ Active corpus: 176 cases (legacy uitgesloten: 10). ⚠ Labels = triage, geen waa
 ### hard_fact_literalism (n=6)
   _orgs:_ initech:4 dev-org:1 acme-corp:1  ·  _types:_ false_premise:2 out_of_corpus:1 planted_fact:1 factual:1 multi_hop:1
 - **out-of-corpus-prijs** [dev-org/out_of_corpus] C=0 G=1 missing=money:430
-  - A: Voor **30 klanten** liggen de kosten tussen **€220 en €430 per maand**, afhankelijk van het gebruik van verschillende tools en API's. Bij **100 klanten** kunnen
+  - A: Voor **30 klanten** liggen de kosten tussen **[intern bedrag] en [intern bedrag] per maand**, afhankelijk van het gebruik van verschillende tools en API's. Bij **100 klanten** kunnen
   - judge: Het antwoord geeft specifieke kosten voor 30 en 100 klanten, wat niet overeenkomt met de vraag naar maandelijkse kosten voor een enkele klant. De bot had een fa
 - **initech-vpb-tarief-200k** [initech/false_premise] C=5 G=3 missing=money:250000,money:50000
   - A: Nee, je betaalt niet 25,8% Vpb over de volledige € 250.000 winst. Voor 2026 geldt dat je over de eerste **€ 200.000** een tarief van **19%** betaalt en over het
@@ -334,7 +334,7 @@ Active corpus: 176 cases (legacy uitgesloten: 10). ⚠ Labels = triage, geen waa
 ### §E.5-verificatie van de top-2
 
 **unsupported_claim (29) — ECHTE grounding/faithfulness-zwakte, maar HETEROGEEN van root-cause.** Geverifieerd over >5 cases per org. Sub-patronen:
-- **out_of_corpus number/date-hallucinatie (12, dev-org-zwaar)**: bot verzint specifieke getallen/datums die hij hoort te weigeren (`v063-hardfact-*`: "€0,07", "10 MB", "Q2 2026", "85%"). Anti-hallucinatie-zwakte.
+- **out_of_corpus number/date-hallucinatie (12, dev-org-zwaar)**: bot verzint specifieke getallen/datums die hij hoort te weigeren (`v063-hardfact-*`: "[intern bedrag]", "10 MB", "Q2 2026", "85%"). Anti-hallucinatie-zwakte.
 - **unsupported toevoeging (factual/multi_hop, ~8)**: correcte kern + onterechte detail. Terugkerend: "**OpenAI als fallback**" (in `v1-llm-model`, `stack-overzicht`, `multi-hop-embedding-vector`) — niet in de bron. Echte faithfulness-zwakte.
 - **factual hallucinatie**: `vector-database` → "Pinecone of Qdrant" (gold = pgvector), C=0/G=0.
 - **planted_fact-adoptie (3, customer-org)**: `globex-planted-therapeut-sophie/frank`, `initech-planted-kantoor-rotterdam` — C=0/G=0; door must-not niet gevangen → mogelijke must-not-gap óf wrong-answer (overlapt adoption_residue/too_cautious).

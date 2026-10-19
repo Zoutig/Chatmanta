@@ -96,6 +96,8 @@ export default async function V1InstellingenPage() {
 
       <Panel title="Standaard bewaartermijnen">
         <Rows>
+          {/* Audit 2026-10 #14: geen V1-codepad past deze termijnen toe. */}
+          <Row label="Status">Nog niet actief in V1 (alleen V0 past ze toe)</Row>
           <Row label="Gesprekken">{PRIVACY_DEFAULTS.chatRetentionDays} dagen</Row>
           <Row label="Gesprekken met een issue">{PRIVACY_DEFAULTS.issueRetentionDays} dagen</Row>
           <Row label="Metadata">{PRIVACY_DEFAULTS.metadataRetentionMonths} maanden</Row>

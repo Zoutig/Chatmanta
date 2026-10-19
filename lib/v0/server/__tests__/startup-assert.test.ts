@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   checkProductionEnv,
+  checkSoftProductionEnv,
   assertProductionEnv,
   isProductionRuntime,
 } from '../startup-assert';
@@ -101,4 +102,23 @@ test('isProductionRuntime: NODE_ENV/VERCEL_ENV', () => {
   assert.equal(isProductionRuntime({ VERCEL_ENV: 'production' }), true);
   assert.equal(isProductionRuntime({ NODE_ENV: 'development' }), false);
   assert.equal(isProductionRuntime({}), false);
+});
+
+// Audit 2026-10: IP_HASH_SALT is een ZACHTE check — waarschuwen, nooit de boot breken.
+test('checkSoftProductionEnv: ontbrekende IP_HASH_SALT → waarschuwing; aanwezig → niets', () => {
+  assert.equal(checkSoftProductionEnv({}).length, 1);
+  assert.match(checkSoftProductionEnv({})[0], /IP_HASH_SALT/);
+  assert.deepEqual(checkSoftProductionEnv({ IP_HASH_SALT: 'x'.repeat(32) }), []);
+});
+
+test('assertProductionEnv: productie zonder IP_HASH_SALT → throwt NIET (alleen warn)', () => {
+  const origWarn = console.warn;
+  const warned: string[] = [];
+  console.warn = (m: string) => void warned.push(String(m));
+  try {
+    assert.doesNotThrow(() => assertProductionEnv(GOOD_ENV, { isProduction: true }));
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.ok(warned.some((w) => w.includes('IP_HASH_SALT')));
 });

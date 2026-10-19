@@ -23,6 +23,8 @@ import { writeChatbotSettingsPatch } from '@/app/v1/app/instellingen/settings-st
 import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
 import { verifyMagicBytes } from '@/lib/rag/file-signature';
+import { isOwnUploadPath } from '@/lib/v1/documents/upload-path';
+import { isProtectedAdminUser } from '@/lib/v1/admin/protected-users';
 import { inviteOrLookupUserByEmail, resolveInviteRedirect } from '../invite-helpers';
 
 /** Jorion-admin-gate voor de deep-dive-actions. Retourneert de actor-id, of een
@@ -169,6 +171,22 @@ export async function deleteOrgDataAction(
         `[deleteOrgDataAction] Storage-opruiming faalde (genegeerd) ${orgId}: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    // 2c. idem voor feedback-bijlagen (audit 2026-10 #15): zelfde nesting
+    //     <orgId>/<feedbackId>/<file> in v1-feedback-attachments, zelfde best-effort.
+    try {
+      const fb = admin.storage.from('v1-feedback-attachments');
+      const { data: ticketDirs } = await fb.list(orgId, { limit: 1000 });
+      const attachmentPaths: string[] = [];
+      for (const dir of ticketDirs ?? []) {
+        const { data: files } = await fb.list(`${orgId}/${dir.name}`, { limit: 1000 });
+        for (const f of files ?? []) attachmentPaths.push(`${orgId}/${dir.name}/${f.name}`);
+      }
+      if (attachmentPaths.length) await fb.remove(attachmentPaths);
+    } catch (e) {
+      console.warn(
+        `[deleteOrgDataAction] bijlagen-opruiming faalde (genegeerd) ${orgId}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
 
     // 3. best-effort de auth-users verwijderen. Eén-org-per-user (§1.5), maar we
     //    checken expliciet of de user na de cascade nog elders member is
@@ -176,6 +194,7 @@ export async function deleteOrgDataAction(
     //    org-delete niet terugdraaien (log warn, ga door).
     const deletedUserIds: string[] = [];
     const skippedMultiOrgUserIds: string[] = [];
+    const skippedProtectedAdminUserIds: string[] = [];
     for (const uid of memberUserIds) {
       if (uid === actorId) {
         skippedMultiOrgUserIds.push(uid); // de handelende admin nooit zichzelf wissen
@@ -189,6 +208,11 @@ export async function deleteOrgDataAction(
       // nog member van een andere org). Sla over en registreer.
       if (cntErr || (count ?? 0) > 0) {
         skippedMultiOrgUserIds.push(uid); // andere org, of count-fout → safe skip
+        continue;
+      }
+      // Nooit een Jorion-admin-account wissen (fail-closed, audit 2026-10).
+      if (await isProtectedAdminUser(admin, uid)) {
+        skippedProtectedAdminUserIds.push(uid); // admin, of admin-status onbekend
         continue;
       }
       const { error: userErr } = await admin.auth.admin.deleteUser(uid);
@@ -211,6 +235,7 @@ export async function deleteOrgDataAction(
         name: org.name,
         deleted_user_ids: deletedUserIds,
         skipped_multi_org_user_ids: skippedMultiOrgUserIds,
+        skipped_protected_admin_user_ids: skippedProtectedAdminUserIds,
       },
     });
 
@@ -417,7 +442,8 @@ export async function adminRemoveMemberAction(
         .from('organization_members')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId);
-      if (!cntErr && (count ?? 0) === 0) {
+      // Nooit een Jorion-admin-account wissen (fail-closed, audit 2026-10).
+      if (!cntErr && (count ?? 0) === 0 && !(await isProtectedAdminUser(svc, userId))) {
         const { error: userErr } = await svc.auth.admin.deleteUser(userId);
         if (userErr) {
           console.error(`[adminRemoveMemberAction] user-delete faalde (genegeerd) ${userId}: ${userErr.message}`);
@@ -742,7 +768,8 @@ export async function adminProcessUploadedDocAction(
 
     // Object-level: het pad MOET in de org/chatbot-namespace liggen (server-gegenereerd
     // in stap 1). Service-role bypast RLS → dit is de guard tegen een geknutseld pad.
-    if (!path.startsWith(`${orgId}/${chatbot.id}/`)) fail('AUTH_FORBIDDEN', 'Pad buiten de org-namespace.');
+    // Strikt formaat i.p.v. startsWith: geen '../' of '%2e%2e' (audit 2026-10 #9).
+    if (!isOwnUploadPath(path, orgId, chatbot.id)) fail('AUTH_FORBIDDEN', 'Pad buiten de org-namespace.');
 
     const { data: blob, error: dlErr } = await svc.storage.from(ADMIN_DOC_BUCKET).download(path);
     if (dlErr || !blob) fail('NOT_FOUND', `Upload niet gevonden: ${dlErr?.message ?? 'geen bestand'}`);

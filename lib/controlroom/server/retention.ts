@@ -41,6 +41,9 @@ export type RetentionOrgResult = {
   /** Contactverzoeken > 90 dagen die (zouden) worden HARD verwijderd (migr 0053). */
   contactRequestCandidates: number;
   applied: boolean;
+  /** true = een anonimiseer- of delete-stap faalde (audit 2026-10: de cron meldt dan
+   *  ok:false i.p.v. stil ok:true). Alleen gezet bij apply. */
+  failed?: boolean;
 };
 
 // Retentietermijn voor contactverzoeken — bewust LOS van de per-org
@@ -60,7 +63,10 @@ function cutoffIso(days: number): string {
 // Hard-delete van contactverzoeken ouder dan 90 dagen (op created_at). Geen
 // anonimisering zoals bij chat-rijen: de AVG eist volledige verwijdering van de
 // bezoekers-PII (naam/e-mail/telefoon). dryRun telt alleen. Org-gescoped.
-async function processContactRequests(orgId: string, apply: boolean): Promise<number> {
+async function processContactRequests(
+  orgId: string,
+  apply: boolean,
+): Promise<{ candidates: number; failed: boolean }> {
   const cutoff = cutoffIso(CONTACT_RETENTION_DAYS);
   const { count, error: countErr } = await sb()
     .from('v0_contact_requests')
@@ -81,10 +87,11 @@ async function processContactRequests(orgId: string, apply: boolean): Promise<nu
       .lt('created_at', cutoff);
     if (delErr) {
       console.error('[retention] contactverzoeken-delete faalde org=%s: %s', orgId, delErr.message);
+      return { candidates: count ?? 0, failed: true };
     }
   }
 
-  return count ?? 0;
+  return { candidates: count ?? 0, failed: false };
 }
 
 async function processOrg(
@@ -125,32 +132,45 @@ async function processOrg(
     msgCount = count ?? 0;
   }
 
+  let failed = false;
   if (apply) {
-    await sb()
+    const { error: qlErr } = await sb()
       .from('query_log')
       .update({ question: REDACTED, answer: REDACTED })
       .eq('organization_id', orgId)
       .lt('created_at', cutoff)
       .neq('answer', REDACTED);
+    if (qlErr) {
+      console.error('[retention] query_log-anonimisering faalde org=%s: %s', orgId, qlErr.message);
+      failed = true;
+    }
     if (threadIds.length > 0) {
-      await sb()
+      const { error: msgErr } = await sb()
         .from('v0_thread_messages')
         .update({ content: REDACTED })
         .in('thread_id', threadIds)
         .lt('created_at', cutoff)
         .neq('content', REDACTED);
+      if (msgErr) {
+        console.error('[retention] berichten-anonimisering faalde org=%s: %s', orgId, msgErr.message);
+        failed = true;
+      }
     }
   }
 
   // Contactverzoeken kennen een eigen, vaste 90-daagse harde-delete-grens (los van
   // de chat-anonimisering hierboven).
-  const contactRequestCandidates = await processContactRequests(orgId, apply);
+  const contact = await processContactRequests(orgId, apply);
+  const contactRequestCandidates = contact.candidates;
+  if (contact.failed) failed = true;
 
   // Privacy-tab toont "laatste verwijdering" (admindashboard/klanten/[orgSlug]) —
   // alleen stempelen als er ook echt iets is aangepast/verwijderd, anders suggereert
   // de datum ten onrechte recente data-verwijdering voor een org zonder kandidaten.
+  // Ook niet stempelen als een stap faalde: dan zou de tab een geslaagde verwijdering
+  // tonen die niet (volledig) gebeurd is.
   const totalTouched = (qlCount ?? 0) + msgCount + contactRequestCandidates;
-  if (apply && totalTouched > 0) {
+  if (apply && totalTouched > 0 && !failed) {
     await upsertPrivacy(orgId, { lastDataDeletionAt: new Date().toISOString() }).catch((e) => {
       console.error('[retention] laatste-verwijdering-stempel faalde org=%s: %s', orgId, (e as Error).message);
     });
@@ -166,6 +186,7 @@ async function processOrg(
     messageCandidates: msgCount,
     contactRequestCandidates,
     applied: apply,
+    ...(failed ? { failed: true } : {}),
   };
 }
 
