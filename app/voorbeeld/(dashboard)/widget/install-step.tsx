@@ -3,7 +3,8 @@
 // Stap 2 Installeren: de embed-code met kopieerknop, instructies per platform
 // (keuze per platform, elk eindigt met cache legen + testen), een kant-en-klare
 // tekst voor de webbouwer (kopiëren of mailto; wij versturen niets) en de
-// toegestane domeinen als alleen-lezen regel met een mailto om er een aan te vragen.
+// toegestane domeinen als alleen-lezen regel. Demo-afwijking: "Laat het ons weten"
+// wijst naar /kennismaking i.p.v. een mailto (geen domeinaanvraag voor de demo-org).
 // Tekst en instructies: lib/v1/widget/install-guide.ts (gedeeld met de demo-kopie).
 
 import { useState } from 'react';
@@ -11,11 +12,10 @@ import { Copy, Mail } from 'lucide-react';
 import { AttentionBlock } from '@/app/v1/_ui/feedback';
 import { Button } from '@/app/v1/_ui/button';
 import { useToast } from '@/app/v1/_ui/toast';
-import { SITE_COMPANY } from '@/lib/site/pricing';
+import Link from 'next/link';
 import {
   FINISH_STEPS,
   INSTALL_PLATFORMS,
-  buildDomainRequestMailto,
   buildEmbedCode,
   buildMailto,
   buildWebbouwerMessage,
@@ -82,7 +82,7 @@ export function InstallStep({
               </button>
             ))}
           </div>
-          <div className="v1-wg-guide-body" aria-live="polite">
+          <div className="v1-wg-guide-body">
             <ol>
               {[...platform.steps, ...FINISH_STEPS].map((s) => (
                 <li key={s}>{s}</li>
@@ -129,12 +129,10 @@ export function InstallStep({
               {allowedDomains.length === 0 ? 'Geen beperking, werkt op elke website' : allowedDomains.join(', ')}
               <span className="v1-row-sub">
                 Beheerd door ChatManta. Ander domein of testomgeving?{' '}
-                <a
-                  className="v1-link"
-                  href={buildDomainRequestMailto({ supportEmail: SITE_COMPANY.email, slug, allowedDomains })}
-                >
+                {/* Demo: geen echte domeinaanvraag naar onze inbox voor de fictieve org. */}
+                <Link className="v1-link" href="/kennismaking">
                   Laat het ons weten
-                </a>
+                </Link>
               </span>
             </dd>
           </div>

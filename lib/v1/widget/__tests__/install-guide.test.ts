@@ -5,6 +5,8 @@ import {
   FINISH_STEPS,
   INSTALL_PLATFORMS,
   NO_SIGNAL_CHECKLIST,
+  NO_SIGNAL_DOMAIN_ITEM,
+  noSignalChecklist,
   buildDomainRequestMailto,
   buildEmbedCode,
   buildMailto,
@@ -48,6 +50,29 @@ test('elke instructie eindigt met cache legen en testen', () => {
 test('geen-signaal-checklist dekt de bekende oorzaken', () => {
   const all = NO_SIGNAL_CHECKLIST.join(' ');
   for (const w of ['elke pagina', 'data-org', 'cache', 'Toegestane domeinen', 'cookiebanner']) assert.ok(all.includes(w), w);
+});
+
+test('domeinregel alleen in de checklist als er domeinen ingesteld zijn', () => {
+  assert.ok(noSignalChecklist(true).includes(NO_SIGNAL_DOMAIN_ITEM));
+  assert.ok(!noSignalChecklist(false).includes(NO_SIGNAL_DOMAIN_ITEM));
+  assert.equal(noSignalChecklist(false).length, NO_SIGNAL_CHECKLIST.length - 1);
+});
+
+test('Drupal en Joomla: geen bewerking van een thema/template dat bij updates wordt overschreven', () => {
+  const drupal = INSTALL_PLATFORMS.find((p) => p.id === 'drupal')!;
+  const d = `${drupal.steps.join(' ')} ${drupal.note ?? ''}`;
+  assert.match(d, /Header and Footer Scripts/);
+  assert.match(d, /subthema/);
+  assert.doesNotMatch(drupal.steps[0], /Asset Injector/);
+  const joomla = INSTALL_PLATFORMS.find((p) => p.id === 'joomla')!;
+  assert.match(joomla.steps.join(' '), /child-template/);
+  assert.match(joomla.note ?? '', /Cassiopeia/);
+});
+
+test('webbouwer-tekst zegt niet dat de chatbot niets opslaat', () => {
+  const msg = buildWebbouwerMessage({ code: 'x', origin: 'https://www.chatmanta.nl', allowedDomains: [] });
+  assert.doesNotMatch(msg, /plaatst geen cookies\./);
+  assert.match(msg, /lokale opslag/);
 });
 
 test('webbouwer-tekst bevat de code, plek, cache, CSP en domeinen', () => {

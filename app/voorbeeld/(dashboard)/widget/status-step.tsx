@@ -13,7 +13,7 @@ import { Badge } from '@/app/v1/_ui/feedback';
 import { Switch } from '@/app/v1/_ui/controls';
 import { Button } from '@/app/v1/_ui/button';
 import { useToast } from '@/app/v1/_ui/toast';
-import { NO_SIGNAL_CHECKLIST } from '@/lib/v1/widget/install-guide';
+import { noSignalChecklist } from '@/lib/v1/widget/install-guide';
 import { checkWidgetInstallationAction, toggleWidgetActiveAction, type WidgetLiveStatus } from './actions';
 import { formatLastSeen } from './format';
 
@@ -110,10 +110,8 @@ export function StatusStep({
                 </>
               ) : (
                 <>
-                  <Badge tone="neutral">
-                    {domainSet ? 'Domein ingesteld, nog niet gezien op je site' : 'Nog niet gezien op je site'}
-                  </Badge>{' '}
-                  Zodra iemand je website opent, zie je het hier.
+                  <Badge tone="neutral">Nog niet gezien</Badge>{' '}
+                  {domainSet ? 'Domein ingesteld. ' : ''}Zodra iemand je website opent, zie je het hier.
                 </>
               )}
             </dd>
@@ -129,7 +127,7 @@ export function StatusStep({
             <p className="v1-wg-nosignal-title">Geen signaal van je website? Loop dit na:</p>
             <ul className="v1-wg-checklist">
               {!live.isActive ? <li>Je chatbot staat op pauze. Dan verschijnt hij niet en meldt je site zich ook niet.</li> : null}
-              {NO_SIGNAL_CHECKLIST.map((s) => (
+              {noSignalChecklist(domainSet).map((s) => (
                 <li key={s}>{s}</li>
               ))}
             </ul>

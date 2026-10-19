@@ -30,12 +30,12 @@ Kopieer de snippet uit het klantdashboard (of de admin), nooit overtypen. Plaats
 | Platform | Waar | Valkuil |
 |---|---|---|
 | WordPress | Plugin **WPCode** → Code Snippets → Header & Footer → Footer | Niet via de thema-editor (weg na thema-update). WordPress.com alleen met plugin-abonnement. |
-| Drupal | `html.html.twig` van het actieve thema vóór `</body>`, of een module als Asset Injector | Tekstblokken strippen `<script>`. **Altijd cache legen** (Prestaties → Alle caches wissen / `drush cr`). Helpt dat niet: de page-cache-tabellen via de database legen is het noodpad. |
+| Drupal | Module die HTML in de footer zet, zoals **Header and Footer Scripts** (body-einde); of `html.html.twig` van een **eigen subthema** vóór `</body>` | Niet in `html.html.twig` van een contrib-thema (weg na thema-update). Asset Injector's JS-injector werkt niet: die verwacht kale JavaScript, geen `<script>`-tag. Tekstblokken strippen `<script>`. **Altijd cache legen** (Prestaties → Alle caches wissen / `drush cr`). Helpt dat niet: de page-cache-tabellen via de database legen is het noodpad. |
 | Wix | Instellingen → Aangepaste code → Body - einde, alle pagina's | Alleen met premium-abonnement + eigen domein. |
 | Squarespace | Code-injectie → Footer | Alleen in abonnementen met eigen code. |
 | Shopify | `layout/theme.liquid` vóór `</body>` | Bij een themawissel opnieuw plaatsen. |
 | Webflow | Site settings → Custom code → Footer code, daarna **publiceren** | Betaald site-abonnement nodig. |
-| Joomla | Template `index.php` vóór `</body>` | De editor strippt `<script>` in artikelen. Cache wissen. |
+| Joomla | `index.php` van een **child-template** (Joomla 4.1+: Systeem → Site-templates → Child template maken) of een eigen template, vóór `</body>` | Niet in Cassiopeia zelf: die wordt bij elke core-update overschreven. De editor strippt `<script>` in artikelen. Cache wissen. |
 | Google Tag Manager | Tag "Aangepaste HTML", trigger **DOM Ready** of **Window Loaded**, daarna publiceren | Container niet gepubliceerd = niets live. |
 | Eigen code | Gedeelde footer/layout vóór `</body>` | — |
 
@@ -44,7 +44,7 @@ Sinds de loader-hardening (wachten op `<body>`) werkt de snippet ook als hij per
 ### Bekende stoorzenders
 - **Caching** (nummer 1): plugin, hosting, CDN. Na plaatsen altijd legen.
 - **Optimizers** die scripts samenvoegen of uitstellen (LiteSpeed "JS combine", WP Rocket "delay JS", Cloudflare Rocket Loader): zet een uitzondering voor `widget-v1.js`. De loader zoekt zijn eigen tag terug als `currentScript` leeg is, maar een samengevoegd script verliest `data-org`.
-- **Cookiebanners met auto-blocking**: markeer de snippet als functioneel/noodzakelijk. De widget plaatst geen cookies (alleen een localStorage-id in de eigen iframe).
+- **Cookiebanners met auto-blocking**: zorg dat de banner de snippet niet tegenhoudt (uitzondering voor `widget-v1.js`). Feitelijk: de widget plaatst geen tracking- of advertentiecookies, maar bewaart wel een anonieme sessie-id in de localStorage van zijn eigen iframe (de privacyverklaring noemt dat "vergelijkbaar met een cookie"). Welke consent-categorie dat bij de klant krijgt, adviseren wij niet zonder Sebastiaan.
 - **Content-Security-Policy**: `https://www.chatmanta.nl` toestaan in `script-src` en `frame-src`.
 - **Apex-domein**: code met `https://chatmanta.nl` (zonder www) werkt via een redirect; de loader accepteert sinds deze ronde zowel apex als www van de eigen origin.
 

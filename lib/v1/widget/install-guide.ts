@@ -30,11 +30,11 @@ export const INSTALL_PLATFORMS: InstallPlatform[] = [
     id: 'drupal',
     name: 'Drupal',
     steps: [
-      'Zet de code in de template html.html.twig van je actieve thema, vlak voor </body>. Of gebruik een module voor eigen code, zoals Asset Injector.',
-      'Plak hem niet in een tekstblok of artikel: de editor haalt <script> meestal weg.',
+      'Gebruik een module die HTML in de footer toevoegt, zoals Header and Footer Scripts, en plak de code in het veld voor de footer (body-einde). Werk je met een eigen subthema, dan kan de code ook in html.html.twig van dat subthema, vlak voor </body>.',
+      'Plak hem niet in een tekstblok of artikel: de editor haalt <script> meestal weg. Een module die alleen kale JavaScript accepteert (zoals de JS-injector van Asset Injector) werkt ook niet met deze code.',
       'Leeg de Drupal-cache: Configuratie → Ontwikkeling → Prestaties → Alle caches wissen (of drush cr).',
     ],
-    note: 'Geen toegang tot de thema-bestanden? Stuur de tekst hieronder naar je webbouwer of hostingpartij.',
+    note: 'Pas html.html.twig niet aan in een thema dat je van drupal.org hebt gedownload: bij een thema-update verdwijnt de code. Geen toegang? Stuur de tekst hieronder naar je webbouwer of hostingpartij.',
   },
   {
     id: 'wix',
@@ -79,11 +79,11 @@ export const INSTALL_PLATFORMS: InstallPlatform[] = [
     id: 'joomla',
     name: 'Joomla',
     steps: [
-      'Ga naar Systeem → Site-templates en open de bestanden van je actieve template.',
-      'Open index.php en plak de code vlak voor </body>. Sla op.',
+      'Ga naar Systeem → Site-templates. Gebruik je de standaardtemplate Cassiopeia, maak dan eerst een child-template (knop Child template maken, vanaf Joomla 4.1).',
+      'Open in de child-template (of je eigen template) index.php en plak de code vlak voor </body>. Sla op en zet de child-template als standaard.',
       'Leeg de Joomla-cache via Systeem → Cache wissen.',
     ],
-    note: 'Plak de code niet in een artikel of module: de editor haalt <script> weg.',
+    note: 'Plak de code niet in Cassiopeia zelf: die wordt bij elke Joomla-update overschreven. Ook niet in een artikel of module: de editor haalt <script> weg.',
   },
   {
     id: 'gtm',
@@ -111,14 +111,26 @@ export const FINISH_STEPS: string[] = [
   'Test: open je website in een privévenster. De chatknop staat rechts- of linksonder. Kijk daarna hieronder bij Status of je site gezien is.',
 ];
 
-/** Checklist als er (nog) geen signaal van de website is. */
+/** Checklist-regel over de allowlist; alleen zinvol als er domeinen ingesteld zijn. */
+export const NO_SIGNAL_DOMAIN_ITEM =
+  'Staat het domein van je website bij Toegestane domeinen (ook www, subdomeinen en testomgevingen)?';
+
+/** Checklist als er (nog) geen signaal van de website is (inclusief de domeinregel). */
 export const NO_SIGNAL_CHECKLIST: string[] = [
   'Staat de code op elke pagina, vlak voor </body>, en is de wijziging gepubliceerd?',
   'Is de code letterlijk overgenomen, met de juiste data-org?',
   'Is de cache geleegd (plugin, hosting, CDN)? Bekijk je site daarna in een privévenster.',
-  'Staat het domein van je website bij Toegestane domeinen (ook www, subdomeinen en testomgevingen)?',
+  NO_SIGNAL_DOMAIN_ITEM,
   'Blokkeert een optimizer (scripts samenvoegen of uitstellen) of een cookiebanner externe scripts? Zet dan een uitzondering voor de ChatManta-code.',
 ];
+
+/**
+ * De checklist voor deze klant. Zonder ingestelde domeinen werkt de widget op elke
+ * site (fail-open), dus dan is de domeinregel een dwaalspoor en laten we hem weg.
+ */
+export function noSignalChecklist(domainSet: boolean): string[] {
+  return domainSet ? NO_SIGNAL_CHECKLIST : NO_SIGNAL_CHECKLIST.filter((s) => s !== NO_SIGNAL_DOMAIN_ITEM);
+}
 
 /** De embed-regel, precies zoals het dashboard hem toont. */
 export function buildEmbedCode(origin: string, slug: string): string {
@@ -145,7 +157,7 @@ export function buildWebbouwerMessage(opts: { code: string; origin: string; allo
     'Aandachtspunten:',
     '- Leeg daarna de cache (caching-plugin, hosting, CDN).',
     `- Gebruikt de site een Content-Security-Policy? Sta dan ${opts.origin} toe in script-src en frame-src.`,
-    '- Een cookiebanner of optimizer die externe scripts blokkeert of samenvoegt: zet een uitzondering voor deze regel. De chatbot plaatst geen cookies.',
+    '- Een cookiebanner of optimizer die externe scripts blokkeert of samenvoegt: zet een uitzondering voor deze regel. De chatbot plaatst geen tracking- of advertentiecookies; hij bewaart alleen een anonieme sessie-id in de lokale opslag van zijn eigen venster.',
     '- Testen: open de site in een privévenster. Rechts- of linksonder verschijnt de chatknop.',
     '',
     'Bedankt!',

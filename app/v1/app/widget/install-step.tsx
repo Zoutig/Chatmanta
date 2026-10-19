@@ -82,7 +82,7 @@ export function InstallStep({
               </button>
             ))}
           </div>
-          <div className="v1-wg-guide-body" aria-live="polite">
+          <div className="v1-wg-guide-body">
             <ol>
               {[...platform.steps, ...FINISH_STEPS].map((s) => (
                 <li key={s}>{s}</li>
