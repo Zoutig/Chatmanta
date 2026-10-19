@@ -46,7 +46,7 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
   function retry(jobId: string) {
     if (
       !confirm(
-        'Deze crawl opnieuw proberen? Alleen de pagina’s die de klant al heeft worden opnieuw opgehaald (eerst de mislukte). Dit kost Firecrawl-tegoed.',
+        'Deze crawl opnieuw proberen? Zijn er mislukte pagina’s, dan worden alleen die opnieuw opgehaald. Anders worden de werkende pagina’s ververst; let op: lukt een pagina dan tijdelijk niet bij Firecrawl, dan valt hij uit de kennisbank tot de volgende poging. Dit kost Firecrawl-tegoed.',
       )
     ) {
       return;

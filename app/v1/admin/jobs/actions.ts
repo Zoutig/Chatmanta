@@ -77,7 +77,7 @@ export async function adminRetryCrawlAction(
     // gescoped. Mislukte pagina's eerst; anders de bestaande selectie verversen.
     const { data: docRows, error: docErr } = await admin
       .from('documents')
-      .select('status, source_url:metadata->>source_url')
+      .select('status, included, source_url:metadata->>source_url')
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
       .eq('knowledge_source_id', sourceId)
@@ -85,15 +85,14 @@ export async function adminRetryCrawlAction(
       .is('deleted_at', null)
       .limit(2000);
     if (docErr) throw new Error(`documents lookup: ${docErr.message}`);
-    const pages: SourcePage[] = ((docRows ?? []) as Array<{ status: string; source_url: string | null }>).map((d) => ({
-      url: d.source_url,
-      status: d.status,
-    }));
+    const pages: SourcePage[] = (
+      (docRows ?? []) as Array<{ status: string; included: boolean | null; source_url: string | null }>
+    ).map((d) => ({ url: d.source_url, status: d.status, included: d.included }));
     const plan = planCrawlRetry(pages, MAX_CRAWL_PAGES);
     if (plan.mode === 'none') {
       fail(
         'CRAWL_FAILED',
-        'Deze bron heeft nog geen opgehaalde pagina’s en de paginakeuze van de klant is niet bewaard. Laat de klant in zijn Kennisbank opnieuw pagina’s kiezen en de crawl starten.',
+        'Deze bron heeft geen mislukte of werkende aangezette pagina’s om opnieuw op te halen, en de paginakeuze van de eerste crawl is niet bewaard. Laat de klant in zijn Kennisbank opnieuw pagina’s kiezen en de crawl starten.',
       );
     }
     const safe = await filterPublicUrls(plan.urls);
