@@ -25,6 +25,9 @@
   --dh-shadow: 0 1px 2px rgba(20, 48, 42, 0.06), 0 8px 24px rgba(20, 48, 42, 0.08);
   --dh-serif: var(--dh-font-serif), Georgia, 'Times New Roman', serif;
   --dh-sans: var(--dh-font-sans), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Hoogte van de sticky .dh-top (demobalk 34px + header 72px + 1px rand).
+     Eén bron voor menu-hoogte, scroll-margin en de sticky zijkolom. */
+  --dh-top-h: 107px;
 
   min-height: 100vh;
   background: var(--dh-sand-50);
@@ -292,7 +295,8 @@
 .dh-mobile-menu {
   border-top: 1px solid var(--dh-line);
   background: var(--dh-sand-50);
-  max-height: calc(100vh - 72px);
+  max-height: calc(100vh - var(--dh-top-h));
+  max-height: calc(100dvh - var(--dh-top-h));
   overflow-y: auto;
 }
 
@@ -959,7 +963,7 @@
   padding-bottom: 36px;
   margin-bottom: 36px;
   border-bottom: 1px solid var(--dh-line);
-  scroll-margin-top: 132px; /* sticky demobalk + header */
+  scroll-margin-top: calc(var(--dh-top-h) + 25px); /* sticky demobalk + header */
 }
 
 .dh-section:last-child {
@@ -968,7 +972,7 @@
 }
 
 .dh-section h2 {
-  scroll-margin-top: 132px; /* sticky demobalk + header */
+  scroll-margin-top: calc(var(--dh-top-h) + 25px); /* sticky demobalk + header */
 }
 
 .dh-list {
@@ -1097,7 +1101,7 @@
 @media (min-width: 1000px) {
   .dh-aside {
     position: sticky;
-    top: 132px; /* onder de sticky demobalk + header */
+    top: calc(var(--dh-top-h) + 25px); /* onder de sticky demobalk + header */
     align-self: start;
   }
 }
