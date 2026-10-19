@@ -59,6 +59,9 @@ export type OrgLimitsInput = {
 /** Zet de drie limieten van een org in één update: vragen per dag/maand (klant ziet
  *  ze) + het EUR-kostenvangnet (alleen intern). 0 = dicht. */
 export async function setOrgLimitsAction(orgId: string, input: OrgLimitsInput): Promise<ActionResult> {
+  const gate = await requireAdminActor(); // actor-id voor de audit
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
   let admin;
   try {
     admin = await getJorionAdminClient(); // gate't intern via requireJorionAdmin
@@ -91,6 +94,18 @@ export async function setOrgLimitsAction(orgId: string, input: OrgLimitsInput): 
       .select('id');
     if (error) throw new Error(`organizations update: ${error.message}`);
     if (!data?.length) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+    await writeAuditLog(admin, {
+      organizationId: orgId,
+      userId: actorId,
+      action: 'org.limits_update',
+      targetType: 'organization',
+      targetId: orgId,
+      metadata: {
+        daily_question_limit: dailyQuestions,
+        monthly_question_limit: monthlyQuestions,
+        daily_budget_eur: Math.round(dailyBudgetEur * 100) / 100,
+      },
+    });
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
   });
