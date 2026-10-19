@@ -12,9 +12,12 @@
 //   - writes via service-role (contact_requests is SELECT-only onder RLS);
 //   - geen ruwe PII in logs (alleen DB-code/message).
 //
+// De stappen zelf staan in lib/v1/widget/contact-request-handler.ts (dependency
+// injection, unit-getest). Hier alleen de echte deps.
+//
 // Notificatiemail: best-effort via after() → notifyNewV1ContactRequest (fail-safe,
 //   gated op RESEND_API_KEY). Adres uit settings.notificationEmail, anders het
-//   account-e-mailadres (org-owner), anders env; geen adres → geen mail, geen fout.
+//   account-e-mailadres (org-owner), anders env; geen adres → geen mail + Sentry-melding.
 //   De submit blokkeert nooit op de mail — de bezoeker-lead gaat voor.
 
 import { after, NextResponse } from 'next/server';
@@ -24,117 +27,42 @@ import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { getOrgChatbot } from '@/app/v1/app/rag-config';
 import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
-import { validateContactBody } from '@/lib/v1/widget/contact-validate';
+import { handleV1ContactRequest } from '@/lib/v1/widget/contact-request-handler';
 import { notifyNewV1ContactRequest } from '@/lib/notifications/v1-contact-request-notify';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  // 0. Eigen per-IP rate-limit-bucket.
-  const rl = await getMutationRateLimiter().check(`v1-contact:${getClientIp(req)}`);
-  if (!rl.allowed) {
-    return new NextResponse(null, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } });
-  }
+  // Lazy: pas na rate-limit + token-check een client maken (zelfde volgorde als vroeger).
+  let client: ReturnType<typeof getV1ServiceRoleClient> | null = null;
+  const svc = () => (client ??= getV1ServiceRoleClient());
 
-  // 1. embed-token + strenge origin-lock (fail-closed).
-  const slug = new URL(req.url).searchParams.get('org');
-  const token = req.headers.get('x-chatmanta-embed');
-  if (!slug || !sameOrigin(req) || !verifyEmbedToken(token, slug)) {
-    return new NextResponse(null, { status: 401 });
-  }
+  const result = await handleV1ContactRequest(req, {
+    ipLimiter: getMutationRateLimiter(),
+    orgLimiter: getOrgRateLimiter(),
+    clientIp: getClientIp,
+    sameOrigin,
+    verifyToken: verifyEmbedToken,
+    findOrg: async (slug) => {
+      const { data: org } = await svc()
+        .from('organizations')
+        .select('id, name')
+        .eq('slug', slug)
+        .is('deleted_at', null)
+        .maybeSingle();
+      return org ? { id: org.id as string, name: (org.name as string | null) ?? null } : null;
+    },
+    getChatbot: (orgId) => getOrgChatbot(svc(), orgId),
+    getSettings: (chatbotId) => getChatbotSettings(svc(), chatbotId),
+    insert: async (row) => {
+      const { error } = await svc().from('contact_requests').insert(row);
+      return { error: error ? { code: (error as { code?: string }).code, message: error.message } : null };
+    },
+    scheduleNotify: (args) => after(() => notifyNewV1ContactRequest(svc(), args)),
+    logError: (msg, detail) => console.error(msg, detail ?? ''),
+  });
 
-  const svc = getV1ServiceRoleClient();
-
-  // 2. Org uit de gesigneerde slug (token), NOOIT uit de body. Naam erbij voor de
-  //    notificatiemail-onderwerpregel.
-  const { data: org } = await svc
-    .from('organizations')
-    .select('id, name')
-    .eq('slug', slug)
-    .is('deleted_at', null)
-    .maybeSingle();
-  if (!org) return new NextResponse(null, { status: 401 });
-  const organizationId = org.id as string;
-  const orgName = (org.name as string | null) ?? slug;
-
-  // 3. Per-org rate-limit (eigen bucket) — vangt token-misbruik over IP's.
-  const orgRl = await getOrgRateLimiter().check(`v1-contact-org:${organizationId}`);
-  if (!orgRl.allowed) {
-    return new NextResponse(null, { status: 429, headers: { 'Retry-After': String(orgRl.retryAfterSec) } });
-  }
-
-  let chatbot: { id: string; name: string; bot_version: string } | null = null;
-  try {
-    chatbot = await getOrgChatbot(svc, organizationId);
-  } catch {
-    chatbot = null;
-  }
-  if (!chatbot) return new NextResponse(null, { status: 404 });
-
-  // 4. Feature-flag: contactverzoeken moeten AAN staan voor deze org. Fail-closed.
-  //    De flag leeft in chatbots.settings (toegevoegd door de settings-agent); we
-  //    lezen 'm defensief zodat dit ook vóór die wiring fail-closed werkt.
-  let enabled = false;
-  let notificationEmail = '';
-  try {
-    const settings = await getChatbotSettings(svc, chatbot.id);
-    enabled = settings.contactRequestsEnabled === true;
-    notificationEmail = typeof settings.notificationEmail === 'string' ? settings.notificationEmail : '';
-  } catch {
-    enabled = false;
-  }
-  if (!enabled) return new NextResponse(null, { status: 403 });
-
-  // 5. Body parsen — shape-validatie doet validateContactBody (unknown in).
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return new NextResponse(null, { status: 400 });
-  }
-
-  // 6+7. Honeypot + validatie — pure functie (gedrag bevroren, unit-getest).
-  const v = validateContactBody(body);
-  if (!v.ok) {
-    return v.reason === 'honeypot'
-      ? NextResponse.json({ ok: true }, { status: 200 })
-      : new NextResponse(null, { status: 400 });
-  }
-  const { name, email, phone, preferredContact, subject, message } = v.value;
-
-  // 8. Insert via service-role. org+chatbot server-bepaald; consent hard true.
-  try {
-    const { error: insErr } = await svc.from('contact_requests').insert({
-      organization_id: organizationId,
-      chatbot_id: chatbot.id,
-      name,
-      email,
-      phone,
-      preferred_contact: preferredContact,
-      subject,
-      message,
-      consent_given: true,
-      status: 'new',
-    });
-    if (insErr) {
-      // Geen PII in de logregel — alleen DB-code/message.
-      console.error('[v1/contact-request] insert faalde:', (insErr as { code?: string }).code ?? '', insErr.message);
-      return new NextResponse(null, { status: 500 });
-    }
-
-    // DB = bron-van-waarheid; mail = best-effort via after() (nooit-throw, gated op
-    // RESEND_API_KEY). Blokkeert de 201 naar de bezoeker niet.
-    after(() =>
-      notifyNewV1ContactRequest(svc, {
-        organizationId,
-        orgName,
-        notificationEmail,
-        request: { name, email, phone, preferredContact, subject, message },
-      }),
-    );
-    return NextResponse.json({ ok: true }, { status: 201 });
-  } catch (err) {
-    console.error('[v1/contact-request] onverwachte fout:', err instanceof Error ? err.message : err);
-    return new NextResponse(null, { status: 500 });
-  }
+  return result.json
+    ? NextResponse.json(result.json, { status: result.status, headers: result.headers })
+    : new NextResponse(null, { status: result.status, headers: result.headers });
 }
