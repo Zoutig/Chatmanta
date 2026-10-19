@@ -23,7 +23,6 @@ export type OnboardingFacts = {
   uploadedDocs: boolean;
   allowedDomains: boolean;
   widgetSeen: boolean;
-  hasThreads: boolean;
 };
 
 /** Template-key → feit + uitleg waarom hij automatisch klaar is. */
@@ -35,7 +34,9 @@ const DERIVED: Record<string, { fact: keyof OnboardingFacts | 'always'; reason: 
   crawl_succeeded: { fact: 'crawlSucceeded', reason: 'Er is een crawl afgerond.' },
   documents_added: { fact: 'uploadedDocs', reason: 'Er zijn documenten geüpload.' },
   widget_installed: { fact: 'widgetSeen', reason: 'De widget is op een website gezien.' },
-  first_real_conversations: { fact: 'hasThreads', reason: 'Er zijn gesprekken.' },
+  // Bewust NIET afgeleid: first_real_conversations ('Eerste echte gesprekken bekeken')
+  // is een handeling van Jorion; dat er een gesprek bestaat (kan een test zijn) zegt
+  // niet dat iemand ze bekeken heeft.
 };
 
 export const ALLOWED_DOMAINS_KEY = 'v1_allowed_domains_set';

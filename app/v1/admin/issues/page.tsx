@@ -114,7 +114,7 @@ export default async function V1IssuesPage({ searchParams }: { searchParams: Pro
   const orgId = sp.org && UUID_RE.test(sp.org) ? sp.org : undefined;
 
   const [summary, groups, orgRow] = await Promise.all([
-    getErrorSummary(),
+    getErrorSummary(orgId),
     listErrorGroups({ status, severity, surface, orgId }),
     orgId
       ? getJorionAdminClient().then((a) =>

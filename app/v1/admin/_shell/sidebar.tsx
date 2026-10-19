@@ -70,11 +70,11 @@ function AdminNavSection({
       ) : (
         <div className="v1-nav-label">{section.label}</div>
       )}
-      {expanded ? (
-        <div id={listId}>
-          <NavGroup items={section.items} activeHref={activeHref} onNavigate={onNavigate} />
-        </div>
-      ) : null}
+      {/* Altijd renderen (hidden i.p.v. weglaten): aria-controls moet naar een
+          bestaand element wijzen, ook als de groep dicht is. */}
+      <div id={listId} hidden={!expanded}>
+        <NavGroup items={section.items} activeHref={activeHref} onNavigate={onNavigate} />
+      </div>
     </nav>
   );
 }

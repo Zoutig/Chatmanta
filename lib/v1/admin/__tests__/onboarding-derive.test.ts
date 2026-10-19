@@ -13,7 +13,6 @@ const none: OnboardingFacts = {
   uploadedDocs: false,
   allowedDomains: false,
   widgetSeen: false,
-  hasThreads: false,
 };
 
 const items = (over: Record<string, OnboardingItemStatus> = {}): OnboardingItem[] =>
@@ -48,7 +47,6 @@ test('afleidbare stappen tonen als klaar, met reden', () => {
     crawlSucceeded: true,
     allowedDomains: true,
     widgetSeen: true,
-    hasThreads: true,
   });
   const by = new Map(out.map((x) => [x.key, x]));
   for (const k of [
@@ -56,7 +54,6 @@ test('afleidbare stappen tonen als klaar, met reden', () => {
     'website_url_added',
     'crawl_succeeded',
     'widget_installed',
-    'first_real_conversations',
     ALLOWED_DOMAINS_KEY,
   ]) {
     assert.equal(by.get(k)?.status, 'done', k);
@@ -65,6 +62,8 @@ test('afleidbare stappen tonen als klaar, met reden', () => {
   // Niet afleidbaar of feit onwaar → blijft te doen.
   assert.equal(by.get('tone_of_voice_set')?.status, 'todo');
   assert.equal(by.get('first_crawl_started')?.status, 'todo');
+  // 'Gesprekken bekeken' is een handeling, geen datafeit → nooit automatisch klaar.
+  assert.equal(by.get('first_real_conversations')?.status, 'todo');
 });
 
 test('een bewust gezette status wint van de afleiding', () => {

@@ -121,7 +121,7 @@ export async function getOnboardingFacts(admin: AdminClient, organizationId: str
       (r) => (r.count ?? 0) > 0,
       () => false,
     );
-  const [contactFilled, websiteSource, crawlStarted, crawlSucceeded, uploadedDocs, bot, hasThreads] = await Promise.all([
+  const [contactFilled, websiteSource, crawlStarted, crawlSucceeded, uploadedDocs, bot] = await Promise.all([
     Promise.resolve(
       admin
         .from('admin_org_profile')
@@ -173,7 +173,6 @@ export async function getOnboardingFacts(admin: AdminClient, organizationId: str
       (r) => r.data as { allowed_domains: string[] | null; widget_last_seen_at: string | null } | null,
       () => null,
     ),
-    has(admin.from('threads').select('id', head).eq('organization_id', organizationId).is('deleted_at', null)),
   ]);
   return {
     contactFilled,
@@ -183,6 +182,5 @@ export async function getOnboardingFacts(admin: AdminClient, organizationId: str
     uploadedDocs,
     allowedDomains: (bot?.allowed_domains?.length ?? 0) > 0,
     widgetSeen: Boolean(bot?.widget_last_seen_at),
-    hasThreads,
   };
 }

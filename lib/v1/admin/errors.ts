@@ -115,6 +115,7 @@ async function countOpen(
   admin: Awaited<ReturnType<typeof getJorionAdminClient>>,
   severity: ErrorSeverity,
   sinceIso?: string,
+  orgId?: string,
 ): Promise<number> {
   let q = admin
     .from(TABLE)
@@ -122,18 +123,20 @@ async function countOpen(
     .eq('status', 'open')
     .eq('severity', severity);
   if (sinceIso) q = q.gte('last_seen_at', sinceIso);
+  if (orgId) q = q.eq('organization_id', orgId);
   const { count } = await q;
   return count ?? 0;
 }
 
-export async function getErrorSummary(): Promise<ErrorSummary> {
+/** Tellers bovenaan Issues; met `orgId` alleen die klant (de ?org=-filter). */
+export async function getErrorSummary(orgId?: string): Promise<ErrorSummary> {
   const admin = await getJorionAdminClient();
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const [openError, openWarning, openInfo, last24hError] = await Promise.all([
-    countOpen(admin, 'error').catch(() => 0),
-    countOpen(admin, 'warning').catch(() => 0),
-    countOpen(admin, 'info').catch(() => 0),
-    countOpen(admin, 'error', since24h).catch(() => 0),
+    countOpen(admin, 'error', undefined, orgId).catch(() => 0),
+    countOpen(admin, 'warning', undefined, orgId).catch(() => 0),
+    countOpen(admin, 'info', undefined, orgId).catch(() => 0),
+    countOpen(admin, 'error', since24h, orgId).catch(() => 0),
   ]);
   return { openError, openWarning, openInfo, last24hError };
 }
