@@ -60,7 +60,7 @@ export function UnansweredList({
 }: { questions: UnansweredRow[] } & UnansweredListDeps) {
   const router = useRouter();
   const toast = useToast();
-  const [drafting, setDrafting] = useState<{ key: string; question: string; answer: string } | null>(null);
+  const [drafting, setDrafting] = useState<{ key: string; original: string; question: string; answer: string } | null>(null);
   const [saved, setSaved] = useState<{ question: string; notIngested: boolean } | null>(null);
   const [doneKeys, setDoneKeys] = useState<Map<string, UnansweredRow['status']>>(() => new Map());
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -81,12 +81,16 @@ export function UnansweredList({
     const question = drafting.question.trim();
     if (!question || !drafting.answer.trim()) return;
     const key = drafting.key;
+    // Alleen optimistisch "afgehandeld" als de vraagtekst niet is aangepast: bij een
+    // andere formulering beslist de server (exacte sleutel of token-overlap) na de
+    // refresh, anders zou de lijst iets anders tonen dan de tellers.
+    const unchanged = question === drafting.original.trim();
     startSave(async () => {
       const res = await saveQA(question, drafting.answer);
       if (res.ok) {
         setDrafting(null);
         setSaved({ question, notIngested: res.notIngested === true });
-        if (!res.notIngested) setDoneKeys((m) => new Map(m).set(key, 'qa'));
+        if (!res.notIngested && unchanged) setDoneKeys((m) => new Map(m).set(key, 'qa'));
         router.refresh();
       } else {
         toast.error(res.error ?? 'Kon de Q&A niet opslaan.');
@@ -169,7 +173,7 @@ export function UnansweredList({
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => setDrafting({ key: q.key, question: q.question, answer: '' })}
+                        onClick={() => setDrafting({ key: q.key, original: q.question, question: q.question, answer: '' })}
                       >
                         Beantwoord
                       </Button>

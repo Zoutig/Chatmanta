@@ -417,6 +417,9 @@ select.v1-input { cursor: pointer; }
 .v1-badge-dot { width: 6px; height: 6px; border-radius: 3px; background: currentColor; }
 
 /* ── Meldingen ───────────────────────────────────────────── */
+/* Bevestiging na opslaan (QASavedNotice): krijgt programmatisch focus, dus geen focusring op de container. */
+.v1-saved-notice { scroll-margin: 16px; }
+.v1-saved-notice:focus { outline: none; }
 .v1-attention { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; padding: 16px 20px; border-radius: var(--v1-r-lg); background: var(--v1-surface); box-shadow: var(--v1-shadow-1); }
 .v1-attention-icon { flex-shrink: 0; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--v1-surface-2); color: var(--v1-ink-2); }
 .v1-attention[data-level='critical'] { background: #fff6f5; box-shadow: 0 0 0 1px rgba(180, 35, 24, 0.14), var(--v1-shadow-1); }

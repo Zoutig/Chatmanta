@@ -4,7 +4,13 @@
 // bestaande testchat (Bekijk chatbot). Bewust een link en geen automatische test:
 // elke testvraag is een echte (billable) chatbot-call die meetelt voor de limieten.
 // Gebruikt door Kennisbank › Q&A, Gesprekken › Meest gesteld en › Wist je chatbot niet.
+//
+// Toegankelijkheid: de melding staat in een live region (role=status) en krijgt bij
+// verschijnen de focus + wordt in beeld gescrold. Zo hoort een screenreader de
+// bevestiging (de focus zat net in het gesloten zijpaneel) en ziet wie ver in een
+// lange lijst gescrold is hem ook.
 
+import { useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AttentionBlock } from '@/app/v1/_ui/feedback';
 import { Button, buttonClass } from '@/app/v1/_ui/button';
@@ -24,21 +30,49 @@ export function QASavedNotice({
   /** Testchat-link; de publieke demo geeft zijn eigen preview-route mee. */
   previewHref?: string;
 }) {
-  if (notIngested) {
-    return (
-      <AttentionBlock
-        level="attention"
-        title="Opgeslagen, maar je chatbot kent dit antwoord nog niet"
-        actions={
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Sluiten
-          </Button>
-        }
-      >
-        Het verwerken lukte nu niet. Bij de Q&amp;A staat &quot;Nog niet in je chatbot&quot;; probeer het daar zo opnieuw.
-      </AttentionBlock>
-    );
-  }
+  return (
+    <NoticeRegion key={notIngested ? 'not-ingested' : question}>
+      {notIngested ? <NotIngested onClose={onClose} /> : <Saved question={question} onClose={onClose} previewHref={previewHref} />}
+    </NoticeRegion>
+  );
+}
+
+function NoticeRegion({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Na de huidige frame: het zijpaneel zet bij sluiten de focus eerst terug.
+    const t = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.scrollIntoView?.({ block: 'nearest' });
+      el.focus({ preventScroll: true });
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div ref={ref} role="status" aria-live="polite" tabIndex={-1} className="v1-saved-notice">
+      {children}
+    </div>
+  );
+}
+
+function NotIngested({ onClose }: { onClose: () => void }) {
+  return (
+    <AttentionBlock
+      level="attention"
+      title="Opgeslagen, maar je chatbot kent dit antwoord nog niet"
+      actions={
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Sluiten
+        </Button>
+      }
+    >
+      Het verwerken lukte nu niet. Bij de Q&amp;A staat &quot;Nog niet in je chatbot&quot;; probeer het daar zo opnieuw.
+    </AttentionBlock>
+  );
+}
+
+function Saved({ question, onClose, previewHref }: { question: string; onClose: () => void; previewHref: string }) {
   return (
     <AttentionBlock
       level="info"
