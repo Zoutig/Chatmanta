@@ -1,0 +1,11 @@
+/* Admin-zijbalk: inklapbare groepskopjes (Rapportage, Systeem). Eigen bestand zodat
+   wijzigingen aan admin.css elders niet botsen. */
+.v1-adm-nav-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: transparent;
+  font-family: var(--v1-font); text-align: left; cursor: pointer; border-radius: var(--v1-r-sm);
+  min-height: 24px;
+}
+.v1-adm-nav-toggle:hover { color: var(--v1-on-navy-2); }
+.v1-adm-nav-toggle:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+.v1-adm-nav-chev { transition: transform var(--v1-fast) ease; }
+.v1-adm-nav-toggle[aria-expanded='false'] .v1-adm-nav-chev { transform: rotate(-90deg); }

@@ -22,8 +22,6 @@ import {
   type AdminOrgProfile,
   type CommercialStatus,
   type HealthStatus,
-  type OnboardingPhase,
-  type Owner,
   type TechnicalStatus,
 } from '@/lib/controlroom/types';
 
