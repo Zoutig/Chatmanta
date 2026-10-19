@@ -43,6 +43,27 @@
 }
 .v1-ui .v1-ov-next-skip:hover { background: rgba(255, 255, 255, 0.08); color: var(--v1-on-navy); }
 
+/* ── Eenmalig succesmoment "Je chatbot staat live" ───────── */
+.v1-ui .v1-ov-live {
+  position: relative; display: flex; align-items: center; gap: 8px 24px;
+  padding: 18px 56px 18px 20px; border-radius: var(--v1-r-xl); background: var(--v1-navy); color: var(--v1-on-navy);
+  box-shadow: var(--v1-shadow-2);
+}
+.v1-ui .v1-ov-live-manta { flex-shrink: 0; width: 180px; height: auto; }
+.v1-ui .v1-ov-live-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.v1-ui .v1-ov-live-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
+.v1-ui .v1-ov-live-text { margin: 0; font-size: 14px; line-height: 1.5; color: var(--v1-on-navy-2); }
+.v1-ui .v1-ov-live-close {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; display: grid; place-items: center;
+  border: 0; border-radius: 10px; background: transparent; color: var(--v1-on-navy-2); cursor: pointer;
+}
+.v1-ui .v1-ov-live-close:hover { background: rgba(255, 255, 255, 0.08); color: var(--v1-on-navy); }
+.v1-ui .v1-ov-live-close:focus-visible { outline: none; box-shadow: var(--v1-focus); }
+@media (max-width: 640px) {
+  .v1-ui .v1-ov-live { flex-direction: column; align-items: flex-start; padding: 16px 20px 20px; }
+  .v1-ui .v1-ov-live-title { font-size: 18px; }
+}
+
 /* ── Twee kolommen ───────────────────────────────────────── */
 .v1-ui .v1-ov-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
 

@@ -25,6 +25,7 @@ import {
   type Owner,
   type TechnicalStatus,
 } from '@/lib/controlroom/types';
+import { v1HealthReasonLabel } from './health-labels';
 
 // ---------------------------------------------------------------------------
 // Geëxporteerde types
@@ -351,7 +352,7 @@ async function getOrgSignals(
     commercialStatus: profile.commercialStatus,
     technicalStatus,
     health: health.status,
-    healthReasons: health.reasons,
+    healthReasons: health.reasons.map(v1HealthReasonLabel),
     widgetStatus,
     sources,
     conversationsThisWeek: threadsWeekRes.count ?? 0,

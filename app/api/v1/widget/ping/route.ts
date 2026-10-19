@@ -12,6 +12,7 @@ import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { getOrgChatbot } from '@/app/v1/app/rag-config';
+import { shouldCountHeartbeat } from '@/lib/v1/widget/heartbeat';
 
 export const runtime = 'nodejs';
 
@@ -41,6 +42,13 @@ export async function POST(req: Request) {
     // body optioneel — host blijft null
   }
 
+  // Alleen tellen als de widget op een ándere site is ingesloten: zonder host (embed-
+  // URL direct geopend) of met onze eigen app-host is het geen installatie-signaal.
+  // De host is client-input (spoofbaar) — signaal, nooit bewijs.
+  if (!shouldCountHeartbeat(host, req.headers.get('host'))) {
+    return new NextResponse(null, { status: 204 });
+  }
+
   try {
     // Org+chatbot uit de GESIGNEERDE slug (token-claim), nooit uit vrije input.
     const svc = getV1ServiceRoleClient();
@@ -54,13 +62,14 @@ export async function POST(req: Request) {
 
     const chatbot = await getOrgChatbot(svc, org.id as string);
     if (chatbot) {
-      // Ook een gepauzeerde widget mag pingen: "gezien" en "actief" zijn
-      // onafhankelijke signalen (paused + gezien → admin-status 'detected').
+      // NB: een gepauzeerde widget pingt in de praktijk niet — de embed-pagina rendert
+      // bij 'paused' geen V1Widget. 'paused + gezien' in de admin komt dus alleen voor
+      // als er vóór het pauzeren al een ping was.
       await svc
         .from('chatbots')
         .update({
           widget_last_seen_at: new Date().toISOString(),
-          ...(host ? { widget_last_seen_origin: host } : {}),
+          widget_last_seen_origin: host,
         })
         .eq('organization_id', org.id as string)
         .eq('id', chatbot.id);

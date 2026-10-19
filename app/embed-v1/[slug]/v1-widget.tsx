@@ -10,6 +10,7 @@ import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { getOrCreateVisitorId } from '@/lib/widget/visitor-id';
 import type { WidgetAppearance } from '@/lib/v1/widget/appearance';
 import { cleanHistory, isRetryable, retryTarget, type HistoryTurn } from '@/lib/v1/widget/chat-history';
+import { embeddedHost } from '@/lib/v1/widget/heartbeat';
 import { WidgetView, type WidgetMessage } from '../_widget/widget-view';
 import { ContactForm, type ContactPayload } from '../_widget/contact-form';
 import {
@@ -97,10 +98,19 @@ export function V1Widget(props: V1WidgetProps) {
   );
   const t = WIDGET_STRINGS[lang];
 
-  // Heartbeat: één ping bij mount (V0-embed-parity). host komt uit ?h= dat de
-  // loader meegaf; voedt widget_last_seen_at voor Live-status + admin-widgetStatus.
+  // Heartbeat: één ping bij mount, maar alleen als de widget echt in een andere
+  // site is ingesloten (in een frame, met een host via ?h= of de referrer, en niet
+  // onze eigen app). Zo maakt het direct openen van /embed-v1/<slug> in een tabblad
+  // de status niet "gezien". De host is client-input: signaal, geen bewijs.
+  // Voedt widget_last_seen_at voor Live-status + admin-widgetStatus.
   useEffect(() => {
-    const host = new URLSearchParams(window.location.search).get('h') ?? undefined;
+    const host = embeddedHost({
+      framed: window.parent !== window,
+      search: window.location.search,
+      referrer: document.referrer,
+      appHost: window.location.host,
+    });
+    if (!host) return;
     void fetch(`/api/v1/widget/ping?org=${encodeURIComponent(slug)}`, {
       method: 'POST',
       headers: {

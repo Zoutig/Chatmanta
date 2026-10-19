@@ -3,6 +3,7 @@
 // Volgorde van boven naar beneden:
 //   PageHeader (begroeting + status-pill, Rondleiding, "Bekijk chatbot")
 //   → kritiek-blok (alleen als er iets kritiek is; één blok, punten samengevoegd)
+//   → anders (eenmalig) "Je chatbot staat live" zodra de widget gezien is
 //   → anders het volgende-stap-blok zolang de setup niet af is
 //   → StatStrip (gesprekken, zelf beantwoord, contactverzoeken, kennisbronnen)
 //   → twee kolommen: "Hier wist je chatbot het niet" + "Meest gestelde vragen"
@@ -31,6 +32,7 @@ import { OnboardingTour, type TourStep } from '@/app/v1/_ui/tour';
 import { getOrgChatbot } from './rag-config';
 import { NextStep } from './_overview/next-step';
 import { TourButton } from './_overview/tour-button';
+import { LiveMoment } from './_overview/live-moment';
 import './_overview/overview.css';
 
 export const dynamic = 'force-dynamic';
@@ -226,7 +228,17 @@ export default async function V1OverviewPage() {
         />
       ) : null}
 
-      {showNextStep ? <NextStep setup={m.setup} widgetInstalled={widgetInstalled} /> : null}
+      {critical.length === 0 && m.widgetStatus === 'active' ? (
+        // Eenmalig (localStorage per org) zodra de widget echt gezien is, ook als
+        // er nog geen gesprek is. Zelfde slot als het volgende-stap-blok: is het
+        // moment al gezien, dan staat daar de volgende stap (nooit twee blokken).
+        <LiveMoment
+          orgId={orgId}
+          fallback={showNextStep ? <NextStep setup={m.setup} widgetInstalled={widgetInstalled} /> : null}
+        />
+      ) : showNextStep ? (
+        <NextStep setup={m.setup} widgetInstalled={widgetInstalled} />
+      ) : null}
 
       <StatStrip label="Cijfers deze maand" items={stats} />
 

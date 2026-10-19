@@ -2,7 +2,7 @@
 
 Een kleine, cyaan manta met grote ogen. Hij maakt de publieke kant van ChatManta persoonlijker: hij zwemt, kijkt je aan, knippert, denkt na en praat mee met de chat. Dit document is de vaste bron voor iedereen (mens of agent) die iets ontwerpt waar hij in voorkomt.
 
-**Live:** in de hero van chatmanta.nl (boven het voorbeeldgesprek), op de 404-pagina (zoekend rondkijken), op de foutpagina van de site (verrast) en als verteller van de rondleiding op /voorbeeld (spreekt de uitleg uit).
+**Live:** in de hero van chatmanta.nl (boven het voorbeeldgesprek), op de 404-pagina (zoekend rondkijken), op de foutpagina van de site (verrast) en als verteller van de rondleiding op /voorbeeld (spreekt de uitleg uit). In het V1-klantdashboard staat hij één keer stil (still 'blij', geen animatie) in het succesmoment "Je chatbot staat live" op Overzicht (`app/v1/app/_overview/live-moment.tsx`), zodra de widget voor het eerst echt gezien is.
 
 ## Waar staat wat
 
@@ -12,6 +12,7 @@ Een kleine, cyaan manta met grote ogen. Hij maakt de publieke kant van ChatManta
 | Stills per expressie | `design/mascotte/stills/*.png` | Transparant, 768×512: `rust blij praten verrast denkt bezorgd ogen-dicht knipoog`. Voor mockups, OG-beelden, mails, decks |
 | Overzichtsplaten | `design/mascotte/referentie/` | Alle mondstanden, ooglidreeks/pupillen, en de 6 losse poses |
 | Site-assets | `public/site/mascotte/manta-body.png`, `manta-face.png` | Gegenereerd (110 KB samen), niet met de hand bewerken |
+| Still in de app | `public/site/mascotte/still-blij.png` | Kopie van `stills/blij.png` (61 KB). Gebruikt door het eenmalige succesmoment "Je chatbot staat live" op het V1-Overzicht |
 | Engine + component | `components/site/mascotte/` | `MantaMascotte` (React), `signalMascotte()` (bus), `manta-engine.ts`, gegenereerde `atlas.ts` |
 | Generator | `scripts/mascotte-assets.mjs` | `npm run mascotte:assets` (site-assets) · `npm run mascotte:assets -- --stills` (ook stills) |
 | Volledig archief | buiten de repo: `Documents/ChatManta_Mascotte/` op Sebs PC | Werkdemo's v1–v5, de 6-posesbestanden (SVG, 12 MB), gelaagde SVG, kijkrichting- en pupilgrootte-PNG's |

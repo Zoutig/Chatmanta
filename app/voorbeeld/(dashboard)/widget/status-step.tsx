@@ -1,14 +1,19 @@
 'use client';
 
 // Stap 3 Status: aan/uit (optimistisch, terug bij een fout), of de widget op de
-// site gevonden is en wanneer, en "Installatie testen". Status-informatie staat
+// site gezien is en wanneer, en "Controleer opnieuw". Status-informatie staat
 // nooit ingeklapt (rustregel 4).
+//
+// "Gezien" = er kwam een heartbeat uit de ingesloten widget (signaal, geen bewijs).
+// "Controleer opnieuw" leest die status opnieuw; hij scant je site niet. Zonder
+// signaal staat er een checklist met de bekende oorzaken.
 
 import { useState, useTransition } from 'react';
 import { Badge } from '@/app/v1/_ui/feedback';
 import { Switch } from '@/app/v1/_ui/controls';
 import { Button } from '@/app/v1/_ui/button';
 import { useToast } from '@/app/v1/_ui/toast';
+import { noSignalChecklist } from '@/lib/v1/widget/install-guide';
 import { checkWidgetInstallationAction, toggleWidgetActiveAction, type WidgetLiveStatus } from './actions';
 import { formatLastSeen } from './format';
 
@@ -16,20 +21,24 @@ export function StatusStep({
   liveStatus,
   widgetMissing,
   missingAfterMs,
+  allowedDomains,
 }: {
   liveStatus: WidgetLiveStatus;
   /** Server-berekend: eerder gezien, maar al een week niet meer. */
   widgetMissing: boolean;
   /** Drempel uit attention.ts (die module is server-only, dus als prop). */
   missingAfterMs: number;
+  /** Alleen voor de tekst: is er al een domein ingesteld? */
+  allowedDomains: string[];
 }) {
   const toast = useToast();
   const [live, setLive] = useState<WidgetLiveStatus>(liveStatus);
   const [toggling, startToggle] = useTransition();
   const [checking, startCheck] = useTransition();
-  // Begint bij de serverwaarde; na een installatie-test of aan/uit opnieuw
+  // Begint bij de serverwaarde; na een controle of aan/uit opnieuw
   // bepaald (in een handler, niet tijdens render: hydration).
   const [missing, setMissing] = useState(widgetMissing);
+  const domainSet = allowedDomains.length > 0;
 
   function toggle(next: boolean) {
     const prev = live.isActive;
@@ -51,17 +60,19 @@ export function StatusStep({
     startCheck(async () => {
       const res = await checkWidgetInstallationAction();
       if (!res.ok) {
-        toast.error(res.error || 'Testen lukte niet. Probeer het opnieuw.');
+        toast.error(res.error || 'Controleren lukte niet. Probeer het opnieuw.');
         return;
       }
       setLive({ isActive: res.isActive, lastSeenAt: res.lastSeenAt, lastSeenOrigin: res.lastSeenOrigin });
       setMissing(
         res.isActive && !!res.lastSeenAt && Date.now() - Date.parse(res.lastSeenAt) > missingAfterMs,
       );
-      if (res.lastSeenAt) toast.success(`Gevonden, laatst gezien ${formatLastSeen(res.lastSeenAt)}`);
-      else toast.error('Nog niet gevonden. Open je website een keer en test opnieuw.');
+      if (res.lastSeenAt) toast.success(`Gezien op je site, laatst ${formatLastSeen(res.lastSeenAt)}`);
+      else toast.error('Nog geen signaal van je website. Loop de checklist hieronder na.');
     });
   }
+
+  const showChecklist = !live.lastSeenAt || missing;
 
   return (
     <section className="v1-wg-step" aria-labelledby="wg-step-3">
@@ -82,7 +93,7 @@ export function StatusStep({
         />
         <dl className="v1-rows v1-wg-rows">
           <div className="v1-row">
-            <dt className="v1-row-label">Gevonden op je site</dt>
+            <dt className="v1-row-label">Gezien op je site</dt>
             <dd className="v1-row-value">
               {live.lastSeenAt ? (
                 <>
@@ -92,24 +103,36 @@ export function StatusStep({
                     </Badge>
                   ) : (
                     <Badge tone="ok" dot>
-                      Gevonden
+                      Gezien
                     </Badge>
                   )}{' '}
                   {live.lastSeenOrigin ? `op ${live.lastSeenOrigin}, ` : ''}laatst gezien {formatLastSeen(live.lastSeenAt)}
                 </>
               ) : (
                 <>
-                  <Badge tone="neutral">Nog niet gevonden</Badge> Zodra iemand je website opent, zie je het hier.
+                  <Badge tone="neutral">Nog niet gezien</Badge>{' '}
+                  {domainSet ? 'Domein ingesteld. ' : ''}Zodra iemand je website opent, zie je het hier.
                 </>
               )}
             </dd>
             <div className="v1-row-action">
               <Button variant="secondary" size="sm" onClick={check} loading={checking}>
-                Installatie testen
+                Controleer opnieuw
               </Button>
             </div>
           </div>
         </dl>
+        {showChecklist ? (
+          <div className="v1-wg-nosignal">
+            <p className="v1-wg-nosignal-title">Geen signaal van je website? Loop dit na:</p>
+            <ul className="v1-wg-checklist">
+              {!live.isActive ? <li>Je chatbot staat op pauze. Dan verschijnt hij niet en meldt je site zich ook niet.</li> : null}
+              {noSignalChecklist(domainSet).map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </section>
   );

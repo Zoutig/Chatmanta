@@ -60,17 +60,24 @@ function saveSkipped(ids: Set<string>): void {
 
 export type SetupState = { hasDocument: boolean; hasKnowledgeSource: boolean; hasTraffic: boolean };
 
-type Step = { id: string; title: string; cta: string; href: string; done: boolean };
+/** `doneTitle`: eerlijkere tekst als de stap echt af is (niet overgeslagen). */
+type Step = { id: string; title: string; doneTitle?: string; cta: string; href: string; done: boolean };
 
 function buildSteps(setup: SetupState, widgetInstalled: boolean, skipped: Set<string>): Step[] {
-  const raw = [
+  const raw: Step[] = [
     { id: 'add_website', title: 'Voeg je website of een andere bron toe', cta: 'Bron toevoegen', href: '/voorbeeld/kennisbank', done: setup.hasKnowledgeSource },
     { id: 'verify_sources', title: 'Controleer je kennisbank', cta: 'Naar Kennisbank', href: '/voorbeeld/kennisbank', done: setup.hasDocument },
     { id: 'test_questions', title: 'Test je chatbot', cta: 'Chatbot testen', href: '/voorbeeld/preview', done: setup.hasTraffic },
-    { id: 'install_widget', title: 'Installeer de widget op je website', cta: 'Widget installeren', href: '/voorbeeld/widget', done: widgetInstalled },
+    // widgetInstalled = niet 'not_installed': ook "alleen domein ingesteld", dus
+    // de klaar-tekst belooft niet dat de widget al op de site gezien is.
+    { id: 'install_widget', title: 'Installeer de widget op je website', doneTitle: 'Widget klaargezet voor je website', cta: 'Widget installeren', href: '/voorbeeld/widget', done: widgetInstalled },
     { id: 'go_live', title: 'Klaar voor bezoekers', cta: 'Bekijk status', href: '/voorbeeld/widget', done: setup.hasTraffic && widgetInstalled },
   ];
-  return raw.map((s) => ({ ...s, done: s.done || skipped.has(s.id) }));
+  return raw.map((s) => ({
+    ...s,
+    title: s.done && s.doneTitle ? s.doneTitle : s.title,
+    done: s.done || skipped.has(s.id),
+  }));
 }
 
 export function NextStep({ setup, widgetInstalled }: { setup: SetupState; widgetInstalled: boolean }) {
