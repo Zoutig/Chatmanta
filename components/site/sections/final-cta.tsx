@@ -16,17 +16,14 @@ export default function FinalCta() {
         <div className="contour" aria-hidden="true" />
         <FinalSea />
         <div className="final-copy">
-          <h2 id="h-final">Laat je website vanavond al meedenken.</h2>
+          <h2 id="h-final">Benieuwd wat hij met jouw website doet?</h2>
           <p>
-            In een kennismaking van 20 minuten kijken we samen naar je site en wat ChatManta voor je kan doen. Geen
-            verplichtingen.
+            In een kennismaking van 20 minuten kijken we samen naar je site. Daarna staat hij meestal binnen een werkdag
+            live. Geen verplichtingen.
           </p>
           <div className="ctas">
             <LinkButton href={ROUTES.kennismaking} variant="teal" arrow>
               Plan een kennismaking
-            </LinkButton>
-            <LinkButton href={ROUTES.demo} variant="link" arrow>
-              Bekijk live demo
             </LinkButton>
           </div>
           <p className="mail">

@@ -1,9 +1,9 @@
-// chatmanta.nl — de marketing-landingspagina. Volgorde = spec §5 / mockup-final.
+// chatmanta.nl — de marketing-landingspagina. Volgorde = PAGE_ORDER in lib/site/navigation.ts
+// (ronde "site rustiger", okt 2026: 12 → 8 secties, bewijs en "eerlijk" vooraan).
 // Secties leven in components/site/sections/* (contract: docs/site/CONTRACT.md);
 // dit bestand stelt ze alleen samen.
 
 import type { Metadata } from 'next';
-import DashboardShowcase from '@/components/site/sections/dashboard-showcase';
 import Faq from '@/components/site/sections/faq';
 import Features from '@/components/site/sections/features';
 import FinalCta from '@/components/site/sections/final-cta';
@@ -12,9 +12,6 @@ import Honest from '@/components/site/sections/honest';
 import HowItWorks from '@/components/site/sections/how-it-works';
 import LiveDemo from '@/components/site/sections/live-demo';
 import Pricing from '@/components/site/sections/pricing';
-import Problem from '@/components/site/sections/problem';
-import RoiCalculator from '@/components/site/sections/roi-calculator';
-import TrustStrip from '@/components/site/sections/trust-strip';
 import { homeJsonLd } from '@/lib/site/structured-data';
 
 // Canonical alleen hier (niet in de layout: subpagina's zouden hem anders erven).
@@ -30,15 +27,11 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd()).replace(/</g, '\\u003c') }}
       />
       <Hero />
-      <TrustStrip />
-      <Problem />
+      <Honest />
+      <LiveDemo />
       <HowItWorks />
       <Features />
-      <Honest />
-      <DashboardShowcase />
-      <RoiCalculator />
       <Pricing />
-      <LiveDemo />
       <Faq />
       <FinalCta />
     </>

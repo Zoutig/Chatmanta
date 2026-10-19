@@ -21,10 +21,10 @@ export default function LiveDemo() {
       containerClassName="demo-blk"
     >
       <Reveal>
-        <h2 id="h-demo">Probeer hem zelf. Stel een moeilijke vraag.</h2>
+        <h2 id="h-demo">Stel hem zelf een lastige vraag</h2>
         <p className="lede">
-          Op onze voorbeeldsite draait een echte ChatManta. Vraag wat je wilt en kijk wat hij doet als hij het antwoord
-          niet weet.
+          Op onze voorbeeldsite van een fictief vakantiepark draait een echte ChatManta. Vraag wat je wilt en kijk wat
+          hij doet als hij het antwoord niet weet.
         </p>
         <LinkButton href={ROUTES.demo} arrow className="demo-cta">
           Open de live demo

@@ -1,7 +1,6 @@
 import { SECTION_IDS, ROUTES, anchor } from '@/lib/site/navigation';
-import { TIERS, formatEuro, monthlyPrice } from '@/lib/site/pricing';
+import { PRICING, TIERS, formatEuro, monthlyPrice } from '@/lib/site/pricing';
 import { LinkButton } from '../ui/button';
-import { Icon } from '../ui/icon';
 import { Section } from '../ui/section';
 import { HeroChat } from './hero/hero-chat';
 import { HeroMascotte } from './hero/hero-mascotte';
@@ -41,23 +40,10 @@ export default function Hero() {
             Bekijk live demo
           </LinkButton>
         </div>
-        <ul className="rr" aria-label="Zonder risico">
-          <li>
-            <Icon name="check" />
-            14 dagen gratis
-          </li>
-          <li>
-            <Icon name="check" />
-            Maandelijks opzegbaar
-          </li>
-          <li>
-            <Icon name="check" />
-            Inrichting gratis
-          </li>
-        </ul>
-        <p className="hero-price">
-          Pakketten vanaf {formatEuro(FROM_PRICE)} per maand, excl. btw.{' '}
-          <a href={anchor('pricing')}>Bekijk prijzen</a>
+        {/* Risk reversal + prijs op één rustige regel (voorheen drie vinkjes + een losse prijsregel). */}
+        <p className="hero-terms">
+          {PRICING.trialDays} dagen gratis · maandelijks opzegbaar · inrichting gratis ·{' '}
+          <a href={anchor('pricing')}>vanaf {formatEuro(FROM_PRICE)} per maand</a> excl. btw
         </p>
       </div>
 
@@ -78,7 +64,6 @@ export default function Hero() {
               <path d="M-20 512C210 486 330 562 490 524S730 452 820 504" />
             </g>
           </svg>
-          <span className="cut-label label">Fictief bedrijf · ter illustratie</span>
         </div>
         <HeroMascotte />
         <HeroChat />

@@ -4,7 +4,7 @@ import { useReducedMotion } from '../../ui/motion-hooks';
 import { useEffect, useRef } from 'react';
 import { Mark } from '../../ui/logo';
 
-/** Breekpunt waarop de golf naast de tekst staat (anders: strook onder de tekst). Gelijk aan final-cta.css. */
+/** Breekpunt waarop de golf naast de tekst staat; daaronder is de zee verborgen. Gelijk aan final-cta.css. */
 const SIDE_MQ = '(min-width: 960px)';
 const VB_W = 1000;
 const VB_H = 420;
@@ -34,6 +34,8 @@ export function FinalSea() {
     const path = pathRef.current;
     const manta = mantaRef.current;
     if (!sea || !path || !manta) return;
+    // Onder 960px is de zee verborgen (final-cta.css): niets meten of animeren.
+    if (!window.matchMedia(SIDE_MQ).matches) return;
 
     const end = () => (window.matchMedia(SIDE_MQ).matches ? 0.78 : 0.9);
     const place = (t: number) => {
