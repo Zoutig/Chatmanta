@@ -89,8 +89,8 @@ export default async function AdminJobsPage({ searchParams }: { searchParams: Pr
         title="Crawls en taken"
         description={
           orgFilter
-            ? `Website-crawls van ${jobs[0]?.organizations?.name ?? 'deze klant'}. Opnieuw proberen start een nieuwe crawl en kost Firecrawl-tegoed.`
-            : 'Website-crawls van alle klanten. Opnieuw proberen start een nieuwe crawl en kost Firecrawl-tegoed.'
+            ? `Website-crawls van ${jobs[0]?.organizations?.name ?? 'deze klant'}. Opnieuw proberen haalt alleen de pagina’s van de klant opnieuw op (eerst de mislukte) en kost Firecrawl-tegoed.`
+            : 'Website-crawls van alle klanten. Opnieuw proberen haalt alleen de pagina’s van de klant opnieuw op (eerst de mislukte) en kost Firecrawl-tegoed.'
         }
         actions={
           orgFilter ? (

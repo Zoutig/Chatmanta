@@ -35,6 +35,7 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [status, setStatus] = useState('all');
 
   const filtered = useMemo(
@@ -43,13 +44,27 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
   );
 
   function retry(jobId: string) {
+    if (
+      !confirm(
+        'Deze crawl opnieuw proberen? Alleen de pagina’s die de klant al heeft worden opnieuw opgehaald (eerst de mislukte). Dit kost Firecrawl-tegoed.',
+      )
+    ) {
+      return;
+    }
     setError(null);
+    setNotice(null);
     setBusy(jobId);
     start(async () => {
       const res = await adminRetryCrawlAction(jobId);
       setBusy(null);
-      if (res.ok) router.refresh();
-      else setError(res.error ?? 'Er ging iets mis. Probeer het opnieuw.');
+      if (res.ok) {
+        const what = res.mode === 'failed' ? 'mislukte pagina' : 'pagina';
+        const n = res.pages;
+        setNotice(
+          `Opnieuw gestart voor ${n} ${what}${n === 1 ? '' : '’s'}${res.total > n ? ` (van de ${res.total}; de rest blijft staan)` : ''}.`,
+        );
+        router.refresh();
+      } else setError(res.error ?? 'Er ging iets mis. Probeer het opnieuw.');
     });
   }
 
@@ -74,6 +89,11 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
       {error ? (
         <p role="alert" className="v1-alert v1-alert--error">
           {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p role="status" className="v1-alert v1-alert--ok">
+          {notice}
         </p>
       ) : null}
 
@@ -121,7 +141,11 @@ export function JobsClient({ rows }: { rows: JobRow[] }) {
                     disabled={pending || !terminal}
                     loading={busy === r.jobId}
                     onClick={() => retry(r.jobId)}
-                    title={terminal ? 'Start een nieuwe crawl voor deze bron (kost Firecrawl-tegoed)' : 'Crawl loopt nog'}
+                    title={
+                      terminal
+                        ? 'Haalt de pagina’s van de klant opnieuw op, eerst de mislukte (kost Firecrawl-tegoed)'
+                        : 'Crawl loopt nog'
+                    }
                   >
                     Opnieuw proberen
                   </Button>

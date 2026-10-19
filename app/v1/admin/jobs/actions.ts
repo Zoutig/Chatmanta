@@ -1,18 +1,26 @@
 'use server';
 
 // V1 admin — crawl-job retry (cross-org). Port van V0's adminRerunCrawlAction naar het
-// V1-model (org+chatbot-gestempeld; GEEN website_pages → her-ontdek via root_url).
+// V1-model (org+chatbot-gestempeld).
+//
+// Respecteert de paginakeuze van de klant: GEEN herontdekking via root_url meer, maar
+// alleen pagina's die al in deze bron staan — eerst de mislukte, anders de bestaande
+// selectie (zie lib/v1/admin/crawl-retry.ts). Een bron zonder enige pagina wordt
+// geweigerd (de selectie van die eerste crawl is niet bewaard).
 //
 // Cross-org via getJorionAdminClient() (service-role NÁ requireJorionAdmin). BETAALDE
-// Firecrawl-call (mapSite + startBatchScrape) — bewust admin-getriggerd, draai 'm NIET
-// in een smoke.
+// Firecrawl-call (startBatchScrape) — bewust admin-getriggerd, draai 'm NIET in een
+// smoke. Audit-regel 'crawl.admin_retry'.
 
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { requireJorionAdmin } from '@/lib/auth';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { writeAuditLog } from '@/lib/v1/audit';
+import { planCrawlRetry, type SourcePage } from '@/lib/v1/admin/crawl-retry';
 import { isAppError } from '@/lib/errors/app-error';
 import { actionTry, fail, type ActionResult, type ActionFail } from '@/lib/errors/action';
-import { mapSite, startBatchScrape, MAX_CRAWL_PAGES, MAX_DISCOVER_PAGES } from '@/lib/v1/crawler/firecrawl';
+import { startBatchScrape, MAX_CRAWL_PAGES } from '@/lib/v1/crawler/firecrawl';
 import { validateCrawlUrl } from '@/lib/v1/crawler/validateCrawlUrl';
 import { recordCrawlEvent } from '@/lib/v1/crawler/crawlEvents';
 
@@ -22,11 +30,15 @@ async function filterPublicUrls(urls: string[]): Promise<string[]> {
   return checks.filter((u): u is string => u !== null);
 }
 
-/** Herstart een crawl-job: her-ontdek via de root-URL van de bron → batch-scrape →
+/** Herstart een crawl-job voor de pagina's van de klant (mislukte eerst) → batch-scrape →
  *  nieuwe processing_job (pending). Ingest gebeurt daarna via de cron/tick-pinger. */
-export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult> {
+export async function adminRetryCrawlAction(
+  jobId: string,
+): Promise<ActionResult<{ mode: 'failed' | 'refresh'; pages: number; total: number }>> {
   let admin: SupabaseClient;
+  let actorId: string;
   try {
+    actorId = (await requireJorionAdmin()).id; // actor-id voor de audit
     admin = await getJorionAdminClient(); // gate't intern via requireJorionAdmin
   } catch (e) {
     if (isAppError(e)) return { ok: false, error: e.message, code: e.code } satisfies ActionFail;
@@ -53,24 +65,39 @@ export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult
 
     const { data: src } = await admin
       .from('knowledge_sources')
-      .select('root_url, normalized_host')
+      .select('id')
       .eq('id', sourceId)
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
       .is('deleted_at', null)
       .maybeSingle();
     if (!src) fail('NOT_FOUND', 'Bron niet gevonden of verwijderd.');
-    const root =
-      (src.root_url as string | null) ??
-      (src.normalized_host ? `https://${src.normalized_host as string}` : null);
-    if (!root) fail('CRAWL_FAILED', 'Geen root-URL om opnieuw te crawlen.');
 
-    const rootCheck = await validateCrawlUrl(root);
-    if (!rootCheck.allowed) fail('CRAWL_FAILED', rootCheck.reason);
-
-    const discovered = await mapSite(root, MAX_DISCOVER_PAGES);
-    const safe = (await filterPublicUrls([root, ...discovered])).slice(0, MAX_CRAWL_PAGES);
-    if (safe.length === 0) fail('CRAWL_FAILED', 'Geen geldige pagina’s om te crawlen.');
+    // De pagina's die de klant al in deze bron heeft (pages-as-documents), org+chatbot-
+    // gescoped. Mislukte pagina's eerst; anders de bestaande selectie verversen.
+    const { data: docRows, error: docErr } = await admin
+      .from('documents')
+      .select('status, source_url:metadata->>source_url')
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .eq('knowledge_source_id', sourceId)
+      .eq('source', 'website')
+      .is('deleted_at', null)
+      .limit(2000);
+    if (docErr) throw new Error(`documents lookup: ${docErr.message}`);
+    const pages: SourcePage[] = ((docRows ?? []) as Array<{ status: string; source_url: string | null }>).map((d) => ({
+      url: d.source_url,
+      status: d.status,
+    }));
+    const plan = planCrawlRetry(pages, MAX_CRAWL_PAGES);
+    if (plan.mode === 'none') {
+      fail(
+        'CRAWL_FAILED',
+        'Deze bron heeft nog geen opgehaalde pagina’s en de paginakeuze van de klant is niet bewaard. Laat de klant in zijn Kennisbank opnieuw pagina’s kiezen en de crawl starten.',
+      );
+    }
+    const safe = await filterPublicUrls(plan.urls);
+    if (safe.length === 0) fail('CRAWL_FAILED', 'Geen geldige pagina’s om opnieuw op te halen.');
 
     // Eerst Firecrawl starten, pas daarna de bron op 'crawling' (zie startSelectedCrawlAction):
     // een mislukte start laat de bron op z'n huidige status i.p.v. hangend/rood.
@@ -82,7 +109,7 @@ export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult
       const msg = err instanceof Error ? err.message : 'Crawl kon niet starten.';
       await recordCrawlEvent(admin, {
         organizationId: orgId, chatbotId, eventType: 'fail', knowledgeSourceId: sourceId,
-        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length, rerun: true },
+        decision: 'start-failed', message: msg, payload: { requestedUrls: safe.length, rerun: true, mode: plan.mode },
       });
       fail('CRAWL_FAILED', msg);
     }
@@ -114,11 +141,20 @@ export async function adminRetryCrawlAction(jobId: string): Promise<ActionResult
     await recordCrawlEvent(admin, {
       organizationId: orgId, chatbotId, eventType: 'start', processingJobId: newJob.id as string,
       knowledgeSourceId: sourceId, externalJobId: crawlId,
-      message: `Opnieuw gestart via admin voor ${safe.length} pagina's${invalidURLs.length ? `, ${invalidURLs.length} geweigerd door Firecrawl` : ''}.`,
-      payload: { requestedUrls: safe.length, rerun: true },
+      message: `Opnieuw gestart via admin voor ${safe.length} ${plan.mode === 'failed' ? 'mislukte ' : ''}pagina's${invalidURLs.length ? `, ${invalidURLs.length} geweigerd door Firecrawl` : ''}.`,
+      payload: { requestedUrls: safe.length, rerun: true, mode: plan.mode, totalInSource: plan.total },
+    });
+
+    await writeAuditLog(admin, {
+      organizationId: orgId,
+      userId: actorId,
+      action: 'crawl.admin_retry',
+      targetType: 'knowledge_source',
+      targetId: sourceId,
+      metadata: { retried_job_id: jobId, new_job_id: newJob.id, mode: plan.mode, pages: safe.length, total: plan.total },
     });
 
     revalidatePath('/v1/admin/jobs');
-    return {};
+    return { mode: plan.mode, pages: safe.length, total: plan.total };
   });
 }
