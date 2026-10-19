@@ -124,6 +124,18 @@ test('deriveUnanswered — "Markeer als opgelost" op het gesprek handelt de vraa
   assert.deepEqual(reopened[0].threadIds, ['t2']);
 });
 
+test('deriveUnanswered — nieuwe fallback in HETZELFDE opgeloste gesprek: open (appendTurn heropent het gesprek)', () => {
+  // lib/v1/conversations/write.ts zet een gesloten gesprek bij een fallback-beurt terug
+  // op 'open'. De loader ziet het gesprek dan als open, dus de vraag komt terug.
+  const qs = deriveUnanswered({
+    logRows: [fb('Parkeren?', 0), fb('parkeren', 60)],
+    qaItems: [],
+    turns: [turn('Parkeren?', 0, 't1', false, 60), turn('parkeren', 60, 't1', false, 60)],
+  });
+  assert.equal(qs[0].status, 'open');
+  assert.deepEqual(qs[0].threadIds, ['t1']);
+});
+
 test('openQuestions + threadsWithOpenQuestions — tellers op dezelfde definitie', () => {
   const qs = deriveUnanswered({
     logRows: [fb('A?', 0), fb('B?', 1), fb('C?', 2, { category: 'off_topic' })],

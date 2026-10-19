@@ -71,7 +71,7 @@ export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): 
     let ownThread = false;
 
     if (existing) {
-      ownThread = await bumpThread(client, orgId, chatbotId, threadId, existing.message_count as number, nowIso);
+      ownThread = await bumpThread(client, orgId, chatbotId, threadId, existing.message_count as number, nowIso, kind === 'fallback');
     } else {
       // Nieuwe thread met de client-uuid als PK.
       const { error: insErr } = await client.from('threads').insert({
@@ -99,7 +99,7 @@ export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): 
           console.error('[v1 appendTurn] threadId hoort bij andere tenant — beurt niet weggeschreven');
           return;
         }
-        ownThread = await bumpThread(client, orgId, chatbotId, threadId, owner.message_count as number, nowIso);
+        ownThread = await bumpThread(client, orgId, chatbotId, threadId, owner.message_count as number, nowIso, kind === 'fallback');
       } else {
         console.error('[v1 appendTurn] thread-insert faalde:', insErr.message);
         return;
@@ -145,6 +145,10 @@ export async function appendTurn(client: SupabaseClient, args: AppendTurnArgs): 
 
 /**
  * Bump message_count (+2) en last_message_at op een bestaande, eigen thread.
+ * reopen=true (de nieuwe beurt is een fallback) zet een "opgelost" gesprek terug op
+ * 'open': de chatbot wist het wéér niet, dus de vraag hoort terug in de werklijst
+ * "Wist je chatbot niet" (lib/v1/dashboard/unanswered-core.ts). Er is geen
+ * gesloten-op-tijdstip, dus zonder heropenen zou die nieuwe fallback als opgelost tellen.
  * @returns true als de bump slaagde (thread is van ons → messages mogen erbij).
  *
  * ponytail: read-then-write op message_count — accepteer de mini-race onder
@@ -159,10 +163,15 @@ async function bumpThread(
   threadId: string,
   currentCount: number,
   nowIso: string,
+  reopen: boolean,
 ): Promise<boolean> {
   const { error } = await client
     .from('threads')
-    .update({ message_count: currentCount + 2, last_message_at: nowIso })
+    .update({
+      message_count: currentCount + 2,
+      last_message_at: nowIso,
+      ...(reopen ? { status: 'open' } : {}),
+    })
     .eq('id', threadId)
     .eq('organization_id', orgId)
     .eq('chatbot_id', chatbotId);

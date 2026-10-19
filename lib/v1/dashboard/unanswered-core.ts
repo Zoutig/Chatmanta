@@ -16,7 +16,11 @@
 //   - 'qa':       er is een actieve, ingelezen Q&A voor deze vraag, opgeslagen ná de
 //                 laatste fallback (exacte sleutel of token-overlap, zoals de Q&A-matcher);
 //   - 'resolved': het gesprek met de laatste fallback is "Markeer als opgelost"
-//                 (threads.status='closed'). Een nieuwe fallback daarna heropent de vraag.
+//                 (threads.status='closed'). Een nieuwe fallback daarna heropent de vraag:
+//                 in een ánder gesprek via de tijdvergelijking hieronder, in hetzelfde
+//                 gesprek doordat appendTurn (lib/v1/conversations/write.ts) een gesloten
+//                 gesprek bij een fallback-beurt terugzet op 'open'. Er is geen
+//                 gesloten-op-tijdstip, dus zonder dat heropenen zou het niet te zien zijn.
 // Alle tellers (zijbalk, Overzicht, gesprekkenfilter, Meest gesteld, werklijst) lezen dit.
 
 import { redactPii } from '@/lib/observability/redact';
