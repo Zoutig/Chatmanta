@@ -24,25 +24,23 @@ Het fundament (M2) staat. Dit document zegt wat je mag aanraken, welke bouwstene
 
 ## 2. De pagina en de sectie-contracten
 
-`app/(site)/page.tsx` rendert de secties in deze volgorde. Elke sectie is een **default export zonder props**. Houd het `id` en de root-klasse vast. Het `id` is het anker, en `scroll-margin-top` zit al in `site.css` (`section[id]`).
+`app/(site)/page.tsx` rendert de secties in deze volgorde (`PAGE_ORDER` in `lib/site/navigation.ts`, met test). Elke sectie is een **default export zonder props**. Houd het `id` en de root-klasse vast. Het `id` is het anker, en `scroll-margin-top` zit al in `site.css` (`section[id]`).
+
+> **Ronde "site rustiger" (okt 2026): 12 → 8 secties.** `trust-strip`, `problem`, `dashboard-showcase` en de sectie-wrapper `roi-calculator.tsx` zijn verwijderd: de vertrouwensregels en de probleem-lede staan in `honest`, de dashboard-screenshot in `features` (alleen ≥900px), de rekenhulp (`roi-calculator/roi-calc.tsx` + `roi-calculator.css`) als uitklapper `#rekenhulp` in `pricing`. Copy-regels (geen bronlinks beloven enz.): bovenaan `docs/site/COPY.md`. `mockup-final.html` is op die punten achterhaald.
 
 | # | Bestand | Component | `id` (via `SECTION_IDS`) | Root-klasse | Kop-id | Variant |
 |---|---|---|---|---|---|---|
-| 2 | `hero.tsx` | `Hero` | `top` (`hero`) | `s-hero` | `h-hero` (**de enige `<h1>`**) | `plain` |
-| 3 | `trust-strip.tsx` | `TrustStrip` | `vertrouwen` (`trust`) | `s-trust` | (aria-label) | `plain` |
-| 4 | `problem.tsx` | `Problem` | `probleem` | `s-problem` | `h-prob` | `default` |
-| 5 | `how-it-works.tsx` | `HowItWorks` | `hoe-het-werkt` (`how`) | `s-how` | `h-how` | `tint` |
-| 6 | `features.tsx` | `Features` | `functies` | `s-features` | `h-feat` | `default` |
-| 7 | `honest.tsx` | `Honest` | `eerlijk` | `s-honest` | `h-honest` | `dark` |
-| 8 | `dashboard-showcase.tsx` | `DashboardShowcase` | `dashboard` | `s-dashboard` | `h-dash` | `default` |
-| 9 | `roi-calculator.tsx` | `RoiCalculator` | `rekenhulp` (`roi`) | `s-roi` | `h-roi` | `default` (mockup: `padding-top:0`) |
-| 10 | `pricing.tsx` | `Pricing` | `prijzen` | `s-pricing` | `h-price` | `default` (mockup: eigen verloop) |
-| 11 | `live-demo.tsx` | `LiveDemo` | `demo` | `s-demo` | `h-demo` | `default` |
-| 12 | `faq.tsx` | `Faq` | `faq` | `s-faq` | `h-faq` | `default` (mockup: `padding-top:0`) |
-| 13 | `final-cta.tsx` | `FinalCta` | `contact` (`finalCta`) | `s-final` | `h-final` | `default`; de navy kaart zit binnen de sectie |
+| 1 | `hero.tsx` | `Hero` | `top` (`hero`) | `s-hero` | `h-hero` (**de enige `<h1>`**) | `plain` |
+| 2 | `honest.tsx` | `Honest` | `eerlijk` | `s-honest` | `h-honest` | `dark` |
+| 3 | `live-demo.tsx` | `LiveDemo` | `demo` | `s-demo` | `h-demo` | `default` |
+| 4 | `how-it-works.tsx` | `HowItWorks` | `hoe-het-werkt` (`how`) | `s-how` | `h-how` | `tint` |
+| 5 | `features.tsx` | `Features` | `functies` | `s-features` | `h-feat` | `default` |
+| 6 | `pricing.tsx` | `Pricing` | `prijzen` (rekenhulp-uitklapper: `rekenhulp` / `roi`) | `s-pricing` | `h-price` | `default` (eigen verloop) |
+| 7 | `faq.tsx` | `Faq` | `faq` | `s-faq` | `h-faq` | `default` |
+| 8 | `final-cta.tsx` | `FinalCta` | `contact` (`finalCta`) | `s-final` | `h-final` | `default`; de navy kaart zit binnen de sectie |
 
 - **Ankers wijken af van de mockup.** De mockup gebruikt `#hoe`, de site gebruikt `#hoe-het-werkt`. Gebruik altijd `SECTION_IDS` en `anchor()` uit `lib/site/navigation.ts`, nooit een losse string.
-- De nav-items (Hoe het werkt, Functies, Prijzen, Demo, FAQ) volgen `#hoe-het-werkt #functies #prijzen #demo #faq` voor de actieve-sectie-indicator. Hernoem die ids niet.
+- De nav-items (Demo, Hoe het werkt, Functies, Prijzen, FAQ) volgen de paginavolgorde voor de actieve-sectie-indicator. Hernoem die ids niet.
 - Elke sectie staat nu als **placeholder** met kop en copy en een `.sec-placeholder`-blok. Vervang de inhoud, maar houd de `Section`-wrapper met id, klasse en `labelledBy`.
 - Wat mag een sectie-component zijn? Bij voorkeur een **server component** die de statische HTML (alle tekst) rendert. Interactie en motion zet je in een **kleine client-subcomponent** (`'use client'`) in je submap, bijvoorbeeld `sections/hero/hero-chat.tsx`.
 

@@ -52,7 +52,7 @@ api.lookAt(element, 900); api.setMode('happy'); api.wink(); api.stop();
 
 `speak` maakt een tijdlijn van lettergrepen (~5 per seconde; klinkergroep → mondvorm: a → ah, o → oh, e/i/ij → ee, oe/u/ui/eu → oo) met pauzes bij leestekens. `onWord` vuurt per witruimte-gescheiden woord, dus je kunt de tekst in hetzelfde tempo laten verschijnen. Voorbeeld: de rondleiding op /voorbeeld (`app/voorbeeld/(dashboard)/_overview/voorbeeld-tour.tsx`), via de optionele `narration`-prop van `OnboardingTour`.
 
-Voorbeeld van een complete choreografie: `components/site/sections/hero/hero-chat.tsx` (vraag lezen → nadenken tijdens typen → meepraten met het antwoord → blij naar de bronvermelding kijken).
+Voorbeeld van een complete choreografie: `components/site/sections/hero/hero-chat.tsx` (vraag lezen → nadenken tijdens typen → meepraten met het antwoord → tevreden naar het antwoord kijken). De bron-chip is daar weg (okt 2026: V1 toont geen bronlinks). In de hero is hij op mobiel bewust kleiner: `min(52vw, 220px)` (`hero.css`), dus nog boven het minimum van ~180px.
 
 ## Ontwerpregels
 

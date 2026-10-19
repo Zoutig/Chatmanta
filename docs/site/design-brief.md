@@ -2,6 +2,8 @@
 
 *Synthese van 4 onderzoeksrapporten (landing-benchmark, motion-benchmark, NL-copy, conversie en prijzen) + spec `docs/superpowers/specs/2026-10-10-marketing-site-design.md` + V1-ontwerplaag "Diepzee" (`app/v1/_ui/ui.css`) + logo (`public/logo/`). Datum: 10-10-2026. Voor: de 3 ontwerp-agents van het toernooi (spec §11, fase 2) en de jury.*
 
+> **Achterhaald op één kernpunt (okt 2026).** Deze brief maakt de **bronlink** tot signatuur-element ("noemt bij elk antwoord de bron", bron-chip in de hero). Dat klopt niet met het product: V1 toont bewust geen bronlinks (AGENTS.md hard rule 9). Ook "de bot maakt van een onbekende vraag een lead" klopt niet: contact loopt via een opt-in knop in de widget. Sinds de ronde "site rustiger" is de signatuur **"verzint niets, zegt eerlijk wat hij niet weet"**; de actuele copy en regels staan bovenaan `docs/site/COPY.md`. Zet de bronlink-belofte niet terug.
+
 **Leesregel.** Alles in §1-§6 is **gedeelde basis**: copy, structuur, prijzen, CTA's, motion-principes en conversie-eisen. De 3 richtingen verschillen **alleen in visuele taal** (§7). Wie copy, volgorde of een bedrag aanpast, valt uit het toernooi. Punten met **[SEB]** zijn open beslissingen (§8). Daar gebruiken de mockups de hier aanbevolen variant.
 
 ---
