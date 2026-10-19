@@ -21,6 +21,8 @@ import {
   DEFAULT_MONTHLY_QUESTION_LIMIT,
 } from '@/lib/v1/limits/usage-limits';
 import { FaqCadenceControl } from './faq-cadence-control';
+import { embeddingLabel, getV1ModelInfo, serviceTierLabel } from '../_ui/model-info';
+import { INDEX_VERSIONS } from '@/lib/rag/index-version';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,8 +46,9 @@ function KeyStatus({ present }: { present: boolean }) {
 export default async function V1InstellingenPage() {
   // Auth-gate: getJorionAdminClient() gooit AUTH_FORBIDDEN als de caller geen
   // Jorion-admin is, of NEXT_REDIRECT als er geen sessie is.
+  let admin;
   try {
-    await getJorionAdminClient();
+    admin = await getJorionAdminClient();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
@@ -56,6 +59,15 @@ export default async function V1InstellingenPage() {
   // Alleen aanwezigheid lezen: waardes worden NOOIT gerenderd.
   const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const faqCadence = await getFaqRefreshCadence();
+  const models = getV1ModelInfo();
+
+  // Hoeveel chatbots staan op welke index-versie (embeddingmodel)? Alleen lezen.
+  const { data: botRows } = await admin.from('chatbots').select('index_version, bot_version').is('deleted_at', null);
+  const perIndex = new Map<string, number>();
+  for (const r of (botRows ?? []) as Array<{ index_version: string | null }>) {
+    const k = r.index_version ?? 'v1';
+    perIndex.set(k, (perIndex.get(k) ?? 0) + 1);
+  }
 
   const keys = {
     NEXT_PUBLIC_V1_SUPABASE_URL: !!process.env.NEXT_PUBLIC_V1_SUPABASE_URL,
@@ -86,11 +98,26 @@ export default async function V1InstellingenPage() {
         </Rows>
       </Panel>
 
-      <Panel title="Modellen">
+      <Panel title="Modellen en botversie">
         <Rows>
-          <Row label="Chat en voorbewerking">gpt-4o-mini</Row>
-          <Row label="Beoordeling en vangnet">gpt-4o</Row>
-          <Row label="Embeddings">text-embedding-3-large (1536) — kennisbanken op index v2; v1 nog 3-small</Row>
+          <Row label="Geërfde botversie">
+            {models.inheritedBotVersion}{' '}
+            <InfoTip text="V1 draait de nieuwste V0-botversie (LATEST) plus de V1-instellingen uit app/v1/app/rag-config.ts. Een nieuwe LATEST verandert dus het gedrag van alle klanten; daarna de antwoord-cache legen." />
+          </Row>
+          <Row label="Antwoord">
+            {models.chatModel} ({serviceTierLabel(models.chatServiceTier)})
+          </Row>
+          <Row label="Hulpstappen">
+            {models.auxModel} ({serviceTierLabel(models.auxServiceTier)})
+          </Row>
+          <Row label="Vangnet bij lage zekerheid">{models.cascade ?? 'Uit'}</Row>
+          <Row label="Drempel overeenkomst">{models.similarityThreshold.toLocaleString('nl-NL')}</Row>
+          <Row label="Antwoord-cache">{models.cacheEnabled ? 'Aan (per klant te legen op de klantpagina)' : 'Uit'}</Row>
+          {INDEX_VERSIONS.map((v) => (
+            <Row key={v} label={`Embeddings index ${v}`}>
+              {embeddingLabel(v)}: {perIndex.get(v) ?? 0} {(perIndex.get(v) ?? 0) === 1 ? 'chatbot' : 'chatbots'}
+            </Row>
+          ))}
         </Rows>
       </Panel>
 
