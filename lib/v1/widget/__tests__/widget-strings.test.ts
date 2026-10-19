@@ -12,17 +12,32 @@ import {
 } from '../widget-strings';
 import { SUBJECT_MAX } from '../contact-validate';
 
-test('contactConsentText: noemt bedrijf, doel en 90 dagen (nl + en)', () => {
+test('contactConsentText: noemt bedrijf, gegevens en doel; geen bewaartermijn-belofte (nl + en)', () => {
   const nl = contactConsentText(WIDGET_STRINGS.nl, 'Bakkerij Voorbeeld');
   assert.match(nl, /Bakkerij Voorbeeld/);
   assert.match(nl, /contact met mij op te nemen/);
-  assert.match(nl, /90 dagen/);
+  assert.match(nl, /onderwerp en bericht/);
+  // Retentie-pinger V1 draait nog niet → de toestemming mag geen termijn beloven.
+  assert.doesNotMatch(nl, /dagen/);
   assert.doesNotMatch(nl, /\{org\}/);
   const en = contactConsentText(WIDGET_STRINGS.en, 'Example Bakery');
   assert.match(en, /Example Bakery/);
   assert.match(en, /get in touch/);
-  assert.match(en, /90 days/);
+  assert.match(en, /subject and message/);
+  assert.doesNotMatch(en, /days/);
   assert.doesNotMatch(en, /\{org\}/);
+});
+
+test('contactConsentText: $-patronen in de naam worden letterlijk ingevuld', () => {
+  for (const name of ['Smit $& Zn', 'A $1 B', "C $` $' D", 'E $$ F']) {
+    const s = contactConsentText(WIDGET_STRINGS.nl, name);
+    assert.ok(s.startsWith(`Ik geef ${name} toestemming`), s);
+  }
+});
+
+test('contactSubject: label zegt optioneel (nl + en)', () => {
+  assert.match(WIDGET_STRINGS.nl.contactSubject, /optioneel/);
+  assert.match(WIDGET_STRINGS.en.contactSubject, /optional/);
 });
 
 test('contactConsentText: geen/lege naam → neutrale omschrijving; lange naam afgekapt', () => {

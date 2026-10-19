@@ -562,7 +562,7 @@ function ContactPanel({ s, persist }: { s: V1ChatbotSettings; persist: Persist }
         />
         <Switch
           label="Contactverzoeken aannemen"
-          description="Onder het gesprek komt een knop 'Liever persoonlijk contact?'. De bezoeker vult zelf naam en e-mail of telefoon in; jij krijgt een mail. Na 90 dagen verwijderd."
+          description="Zodra een bezoeker een vraag heeft gesteld, verschijnt onder het gesprek een knop 'Liever persoonlijk contact?' (in het Engels: 'Prefer personal contact?'). De bezoeker vult zelf naam en e-mail of telefoon in; jij krijgt een mail."
           checked={d.contactRequestsEnabled}
           onChange={(v) => {
             // Aanzetten = persoonsgegevens verzamelen → eerst bevestigen.
@@ -621,8 +621,9 @@ function ConfirmContactRequests({ onCancel, onConfirm }: { onCancel: () => void;
           Contactverzoeken aanzetten?
         </h2>
         <p className="v1-dialog-body">
-          Je chatbot toont dan onder het gesprek een knop &lsquo;Liever persoonlijk contact?&rsquo;. Een
-          bezoeker die erop klikt, vult zelf zijn naam, e-mailadres of telefoonnummer en eventueel een
+          Zodra een bezoeker een vraag heeft gesteld, toont je chatbot onder het gesprek een knop
+          &lsquo;Liever persoonlijk contact?&rsquo; (in het Engels: &lsquo;Prefer personal contact?&rsquo;).
+          Een bezoeker die erop klikt, vult zelf zijn naam, e-mailadres of telefoonnummer en eventueel een
           onderwerp en bericht in. De chatbot vraagt er niet zelf om.
         </p>
         <p className="v1-dialog-body">
@@ -630,8 +631,8 @@ function ConfirmContactRequests({ onCancel, onConfirm }: { onCancel: () => void;
           je account-e-mailadres). Je vindt ze ook onder Contactverzoeken.
         </p>
         <p className="v1-dialog-body">
-          Je verzamelt dan persoonsgegevens. Ze worden na 90 dagen automatisch verwijderd. Verwerk ze
-          volgens de AVG.
+          Je verzamelt dan persoonsgegevens. Uit het chatbotsysteem worden ze na 90 dagen automatisch
+          verwijderd; de meldingsmails in je eigen mailbox beheer je zelf. Verwerk ze volgens de AVG.
         </p>
         <div className="v1-dialog-actions">
           <Button variant="ghost" onClick={onCancel} autoFocus>

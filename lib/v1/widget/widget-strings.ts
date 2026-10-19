@@ -85,9 +85,12 @@ export const WIDGET_STRINGS: Record<WidgetLang, WidgetStrings> = {
     contactEmailAddress: 'E-mailadres',
     contactPhoneNumber: 'Telefoonnummer',
     contactMessage: 'Bericht (optioneel)',
-    contactSubject: 'Onderwerp',
+    contactSubject: 'Onderwerp (optioneel)',
+    // Bewust GEEN bewaartermijn: de V1-retentie-pinger draait nog niet (V1_LAUNCH_TODO
+    // #7c) en de notificatiemail valt buiten ChatManta's beheer. Pas terugzetten als
+    // dat allebei waar is.
     contactConsent:
-      'Ik geef {org} toestemming mijn naam en contactgegevens te gebruiken om contact met mij op te nemen over mijn vraag. Mijn gegevens worden na 90 dagen verwijderd.',
+      'Ik geef {org} toestemming mijn naam, contactgegevens, onderwerp en bericht te gebruiken om contact met mij op te nemen over mijn vraag.',
     contactConsentOrgFallback: 'het bedrijf achter deze website',
     contactCancel: 'Annuleren',
     contactSend: 'Versturen',
@@ -116,9 +119,9 @@ export const WIDGET_STRINGS: Record<WidgetLang, WidgetStrings> = {
     contactEmailAddress: 'Email address',
     contactPhoneNumber: 'Phone number',
     contactMessage: 'Message (optional)',
-    contactSubject: 'Subject',
+    contactSubject: 'Subject (optional)',
     contactConsent:
-      'I allow {org} to use my name and contact details to get in touch with me about my question. My details are deleted after 90 days.',
+      'I allow {org} to use my name, contact details, subject and message to get in touch with me about my question.',
     contactConsentOrgFallback: 'the company behind this website',
     contactCancel: 'Cancel',
     contactSend: 'Send',
@@ -133,12 +136,13 @@ export const CONSENT_ORG_MAX = 120;
 /**
  * Toestemmingstekst van het contactformulier met de bedrijfsnaam ingevuld: de
  * bezoeker ziet aan wie de gegevens gaan (de klant = verwerkingsverantwoordelijke),
- * waarvoor en hoe lang ze bewaard worden. Geen naam → neutrale omschrijving.
+ * welke gegevens en waarvoor. Geen naam → neutrale omschrijving.
  * Wordt als React-tekst gerenderd (geen HTML), dus de naam hoeft niet ge-escaped.
+ * Vervanging via een functie: een `$&`/`$1` in de naam mag geen vervangpatroon zijn.
  */
 export function contactConsentText(t: WidgetStrings, orgName: string | null | undefined): string {
   const name = (orgName ?? '').replace(/\s+/g, ' ').trim().slice(0, CONSENT_ORG_MAX).trim();
-  return t.contactConsent.replace('{org}', name || t.contactConsentOrgFallback);
+  return t.contactConsent.replace('{org}', () => name || t.contactConsentOrgFallback);
 }
 
 /** Max. lengte van het onderwerp — gelijk aan SUBJECT_MAX in contact-validate. */

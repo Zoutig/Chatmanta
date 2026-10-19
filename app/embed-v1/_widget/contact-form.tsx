@@ -6,8 +6,10 @@
 // Onderwerp (2026-10-19): voorgevuld met de laatste vraag van de bezoeker
 // (initialSubject), zichtbaar en aanpasbaar. Gaat mee in het bestaande `subject`-
 // veld van het request (route + kolom + mail + kaart kenden het al; het formulier
-// stuurde altijd null). Toestemmingstekst noemt de bedrijfsnaam (orgName), het doel
-// en de bewaartermijn.
+// stuurde altijd null). Toestemmingstekst noemt welke gegevens en waarvoor; aan wie
+// via orgName, maar de aanroepers geven die (nog) niet mee → neutrale omschrijving
+// "het bedrijf achter deze website". organizations.name is een door de admin
+// ingevuld veld en kan een intern label zijn; zie besluit voor Sebastiaan.
 
 import { useState } from 'react';
 import {
@@ -39,7 +41,7 @@ export function ContactForm({
   onSubmit: (payload: ContactPayload) => Promise<boolean>;
   onDone: () => void;
   strings?: WidgetStrings;
-  /** Bedrijfsnaam voor de toestemmingstekst (aan wie gaan de gegevens). */
+  /** Bedrijfsnaam voor de toestemmingstekst (aan wie gaan de gegevens). Leeg → neutrale tekst. */
   orgName?: string | null;
   /** Voorgevuld onderwerp (laatste bezoekersvraag); de bezoeker kan het aanpassen. */
   initialSubject?: string;

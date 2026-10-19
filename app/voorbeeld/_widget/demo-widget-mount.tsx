@@ -33,7 +33,7 @@ const MSG_FAILED = 'Er ging iets mis. Probeer het zo nog eens.';
 const MSG_DROPPED = 'De verbinding viel weg.';
 
 const SESSION_KEY = 'chatmanta-voorbeeld:widget-sessie';
-// Fictief bedrijf van de voorbeeldwebsite (titel + toestemmingstekst).
+// Fictief bedrijf van de voorbeeldwebsite (widgettitel).
 const DEMO_ORG_NAME = 'De Helmduin';
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; streaming?: boolean; error?: boolean };
@@ -240,7 +240,6 @@ export function DemoWidgetMount() {
         <ContactForm
           onCancel={() => setContactOpen(false)}
           onSubmit={submitContact}
-          orgName={DEMO_ORG_NAME}
           initialSubject={lastVisitorQuestion(messages)}
           onDone={() => {
             setContactOpen(false);
