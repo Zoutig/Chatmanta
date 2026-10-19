@@ -64,6 +64,25 @@ export function checkProductionEnv(env: StartupEnv): StartupCheck {
   return { ok: errors.length === 0, errors };
 }
 
+/**
+ * Zachte checks: alleen een waarschuwing, NOOIT een boot-fout. Bewust gescheiden van
+ * checkProductionEnv: een ontbrekende var hier mag geen (preview-)deploy breken, want
+ * NODE_ENV=production geldt ook voor previews en die env is niet overal gelijk.
+ *   - IP_HASH_SALT (audit 2026-10): zonder salt hasht hashIp() nog wel, maar zwakker
+ *     (een IPv4-hash is dan met een tabel terug te rekenen). Dus wel luid melden.
+ */
+export function checkSoftProductionEnv(env: StartupEnv): string[] {
+  const warnings: string[] = [];
+  if (!env.IP_HASH_SALT) {
+    warnings.push(
+      'IP_HASH_SALT ontbreekt: IP-adressen van bezoekers worden zonder salt gehasht (query_log.ip_hash, ' +
+        'rate-limit-sleutels). Dat is zwakker pseudonimiseren (AVG). Zet een random salt ' +
+        '(bv. `openssl rand -hex 32`); wijzigen breekt alleen de vergelijkbaarheid met oude hashes.',
+    );
+  }
+  return warnings;
+}
+
 /** Boot-assert. In productie: gooit bij config-fouten (fail-closed → de deploy/boot
  *  faalt zichtbaar). Buiten productie: luide console.error zodat lokale dev zonder
  *  volledige `.env.local` nog kan booten, maar de fout niet onopgemerkt blijft. */
@@ -71,6 +90,8 @@ export function assertProductionEnv(
   env: StartupEnv,
   opts: { isProduction: boolean },
 ): void {
+  // Zachte checks eerst: alleen loggen, nooit gooien (zie checkSoftProductionEnv).
+  for (const w of checkSoftProductionEnv(env)) console.warn(`[startup-assert] waarschuwing: ${w}`);
   const { ok, errors } = checkProductionEnv(env);
   if (ok) return;
   const header = '[startup-assert] productie-env onvolledig:';
