@@ -78,6 +78,9 @@ export async function runV1ContactRetention(
       .lt('created_at', cutoff); // leeftijdsfilter — verplicht, enige selectie
     if (delErr) {
       console.error('[v1/retention] contactverzoeken-delete faalde:', delErr.message);
+      // Niet stil doorlopen (audit 2026-10): de cron-route vangt dit en meldt ok:false
+      // + 500, zodat een pinger/monitor ziet dat de AVG-verwijdering niet gebeurde.
+      throw new Error(`contactverzoeken-delete faalde: ${delErr.message}`);
     }
   }
 

@@ -31,3 +31,22 @@ test('cutoff ligt rond precies 90 dagen terug (±1 dag door middernacht-flooring
 test('de retentietermijn is 90 dagen', () => {
   assert.equal(V1_CONTACT_RETENTION_DAYS, 90);
 });
+
+// Audit 2026-10: een gefaalde delete mag niet als succes terugkomen (de cron-route
+// meldt dan ok:false + 500). Fake service-client: telling slaagt, delete faalt.
+test('runV1ContactRetention: gefaalde delete gooit (geen stille ok:true)', async () => {
+  const { runV1ContactRetention } = await import('../retention');
+  const countChain = { lt: async () => ({ count: 3, error: null }) };
+  const deleteChain = { lt: async () => ({ error: { message: 'permission denied' } }) };
+  const fakeSvc = {
+    from: () => ({
+      select: () => countChain,
+      delete: () => deleteChain,
+    }),
+  } as unknown as Parameters<typeof runV1ContactRetention>[0];
+
+  await assert.rejects(runV1ContactRetention(fakeSvc, { apply: true }), /delete faalde/);
+  const dry = await runV1ContactRetention(fakeSvc, { apply: false });
+  assert.equal(dry.candidates, 3);
+  assert.equal(dry.applied, false);
+});
