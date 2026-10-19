@@ -88,3 +88,34 @@ test('contactmails: per org max ORG_DAILY_CONTACT_MAIL_LIMIT per dag, los per or
   assert.equal(await allowOrgContactMailToday('org-a', limiter), false);
   assert.equal(await allowOrgContactMailToday('org-b', limiter), true);
 });
+
+test('limieten: env-override, ongeldige waarde valt terug op de default', async () => {
+  const { visitorDailyQuestionLimit, voorbeeldDailyQuestionLimit, VOORBEELD_DAILY_QUESTION_LIMIT } =
+    await import('../visitor-day-limit');
+  const saved = { a: process.env.VISITOR_DAILY_QUESTION_LIMIT, b: process.env.VOORBEELD_DAILY_QUESTION_LIMIT };
+  try {
+    delete process.env.VISITOR_DAILY_QUESTION_LIMIT;
+    delete process.env.VOORBEELD_DAILY_QUESTION_LIMIT;
+    assert.equal(visitorDailyQuestionLimit(), VISITOR_DAILY_QUESTION_LIMIT);
+    assert.equal(voorbeeldDailyQuestionLimit(), VOORBEELD_DAILY_QUESTION_LIMIT);
+    assert.ok(VOORBEELD_DAILY_QUESTION_LIMIT > VISITOR_DAILY_QUESTION_LIMIT);
+    process.env.VISITOR_DAILY_QUESTION_LIMIT = '70';
+    process.env.VOORBEELD_DAILY_QUESTION_LIMIT = 'abc';
+    assert.equal(visitorDailyQuestionLimit(), 70);
+    assert.equal(voorbeeldDailyQuestionLimit(), VOORBEELD_DAILY_QUESTION_LIMIT);
+  } finally {
+    if (saved.a === undefined) delete process.env.VISITOR_DAILY_QUESTION_LIMIT;
+    else process.env.VISITOR_DAILY_QUESTION_LIMIT = saved.a;
+    if (saved.b === undefined) delete process.env.VOORBEELD_DAILY_QUESTION_LIMIT;
+    else process.env.VOORBEELD_DAILY_QUESTION_LIMIT = saved.b;
+  }
+});
+
+test('demo-bucket staat los van de klant-widget-bucket', async () => {
+  const { checkVoorbeeldDayLimit } = await import('../visitor-day-limit');
+  const limiter = new InMemoryRateLimiter({ maxRequestsPerMin: 2, windowSec: 24 * 60 * 60 });
+  await checkVisitorDayLimit('org-demo', '203.0.113.9', limiter);
+  await checkVisitorDayLimit('org-demo', '203.0.113.9', limiter);
+  assert.equal((await checkVisitorDayLimit('org-demo', '203.0.113.9', limiter)).ok, false);
+  assert.equal((await checkVoorbeeldDayLimit('org-demo', '203.0.113.9', limiter)).ok, true);
+});

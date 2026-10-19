@@ -14,16 +14,41 @@
 // elkaar buiten. Op Vercel is x-forwarded-for er altijd. Sleutels bevatten alleen
 // het gehashte IP (AVG).
 
-import { getDayRateLimiter, type RateLimiter } from '@/lib/v0/server/rate-limit';
+//
+// LET OP, wat dit NIET dekt: rotatie over veel IP's. Een token is nog steeds met curl
+// te halen (de token-route kijkt alleen naar Origin/Referer, en zonder host-binding),
+// dus met ~50 IP's is de maandlimiet (2000 vragen) alsnog in minuten op. De EUR-cap
+// per org is daar géén vangnet: korte vragen zijn zo goedkoop dat de vragenlimiet
+// veel eerder dichtgaat. Deze buckets stoppen één script, niet een gespreide aanval.
+// Open vervolg: org-brede uurlimiet en/of alert bij een burst.
+
+import { getDayRateLimiter, readEnvLimit, type RateLimiter } from '@/lib/v0/server/rate-limit';
 import { hashIp } from '@/lib/observability/hash-ip';
 
 /**
- * Maximum chatvragen per bezoeker (org + IP) per 24 uur. 40 is ruim voor een echt
- * gesprek (doorgaans 1-10 vragen) en voor een klant die zijn eigen widget een middag
- * test, maar één IP kan zo hooguit ~16% van de standaard-daglimiet opmaken. Voor
- * rotatie over veel IP's blijft de EUR-cap per org het vangnet.
+ * Standaard maximum chatvragen per bezoeker (org + IP) per 24 uur op een klant-widget.
+ * 40 is ruim voor een echt gesprek (doorgaans 1-10 vragen) en voor een klant die zijn
+ * eigen widget een middag test, maar één IP kan zo hooguit ~16% van de standaard-
+ * daglimiet opmaken. Bij te stellen via env VISITOR_DAILY_QUESTION_LIMIT (Vercel-
+ * env wijzigen vraagt een redeploy).
  */
 export const VISITOR_DAILY_QUESTION_LIMIT = 40;
+
+/**
+ * Standaard voor de publieke demo /voorbeeld. Hoger, want demo's (sales vanaf één
+ * kantoor-IP, een bedrijf achter één NAT-IP) stellen veel vragen vanaf hetzelfde IP;
+ * de EUR-dagcap + maandlimiet van de demo-org blijven de bovengrens. Env-override:
+ * VOORBEELD_DAILY_QUESTION_LIMIT.
+ */
+export const VOORBEELD_DAILY_QUESTION_LIMIT = 150;
+
+export function visitorDailyQuestionLimit(): number {
+  return readEnvLimit('VISITOR_DAILY_QUESTION_LIMIT', VISITOR_DAILY_QUESTION_LIMIT);
+}
+
+export function voorbeeldDailyQuestionLimit(): number {
+  return readEnvLimit('VOORBEELD_DAILY_QUESTION_LIMIT', VOORBEELD_DAILY_QUESTION_LIMIT);
+}
 
 /** Maximum contactverzoeken per bezoeker (org + IP) per 24 uur. Een mens stuurt er
  *  één, hooguit een correctie; 5 laat ruimte voor een gedeeld kantoor-IP. */
@@ -50,13 +75,24 @@ async function checkPerIp(limiter: RateLimiter, bucket: string, orgId: string, c
   return (await limiter.check(`${bucket}:${orgId}:${ipHash}`)).allowed;
 }
 
-/** Chat: daglimiet per (org, bezoeker-IP). */
+/** Chat (klant-widget): daglimiet per (org, bezoeker-IP). */
 export async function checkVisitorDayLimit(
   orgId: string,
   clientIp: string,
-  limiter: RateLimiter = getDayRateLimiter('org-ip-chat', VISITOR_DAILY_QUESTION_LIMIT),
+  limiter: RateLimiter = getDayRateLimiter('org-ip-chat', visitorDailyQuestionLimit()),
 ): Promise<VisitorDayVerdict> {
   return (await checkPerIp(limiter, 'org-ip-day', orgId, clientIp))
+    ? { ok: true }
+    : { ok: false, message: VISITOR_DAY_LIMIT_MESSAGE };
+}
+
+/** Chat (demo /voorbeeld): eigen, ruimere bucket per (org, bezoeker-IP). */
+export async function checkVoorbeeldDayLimit(
+  orgId: string,
+  clientIp: string,
+  limiter: RateLimiter = getDayRateLimiter('voorbeeld-ip-chat', voorbeeldDailyQuestionLimit()),
+): Promise<VisitorDayVerdict> {
+  return (await checkPerIp(limiter, 'voorbeeld-ip-day', orgId, clientIp))
     ? { ok: true }
     : { ok: false, message: VISITOR_DAY_LIMIT_MESSAGE };
 }

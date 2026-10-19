@@ -183,7 +183,7 @@ let _orgInstance: RateLimiter | null = null;
 let _clientErrorInstance: RateLimiter | null = null;
 let _upstashWarned = false;
 
-function readEnvLimit(envName: string, fallback: number): number {
+export function readEnvLimit(envName: string, fallback: number): number {
   const raw = Number(process.env[envName]);
   return Number.isFinite(raw) && raw > 0 ? raw : fallback;
 }
