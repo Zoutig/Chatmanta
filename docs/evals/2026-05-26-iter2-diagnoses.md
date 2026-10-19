@@ -87,7 +87,7 @@ De #104-bucket `unsupported_claim` (29 cases) splitst in:
 ### §E.5 — handmatige verificatie van het dominante subtype (out_of_corpus_overanswer)
 De judge-reasoning bevestigt dat dit **echt botgedrag** is, geen judge/label-artefact. ≥8 van de 12 zijn ondubbelzinnige hallucinaties — de bot noemt mét stelligheid + `[1]`-citatie een specifiek getal/datum op een out_of_corpus-vraag waarvan de gold = "niet beschikbaar / geen vaste structuur":
 - `v063-hardfact-v2-kwartaal` C=0 G=0 → "Q2 2026" verzonnen
-- `v063-hardfact-tarief-per-gesprek` C=0 G=0 → "€0,07" (= must-not-violation)
+- `v063-hardfact-tarief-per-gesprek` C=0 G=0 → "[intern bedrag]" (= must-not-violation)
 - `v063-hardfact-max-doc-size` C=0 G=0 → "10 MB" (= must-not-violation)
 - `v063-hardfact-grounding-rate` C=0 G=0 → "85%" (= must-not-violation)
 - `v063-hardfact-aantal-pricing-tiers` C=0 G=0 → "vijf tiers" (= must-not-violation)
@@ -133,7 +133,7 @@ Nieuwe `isEchoedHardFact(r)` naast de bestaande `isCalcWarning`: een unsupported
 
 ### Effect + validatie
 - v0.8.1: unsupported-hard-fact **7 → 4** (3× echo-warn). v0.7.3: **8 → 2** (5× echo-warn).
-- **Validatie dat echte hallucinatie HARD fail blíjft:** `out-of-corpus-prijs` (€430, niet in de vraag) → géén echo → blijft gevlagd. De 4 resterende v0.8.1-cases zijn alle berékend/onvindbaar, niet ge-echood.
+- **Validatie dat echte hallucinatie HARD fail blíjft:** `out-of-corpus-prijs` ([intern bedrag], niet in de vraag) → géén echo → blijft gevlagd. De 4 resterende v0.8.1-cases zijn alle berékend/onvindbaar, niet ge-echood.
 
 ### Runtime vs eval-only + aanbeveling
 **Eval-only** is de juiste laag: de echo's zijn een meet-artefact van de hard-fact-verifier (die elk getal in het antwoord eist verbatim in een chunk), niet een botgedrag dat klanten raakt — de bot reflecteert/weigert correct. Een runtime-verifier-wijziging zou een botversie-kandidaat zijn (concurreert in Taak 6), maar is **niet** nodig: de 4 resterende HARD-fails zijn grotendeels untagged tiered-Vpb-calc. **Aanbeveling (label-curatie, niet vannacht):** tag de Vpb-cases (`vpb-tarief-200k`, `mh-bv-vpb-dga-250k`) als `calculation_required` na §E.5-certificering — dan vallen ze onder calc-warn en daalt de echte unsupported-hard-fact verder. Dit is géén gate-versoepeling maar correcte §E.6-classificatie.
