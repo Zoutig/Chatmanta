@@ -562,7 +562,7 @@ function ContactPanel({ s, persist }: { s: V1ChatbotSettings; persist: Persist }
         />
         <Switch
           label="Contactverzoeken aannemen"
-          description="Wil een bezoeker contact, dan biedt je chatbot een kort formulier aan."
+          description="Onder het gesprek komt een knop 'Liever persoonlijk contact?'. De bezoeker vult zelf naam en e-mail of telefoon in; jij krijgt een mail. Na 90 dagen verwijderd."
           checked={d.contactRequestsEnabled}
           onChange={(v) => {
             // Aanzetten = persoonsgegevens verzamelen → eerst bevestigen.
@@ -621,12 +621,17 @@ function ConfirmContactRequests({ onCancel, onConfirm }: { onCancel: () => void;
           Contactverzoeken aanzetten?
         </h2>
         <p className="v1-dialog-body">
-          Wil een bezoeker contact met een mens, dan biedt je chatbot na zijn antwoord een kort formulier
-          aan: naam, contactgegevens en een korte toelichting.
+          Je chatbot toont dan onder het gesprek een knop &lsquo;Liever persoonlijk contact?&rsquo;. Een
+          bezoeker die erop klikt, vult zelf zijn naam, e-mailadres of telefoonnummer en eventueel een
+          onderwerp en bericht in. De chatbot vraagt er niet zelf om.
         </p>
         <p className="v1-dialog-body">
-          Je verzamelt dan persoonsgegevens. Ze staan onder Contactverzoeken en worden na 90 dagen
-          automatisch verwijderd. Verwerk ze volgens de AVG.
+          Van elk verzoek krijg je een mail op het adres bij &lsquo;Meldingen sturen naar&rsquo; (leeg =
+          je account-e-mailadres). Je vindt ze ook onder Contactverzoeken.
+        </p>
+        <p className="v1-dialog-body">
+          Je verzamelt dan persoonsgegevens. Ze worden na 90 dagen automatisch verwijderd. Verwerk ze
+          volgens de AVG.
         </p>
         <div className="v1-dialog-actions">
           <Button variant="ghost" onClick={onCancel} autoFocus>
