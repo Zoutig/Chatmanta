@@ -25,7 +25,8 @@ import {
 } from './unanswered-core';
 
 const SCAN_LIMIT = 1000;
-const IN_CHUNK = 150;
+/** Brokgrootte voor .in(): kleiner houdt ook de 1000-rijen-cap per brok buiten bereik. */
+const IN_CHUNK = 100;
 
 export type UnansweredOverview = {
   /** Alle vragen met een fallback in het venster, open eerst. */
@@ -65,6 +66,7 @@ export async function loadUnanswered(
 ): Promise<UnansweredOverview> {
   try {
     const since = unansweredSinceIso();
+    const userSince = new Date(Date.parse(since) - 60 * 60 * 1000).toISOString();
 
     const { data: fallbackRows, error } = await client
       .from('query_log')
@@ -122,6 +124,11 @@ export async function loadUnanswered(
             .eq('chatbot_id', chatbotId)
             .eq('role', 'user')
             .in('thread_id', ids)
+            // Alleen het venster (+1 uur speling voor de vraag vlak vóór een fallback op
+            // de venstergrens), nieuwste eerst: bij de cap vallen oude berichten weg,
+            // niet willekeurige.
+            .gte('created_at', userSince)
+            .order('created_at', { ascending: false })
             .limit(SCAN_LIMIT),
           client
             .from('threads')

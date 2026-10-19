@@ -859,6 +859,14 @@ export const FIXTURE_QA_QUESTIONS: string[] = [
   'Moeten we zelf beddengoed meenemen?',
 ];
 
+/** De onbeantwoorde demo-vragen. Eén bron voor werklijst, Overzicht én zijbalk-teller
+ *  (lib/voorbeeld/fixtures/shell.ts), zodat die niet uit elkaar kunnen lopen. */
+export const FIXTURE_UNANSWERED_QUESTIONS: { question: string; occurrences: number }[] = [
+  { question: 'Kan ik op het park vissen?', occurrences: 7 },
+  { question: 'Is er een geldautomaat op het park?', occurrences: 4 },
+  { question: 'Kan ik een huisje bekijken voordat ik boek?', occurrences: 3 },
+];
+
 /** Onbeantwoorde vragen voor Overzicht ("Hier wist je chatbot het niet"). */
 export function getFixtureUnanswered(now: Date = new Date()): { question: string; occurrences: number; lastSeenAt: string }[] {
   const built = buildAll(now);
@@ -868,9 +876,5 @@ export function getFixtureUnanswered(now: Date = new Date()): { question: string
       .reduce((max, b) => Math.max(max, b.startedAt.getTime()), 0);
     return new Date(t || now.getTime()).toISOString();
   };
-  return [
-    { question: 'Kan ik op het park vissen?', occurrences: 7 },
-    { question: 'Is er een geldautomaat op het park?', occurrences: 4 },
-    { question: 'Kan ik een huisje bekijken voordat ik boek?', occurrences: 3 },
-  ].map((u) => ({ ...u, lastSeenAt: lastSeen(u.question) }));
+  return FIXTURE_UNANSWERED_QUESTIONS.map((u) => ({ ...u, lastSeenAt: lastSeen(u.question) }));
 }
