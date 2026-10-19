@@ -16,7 +16,13 @@ test('zelfintroductie (NL en EN) → cache overslaan', () => {
   assert.equal(shouldBypassAnswerCache('Mijn naam is Petra, hebben jullie plek?'), true);
   assert.equal(shouldBypassAnswerCache('Hello, I am Sarah from Utrecht'), true);
   assert.equal(shouldBypassAnswerCache('My name is Tom'), true);
-  assert.equal(shouldBypassAnswerCache('IK BEN benieuwd naar de prijzen'), true);
+  assert.equal(shouldBypassAnswerCache('Ik heet Jan en wil een offerte'), true);
+  assert.equal(shouldBypassAnswerCache("I'm Jan, do you deliver?"), true);
+  assert.equal(shouldBypassAnswerCache("I’m Jan"), true);
+  assert.equal(shouldBypassAnswerCache('mijn naam: Jan'), true);
+  assert.equal(shouldBypassAnswerCache('my name Tom, any rooms?'), true);
+  assert.equal(shouldBypassAnswerCache('ik ben jan, wat kost het?'), true);
+  assert.equal(shouldBypassAnswerCache('hoi ik ben jan'), true);
 });
 
 test('gewone vragen blijven cachebaar', () => {
@@ -26,4 +32,12 @@ test('gewone vragen blijven cachebaar', () => {
   assert.equal(shouldBypassAnswerCache('Ham of kaas op de pizza?'), false);
   assert.equal(shouldBypassAnswerCache('Is er een miami-thema?'), false);
   assert.equal(shouldBypassAnswerCache(''), false);
+});
+
+test('"ik ben"/"I am" zonder naam blijft cachebaar (FAQ-pre-cache)', () => {
+  assert.equal(shouldBypassAnswerCache('Ik ben mijn wachtwoord vergeten, wat nu?'), false);
+  assert.equal(shouldBypassAnswerCache('ik ben op zoek naar een huisje voor 4 personen'), false);
+  assert.equal(shouldBypassAnswerCache('Ik ben benieuwd naar de prijzen'), false);
+  assert.equal(shouldBypassAnswerCache('I am looking for parking near the station'), false);
+  assert.equal(shouldBypassAnswerCache("I'm interested in a subscription"), false);
 });
