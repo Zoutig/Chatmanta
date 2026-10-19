@@ -12,9 +12,9 @@
 .site-ui .s-hero h1 .soft { color: var(--teal-ink); }
 .site-ui .s-hero .lede { margin-top: 20px; max-width: 560px; }
 .site-ui .s-hero .hero-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 28px; }
-.site-ui .s-hero .hero-price { margin: 14px 0 0; font-size: 0.9rem; color: var(--muted); }
-.site-ui .s-hero .hero-price a { color: var(--teal-ink); font-weight: 600; text-underline-offset: 3px; }
-.site-ui .s-hero .hero-price a:hover { color: var(--ink); }
+.site-ui .s-hero .hero-terms { margin: 16px 0 0; max-width: 560px; font-size: 0.9rem; line-height: 1.6; color: var(--muted); }
+.site-ui .s-hero .hero-terms a { color: var(--teal-ink); font-weight: 600; text-underline-offset: 3px; }
+.site-ui .s-hero .hero-terms a:hover { color: var(--ink); }
 
 /* Hero-cut-out: navy paneel loopt rechts door tot de schermrand */
 .site-ui .s-hero .hero-stage { position: relative; padding: 28px 0 44px; }
@@ -26,10 +26,6 @@
   overflow: hidden; z-index: 0;
 }
 .site-ui .s-hero .cut-lines { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.site-ui .s-hero .cut-label {
-  position: absolute; bottom: 14px; z-index: 1; color: var(--on-dark-2);
-  right: max(16px, calc(var(--gutter) + max(0px, (100vw - var(--maxw)) / 2)));
-}
 @media (min-width: 1024px) {
   .site-ui .s-hero .hero-stage { padding: 56px 0; }
   .site-ui .s-hero .cutout { left: 14%; }
@@ -41,27 +37,26 @@
 @media (min-width: 640px) and (max-width: 1023px) { .site-ui .s-hero .hero-chat-wrap { margin: 0 auto; } }
 
 /* Mascotte (components/site/mascotte, docs/site/MASCOTTE.md): zwemt boven de chat, rechtsboven
-   op het paneel. De extra padding-top van de stage maakt ruimte zodat hij de chat niet bedekt. */
-.site-ui .s-hero .hero-mascotte { position: absolute; z-index: 2; width: min(70vw, 300px); top: -30px; right: -20px; }
-.site-ui .s-hero .hero-stage { padding-top: 160px; }
+   op het paneel. De extra padding-top van de stage maakt ruimte zodat hij de chat niet bedekt.
+   Mobiel bewust kleiner (ronde "site rustiger", okt 2026): clamp(180px, 52vw, 220px): nooit onder
+   ~180px, want dan wordt het gezicht onleesbaar (MASCOTTE.md). */
+.site-ui .s-hero .hero-mascotte { position: absolute; z-index: 2; width: clamp(180px, 52vw, 220px); top: -24px; right: -12px; }
+.site-ui .s-hero .hero-stage { padding-top: 112px; padding-bottom: 32px; }
 @media (min-width: 1024px) {
   .site-ui .s-hero .hero-mascotte { width: 420px; top: -64px; right: -70px; }
-  .site-ui .s-hero .hero-stage { padding-top: 200px; }
+  .site-ui .s-hero .hero-stage { padding-top: 200px; padding-bottom: 56px; }
 }
 
 /* Typ-engine-staten (alleen actief na hydratie + zonder reduced motion; zie hero/hero-chat.tsx).
    Zonder JS / bij reduced motion ontbreken .prep/.streaming ⇒ volledige eindstand zichtbaar. */
-.site-ui .s-hero .prep .msg,
-.site-ui .s-hero .prep .chip { opacity: 0; transform: translateY(8px); }
-.site-ui .s-hero .prep .chip { transform: translateY(6px) scale(0.92); }
-.site-ui .s-hero .prep .msg.in,
-.site-ui .s-hero .prep .chip.in { opacity: 1; transform: none; }
+.site-ui .s-hero .prep .msg { opacity: 0; transform: translateY(8px); }
+.site-ui .s-hero .prep .msg.in { opacity: 1; transform: none; }
 .site-ui .s-hero .w { transition: opacity 140ms linear; }
 .site-ui .s-hero .streaming .w { opacity: 0; }
 .site-ui .s-hero .streaming .w.on { opacity: 1; }
 
 @media (max-width: 639px) {
-  .site-ui .s-hero { padding-top: 20px; }
+  .site-ui .s-hero { padding-top: 20px; padding-bottom: 32px; }
   .site-ui .s-hero h1 { font-size: 2.3rem; }
   .site-ui .s-hero .lede { font-size: 1rem; margin-top: 14px; }
   .site-ui .s-hero .hero-ctas { margin-top: 20px; }

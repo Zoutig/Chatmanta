@@ -8,6 +8,12 @@
 }
 .site-ui .s-demo .lede { margin-top: 16px; }
 .site-ui .s-demo .demo-cta { margin-top: 26px; }
+/* Op een telefoon is de knop zelf het bewijs; de nagebouwde browser (decoratief) kost
+   daar bijna een scherm en herhaalt het voorbeeldgesprek uit de hero. */
+@media (max-width: 639px) {
+  .site-ui .s-demo .browser { display: none; }
+  .site-ui .s-demo .demo-cta { width: 100%; }
+}
 
 /* Browser-frame */
 .site-ui .s-demo .browser {

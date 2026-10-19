@@ -36,9 +36,11 @@
   position: absolute; left: 0; right: 0; bottom: 0; height: var(--sea-h);
   z-index: -1; pointer-events: none;
 }
-.site-ui .s-final .final-card { padding-bottom: calc(var(--pad-y) + 120px); }
+/* < 960px: geen zee-strook meer (gaf ±200px lege navy ruimte op mobiel, ronde "site rustiger"). */
+@media (max-width: 959px) {
+  .site-ui .s-final .final-sea { display: none; }
+}
 @media (min-width: 960px) {
-  .site-ui .s-final .final-card { padding-bottom: var(--pad-y); }
   .site-ui .s-final .final-sea { left: auto; top: 0; height: auto; width: 42%; }
   .site-ui .s-final .final-copy { max-width: min(600px, 54%); }
 }

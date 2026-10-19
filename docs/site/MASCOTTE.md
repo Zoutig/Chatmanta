@@ -52,12 +52,12 @@ api.lookAt(element, 900); api.setMode('happy'); api.wink(); api.stop();
 
 `speak` maakt een tijdlijn van lettergrepen (~5 per seconde; klinkergroep → mondvorm: a → ah, o → oh, e/i/ij → ee, oe/u/ui/eu → oo) met pauzes bij leestekens. `onWord` vuurt per witruimte-gescheiden woord, dus je kunt de tekst in hetzelfde tempo laten verschijnen. Voorbeeld: de rondleiding op /voorbeeld (`app/voorbeeld/(dashboard)/_overview/voorbeeld-tour.tsx`), via de optionele `narration`-prop van `OnboardingTour`.
 
-Voorbeeld van een complete choreografie: `components/site/sections/hero/hero-chat.tsx` (vraag lezen → nadenken tijdens typen → meepraten met het antwoord → blij naar de bronvermelding kijken).
+Voorbeeld van een complete choreografie: `components/site/sections/hero/hero-chat.tsx` (vraag lezen → nadenken tijdens typen → meepraten met het antwoord → tevreden naar het antwoord kijken). De bron-chip is daar weg (okt 2026: V1 toont geen bronlinks). In de hero is hij op mobiel bewust kleiner: `clamp(180px, 52vw, 220px)` (`hero.css`), dus nooit onder het minimum van ~180px.
 
 ## Ontwerpregels
 
 - **Achtergrond:** hij is gemaakt voor de navy vlakken (`--ink`, `--navy-hi`). Op licht kan, maar de zachte gloed rond het lichaam valt dan weg; test het.
-- **Grootte:** minimaal ~180 px breed (gezicht moet leesbaar blijven); in de hero 300 px mobiel, 420 px desktop.
+- **Grootte:** minimaal ~180 px breed (gezicht moet leesbaar blijven); in de hero 180-220 px mobiel (`clamp(180px, 52vw, 220px)`), 420 px desktop.
 - **Eén signatuurmoment per sectie** (zie `CONTRACT.md` §6). De mascotte is een bijrol: hij mag tekst of knoppen nooit bedekken.
 - **Niet zelf tekenen of hertekenen.** Nieuwe uitdrukkingen = combinaties van bestaande mond-/ooglidstanden. Nieuwe poses (andere lichaamshouding) moeten als nieuw bronmateriaal komen, op exact dezelfde canvas (1536×1024) en houding als `mascotte_zonder_gezicht.png`, anders past de face-rig niet.
 - **Het logo blijft het logo.** De mascotte vervangt `Mark`/`Logo` niet (`CONTRACT.md` §3).

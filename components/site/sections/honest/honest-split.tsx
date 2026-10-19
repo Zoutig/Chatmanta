@@ -121,6 +121,10 @@ function Typing({ on }: { on: boolean }) {
  * Eén keer afgespeeld bij in beeld, beide tegelijk (ChatManta 300ms later).
  * Content-first: SSR toont de eindstand; pas ná hydratie (en zonder reduced motion)
  * gaat het naar de verborgen beginstand. Typen is visueel (aria-live="off").
+ *
+ * De contactknop onder het eerlijke antwoord is een ILLUSTRATIE van de echte widgetknop
+ * ("Liever persoonlijk contact?", opt-in per klant), geen nep-actie: hij doet hier niets
+ * en is daarom ook geen <button>.
  */
 export function HonestSplit({
   question,
@@ -128,7 +132,6 @@ export function HonestSplit({
   good,
   note,
   callback,
-  callbackDone,
   badLabel,
   goodLabel,
 }: {
@@ -137,7 +140,6 @@ export function HonestSplit({
   good: Seg[];
   note: string;
   callback: string;
-  callbackDone: string;
   badLabel: ReactNode;
   goodLabel: ReactNode;
 }) {
@@ -147,7 +149,6 @@ export function HonestSplit({
   // Beginstand = verborgen; wordt pas gebruikt ná hydratie en zonder reduced motion (zie `view`).
   const [b, setB] = useState<SideState>(PREP);
   const [g, setG] = useState<SideState>(PREP);
-  const [done, setDone] = useState(false);
   const animate = hydrated && !reduce;
 
   useEffect(() => {
@@ -219,26 +220,13 @@ export function HonestSplit({
             {note}
           </span>
         ) : (
-          <button
-            type="button"
-            className={cx('btn btn-outline callback', s.extra && 'in', done && 'done')}
-            // Nog onzichtbaar (prep, vóór de animatie)? Dan ook niet focusbaar/voorgelezen.
-            tabIndex={s.prep && !s.extra ? -1 : undefined}
-            aria-hidden={s.prep && !s.extra ? true : undefined}
-            onClick={() => setDone(true)}
-          >
-            <span className="lbl">{callback}</span>
-            <span className="ok">
-              <Icon name="check" />
-              {callbackDone}
-            </span>
-          </button>
-        )}
-        {kind === 'good' ? (
-          <span className="sr-only" role="status">
-            {done ? callbackDone : ''}
+          // Illustratie van de contactknop in de widget (geen echte knop, dus cursor:default en een
+          // sr-only-voorvoegsel); nog onzichtbaar (prep)? Dan ook niet voorgelezen.
+          <span className={cx('callback', s.extra && 'in')} aria-hidden={s.prep && !s.extra ? true : undefined}>
+            <span className="sr-only">Knop in de chat: </span>
+            {callback}
           </span>
-        ) : null}
+        )}
       </div>
     </div>
   );

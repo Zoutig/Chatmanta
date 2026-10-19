@@ -1,9 +1,10 @@
-// chatmanta.nl — de marketing-landingspagina. Volgorde = spec §5 / mockup-final.
+// chatmanta.nl — de marketing-landingspagina. De volgorde komt uit PAGE_ORDER in lib/site/navigation.ts
+// (ronde "site rustiger", okt 2026: 12 → 8 secties, bewijs en "eerlijk" vooraan).
 // Secties leven in components/site/sections/* (contract: docs/site/CONTRACT.md);
 // dit bestand stelt ze alleen samen.
 
+import type { ComponentType } from 'react';
 import type { Metadata } from 'next';
-import DashboardShowcase from '@/components/site/sections/dashboard-showcase';
 import Faq from '@/components/site/sections/faq';
 import Features from '@/components/site/sections/features';
 import FinalCta from '@/components/site/sections/final-cta';
@@ -12,10 +13,20 @@ import Honest from '@/components/site/sections/honest';
 import HowItWorks from '@/components/site/sections/how-it-works';
 import LiveDemo from '@/components/site/sections/live-demo';
 import Pricing from '@/components/site/sections/pricing';
-import Problem from '@/components/site/sections/problem';
-import RoiCalculator from '@/components/site/sections/roi-calculator';
-import TrustStrip from '@/components/site/sections/trust-strip';
+import { PAGE_ORDER, type SectionKey } from '@/lib/site/navigation';
 import { homeJsonLd } from '@/lib/site/structured-data';
+
+/** Component per sectie. De rekenhulp ('roi') is geen eigen sectie: die zit in Prijzen. */
+const SECTIONS: Record<Exclude<SectionKey, 'roi'>, ComponentType> = {
+  hero: Hero,
+  honest: Honest,
+  demo: LiveDemo,
+  how: HowItWorks,
+  features: Features,
+  pricing: Pricing,
+  faq: Faq,
+  finalCta: FinalCta,
+};
 
 // Canonical alleen hier (niet in de layout: subpagina's zouden hem anders erven).
 export const metadata: Metadata = {
@@ -29,18 +40,11 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd()).replace(/</g, '\\u003c') }}
       />
-      <Hero />
-      <TrustStrip />
-      <Problem />
-      <HowItWorks />
-      <Features />
-      <Honest />
-      <DashboardShowcase />
-      <RoiCalculator />
-      <Pricing />
-      <LiveDemo />
-      <Faq />
-      <FinalCta />
+      {PAGE_ORDER.map((key) => {
+        if (key === 'roi') return null;
+        const Sec = SECTIONS[key];
+        return <Sec key={key} />;
+      })}
     </>
   );
 }

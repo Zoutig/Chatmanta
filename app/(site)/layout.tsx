@@ -13,7 +13,7 @@ import './site.css';
 // preflight voorheen leverde staat nu in site.css (@layer site-base).
 
 const DESCRIPTION =
-  'ChatManta: de Nederlandse website-chatbot die alleen antwoordt uit jouw eigen website en documenten, met bron erbij.';
+  'ChatManta: de Nederlandse website-chatbot die alleen antwoordt uit jouw eigen website en documenten, en eerlijk zegt wanneer hij iets niet weet.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

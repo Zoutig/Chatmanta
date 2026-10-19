@@ -4,7 +4,7 @@
    - Tokens + gedeelde klassen (knoppen, chatvenster, logo, …) staan in app/(site)/site.css.
    Port van mockup-final §7 ("EERLIJK"). Navy-achtergrond + koppen komen van .sec-dark. */
 
-.site-ui .s-honest .sec-head .lede { max-width: 680px; margin-left: auto; margin-right: auto; }
+.site-ui .s-honest .sec-head .lede { max-width: 640px; }
 
 .site-ui .s-honest .split { display: grid; gap: 18px; }
 .site-ui .s-honest .split > * { min-width: 0; }
@@ -30,16 +30,8 @@
 .site-ui .s-honest .fake-note { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.78rem; font-weight: 600; color: var(--warn-dark); background: rgba(251, 146, 60, 0.12); border: 1px solid rgba(253, 186, 116, 0.3); padding: 4px 10px; border-radius: 6px; transition: opacity var(--base) var(--ease), transform var(--base) var(--ease); }
 .site-ui .s-honest .fake-note svg { width: 13px; height: 13px; }
 
-/* bel-me-terug-knop (outline, op navy) */
-.site-ui .s-honest .callback { align-self: flex-start; margin-top: 10px; --h: 44px; font-size: 0.88rem; background: transparent; color: var(--aqua-pale); border-color: rgba(94, 234, 212, 0.55); box-shadow: none; transition: opacity var(--base) var(--ease), transform 420ms var(--spring), border-color var(--fast) var(--ease), color var(--fast) var(--ease); }
-.site-ui .s-honest .callback:focus-visible { box-shadow: var(--focus-dark); }
-.site-ui .s-honest .callback:hover { border-color: var(--aqua-hi); color: #fff; }
-.site-ui .s-honest .callback .ok { display: none; align-items: center; gap: 6px; }
-.site-ui .s-honest .callback.done .ok { display: inline-flex; }
-.site-ui .s-honest .callback.done .lbl { display: none; }
-.site-ui .s-honest .callback .ok svg { width: 16px; height: 16px; }
-.site-ui .s-honest .callback .ok path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: honest-draw 320ms var(--ease) forwards; }
-@keyframes honest-draw { to { stroke-dashoffset: 0; } }
+/* contactknop van de widget (illustratie, niet klikbaar) */
+.site-ui .s-honest .callback { cursor: default; align-self: flex-start; margin-top: 10px; padding: 7px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: var(--aqua-pale); border: 1px solid rgba(94, 234, 212, 0.45); transition: opacity var(--base) var(--ease), transform var(--base) var(--ease); }
 
 /* typ-engine-staten (alleen na hydratie, zonder reduced motion) */
 .site-ui .s-honest .prep .msg { opacity: 0; transform: translateY(8px); }
@@ -54,7 +46,9 @@
 .site-ui .s-honest .streaming .w { opacity: 0; }
 .site-ui .s-honest .streaming .w.on { opacity: 1; }
 
-/* belofte-strook */
-.site-ui .s-honest .strip { list-style: none; margin: 32px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: center; font-size: 0.92rem; font-weight: 600; color: var(--on-dark); }
+/* vertrouwensregels (voorheen de losse trust-strook onder de hero) */
+.site-ui .s-honest .strip { list-style: none; margin: 28px 0 0; padding: 22px 0 0; border-top: 1px solid var(--line-dark); display: grid; grid-template-columns: 1fr; gap: 10px 28px; font-size: 0.9rem; font-weight: 600; color: var(--on-dark); }
+@media (min-width: 540px) { .site-ui .s-honest .strip { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 960px) { .site-ui .s-honest .strip { display: flex; flex-wrap: wrap; justify-content: space-between; } }
 .site-ui .s-honest .strip li { display: inline-flex; align-items: center; gap: 8px; }
 .site-ui .s-honest .strip svg { width: 16px; height: 16px; color: var(--aqua-hi); flex: none; }

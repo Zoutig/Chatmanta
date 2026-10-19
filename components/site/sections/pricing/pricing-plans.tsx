@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useLayoutEffect,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from 'react';
 import { ROUTES } from '@/lib/site/navigation';
 import {
   PRICING,
@@ -9,22 +17,37 @@ import {
   dayFraming,
   formatEuro,
   formatNumber,
-  getTier,
   monthlyPrice,
-  roundTo,
-  staffCostPerMonth,
   type BillingCycle,
   type Tier,
+  type TierId,
 } from '@/lib/site/pricing';
 import { Icon } from '../../ui/icon';
 import { useReducedMotion } from '../../ui/motion-hooks';
 import { LinkButton } from '../../ui/button';
 import { cx } from '../../ui/cx';
+import { tabIndexForKey } from './tab-keys';
 
 // useLayoutEffect geeft een waarschuwing op de server; daar is meten toch niet nodig.
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-const nlDecimal = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 });
+/** Onder deze breedte staan de kaarten onder elkaar → dan één kaart tegelijk via tabs. Gelijk aan pricing.css. */
+const STACKED_MQ = '(max-width: 979px)';
+
+function subscribeStacked(cb: () => void) {
+  const mq = window.matchMedia(STACKED_MQ);
+  mq.addEventListener('change', cb);
+  return () => mq.removeEventListener('change', cb);
+}
+
+/** true op smalle schermen (na hydratie). Server/hydratie: false ⇒ alle kaarten (werkt zonder JS). */
+function useStacked(): boolean {
+  return useSyncExternalStore(
+    subscribeStacked,
+    () => window.matchMedia(STACKED_MQ).matches,
+    () => false,
+  );
+}
 
 /** Prijsrol: oud getal rolt omhoog weg, nieuw komt van onder (mockup `rollTo`). CSS-keyframes
  *  in pricing.css; het oude getal blijft één animatieduur staan en verdwijnt dan. */
@@ -62,14 +85,36 @@ function Roll({ value, widthCh, animate }: { value: number; widthCh: number; ani
   );
 }
 
-function PlanCard({ tier, cycle, toggled, animate }: { tier: Tier; cycle: BillingCycle; toggled: number; animate: boolean }) {
+function PlanCard({
+  tier,
+  cycle,
+  toggled,
+  animate,
+  panel,
+}: {
+  tier: Tier;
+  cycle: BillingCycle;
+  toggled: number;
+  animate: boolean;
+  /** Alleen gezet in tab-modus (smal scherm + JS). */
+  panel?: { active: boolean };
+}) {
   const intro = monthlyPrice(tier, cycle, 'intro');
   const normal = monthlyPrice(tier, cycle, 'normal');
   // vaste breedte per kaart (langste bedrag over beide ritmes) → geen verspringen bij rollen
   const digits = Math.max(String(tier.intro.yearly).length, String(tier.intro.monthly).length);
   const headId = `pn-${tier.id}`;
   return (
-    <article className={cx('plan', tier.featured && 'groei')} data-plan={tier.id} aria-labelledby={headId}>
+    <article
+      className={cx('plan', tier.featured && 'groei')}
+      data-plan={tier.id}
+      id={`plan-${tier.id}`}
+      // Tab-modus: het paneel wordt gelabeld door zijn tab (WAI-ARIA APG), anders door de kop.
+      aria-labelledby={panel ? `plan-tab-${tier.id}` : headId}
+      // Smal scherm + JS: één kaart tegelijk; de kaart is dan het paneel van zijn tab.
+      role={panel ? 'tabpanel' : undefined}
+      hidden={panel ? !panel.active : undefined}
+    >
       {tier.badge ? <span className="badge-top">{tier.badge}</span> : null}
       <h3 id={headId}>{tier.name}</h3>
       <p className="who">{tier.who}</p>
@@ -151,10 +196,25 @@ function PlanCard({ tier, cycle, toggled, animate }: { tier: Tier; cycle: Billin
 }
 
 /**
- * Kostenvergelijking + toggle (jaarlijks/maandelijks) + de drie pakketkaarten.
- * SSR rendert de jaarlijkse bedragen in de HTML (werkt zonder JS); JS doet alleen de toggle.
+ * Toggle (jaarlijks/maandelijks) + de drie pakketkaarten.
+ * SSR rendert de jaarlijkse bedragen in de HTML (werkt zonder JS); JS doet de toggle.
+ * Smal scherm (<980px) + JS: Start/Groei/Compleet-tabs boven één kaart tegelijk, Groei
+ * voorgeselecteerd (scheelt op mobiel ±2 schermhoogtes). Zonder JS: kaarten onder elkaar.
+ * De "medewerker kost ±€X"-regel die hier stond is opgegaan in de uitklapbare rekenhulp.
  */
 export function PricingPlans() {
+  const stacked = useStacked();
+  const [activePlan, setActivePlan] = useState<TierId>((TIERS.find((t) => t.featured) ?? TIERS[0]).id);
+  const planBarRef = useRef<HTMLDivElement>(null);
+  const onPlanKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const ni = tabIndexForKey(e.key, TIERS.findIndex((t) => t.id === activePlan), TIERS.length);
+    if (ni === null) return;
+    e.preventDefault();
+    const next = TIERS[ni];
+    setActivePlan(next.id);
+    planBarRef.current?.querySelector<HTMLButtonElement>(`[data-plan-tab="${next.id}"]`)?.focus();
+  };
+
   const reduce = useReducedMotion();
   const [cycle, setCycle] = useState<BillingCycle>(PRICING.defaultCycle);
   const [toggled, setToggled] = useState(0);
@@ -198,21 +258,11 @@ export function PricingPlans() {
     setToggled((n) => n + 1);
   };
 
-  const groei = getTier('groei');
-  const staff = roundTo(staffCostPerMonth(), 50);
-  const sc = PRICING.staffComparison;
-  // DOM-volgorde = Start · Groei · Compleet; op mobiel zet CSS (`order:-1`) Groei bovenaan.
+  // DOM-volgorde = Start · Groei · Compleet; zonder JS op mobiel zet CSS (`order:-1`) Groei bovenaan.
   const animate = toggled > 0 && !reduce;
 
   return (
     <>
-      <p className="compare-cost">
-        Een medewerker die {sc.hoursPerDay} uur per dag klantvragen beantwoordt, kost{' '}
-        <b>±{formatEuro(staff)} per maand</b>. {groei.name}: <b>{formatEuro(monthlyPrice(groei, cycle))}</b>.
-        <small>
-          Aanname: {formatEuro(sc.hourlyRate)}/uur × {nlDecimal.format(sc.workdaysPerMonth)} werkdagen.
-        </small>
-      </p>
       <div className="toggle-wrap">
         <div className={cx('toggle', pillReady && 'is-ready')} role="group" aria-label="Facturering" ref={toggleRef}>
           <span className="pill" ref={pillRef} aria-hidden="true" />
@@ -224,9 +274,38 @@ export function PricingPlans() {
           </button>
         </div>
       </div>
-      <div className="plans">
+      {stacked ? (
+        <div className="plan-tabs" role="tablist" aria-label="Kies een pakket" ref={planBarRef} onKeyDown={onPlanKey}>
+          {TIERS.map((t) => {
+            const on = t.id === activePlan;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                id={`plan-tab-${t.id}`}
+                data-plan-tab={t.id}
+                aria-controls={`plan-${t.id}`}
+                aria-selected={on}
+                tabIndex={on ? 0 : -1}
+                onClick={() => setActivePlan(t.id)}
+              >
+                {t.name}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      <div className={cx('plans', stacked && 'is-tabbed')}>
         {TIERS.map((tier) => (
-          <PlanCard key={tier.id} tier={tier} cycle={cycle} toggled={toggled} animate={animate} />
+          <PlanCard
+            key={tier.id}
+            tier={tier}
+            cycle={cycle}
+            toggled={toggled}
+            animate={animate}
+            panel={stacked ? { active: tier.id === activePlan } : undefined}
+          />
         ))}
       </div>
     </>

@@ -1,4 +1,4 @@
-import { SECTION_IDS } from '@/lib/site/navigation';
+import { LEGACY_SECTION_IDS, SECTION_IDS } from '@/lib/site/navigation';
 import { Icon } from '../ui/icon';
 import { Reveal } from '../ui/reveal';
 import { Section, SectionHead } from '../ui/section';
@@ -9,25 +9,29 @@ const QUESTION = 'Kunnen jullie zaterdag nog een monteur sturen?';
 const BAD: Seg[] = [{ text: 'Ja hoor, ' }, { text: 'zaterdag komt er een monteur tussen 8 en 12 uur!', mark: true }];
 const GOOD: Seg[] = [
   {
-    text: 'Daar kan ik je helaas geen zeker antwoord op geven, want ik zie op de website geen zaterdagservice. Zal ik je gegevens doorgeven, zodat we je maandag meteen bellen?',
+    text: 'Dat kan ik niet met zekerheid zeggen: op de website staat niets over een zaterdagservice. Neem gerust contact op, dan wordt het voor je nagekeken.',
   },
 ];
 
 /**
- * §7 Liever eerlijk dan verzonnen — donkere nacht-sectie, het contrastmoment van de pagina:
- * een gewone chatbot (verzint) naast ChatManta (eerlijk). Signatuurmoment: beide gesprekken
- * spelen één keer bij in beeld; de verzonnen zin krijgt een oranje markering.
+ * Probleem + "Liever eerlijk dan verzonnen" in één donkere sectie (vroeger twee secties:
+ * Probleem met drie kaarten + inbox, en Eerlijk). De lede noemt het probleem, de split laat
+ * het verschil zien: een gewone chatbot (verzint) naast ChatManta (eerlijk). Eronder de
+ * vertrouwensregels die eerst een eigen strook onder de hero hadden.
+ *
+ * Eerlijk over het product: GEEN bronlinks (V1 toont die niet, hard rule 9) en geen bot die
+ * zelf om gegevens vraagt; contact loopt via de (opt-in) contactknop in de widget.
  */
 export default function Honest() {
   return (
     <Section id={SECTION_IDS.honest} variant="dark" className="s-honest" labelledBy="h-honest">
+      {/* Alias voor oude links naar de vervallen probleem-sectie. */}
+      <span id={LEGACY_SECTION_IDS.problem} aria-hidden="true" />
       <Reveal>
         <SectionHead
-          center
-          eyebrow="Ons uitgangspunt"
           titleId="h-honest"
           title="Liever eerlijk dan verzonnen."
-          lede="Veel chatbots doen alsof ze alles weten. Dan verzinnen ze een levertijd, een prijs of een garantie die niet bestaat, en jij moet het uitleggen. ChatManta werkt anders: hij antwoordt alleen met wat er in jouw website en documenten staat. Staat het er niet? Dan zegt hij dat gewoon en biedt hij aan om je klant met jou in contact te brengen."
+          lede="Je klanten stellen hun vragen ook als jij er niet bent. Veel chatbots vullen dat gat met een verzonnen levertijd, prijs of garantie. ChatManta antwoordt alleen met wat er op jouw website en in je documenten staat. Staat het er niet, dan zegt hij dat."
         />
       </Reveal>
       <HonestSplit
@@ -35,8 +39,7 @@ export default function Honest() {
         bad={BAD}
         good={GOOD}
         note="Staat nergens op de site"
-        callback="Ja, bel me terug"
-        callbackDone="Doorgegeven"
+        callback="Liever persoonlijk contact?"
         badLabel={
           <>
             <Icon name="info" />
@@ -45,18 +48,22 @@ export default function Honest() {
         }
         goodLabel="ChatManta"
       />
-      <ul className="strip">
+      <ul className="strip" id={LEGACY_SECTION_IDS.trust} aria-label="Waarom je ChatManta kunt vertrouwen">
         <li>
-          <Icon name="check" />
-          Alleen uit jouw content
+          <Icon name="shieldCheck" />
+          Antwoordt alleen uit jouw content
         </li>
         <li>
-          <Icon name="check" />
-          Altijd met bronlink
+          <Icon name="globe" />
+          Opgeslagen in Europa
         </li>
         <li>
-          <Icon name="check" />
-          Weet hij het niet, dan zegt hij het
+          <Icon name="docCheck" />
+          Verwerkersovereenkomst beschikbaar
+        </li>
+        <li>
+          <Icon name="chat" />
+          Volledig Nederlands
         </li>
       </ul>
     </Section>
