@@ -1,4 +1,4 @@
-// Unit-test voor de daglimiet per bezoeker (security-audit 2026-10, #4). Draait met
+// Unit-test voor de daglimieten op publieke V1-paden (security-audit 2026-10, #4/#5). Draait met
 // een in-memory limiter met dagvenster (geen Upstash nodig). Run:
 //   node --import tsx --conditions=react-server --test lib/v1/limits/__tests__/visitor-day-limit.test.ts
 
@@ -6,7 +6,11 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { InMemoryRateLimiter, type RateLimiter } from '@/lib/v0/server/rate-limit';
 import {
+  allowOrgContactMailToday,
+  allowVisitorContactToday,
   checkVisitorDayLimit,
+  ORG_DAILY_CONTACT_MAIL_LIMIT,
+  VISITOR_DAILY_CONTACT_LIMIT,
   VISITOR_DAILY_QUESTION_LIMIT,
   VISITOR_DAY_LIMIT_MESSAGE,
 } from '../visitor-day-limit';
@@ -65,4 +69,22 @@ test('InMemoryRateLimiter: windowSec bepaalt het venster (default blijft 60 s)',
   const minute = new InMemoryRateLimiter({ maxRequestsPerMin: 1 });
   const m = await minute.check('k');
   assert.ok(m.resetAt - Date.now() <= 60_000);
+});
+
+test('contactformulier: per (org, IP) max VISITOR_DAILY_CONTACT_LIMIT per dag', async () => {
+  const limiter = new InMemoryRateLimiter({ maxRequestsPerMin: VISITOR_DAILY_CONTACT_LIMIT, windowSec: 86_400 });
+  for (let i = 0; i < VISITOR_DAILY_CONTACT_LIMIT; i++) {
+    assert.equal(await allowVisitorContactToday('org-a', '198.51.100.1', limiter), true);
+  }
+  assert.equal(await allowVisitorContactToday('org-a', '198.51.100.1', limiter), false);
+  assert.equal(await allowVisitorContactToday('org-a', '198.51.100.2', limiter), true);
+});
+
+test('contactmails: per org max ORG_DAILY_CONTACT_MAIL_LIMIT per dag, los per org', async () => {
+  const limiter = new InMemoryRateLimiter({ maxRequestsPerMin: ORG_DAILY_CONTACT_MAIL_LIMIT, windowSec: 86_400 });
+  for (let i = 0; i < ORG_DAILY_CONTACT_MAIL_LIMIT; i++) {
+    assert.equal(await allowOrgContactMailToday('org-a', limiter), true);
+  }
+  assert.equal(await allowOrgContactMailToday('org-a', limiter), false);
+  assert.equal(await allowOrgContactMailToday('org-b', limiter), true);
 });

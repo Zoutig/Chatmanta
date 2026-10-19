@@ -276,24 +276,27 @@ export function getClientErrorRateLimiter(): RateLimiter {
   return _clientErrorInstance;
 }
 
-let _orgIpDayInstance: RateLimiter | null = null;
+const _dayInstances = new Map<string, RateLimiter>();
 
 /**
- * Dagbucket per (org, bezoeker-IP) voor het publieke V1-chatpad (security-audit
- * 2026-10, #4). De per-IP-limiter telt per minuut; zonder daggrens kan één IP de
- * daglimiet van een klant (250 vragen) in minuten opmaken en de widget voor alle
- * echte bezoekers platleggen. Sleutel: `org-ip-day:<orgId>:<ipHash>` (gehasht IP).
- * `limitPerDay` komt uit lib/v1/limits/visitor-day-limit.ts. Zelfde fail-safe als
- * de andere limiters (Upstash-storing → per-instance in-memory, nooit een 500).
+ * Dagbucket (sliding window van 24 uur) voor publieke V1-paden (security-audit
+ * 2026-10, #4/#5). De andere limiters tellen per minuut; zonder daggrens kan één
+ * script de daglimiet van een klant in minuten opmaken of de klant met
+ * contactmails bestoken. Eén Upstash-prefix per `bucket` (bv. 'org-ip-chat'), zodat
+ * de tellers los van elkaar staan. De limieten zelf staan bij de aanroeper
+ * (lib/v1/limits/visitor-day-limit.ts). Zelfde fail-safe als de andere limiters
+ * (Upstash-storing → per-instance in-memory, nooit een 500).
  */
-export function getOrgIpDayRateLimiter(limitPerDay: number): RateLimiter {
-  if (_orgIpDayInstance) return _orgIpDayInstance;
-  _orgIpDayInstance = buildLimiter({
+export function getDayRateLimiter(bucket: string, limitPerDay: number): RateLimiter {
+  const existing = _dayInstances.get(bucket);
+  if (existing) return existing;
+  const limiter = buildLimiter({
     limit: limitPerDay,
-    prefix: '@chatmanta/rl-org-ip-day',
+    prefix: `@chatmanta/rl-day-${bucket}`,
     windowSec: 24 * 60 * 60,
   });
-  return _orgIpDayInstance;
+  _dayInstances.set(bucket, limiter);
+  return limiter;
 }
 
 const _firecrawlInstances = new Map<string, RateLimiter>();
