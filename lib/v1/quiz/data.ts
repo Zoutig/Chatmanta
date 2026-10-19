@@ -480,16 +480,31 @@ export async function createAnswer(
   return mapAnswer(data as AnswerRow);
 }
 
+/**
+ * Koppel het KB-document aan het antwoord, maar alleen als er nog geen koppeling is
+ * (conditionele update = claim). Zo levert een gelijktijdige retry nooit twee
+ * gekoppelde documenten op. @returns true als déze aanroep de koppeling zette;
+ * false = een ander proces was eerder (of de update faalde) → de caller ruimt zijn
+ * eigen, nu overbodige document op.
+ */
 export async function setAnswerIngestedDoc(
   client: SupabaseClient,
   answerId: string,
   documentId: string,
-): Promise<void> {
-  const { error } = await client
+  organizationId: string,
+): Promise<boolean> {
+  const { data, error } = await client
     .from(ANSWERS)
     .update({ ingested_document_id: documentId })
-    .eq('id', answerId);
-  if (error) console.error('[v1:setAnswerIngestedDoc]', error.message);
+    .eq('id', answerId)
+    .eq('organization_id', organizationId)
+    .is('ingested_document_id', null)
+    .select('id');
+  if (error) {
+    console.error('[v1:setAnswerIngestedDoc]', error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
 }
 
 export async function listAnswers(client: SupabaseClient, quizId: string): Promise<QuizAnswer[]> {

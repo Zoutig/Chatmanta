@@ -18,6 +18,7 @@ import {
   type QuestionConversationHit,
 } from '../top-questions-actions';
 import { CurrentBotAnswer } from '@/app/v1/app/kennisbank/qa/current-bot-answer';
+import { QASavedNotice } from '@/app/v1/app/kennisbank/qa/qa-saved-notice';
 import { List, ListRow } from '@/app/v1/_ui/list';
 import { Badge, EmptyState } from '@/app/v1/_ui/feedback';
 import { Button } from '@/app/v1/_ui/button';
@@ -52,6 +53,8 @@ export function TopQuestionsTab({
     () => new Set(existingQAQuestions.map((q) => q.trim().toLowerCase())),
   );
   const [saving, startSave] = useTransition();
+  const [saved, setSaved] = useState<{ question: string; notIngested: boolean } | null>(null);
+  const closeSaved = useCallback(() => setSaved(null), []);
 
   const [drilldown, setDrilldown] = useState<KlantFaqRow | null>(null);
   const [hits, setHits] = useState<QuestionConversationHit[] | null>(null);
@@ -82,7 +85,7 @@ export function TopQuestionsTab({
       if (res.ok) {
         setSavedKeys((prev) => new Set(prev).add(question.toLowerCase()));
         setDrafting(null);
-        toast.success('Toegevoegd aan je Q&A');
+        setSaved({ question, notIngested: res.notIngested === true });
       } else {
         toast.error(res.error ?? 'Kon de Q&A niet opslaan.');
       }
@@ -109,6 +112,7 @@ export function TopQuestionsTab({
 
   return (
     <div className="v1-stack">
+      {saved ? <QASavedNotice question={saved.question} notIngested={saved.notIngested} onClose={closeSaved} /> : null}
       <p className="v1-hint">
         Vragen die minstens {config.minCount}× zijn gesteld, gegroepeerd op betekenis · top {items.length} van
         max {config.topN}

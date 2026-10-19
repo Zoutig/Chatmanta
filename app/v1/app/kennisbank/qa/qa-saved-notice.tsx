@@ -1,0 +1,96 @@
+'use client';
+
+// Bevestiging na het opslaan van een Q&A: wat er nu gebeurt + een weg naar de
+// bestaande testchat (Bekijk chatbot). Bewust een link en geen automatische test:
+// elke testvraag is een echte (billable) chatbot-call die meetelt voor de limieten.
+// Gebruikt door Kennisbank › Q&A, Gesprekken › Meest gesteld en › Wist je chatbot niet.
+//
+// Toegankelijkheid: de melding staat in een live region (role=status) en krijgt bij
+// verschijnen de focus + wordt in beeld gescrold. Zo hoort een screenreader de
+// bevestiging (de focus zat net in het gesloten zijpaneel) en ziet wie ver in een
+// lange lijst gescrold is hem ook.
+
+import { useEffect, useRef, type ReactNode } from 'react';
+import Link from 'next/link';
+import { AttentionBlock } from '@/app/v1/_ui/feedback';
+import { Button, buttonClass } from '@/app/v1/_ui/button';
+
+export const PREVIEW_HREF = '/v1/app/preview';
+
+export function QASavedNotice({
+  question,
+  notIngested = false,
+  onClose,
+  previewHref = PREVIEW_HREF,
+}: {
+  question: string;
+  /** true = opgeslagen, maar de chatbot kon het (nog) niet verwerken. */
+  notIngested?: boolean;
+  onClose: () => void;
+  /** Testchat-link; de publieke demo geeft zijn eigen preview-route mee. */
+  previewHref?: string;
+}) {
+  return (
+    <NoticeRegion key={notIngested ? 'not-ingested' : question}>
+      {notIngested ? <NotIngested onClose={onClose} /> : <Saved question={question} onClose={onClose} previewHref={previewHref} />}
+    </NoticeRegion>
+  );
+}
+
+function NoticeRegion({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Na de huidige frame: het zijpaneel zet bij sluiten de focus eerst terug.
+    const t = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.scrollIntoView?.({ block: 'nearest' });
+      el.focus({ preventScroll: true });
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div ref={ref} role="status" aria-live="polite" tabIndex={-1} className="v1-saved-notice">
+      {children}
+    </div>
+  );
+}
+
+function NotIngested({ onClose }: { onClose: () => void }) {
+  return (
+    <AttentionBlock
+      level="attention"
+      title="Opgeslagen, maar je chatbot kent dit antwoord nog niet"
+      actions={
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Sluiten
+        </Button>
+      }
+    >
+      Het verwerken lukte nu niet. Bij de Q&amp;A staat &quot;Nog niet in je chatbot&quot;; probeer het daar zo opnieuw.
+    </AttentionBlock>
+  );
+}
+
+function Saved({ question, onClose, previewHref }: { question: string; onClose: () => void; previewHref: string }) {
+  return (
+    <AttentionBlock
+      level="info"
+      title="Opgeslagen. Je chatbot gebruikt dit antwoord vanaf nu"
+      actions={
+        <>
+          <Link href={previewHref} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+            Test je chatbot
+          </Link>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Sluiten
+          </Button>
+        </>
+      }
+    >
+      Bij &quot;{question.length > 90 ? `${question.slice(0, 90)}…` : question}&quot; en vergelijkbare vragen haalt je
+      chatbot het antwoord nu hieruit. Hij zet het in zijn eigen woorden. Stel de vraag zelf in de testchat om het te
+      controleren.
+    </AttentionBlock>
+  );
+}

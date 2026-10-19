@@ -71,7 +71,11 @@
 .v1-ui .v1-gs-skel-row { display: flex; }
 .v1-ui .v1-gs-skel-row[data-side='end'] { justify-content: flex-end; }
 
-/* Meest gestelde vragen: acties onder de vraag op smalle schermen. */
+/* Wist je chatbot niet: kop boven de afgehandelde vragen + gesprek-link. */
+.v1-ui .v1-gs-unanswered-head { margin: 0; padding: 12px 0 2px; font-size: 13px; font-weight: 600; color: var(--v1-ink); }
+.v1-ui .v1-gs-unanswered-link { font-size: 13px; white-space: nowrap; }
+
+/* Meest gestelde vragen (en Wist je chatbot niet): acties onder de vraag op smalle schermen. */
 @media (max-width: 900px) {
   .v1-ui .v1-gs-faq .v1-list-row { flex-wrap: wrap; }
   .v1-ui .v1-gs-faq .v1-list-end { width: 100%; flex-wrap: wrap; gap: 8px; }

@@ -40,8 +40,10 @@ export function ConversationList({
   fixtureUnansweredCount,
   faqCount,
   topQuestions,
+  unansweredOpenCount = 0,
+  unansweredView = null,
 }: {
-  view: 'gesprekken' | 'top-questions';
+  view: 'gesprekken' | 'unanswered' | 'top-questions';
   period: Period;
   onlyUnanswered: boolean;
   /** Voorbeeldgesprekken in de periode, al gefilterd op onbeantwoord als dat aanstaat. */
@@ -49,6 +51,9 @@ export function ConversationList({
   fixtureUnansweredCount: number;
   faqCount: number;
   topQuestions: ReactNode;
+  /** Open vragen in de werklijst "Wist je chatbot niet" (tab-teller). */
+  unansweredOpenCount?: number;
+  unansweredView?: ReactNode;
 }) {
   const own = useDemoConversations();
   const since = periodStart(period).toISOString();
@@ -67,6 +72,8 @@ export function ConversationList({
   if (onlyUnanswered) filterQs.set('unanswered', '1');
   const topQs = new URLSearchParams(filterQs);
   topQs.set('view', 'top-questions');
+  const unQs = new URLSearchParams(filterQs);
+  unQs.set('view', 'unanswered');
 
   return (
     <>
@@ -75,11 +82,14 @@ export function ConversationList({
         active={view}
         items={[
           { id: 'gesprekken', label: 'Alle gesprekken', count: items.length, href: `${BASE}?${filterQs}` },
+          { id: 'unanswered', label: 'Wist je chatbot niet', count: unansweredOpenCount, href: `${BASE}?${unQs}` },
           { id: 'top-questions', label: 'Meest gestelde vragen', count: faqCount, href: `${BASE}?${topQs}` },
         ]}
       />
 
-      {view === 'top-questions' ? (
+      {view === 'unanswered' ? (
+        unansweredView
+      ) : view === 'top-questions' ? (
         topQuestions
       ) : (
         <div className="v1-stack">

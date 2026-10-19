@@ -1,6 +1,8 @@
 // V1 Klantendashboard: Gesprekken (spec 7.3 + bijlage A).
 //
-// Twee tabs via ?view=: "Alle gesprekken" (lijst) en "Meest gestelde vragen".
+// Drie tabs via ?view=: "Alle gesprekken" (lijst), "Wist je chatbot niet" (werklijst
+// onbeantwoorde vragen, inline beantwoorden) en "Meest gestelde vragen".
+// "Onbeantwoord" komt overal uit dezelfde definitie (lib/v1/dashboard/unanswered.ts).
 // Eén filterregel: periode (?filter=today|last_7_days|last_30_days) plus de
 // schakelaar "Alleen onbeantwoord" (?unanswered=1, met teller; vervangt de
 // vroegere warn-banner). Een gesprek opent rechts in een Drawer via de
@@ -17,7 +19,13 @@ import Link from 'next/link';
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
-import { listV1Conversations, type V1ConversationListItem } from '@/lib/v1/dashboard/conversations';
+import {
+  countV1UnansweredConversations,
+  listV1Conversations,
+  type V1ConversationListItem,
+} from '@/lib/v1/dashboard/conversations';
+import { getUnansweredForOrg } from '@/lib/v1/dashboard/unanswered';
+import { normalizeQuestionKey } from '@/lib/v1/dashboard/unanswered-core';
 import { getV1KlantFaqForDashboard, getV1FaqConfig } from '@/lib/v1/dashboard/faq';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { LinkTabs } from '@/app/v1/_ui/tabs';
@@ -27,6 +35,7 @@ import { buttonClass } from '@/app/v1/_ui/button';
 import { getOrgChatbot } from '../rag-config';
 import { FilterBar, type Period } from './filter-bar';
 import { TopQuestionsTab } from './top-questions/top-questions-tab';
+import { UnansweredTab } from './unanswered/unanswered-tab';
 import { formatShort } from './_conversation/format';
 
 export const dynamic = 'force-dynamic';
@@ -69,10 +78,17 @@ export default async function V1GesprekkenPage({
   const legacyUnanswered = rawFilter === 'unanswered';
   const period: Period = PERIODS.includes(rawFilter as Period) ? (rawFilter as Period) : 'last_30_days';
   const onlyUnanswered = legacyUnanswered || rawUnanswered === '1';
-  const view: 'gesprekken' | 'top-questions' = rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
+  const view: 'gesprekken' | 'unanswered' | 'top-questions' =
+    rawView === 'top-questions' ? 'top-questions' : rawView === 'unanswered' ? 'unanswered' : 'gesprekken';
 
-  const [all, faqResult, faqConfig, qaData] = await Promise.all([
-    listV1Conversations(supabase, orgId, chatbot.id, period),
+  const unanswered = await getUnansweredForOrg(orgId, chatbot.id);
+
+  const [items, unansweredCount, faqRaw, faqConfig, qaData] = await Promise.all([
+    listV1Conversations(supabase, orgId, chatbot.id, period, {
+      openThreadIds: unanswered.openThreadIds,
+      onlyUnanswered,
+    }),
+    countV1UnansweredConversations(supabase, orgId, chatbot.id, period, unanswered.openThreadIds),
     getV1KlantFaqForDashboard(supabase, orgId, chatbot.id),
     getV1FaqConfig(supabase, orgId, chatbot.id),
     supabase
@@ -84,14 +100,25 @@ export default async function V1GesprekkenPage({
   ]);
 
   const existingQAQuestions = (qaData.data ?? []).map((r: { question: string }) => r.question as string);
-  const unansweredCount = all.filter((x) => x.unanswered).length;
-  const items = onlyUnanswered ? all.filter((x) => x.unanswered) : all;
+
+  // Meest gesteld: de badge "Onbeantwoord" volgt de gedeelde definitie i.p.v. de
+  // dagelijkse snapshot (die off-topic meetelde en niet wist van een nieuwe Q&A).
+  const openKeys = new Set(unanswered.questions.filter((q) => q.status === 'open').map((q) => q.key));
+  const faqResult = {
+    ...faqRaw,
+    items: faqRaw.items.map((row) => {
+      const keys = [row.question, ...row.memberQuestions].map(normalizeQuestionKey);
+      return { ...row, lastStatus: keys.some((k) => openKeys.has(k)) ? ('unanswered' as const) : ('answered' as const) };
+    }),
+  };
 
   // Tabs houden de filters vast, zodat terugschakelen dezelfde lijst geeft.
   const filterQs = new URLSearchParams({ filter: period });
   if (onlyUnanswered) filterQs.set('unanswered', '1');
   const topQs = new URLSearchParams(filterQs);
   topQs.set('view', 'top-questions');
+  const unQs = new URLSearchParams(filterQs);
+  unQs.set('view', 'unanswered');
 
   return (
     <div className="v1-page">
@@ -103,6 +130,12 @@ export default async function V1GesprekkenPage({
         items={[
           { id: 'gesprekken', label: 'Alle gesprekken', count: items.length, href: `${BASE}?${filterQs}` },
           {
+            id: 'unanswered',
+            label: 'Wist je chatbot niet',
+            count: unanswered.openCount,
+            href: `${BASE}?${unQs}`,
+          },
+          {
             id: 'top-questions',
             label: 'Meest gestelde vragen',
             count: faqResult.items.length,
@@ -111,7 +144,19 @@ export default async function V1GesprekkenPage({
         ]}
       />
 
-      {view === 'top-questions' ? (
+      {view === 'unanswered' ? (
+        <UnansweredTab
+          questions={unanswered.questions.map((q) => ({
+            key: q.key,
+            question: q.question,
+            occurrences: q.occurrences,
+            lastSeenAt: q.lastSeenAt,
+            status: q.status,
+            qaExists: q.qaExists,
+            threadIds: q.threadIds,
+          }))}
+        />
+      ) : view === 'top-questions' ? (
         <TopQuestionsTab
           initial={faqResult.items}
           totalUnique={faqResult.totalUnique}

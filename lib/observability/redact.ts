@@ -24,3 +24,22 @@ export function redactPii(text: string | null | undefined): string {
     .replace(PHONE_GENERIC, '[telefoon]')
     .replace(BSN, '[bsn]');
 }
+
+/** Alleen de gevoelige nummers (IBAN en BSN) maskeren; e-mail en telefoon blijven
+ *  staan. Voor tekst die een ondernemer zelf over zijn eigen bedrijf invult (het
+ *  quiz-antwoord bij "Contactgegevens"): daar zijn het zakelijke e-mailadres en
+ *  telefoonnummer juist de bedoeling. Volgorde als redactPii: IBAN vóór BSN, en
+ *  9 cijfers die deel zijn van een telefoonnummer ("+31 612345678") blijven staan. */
+export function redactSensitiveNumbers(text: string | null | undefined): string {
+  if (!text) return '';
+  const withoutIban = text.replace(IBAN, '[iban]');
+  const phoneSpans: Array<[number, number]> = [];
+  for (const re of [PHONE_MOBILE, PHONE_GENERIC]) {
+    for (const m of withoutIban.matchAll(re)) {
+      phoneSpans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+    }
+  }
+  return withoutIban.replace(BSN, (match, offset: number) =>
+    phoneSpans.some(([s, e]) => offset >= s && offset + match.length <= e) ? match : '[bsn]',
+  );
+}

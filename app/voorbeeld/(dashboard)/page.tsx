@@ -123,7 +123,7 @@ export default function V1OverviewPage() {
 
       <div className="v1-ov-cols">
         <section id="vb-unanswered" className="v1-card v1-ov-card-list" aria-label="Hier wist je chatbot het niet">
-          <SectionHead title="Hier wist je chatbot het niet" link={{ href: '/voorbeeld/gesprekken', label: 'Alle gesprekken' }} />
+          <SectionHead title="Hier wist je chatbot het niet" link={{ href: '/voorbeeld/gesprekken?view=unanswered', label: 'Werklijst' }} />
           <UnansweredList
             fixtureRows={unanswered.map((u) => ({
               question: u.question,

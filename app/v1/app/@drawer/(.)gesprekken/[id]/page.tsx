@@ -13,5 +13,5 @@ export default async function ConversationDrawerPage({ params }: { params: Promi
 
   if (res.status === 'forbidden') return <EmptyState>Je bent geen lid van deze organisatie.</EmptyState>;
   if (res.status === 'not_found') return <EmptyState>Dit gesprek bestaat niet (meer).</EmptyState>;
-  return <ConversationView detail={res.detail} isUnanswered={res.isUnanswered} questionForQA={res.questionForQA} />;
+  return <ConversationView detail={res.detail} isUnanswered={res.isUnanswered} isClosed={res.isClosed} questionForQA={res.questionForQA} />;
 }

@@ -135,9 +135,9 @@ export async function getConversationsForQuestionAction(
 export async function addQAFromTopQuestionAction(
   question: string,
   answer: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; notIngested?: boolean }> {
   const res = await upsertQAItemAction({ question, answer, active: true });
   if (!res.ok) return { ok: false, error: res.error };
   revalidatePath(GESPREKKEN_PATH, 'layout');
-  return { ok: true };
+  return { ok: true, notIngested: res.notIngested };
 }

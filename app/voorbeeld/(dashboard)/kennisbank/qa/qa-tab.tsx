@@ -20,6 +20,7 @@ import {
   upsertQAItemAction,
 } from './qa-actions';
 import { CurrentBotAnswer } from './current-bot-answer';
+import { QASavedNotice } from '@/app/v1/app/kennisbank/qa/qa-saved-notice';
 
 export type QAItem = {
   id: string;
@@ -57,6 +58,8 @@ export function QATab({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const closeSaved = useCallback(() => setSaved(null), []);
 
   const openNew = useCallback(() => {
     setError(null);
@@ -103,7 +106,9 @@ export function QATab({
       if (res.ok) {
         setItems(res.qa);
         setEditing(null);
-        toast.success('Q&A opgeslagen');
+        // Zelfde bevestiging als V1: wat er nu gebeurt + knop naar de testchat.
+        if (editing.active) setSaved(editing.question.trim());
+        else toast.success('Q&A opgeslagen (inactief)');
       } else {
         setError(res.error);
       }
@@ -139,6 +144,8 @@ export function QATab({
 
   return (
     <>
+      {saved ? <QASavedNotice question={saved} onClose={closeSaved} previewHref="/voorbeeld/preview" /> : null}
+
       {items.length === 0 ? (
         <div className="v1-card v1-kb-card-flush">
           <EmptyState action={<Button variant="secondary" size="sm" onClick={openNew}>Toevoegen</Button>}>

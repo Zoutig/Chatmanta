@@ -7,8 +7,8 @@
 //
 // V1-schema is gedenormaliseerd t.o.v. V0: threads draagt first_question /
 // message_count / last_message_at, dus de lijst hoeft geen first-message-join.
-// "Onbeantwoord" wordt afgeleid uit een assistant-message met kind='fallback'
-// (threads.status is open/closed, niet answered/unanswered).
+// "Onbeantwoord" komt uit de gedeelde definitie in unanswered-core.ts (fallback,
+// geen off-topic, nog niet afgehandeld); threads.status='closed' = "opgelost".
 
 import 'server-only';
 
@@ -58,56 +58,102 @@ function sinceFilter(filter: V1ConversationFilter): string | null {
 
 // ---------------------------------------------------------------------------
 // listV1Conversations — threads (recent eerst) met de denormaliseerde eerste-
-// vraag/aantal/laatste-activiteit. `unanswered` per rij afgeleid uit een
-// fallback-assistant-message; filter='unanswered' beperkt tot die rijen.
+// vraag/aantal/laatste-activiteit. "Onbeantwoord" komt uit de gedeelde definitie
+// (lib/v1/dashboard/unanswered.ts): de caller geeft de set gesprekken met een open
+// onbeantwoorde vraag mee. Met onlyUnanswered filtert de QUERY zelf op die set
+// (vóór de LIMIT), zodat er bij veel gesprekken geen onbeantwoorde wegvallen.
 // ---------------------------------------------------------------------------
 export async function listV1Conversations(
   client: SupabaseClient,
   orgId: string,
   chatbotId: string,
   filter: V1ConversationFilter = 'last_30_days',
+  opts: { openThreadIds?: Set<string>; onlyUnanswered?: boolean } = {},
 ): Promise<V1ConversationListItem[]> {
+  const open = opts.openThreadIds ?? new Set<string>();
+  const only = opts.onlyUnanswered === true || filter === 'unanswered';
   try {
-    const { data: threads, error } = await client
-      .from('threads')
-      .select('id, first_question, message_count, last_message_at, created_at')
-      .eq('organization_id', orgId)
-      .eq('chatbot_id', chatbotId)
-      .is('deleted_at', null)
-      .gte('created_at', sinceFilter(filter)!)
-      .order('last_message_at', { ascending: false })
-      .limit(LIST_LIMIT);
-    if (error || !threads || threads.length === 0) return [];
+    const since = sinceFilter(filter)!;
+    type Row = { id: string; first_question: string | null; message_count: number | null; last_message_at: string | null; created_at: string | null };
+    const base = () =>
+      client
+        .from('threads')
+        .select('id, first_question, message_count, last_message_at, created_at')
+        .eq('organization_id', orgId)
+        .eq('chatbot_id', chatbotId)
+        .is('deleted_at', null)
+        .gte('created_at', since)
+        .order('last_message_at', { ascending: false })
+        .limit(LIST_LIMIT);
 
-    const ids = threads.map((t) => t.id as string);
+    let rows: Row[] = [];
+    if (only) {
+      const ids = [...open];
+      if (ids.length === 0) return [];
+      const parts = await Promise.all(
+        chunkIds(ids).map(async (part) => {
+          const { data } = await base().in('id', part);
+          return (data ?? []) as Row[];
+        }),
+      );
+      rows = parts
+        .flat()
+        .sort((a, b) => String(b.last_message_at ?? '').localeCompare(String(a.last_message_at ?? '')))
+        .slice(0, LIST_LIMIT);
+    } else {
+      const { data, error } = await base();
+      if (error || !data) return [];
+      rows = data as Row[];
+    }
 
-    // Fallback-set: threads met minstens één assistant-message kind='fallback'.
-    // Voedt zowel de per-rij-badge als het 'unanswered'-filter.
-    const { data: fallbackRows } = await client
-      .from('thread_messages')
-      .select('thread_id')
-      .eq('organization_id', orgId)
-      .eq('chatbot_id', chatbotId)
-      .eq('role', 'assistant')
-      .eq('kind', 'fallback')
-      .in('thread_id', ids);
-    const unansweredIds = new Set((fallbackRows ?? []).map((r) => String(r.thread_id)));
-
-    const items: V1ConversationListItem[] = threads.map((t) => {
-      const id = t.id as string;
-      return {
-        id,
-        firstQuestion: (t.first_question as string) || '(geen vraag)',
-        messageCount: (t.message_count as number) ?? 0,
-        lastMessageAt: String(t.last_message_at ?? t.created_at ?? ''),
-        unanswered: unansweredIds.has(id),
-      };
-    });
-
-    return filter === 'unanswered' ? items.filter((i) => i.unanswered) : items;
+    return rows.map((t) => ({
+      id: t.id,
+      firstQuestion: t.first_question || '(geen vraag)',
+      messageCount: t.message_count ?? 0,
+      lastMessageAt: String(t.last_message_at ?? t.created_at ?? ''),
+      unanswered: open.has(t.id),
+    }));
   } catch {
     return [];
   }
+}
+
+/** Aantal gesprekken in de periode met een open onbeantwoorde vraag (filter-teller). */
+export async function countV1UnansweredConversations(
+  client: SupabaseClient,
+  orgId: string,
+  chatbotId: string,
+  filter: V1ConversationFilter,
+  openThreadIds: Set<string>,
+): Promise<number> {
+  const ids = [...openThreadIds];
+  if (ids.length === 0) return 0;
+  try {
+    const since = sinceFilter(filter)!;
+    const counts = await Promise.all(
+      chunkIds(ids).map(async (part) => {
+        const { count } = await client
+          .from('threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', orgId)
+          .eq('chatbot_id', chatbotId)
+          .is('deleted_at', null)
+          .gte('created_at', since)
+          .in('id', part);
+        return count ?? 0;
+      }),
+    );
+    return counts.reduce((a, b) => a + b, 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** .in()-lijsten klein houden (URL-lengte). */
+function chunkIds(ids: string[], size = 150): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
 }
 
 // ---------------------------------------------------------------------------
