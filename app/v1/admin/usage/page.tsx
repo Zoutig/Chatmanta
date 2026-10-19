@@ -18,6 +18,8 @@ import { Metric, MetricGrid } from '../_ui/metric';
 import { ReloadButton } from '../_ui/reload-button';
 import { DataTable, NumCell } from '../_ui/data-table';
 import { formatEur, formatUsd } from '../_ui/format';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,10 +52,16 @@ function OpenAiTotalLoading() {
   return <Metric label="Totaal OpenAI-account deze maand" value="Laden…" />;
 }
 
-export default async function V1UsagePage() {
+export default async function V1UsagePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ intern?: string | string[] }>;
+}) {
+  const showInternal = parseShowInternal((await searchParams).intern);
   let klanten;
+  let hiddenCount = 0;
   try {
-    klanten = await getKlantenWithBudgets();
+    ({ klanten, hiddenCount } = await getKlantenWithBudgets({ showInternal }));
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
@@ -70,7 +78,12 @@ export default async function V1UsagePage() {
       <PageHeader
         title="Gebruik en kosten"
         description="Verbruik en kosten per klant deze maand, met de benutting van het budget."
-        actions={<ReloadButton />}
+        actions={
+          <>
+            <InternalOrgsToggle basePath="/v1/admin/usage" showInternal={showInternal} hiddenCount={hiddenCount} />
+            <ReloadButton />
+          </>
+        }
       />
 
       <MetricGrid>

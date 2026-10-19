@@ -23,6 +23,9 @@ import { GenerateRecapButton } from './[orgId]/components/generate-recap-button'
 import { SignalDot } from './[orgId]/components/signal-dot';
 import { ReloadButton } from '../_ui/reload-button';
 import { DataTable, NumCell } from '../_ui/data-table';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
+import { listAdminOrgs } from '@/lib/v1/admin/org-list';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -32,7 +35,7 @@ const BASE_PATH = '/v1/admin/maandelijkse-recap';
 export default async function V1MaandRecapOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; intern?: string | string[] }>;
 }) {
   let admin;
   try {
@@ -55,14 +58,9 @@ export default async function V1MaandRecapOverviewPage({
     options.unshift({ value: currentKey, label: monthLabelNL(year, month) });
   }
 
-  // Alle orgs; fan-out per org voor de recap-statistieken.
-  const { data: orgs } = await admin
-    .from('organizations')
-    .select('id, name')
-    .is('deleted_at', null)
-    .order('name', { ascending: true });
-
-  const orgList = (orgs ?? []) as { id: string; name: string }[];
+  // Alle orgs (interne standaard verborgen); fan-out per org voor de recap-statistieken.
+  const showInternal = parseShowInternal(sp.intern);
+  const { orgs: orgList, hiddenCount } = await listAdminOrgs(admin, { showInternal });
 
   const settled = await Promise.all(
     orgList.map((o) => getV1RecapOverviewRow(admin, o.id, o.name, year, month).catch(() => null)),
@@ -77,6 +75,12 @@ export default async function V1MaandRecapOverviewPage({
         actions={
           <>
             <MonthSelector current={currentKey} options={options} basePath={BASE_PATH} />
+            <InternalOrgsToggle
+              basePath={BASE_PATH}
+              showInternal={showInternal}
+              hiddenCount={hiddenCount}
+              params={{ period: sp.period }}
+            />
             <ReloadButton />
           </>
         }

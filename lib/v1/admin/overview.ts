@@ -15,9 +15,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getFirecrawlAccountUsage } from '@/lib/v0/crawler/firecrawl';
 import { deriveHealth, deriveTechnicalStatus } from '@/lib/controlroom/server/health';
+import { defaultProfile, listAdminOrgs, type AdminOrgListOptions } from './org-list';
 import type { OrgSignals } from '@/lib/controlroom/server/health';
+export type { AdminOrgListOptions } from './org-list';
 import {
-  PROFILE_DEFAULTS,
   type AdminOrgProfile,
   type CommercialStatus,
   type HealthStatus,
@@ -105,87 +106,6 @@ function daysAgoIso(days: number): string {
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-// ---------------------------------------------------------------------------
-// Profile-laag — inline variant van profiles.ts (zonder V0-sb() side-effect)
-// ---------------------------------------------------------------------------
-
-type ProfileRow = {
-  organization_id: string;
-  commercial_status: string;
-  technical_status_override: string | null;
-  onboarding_phase: string;
-  customer_owner: string;
-  technical_owner: string;
-  contact_name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  notes: string | null;
-  next_action: string | null;
-  next_action_owner: string | null;
-  next_action_due_date: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-function rowToProfile(r: ProfileRow): AdminOrgProfile {
-  return {
-    organizationId: r.organization_id,
-    commercialStatus: r.commercial_status as CommercialStatus,
-    technicalStatusOverride: (r.technical_status_override as TechnicalStatus | null) ?? null,
-    onboardingPhase: r.onboarding_phase as OnboardingPhase,
-    customerOwner: r.customer_owner as Owner,
-    technicalOwner: r.technical_owner as Owner,
-    contactName: r.contact_name,
-    contactEmail: r.contact_email,
-    contactPhone: r.contact_phone,
-    notes: r.notes,
-    nextAction: r.next_action,
-    nextActionOwner: (r.next_action_owner as Owner | null) ?? null,
-    nextActionDueDate: r.next_action_due_date,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
-
-function defaultProfile(orgId: string): AdminOrgProfile {
-  return {
-    organizationId: orgId,
-    commercialStatus: PROFILE_DEFAULTS.commercialStatus,
-    technicalStatusOverride: null,
-    onboardingPhase: PROFILE_DEFAULTS.onboardingPhase,
-    customerOwner: PROFILE_DEFAULTS.customerOwner,
-    technicalOwner: PROFILE_DEFAULTS.technicalOwner,
-    contactName: null,
-    contactEmail: null,
-    contactPhone: null,
-    notes: null,
-    nextAction: null,
-    nextActionOwner: null,
-    nextActionDueDate: null,
-    createdAt: '',
-    updatedAt: '',
-  };
-}
-
-/** Batch-read admin_org_profile over alle org-ids; ontbrekende orgs krijgen een
- *  virtuele default (read-first, geen write nodig voor weergave). */
-async function getProfilesMap(
-  admin: SupabaseClient,
-  orgIds: string[],
-): Promise<Map<string, AdminOrgProfile>> {
-  const map = new Map<string, AdminOrgProfile>();
-  for (const id of orgIds) map.set(id, defaultProfile(id));
-  if (orgIds.length === 0) return map;
-  const { data } = await admin
-    .from('admin_org_profile')
-    .select('*')
-    .in('organization_id', orgIds);
-  for (const r of data ?? []) {
-    map.set((r as ProfileRow).organization_id, rowToProfile(r as ProfileRow));
-  }
-  return map;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,22 +290,17 @@ async function getOrgSignals(
 // Publieke API
 // ---------------------------------------------------------------------------
 
-/** Haalt alle V1-organisaties op en berekent per org de live-signalen.
- *  Gebruikt één gedeelde admin-client (cross-org service-role NÁ requireJorionAdmin).
- *  Gooit door bij auth-fouten — de RSC-caller handelt AUTH_FORBIDDEN af. */
-export async function getControlRoomKlanten(): Promise<ControlRoomKlant[]> {
+/** Haalt de V1-organisaties op (interne standaard verborgen) en berekent per org
+ *  de live-signalen. Gebruikt één gedeelde admin-client (cross-org service-role NÁ
+ *  requireJorionAdmin). Gooit door bij auth-fouten — de RSC-caller handelt
+ *  AUTH_FORBIDDEN af. */
+export async function getControlRoomKlanten(
+  opts: AdminOrgListOptions = {},
+): Promise<{ klanten: ControlRoomKlant[]; hiddenCount: number }> {
   const admin = await getJorionAdminClient();
 
-  const { data: orgs } = await admin
-    .from('organizations')
-    .select('id, name, slug')
-    .is('deleted_at', null)
-    .order('name', { ascending: true });
-
-  const orgList = (orgs ?? []) as Array<{ id: string; name: string; slug: string }>;
-  if (orgList.length === 0) return [];
-
-  const profiles = await getProfilesMap(admin, orgList.map((o) => o.id));
+  const { orgs: orgList, profiles, hiddenCount } = await listAdminOrgs(admin, opts);
+  if (orgList.length === 0) return { klanten: [], hiddenCount };
 
   // Fan-out: per-org parallel, fail-safe (één mislukte org legt het overzicht niet plat).
   const klanten = await Promise.all(
@@ -420,7 +335,7 @@ export async function getControlRoomKlanten(): Promise<ControlRoomKlant[]> {
     ),
   );
 
-  return klanten;
+  return { klanten, hiddenCount };
 }
 
 const HEALTH_RANK = { red: 0, orange: 1, green: 2 } as const;
@@ -469,9 +384,12 @@ export function buildOverviewSummary(klanten: ControlRoomKlant[]): OverviewSumma
 const MAX_COST_ROWS = 20_000;
 
 /** Dagelijks klant-chatbot-verbruik (EUR) over de huidige kalendermaand, over
- *  álle V1-orgs samen. Bron = query_log.cost_eur (V1 factureert in EUR).
+ *  de meegegeven V1-orgs samen (default: alle). Bron = query_log.cost_eur (V1 factureert in EUR).
  *  Eén read, geen org-fan-out. Fail-safe → lege dag-reeks bij DB-fout. */
-export async function getDailyCostThisMonth(): Promise<{
+export async function getDailyCostThisMonth(
+  /** Alleen deze orgs meetellen (bv. zonder interne orgs). Weglaten = alle orgs. */
+  onlyOrgIds?: string[],
+): Promise<{
   points: DailyCostPointEur[];
   totalEur: number;
 }> {
@@ -497,12 +415,14 @@ export async function getDailyCostThisMonth(): Promise<{
     const admin = await getJorionAdminClient();
     const { data, error } = await admin
       .from('query_log')
-      .select('created_at, cost_eur')
+      .select('created_at, cost_eur, organization_id')
       .gte('created_at', start.toISOString())
       .limit(MAX_COST_ROWS);
     if (error || !data) return { points, totalEur: 0 };
+    const allow = onlyOrgIds ? new Set(onlyOrgIds) : null;
     let total = 0;
     for (const r of data) {
+      if (allow && !allow.has((r as { organization_id: string }).organization_id)) continue;
       const cost = Number((r as { cost_eur: number | null }).cost_eur) || 0;
       total += cost;
       const i = indexByKey.get(

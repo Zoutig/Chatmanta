@@ -28,6 +28,8 @@ import {
   type UngroundedFact,
 } from '@/lib/v1/admin/bot-performance';
 import { PageHeader } from '@/app/v1/_ui/page-header';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
 import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
 import { Metric, MetricGrid } from '../_ui/metric';
 import { LineChart } from '../_ui/line-chart';
@@ -37,7 +39,7 @@ import { FilterChip } from '../_ui/filter-chips';
 
 export const dynamic = 'force-dynamic';
 
-type SP = { org?: string; window?: string };
+type SP = { org?: string; window?: string; intern?: string | string[] };
 
 // ───────────────────────── opmaak ─────────────────────────
 
@@ -426,16 +428,22 @@ function CrossOrgTable({ orgs, window }: { orgs: OrgBotPerf[]; window: PerfWindo
 
 // ───────────────────────── weergaven ─────────────────────────
 
-function OverviewView({ overview }: { overview: BotPerfOverview }) {
-  const { aggregate, orgs, daily, window, injectionAgg } = overview;
+function OverviewView({ overview, showInternal }: { overview: BotPerfOverview; showInternal: boolean }) {
+  const { aggregate, orgs, daily, window, injectionAgg, hiddenCount } = overview;
   return (
     <div className="v1-page">
       <PageHeader
         title="Botprestaties"
-        description={`${windowTitle(window)}, alle klanten.`}
+        description={`${windowTitle(window)}, ${showInternal ? 'alle orgs' : 'alle klanten (zonder interne orgs)'}.`}
         actions={
           <>
             <WindowToggle window={window} orgId={null} />
+            <InternalOrgsToggle
+              basePath="/v1/admin/bot-prestaties"
+              showInternal={showInternal}
+              hiddenCount={hiddenCount}
+              params={{ window }}
+            />
             <ReloadButton />
           </>
         }
@@ -499,8 +507,9 @@ export default async function BotPrestatiesPage({ searchParams }: { searchParams
       // Onbekende/verwijderde org → val terug op het overzicht
     }
 
-    const overview = await getBotPerfOverview(window);
-    return <OverviewView overview={overview} />;
+    const showInternal = parseShowInternal(sp.intern);
+    const overview = await getBotPerfOverview(window, { showInternal });
+    return <OverviewView overview={overview} showInternal={showInternal} />;
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;

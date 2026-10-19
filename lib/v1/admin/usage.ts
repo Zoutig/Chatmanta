@@ -11,7 +11,7 @@ import 'server-only';
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { DEFAULT_DAILY_BUDGET_EUR, getOrgSpendTodayEur, isOverBudget, resolveDailyBudgetEur } from '@/lib/v1/limits/usage-limits';
-import { getControlRoomKlanten, type ControlRoomKlant } from './overview';
+import { getControlRoomKlanten, type AdminOrgListOptions, type ControlRoomKlant } from './overview';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,13 +76,15 @@ export function budgetUtilStatus(
  * Beide reads lopen parallel; de auth-gate (requireJorionAdmin) zit intern
  * in getJorionAdminClient() — ook getControlRoomKlanten() roept dat aan.
  */
-export async function getKlantenWithBudgets(): Promise<KlantWithBudget[]> {
-  const [klanten, admin] = await Promise.all([
-    getControlRoomKlanten(),
+export async function getKlantenWithBudgets(
+  opts: AdminOrgListOptions = {},
+): Promise<{ klanten: KlantWithBudget[]; hiddenCount: number }> {
+  const [{ klanten, hiddenCount }, admin] = await Promise.all([
+    getControlRoomKlanten(opts),
     getJorionAdminClient(),
   ]);
 
-  if (klanten.length === 0) return [];
+  if (klanten.length === 0) return { klanten: [], hiddenCount };
 
   const { data } = await admin
     .from('organizations')
@@ -103,7 +105,7 @@ export async function getKlantenWithBudgets(): Promise<KlantWithBudget[]> {
   );
   const spentByOrg = new Map(withSpend.map((k, i) => [k.orgId, spentTodayEur[i]]));
 
-  return klanten.map((k) => {
+  const withBudgets = klanten.map((k) => {
     const dailyBudgetEur = budgetByOrg.get(k.orgId) ?? DEFAULT_DAILY_BUDGET_EUR;
     const spentToday = spentByOrg.get(k.orgId) ?? 0;
     return {
@@ -113,4 +115,5 @@ export async function getKlantenWithBudgets(): Promise<KlantWithBudget[]> {
       cappedToday: isOverBudget(spentToday, dailyBudgetEur),
     };
   });
+  return { klanten: withBudgets, hiddenCount };
 }

@@ -15,12 +15,19 @@ import { PageHeader } from '@/app/v1/_ui/page-header';
 import { Badge, EmptyState } from '@/app/v1/_ui/feedback';
 import { DataTable, NumCell } from '../_ui/data-table';
 import { ReloadButton } from '../_ui/reload-button';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
 
 export const dynamic = 'force-dynamic';
 
 type ItemRow = { organization_id: string; status: string };
 
-export default async function V1OnboardingPage() {
+export default async function V1OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ intern?: string | string[] }>;
+}) {
+  const showInternal = parseShowInternal((await searchParams).intern);
   let admin;
   try {
     admin = await getJorionAdminClient();
@@ -31,7 +38,7 @@ export default async function V1OnboardingPage() {
     throw e;
   }
 
-  const klanten = await getControlRoomKlanten();
+  const { klanten, hiddenCount } = await getControlRoomKlanten({ showInternal });
 
   // Batch-read: alle onboarding-items over alle orgs in één query.
   const { data: itemData } =
@@ -71,7 +78,12 @@ export default async function V1OnboardingPage() {
       <PageHeader
         title="Onboarding"
         description="Fase, eigenaar, voortgang en volgende actie van elke klant in onboarding."
-        actions={<ReloadButton />}
+        actions={
+          <>
+            <InternalOrgsToggle basePath="/v1/admin/onboarding" showInternal={showInternal} hiddenCount={hiddenCount} />
+            <ReloadButton />
+          </>
+        }
       />
 
       <section className="v1-card">
