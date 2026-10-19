@@ -12,7 +12,9 @@ export const DEMO_SHELL: {
 } = {
   orgName: DEMO_ORG_NAME,
   chatbotStatus: 'live',
-  unansweredCount: 7,
+  // Zijbalk telt open onbeantwoorde VRAGEN (zoals V1): gelijk aan de werklijst
+  // "Wist je chatbot niet" en de Overzicht-kaart (getFixtureUnanswered).
+  unansweredCount: 3,
   contactRequestsNewCount: 2,
   // Een klaarstaande kennisquiz laat de teal stip bij Kennisbank zien.
   signals: { ...NO_SIGNALS, quizReady: true },
