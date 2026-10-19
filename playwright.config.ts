@@ -42,13 +42,19 @@ export default defineConfig({
     {
       // V0-tests: gebruiken de gedeelde demo-login-cookie uit global-setup.
       name: 'chromium',
-      testIgnore: /v1\//,
+      testIgnore: /(v1|public)\//,
       use: { ...devices['Desktop Chrome'], storageState: 'tests/.auth-state.json' },
     },
     {
       // V1-auth-tests: GEEN V0-storageState — de test logt zelf in via Supabase Auth.
       name: 'v1',
       testMatch: /v1\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      // Publieke pagina's (demo, embed): geen login, schone context per test.
+      name: 'public',
+      testMatch: /public\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
   ],
