@@ -43,9 +43,23 @@ export function initSentry(): void {
 
 /** Dunne capture-helper voor onRequestError + ad-hoc server-fouten.
  *  No-op zonder DSN (Sentry.captureException doet niets als init geen DSN kreeg).
- *  Geef ALLEEN gesaneerde velden mee als ctx — nooit een ruwe request/headers. */
-export function captureServerError(err: unknown, ctx?: Record<string, unknown>): void {
-  Sentry.captureException(err, ctx ? { extra: ctx } : undefined);
+ *  Geef ALLEEN gesaneerde velden mee als ctx — nooit een ruwe request/headers.
+ *  `opts.tags` (optioneel) = doorzoekbare Sentry-tags, bv. een org-id; ook hier
+ *  nooit PII. Zonder opts exact het oude gedrag. */
+export function captureServerError(
+  err: unknown,
+  ctx?: Record<string, unknown>,
+  opts?: { tags?: Record<string, string>; level?: Sentry.SeverityLevel },
+): void {
+  if (!opts) {
+    Sentry.captureException(err, ctx ? { extra: ctx } : undefined);
+    return;
+  }
+  Sentry.captureException(err, {
+    ...(ctx ? { extra: ctx } : {}),
+    ...(opts.tags ? { tags: opts.tags } : {}),
+    ...(opts.level ? { level: opts.level } : {}),
+  });
 }
 
 /** Flush pending events vóór een serverless-instance suspendt. @sentry/node flusht
