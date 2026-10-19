@@ -23,6 +23,7 @@ import { writeChatbotSettingsPatch } from '@/app/v1/app/instellingen/settings-st
 import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import { extractDocText, isAllowedDocExt } from '@/lib/rag/doc-parse';
 import { verifyMagicBytes } from '@/lib/rag/file-signature';
+import { isOwnUploadPath } from '@/lib/v1/documents/upload-path';
 import { inviteOrLookupUserByEmail, resolveInviteRedirect } from '../invite-helpers';
 
 /** Jorion-admin-gate voor de deep-dive-actions. Retourneert de actor-id, of een
@@ -742,7 +743,8 @@ export async function adminProcessUploadedDocAction(
 
     // Object-level: het pad MOET in de org/chatbot-namespace liggen (server-gegenereerd
     // in stap 1). Service-role bypast RLS → dit is de guard tegen een geknutseld pad.
-    if (!path.startsWith(`${orgId}/${chatbot.id}/`)) fail('AUTH_FORBIDDEN', 'Pad buiten de org-namespace.');
+    // Strikt formaat i.p.v. startsWith: geen '../' of '%2e%2e' (audit 2026-10 #9).
+    if (!isOwnUploadPath(path, orgId, chatbot.id)) fail('AUTH_FORBIDDEN', 'Pad buiten de org-namespace.');
 
     const { data: blob, error: dlErr } = await svc.storage.from(ADMIN_DOC_BUCKET).download(path);
     if (dlErr || !blob) fail('NOT_FOUND', `Upload niet gevonden: ${dlErr?.message ?? 'geen bestand'}`);
