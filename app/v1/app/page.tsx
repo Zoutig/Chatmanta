@@ -31,6 +31,7 @@ import { OnboardingTour, type TourStep } from '@/app/v1/_ui/tour';
 import { getOrgChatbot } from './rag-config';
 import { NextStep } from './_overview/next-step';
 import { TourButton } from './_overview/tour-button';
+import { LiveMoment } from './_overview/live-moment';
 import './_overview/overview.css';
 
 export const dynamic = 'force-dynamic';
@@ -226,7 +227,13 @@ export default async function V1OverviewPage() {
         />
       ) : null}
 
-      {showNextStep ? <NextStep setup={m.setup} widgetInstalled={widgetInstalled} /> : null}
+      {showNextStep ? (
+        <NextStep setup={m.setup} widgetInstalled={widgetInstalled} />
+      ) : critical.length === 0 && m.widgetStatus === 'active' ? (
+        // Eenmalig (localStorage per org) zodra de widget echt gezien is; zelfde
+        // slot als het volgende-stap-blok, dus nooit twee blokken bovenaan.
+        <LiveMoment orgId={orgId} />
+      ) : null}
 
       <StatStrip label="Cijfers deze maand" items={stats} />
 
