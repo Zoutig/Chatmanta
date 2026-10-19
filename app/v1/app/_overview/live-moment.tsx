@@ -7,7 +7,7 @@
 // Zonder localStorage (privévenster, geblokkeerd) verdwijnt het na sluiten alleen
 // voor deze sessie; dat is acceptabel.
 
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import Image from 'next/image';
 import { X } from 'lucide-react';
 
@@ -45,14 +45,28 @@ function subscribe(cb: () => void): () => void {
   };
 }
 
-export function LiveMoment({ orgId }: { orgId: string }) {
-  // Server-snapshot = "al gezien" → niets renderen tot na hydratie (geen flits).
+/** Na sluiten: focus naar de paginakop, zodat toetsenbord/screenreader niet op <body> belandt. */
+function focusPageHeading(): void {
+  const h = document.querySelector<HTMLElement>('.v1-page h1');
+  if (!h) return;
+  if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex', '-1');
+  h.focus();
+}
+
+/**
+ * `fallback` = wat in dit slot staat als het moment al gezien is (het
+ * volgende-stap-blok, of niets). Zo staat er altijd hooguit één blok bovenaan,
+ * ook als de setup-stappen nog niet allemaal af zijn.
+ */
+export function LiveMoment({ orgId, fallback = null }: { orgId: string; fallback?: ReactNode }) {
+  // Server-snapshot = "al gezien" → de fallback renderen tot na hydratie; wie het
+  // moment al zag, krijgt zo geen flits.
   const seen = useSyncExternalStore(
     subscribe,
     () => isSeen(orgId),
     () => true,
   );
-  if (seen) return null;
+  if (seen) return <>{fallback}</>;
 
   return (
     <section className="v1-ov-live" aria-labelledby="v1-ov-live-title">
@@ -70,7 +84,15 @@ export function LiveMoment({ orgId }: { orgId: string }) {
         </h2>
         <p className="v1-ov-live-text">We zien hem op je website. Vanaf nu beantwoordt hij vragen van je bezoekers.</p>
       </div>
-      <button type="button" className="v1-ov-live-close" onClick={() => markSeen(orgId)} aria-label="Sluiten">
+      <button
+        type="button"
+        className="v1-ov-live-close"
+        onClick={() => {
+          markSeen(orgId);
+          focusPageHeading();
+        }}
+        aria-label='Melding "Je chatbot staat live" sluiten'
+      >
         <X size={18} aria-hidden="true" />
       </button>
     </section>

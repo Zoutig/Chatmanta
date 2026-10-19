@@ -3,6 +3,7 @@
 // Volgorde van boven naar beneden:
 //   PageHeader (begroeting + status-pill, Rondleiding, "Bekijk chatbot")
 //   → kritiek-blok (alleen als er iets kritiek is; één blok, punten samengevoegd)
+//   → anders (eenmalig) "Je chatbot staat live" zodra de widget gezien is
 //   → anders het volgende-stap-blok zolang de setup niet af is
 //   → StatStrip (gesprekken, zelf beantwoord, contactverzoeken, kennisbronnen)
 //   → twee kolommen: "Hier wist je chatbot het niet" + "Meest gestelde vragen"
@@ -227,12 +228,16 @@ export default async function V1OverviewPage() {
         />
       ) : null}
 
-      {showNextStep ? (
+      {critical.length === 0 && m.widgetStatus === 'active' ? (
+        // Eenmalig (localStorage per org) zodra de widget echt gezien is, ook als
+        // er nog geen gesprek is. Zelfde slot als het volgende-stap-blok: is het
+        // moment al gezien, dan staat daar de volgende stap (nooit twee blokken).
+        <LiveMoment
+          orgId={orgId}
+          fallback={showNextStep ? <NextStep setup={m.setup} widgetInstalled={widgetInstalled} /> : null}
+        />
+      ) : showNextStep ? (
         <NextStep setup={m.setup} widgetInstalled={widgetInstalled} />
-      ) : critical.length === 0 && m.widgetStatus === 'active' ? (
-        // Eenmalig (localStorage per org) zodra de widget echt gezien is; zelfde
-        // slot als het volgende-stap-blok, dus nooit twee blokken bovenaan.
-        <LiveMoment orgId={orgId} />
       ) : null}
 
       <StatStrip label="Cijfers deze maand" items={stats} />
