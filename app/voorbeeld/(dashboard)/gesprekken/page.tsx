@@ -2,7 +2,8 @@
 // vaste voorbeeldgesprekken (lib/voorbeeld/fixtures/gesprekken.ts) in plaats van
 // database-reads.
 //
-// Twee tabs via ?view=: "Alle gesprekken" (lijst) en "Meest gestelde vragen".
+// Drie tabs via ?view=: "Alle gesprekken" (lijst), "Wist je chatbot niet" (werklijst,
+// zelfde component als V1) en "Meest gestelde vragen".
 // Eén filterregel: periode (?filter=today|last_7_days|last_30_days) plus de
 // schakelaar "Alleen onbeantwoord" (?unanswered=1, met teller). Een gesprek
 // opent rechts in een Drawer via de onderschepte route @drawer/(.)[id].
@@ -14,9 +15,13 @@ import { PageHeader } from '@/app/v1/_ui/page-header';
 import {
   FIXTURE_FAQ_CONFIG,
   FIXTURE_QA_QUESTIONS,
+  findFixtureConversationsForQuestions,
   getFixtureFaq,
+  getFixtureUnanswered,
   listFixtureConversations,
 } from '@/lib/voorbeeld/fixtures/gesprekken';
+import { normalizeQuestionKey } from '@/lib/v1/dashboard/unanswered-core';
+import { DemoUnansweredTab } from './unanswered-tab';
 import type { Period } from './filter-bar';
 import { TopQuestionsTab } from './top-questions/top-questions-tab';
 import { formatShort } from './_conversation/format';
@@ -38,10 +43,20 @@ export default async function V1GesprekkenPage({
   const legacyUnanswered = rawFilter === 'unanswered';
   const period: Period = PERIODS.includes(rawFilter as Period) ? (rawFilter as Period) : 'last_30_days';
   const onlyUnanswered = legacyUnanswered || rawUnanswered === '1';
-  const view: 'gesprekken' | 'top-questions' = rawView === 'top-questions' ? 'top-questions' : 'gesprekken';
+  const view: 'gesprekken' | 'unanswered' | 'top-questions' =
+    rawView === 'top-questions' ? 'top-questions' : rawView === 'unanswered' ? 'unanswered' : 'gesprekken';
 
   const all = listFixtureConversations(period);
   const faqResult = getFixtureFaq();
+  const unansweredRows = getFixtureUnanswered().map((u) => ({
+    key: normalizeQuestionKey(u.question),
+    question: u.question,
+    occurrences: u.occurrences,
+    lastSeenAt: u.lastSeenAt,
+    status: 'open' as const,
+    qaExists: false,
+    threadIds: findFixtureConversationsForQuestions([u.question]).map((h) => h.threadId),
+  }));
   const unansweredCount = all.filter((x) => x.unanswered).length;
   const items: ListItem[] = (onlyUnanswered ? all.filter((x) => x.unanswered) : all).map((c) => ({
     ...c,
@@ -59,6 +74,8 @@ export default async function V1GesprekkenPage({
         items={items}
         fixtureUnansweredCount={unansweredCount}
         faqCount={faqResult.items.length}
+        unansweredOpenCount={unansweredRows.length}
+        unansweredView={view === 'unanswered' ? <DemoUnansweredTab questions={unansweredRows} /> : null}
         topQuestions={
           view === 'top-questions' ? (
             <TopQuestionsTab

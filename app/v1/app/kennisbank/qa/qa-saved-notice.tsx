@@ -15,11 +15,14 @@ export function QASavedNotice({
   question,
   notIngested = false,
   onClose,
+  previewHref = PREVIEW_HREF,
 }: {
   question: string;
   /** true = opgeslagen, maar de chatbot kon het (nog) niet verwerken. */
   notIngested?: boolean;
   onClose: () => void;
+  /** Testchat-link; de publieke demo geeft zijn eigen preview-route mee. */
+  previewHref?: string;
 }) {
   if (notIngested) {
     return (
@@ -42,7 +45,7 @@ export function QASavedNotice({
       title="Opgeslagen. Je chatbot gebruikt dit antwoord vanaf nu"
       actions={
         <>
-          <Link href={PREVIEW_HREF} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+          <Link href={previewHref} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
             Test je chatbot
           </Link>
           <Button variant="ghost" size="sm" onClick={onClose}>
