@@ -16,6 +16,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
 import { bestForegroundOn } from '@/lib/widget/contrast';
 import { isFittedLogo, type WidgetAppearance } from '@/lib/v1/widget/appearance';
 import { WIDGET_STRINGS, type WidgetStrings } from '@/lib/v1/widget/widget-strings';
+import { WIDGET_CREDIT_URL } from '@/lib/v1/widget/credit';
 
 export type WidgetMessage = {
   id: string;
@@ -264,7 +265,22 @@ export function WidgetView({
                 <SendIcon />
               </button>
             </form>
-            <p className="cmw-credit">{t.poweredBy}</p>
+            <p className="cmw-credit">
+              {/* Absolute URL zonder klantinfo (lib/v1/widget/credit.ts). noopener: de
+                  nieuwe tab kan de klantpagina niet besturen; noreferrer: de embed-URL
+                  met slug gaat niet als Referer mee. De iframe is niet gesandboxt, dus
+                  target=_blank werkt. */}
+              <a
+                className="cmw-credit-link"
+                href={WIDGET_CREDIT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`${t.poweredBy} (${t.opensNewTab})`}
+              >
+                {t.poweredBy}
+                <span className="cmw-sr"> ({t.opensNewTab})</span>
+              </a>
+            </p>
           </div>
         </section>
       ) : null}

@@ -29,6 +29,7 @@ import { FeedbackButtons, type FeedbackState } from './feedback-buttons';
 import { formatAccentText } from '@/lib/widget/format-accent';
 import { cleanWidgetAnswer, renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { bestForegroundOn } from '@/lib/widget/contrast';
+import { SITE_URL } from '@/lib/site/navigation';
 import { LocalStorageThreadStore } from '@/lib/widget/thread-store';
 import { getOrCreateVisitorId } from '@/lib/widget/visitor-id';
 import type { Thread } from '@/lib/widget/thread-types';
@@ -1283,7 +1284,7 @@ export function ChatMantaWidget({
           >
             Powered by{' '}
             <a
-              href="/v0/home"
+              href={`${SITE_URL}/`}
               style={{ color: '#6b7280', textDecoration: 'none', fontWeight: 600 }}
               target="_blank"
               rel="noopener noreferrer"
