@@ -7,16 +7,24 @@ import { getSessionOrg, requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getActiveQuizForOrg, listAnswers, listQuestions } from '@/lib/v1/quiz/data';
+import { answersMissingIngest } from '@/lib/v1/quiz/answer-ingest';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { EmptyState } from '@/app/v1/_ui/feedback';
 import { QuizRunner } from './quiz-runner';
+import { QuizIngestRetry } from './ingest-retry';
 import './quiz.css';
 
 export const metadata = { title: 'Kennisquiz · ChatManta' };
 export const dynamic = 'force-dynamic';
 
 const KENNISBANK = '/v1/app/kennisbank';
+
+/** Ingevulde antwoorden zonder KB-document (ingest mislukt). Antwoorden van de
+ *  laatste minuten tellen nog niet mee: die kunnen nog bezig zijn. */
+function countNotIngested(answers: Parameters<typeof answersMissingIngest>[0]): number {
+  return answersMissingIngest(answers, Date.now()).length;
+}
 
 export default async function V1QuizPage() {
   let orgId: string;
@@ -31,7 +39,9 @@ export default async function V1QuizPage() {
   const sb = getV1ServiceRoleClient();
   const quiz = await getActiveQuizForOrg(sb, orgId);
 
-  if (!quiz || quiz.status !== 'actief') {
+  // 'voltooid' toont de afgeronde staat (met de inlees-status); vroeger viel een net
+  // afgeronde quiz hier terug op "geen quiz klaar".
+  if (!quiz || (quiz.status !== 'actief' && quiz.status !== 'voltooid')) {
     return (
       <div className="v1-page v1-qz-page">
         <PageHeader title="Kennisquiz" />
@@ -56,7 +66,9 @@ export default async function V1QuizPage() {
   ]);
 
   const answeredIds = new Set(answers.map((a) => a.questionId));
-  const unanswered = questions.filter((q) => !answeredIds.has(q.id));
+  const unanswered = quiz.status === 'voltooid' ? [] : questions.filter((q) => !answeredIds.has(q.id));
+  const notIngested = countNotIngested(answers);
+  const retryBlock = notIngested > 0 ? <QuizIngestRetry count={notIngested} /> : null;
 
   // Voltooide quiz (alle vragen beantwoord/overgeslagen).
   if (unanswered.length === 0) {
@@ -65,6 +77,7 @@ export default async function V1QuizPage() {
     return (
       <div className="v1-page v1-qz-page">
         <PageHeader title="Kennisquiz" />
+        {retryBlock}
         <div className="v1-card">
           <EmptyState
             action={
@@ -75,8 +88,10 @@ export default async function V1QuizPage() {
           >
             <strong>Quiz afgerond.</strong> We hebben {answeredCount}{' '}
             {answeredCount === 1 ? 'antwoord' : 'antwoorden'} opgeslagen
-            {skippedCount > 0 ? ` (${skippedCount} overgeslagen)` : ''}. Je kennisbank wordt de komende minuten
-            bijgewerkt.
+            {skippedCount > 0 ? ` (${skippedCount} overgeslagen)` : ''}.{' '}
+            {notIngested > 0
+              ? 'Een deel staat nog niet in je kennisbank, zie hierboven.'
+              : 'Je chatbot gebruikt ze vanaf nu in zijn antwoorden.'}
           </EmptyState>
         </div>
       </div>
@@ -90,6 +105,7 @@ export default async function V1QuizPage() {
   return (
     <div className="v1-page v1-qz-page">
       <PageHeader title="Kennisquiz" description="Een paar korte vragen, je antwoorden gaan direct naar je kennisbank." />
+      {retryBlock}
       <QuizRunner question={current} index={index} total={total} />
     </div>
   );

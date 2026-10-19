@@ -1,18 +1,24 @@
 'use server';
 
-// V1 klant — quiz-antwoord indienen.
+// V1 klant — quiz-antwoord indienen + mislukte inlees-pogingen opnieuw proberen.
 //
 // Auth (SA-1): getSessionOrg() + requireOrgMember() vóór elke service-role-write.
 // Org uit de getrouwde sessie, NOOIT uit client-input. questionId valideert via DB
-// (vraag.quizId == actieve quiz van deze org). PII-redactie aan de poort (redactPii)
-// vóór ingest of opslag. UNIQUE(question_id) is de echte idempotentie-grens.
+// (vraag.quizId == actieve quiz van deze org). UNIQUE(question_id) is de echte
+// idempotentie-grens; de koppeling antwoord→document is een conditionele claim.
+//
+// Redactie (gelijkgetrokken met de handmatige Q&A): zakelijke e-mail/telefoon/website
+// blijven staan, alleen IBAN/BSN worden gemaskeerd (sanitizeQuizAnswer).
+// Na een geslaagde ingest: answer-cache purgen (zelfde patroon als qa-actions).
 
 import { revalidatePath } from 'next/cache';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSessionOrg, requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
-import { redactPii } from '@/lib/observability/redact';
-import { ingestDocument } from '@/lib/rag/ingest';
+import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
+import { answersMissingIngest, quizIngestInput, sanitizeQuizAnswer } from '@/lib/v1/quiz/answer-ingest';
+import type { QuizQuestion } from '@/lib/controlroom/types';
 import { getOrgChatbot } from '../rag-config';
 import {
   createAnswer,
@@ -28,6 +34,9 @@ import {
 
 const QUIZ_ANSWER_MAX = 2000;
 const QUIZ_PATH = '/v1/app/quiz';
+const KENNISBANK_PATH = '/v1/app/kennisbank';
+/** Max. antwoorden per retry-klik (een quiz heeft er hooguit 20). */
+const RETRY_MAX = 20;
 
 type SubmitPayload = {
   antwoord?: string | null;
@@ -37,12 +46,63 @@ type SubmitPayload = {
 };
 
 type SubmitResult =
-  | { ok: true; done: boolean; answered: number; total: number }
+  | { ok: true; done: boolean; answered: number; total: number; ingestFailed: boolean }
   | { ok: false; error: string };
 
-function authFail(e: unknown): SubmitResult {
+function authFail(e: unknown): { ok: false; error: string } {
   if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') return { ok: false, error: 'Geen toegang.' };
   throw e; // NEXT_REDIRECT (geen sessie) propageren
+}
+
+/**
+ * Lees één antwoord in als KB-document en koppel het (conditioneel) aan het antwoord.
+ * 'ok' = gekoppeld; 'duplicate' = een gelijktijdige poging was eerder (ons document is
+ * weer opgeruimd); 'failed' = ingest of koppeling mislukte (antwoord blijft bewaard).
+ * Purgen doet de caller (één keer per actie).
+ */
+async function ingestQuizAnswer(
+  sb: SupabaseClient,
+  ctx: { orgId: string; chatbotId: string; quizId: string },
+  question: Pick<QuizQuestion, 'id' | 'vraag' | 'categorie' | 'categorieLabel'>,
+  answerId: string,
+  antwoord: string,
+): Promise<'ok' | 'duplicate' | 'failed'> {
+  let documentId: string;
+  try {
+    const input = quizIngestInput(question, ctx.quizId, antwoord);
+    const res = await ingestDocument(sb, {
+      organizationId: ctx.orgId,
+      chatbotId: ctx.chatbotId,
+      filename: input.filename,
+      text: input.text,
+      source: 'upload',
+      metadata: input.metadata,
+    });
+    documentId = res.documentId;
+  } catch (e) {
+    console.error('[v1:quiz] ingest faalde', (e as Error).message);
+    return 'failed';
+  }
+
+  const claimed = await setAnswerIngestedDoc(sb, answerId, documentId, ctx.orgId);
+  if (claimed) return 'ok';
+
+  // Niet geclaimd: óf een andere poging koppelde al een document (→ het onze is dubbel),
+  // óf de update faalde. In beide gevallen ons document uit de retrieval halen, zodat
+  // er nooit een ongekoppeld (onbeheerbaar) duplicaat blijft staan.
+  await sb
+    .from('documents')
+    .update({ included: false, deleted_at: new Date().toISOString() })
+    .eq('id', documentId)
+    .eq('organization_id', ctx.orgId)
+    .eq('chatbot_id', ctx.chatbotId);
+  const { data: row } = await sb
+    .from('v1_quiz_answer')
+    .select('ingested_document_id')
+    .eq('id', answerId)
+    .eq('organization_id', ctx.orgId)
+    .maybeSingle();
+  return row?.ingested_document_id ? 'duplicate' : 'failed';
 }
 
 export async function submitQuizAnswerV1Action(
@@ -81,7 +141,6 @@ export async function submitQuizAnswerV1Action(
       }
     }
 
-    // PII-redactie aan de poort.
     let antwoord: string | null = null;
     let meerkeuzeOptie: string | null = null;
     let andersTekst: string | null = null;
@@ -96,10 +155,10 @@ export async function submitQuizAnswerV1Action(
         antwoord = (payload.antwoord ?? '').trim().slice(0, QUIZ_ANSWER_MAX) || null;
       }
       if (antwoord && antwoord.length > 0) {
-        const safe = redactPii(antwoord);
-        redacted = safe !== antwoord;
-        antwoord = safe;
-        if (andersTekst) andersTekst = redactPii(andersTekst);
+        const safe = sanitizeQuizAnswer(antwoord);
+        redacted = safe.redacted;
+        antwoord = safe.text;
+        if (andersTekst) andersTekst = sanitizeQuizAnswer(andersTekst).text;
       }
     }
 
@@ -127,24 +186,19 @@ export async function submitQuizAnswerV1Action(
     }
 
     // Ingest — pas na de geslaagde claim (één winner, geen dubbele KB-documenten).
+    // Een fout draait het opgeslagen antwoord niet terug; de klant ziet het op de
+    // quizpagina als "nog niet verwerkt" met een knop om het opnieuw te proberen.
+    let ingestFailed = false;
     if (antwoord && antwoord.length > 0) {
-      try {
-        if (chatbot) {
-          const res = await ingestDocument(sb, {
-            organizationId: orgId,
-            chatbotId: chatbot.id,
-            filename: `Quiz-antwoord · ${question.categorieLabel ?? question.categorie}`,
-            text: `Vraag: ${question.vraag}\nAntwoord: ${antwoord}`,
-            source: 'upload',
-            metadata: { origin: 'quiz', quiz_id: quiz.id, question_id: question.id, label: 'quiz-antwoord' },
-          });
-          await setAnswerIngestedDoc(sb, answer.id, res.documentId);
-        }
-      } catch (e) {
-        // Ingest is niet-transactioneel; een fout mag het opgeslagen antwoord niet
-        // terugdraaien. De operator ziet het antwoord in de quiz-rij.
-        console.error('[v1:submitQuizAnswer] ingest faalde', (e as Error).message);
-      }
+      const res = await ingestQuizAnswer(
+        sb,
+        { orgId, chatbotId: chatbot.id, quizId: quiz.id },
+        question,
+        answer.id,
+        antwoord,
+      );
+      if (res === 'failed') ingestFailed = true;
+      else await purgeAnswerCache(sb, orgId, chatbot.id); // best-effort (logt, gooit niet)
     }
 
     // Tellingen bijwerken + bepalen of de quiz klaar is.
@@ -163,9 +217,72 @@ export async function submitQuizAnswerV1Action(
       revalidatePath('/v1/admin/quiz', 'layout');
     }
     revalidatePath(QUIZ_PATH);
-    return { ok: true, done, answered: answeredCount, total: active.length };
+    revalidatePath(KENNISBANK_PATH);
+    return { ok: true, done, answered: answeredCount, total: active.length, ingestFailed };
   } catch (e) {
     console.error('[v1:submitQuizAnswerV1Action]', e);
+    return { ok: false, error: 'Er ging iets mis. Probeer het opnieuw.' };
+  }
+}
+
+type RetryResult = { ok: true; retried: number; failed: number } | { ok: false; error: string };
+
+/**
+ * Lees de antwoorden van de quiz van deze org die nog niet in de kennisbank staan
+ * opnieuw in. Geen ID's van de client: quiz en antwoorden komen uit de sessie-org.
+ * Antwoorden jonger dan de grace-periode worden overgeslagen (eerste poging kan nog
+ * lopen); de conditionele koppeling voorkomt dubbele documenten bij een race.
+ */
+export async function retryQuizIngestV1Action(): Promise<RetryResult> {
+  let orgId: string;
+  try {
+    ({ orgId } = await getSessionOrg());
+    await requireOrgMember(orgId);
+  } catch (e) {
+    return authFail(e);
+  }
+
+  const sb = getV1ServiceRoleClient();
+  try {
+    const quiz = await getActiveQuizForOrg(sb, orgId);
+    if (!quiz || quiz.organizationId !== orgId || (quiz.status !== 'actief' && quiz.status !== 'voltooid')) {
+      return { ok: false, error: 'Er is geen quiz om te verwerken.' };
+    }
+    const chatbot = await getOrgChatbot(sb, orgId);
+    if (!chatbot) return { ok: false, error: 'Er is nog geen chatbot ingesteld.' };
+
+    const [questions, answers] = await Promise.all([listQuestions(sb, quiz.id), listAnswers(sb, quiz.id)]);
+    const byId = new Map(questions.map((q) => [q.id, q]));
+    const todo = answersMissingIngest(
+      answers.filter((a) => a.organizationId === orgId),
+      Date.now(),
+    ).slice(0, RETRY_MAX);
+
+    let retried = 0;
+    let failed = 0;
+    for (const a of todo) {
+      const q = byId.get(a.questionId);
+      if (!q || q.organizationId !== orgId || !a.antwoord) {
+        failed += 1;
+        continue;
+      }
+      const res = await ingestQuizAnswer(
+        sb,
+        { orgId, chatbotId: chatbot.id, quizId: quiz.id },
+        q,
+        a.id,
+        a.antwoord,
+      );
+      if (res === 'failed') failed += 1;
+      else retried += 1;
+    }
+    if (retried > 0) await purgeAnswerCache(sb, orgId, chatbot.id);
+
+    revalidatePath(QUIZ_PATH);
+    revalidatePath(KENNISBANK_PATH);
+    return { ok: true, retried, failed };
+  } catch (e) {
+    console.error('[v1:retryQuizIngestV1Action]', e);
     return { ok: false, error: 'Er ging iets mis. Probeer het opnieuw.' };
   }
 }

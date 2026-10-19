@@ -42,7 +42,11 @@ export function QuizRunner({ question, index, total }: { question: QuizQuestion;
         setOpen('');
         setChoice('');
         setAnders('');
-        if (res.done) toast.success('Quiz afgerond. Je antwoorden staan in je kennisbank.');
+        if (res.ingestFailed) {
+          toast.error('Antwoord bewaard, maar je chatbot kon het nog niet leren. Je kunt het later opnieuw proberen.');
+        } else if (res.done) {
+          toast.success('Quiz afgerond. Je antwoorden staan in je kennisbank.');
+        }
         router.refresh();
       } else {
         setError(res.error ?? 'Er ging iets mis. Probeer het opnieuw.');
