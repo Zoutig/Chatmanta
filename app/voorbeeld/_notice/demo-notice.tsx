@@ -29,6 +29,9 @@ export function DemoNotice() {
   const open = !seen && !dismissed;
   const ref = useRef<HTMLDialogElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
+  // Alleen sluiten als de klik óók op de achtergrond begon: tekst selecteren die buiten
+  // de kaart eindigt geeft anders een click met target = de dialog.
+  const downOnBackdrop = useRef(false);
   const titleId = useId();
   const bodyId = useId();
 
@@ -59,9 +62,15 @@ export function DemoNotice() {
       aria-labelledby={titleId}
       aria-describedby={bodyId}
       onClose={onClosed}
-      // Klik op de achtergrond (buiten de kaart) sluit ook.
+      // Klik op de achtergrond (buiten de kaart) sluit ook: pointerdown én click moeten
+      // allebei op de dialog zelf vallen (de kaart vult de dialog, dus dat is de backdrop).
+      onPointerDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) close();
+        const fromBackdrop = downOnBackdrop.current;
+        downOnBackdrop.current = false;
+        if (fromBackdrop && e.target === e.currentTarget) close();
       }}
     >
       <div className="vbn-card">

@@ -6,12 +6,13 @@
 .vbn {
   color-scheme: light;
   width: min(420px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
   margin: auto;
   padding: 0;
   border: 0;
   border-radius: 20px;
-  overflow: auto;
+  /* Scrollen gebeurt in .vbn-card, niet in de dialog zelf: anders telt een klik op de
+     scrollbalk als 'klik op de achtergrond' en sluit de melding. */
+  overflow: hidden;
   background: #fff;
   color: #0c1e2e;
   font-family: var(--font-v1), 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -20,7 +21,13 @@
 .vbn::backdrop { background: rgba(8, 18, 28, 0.55); }
 html:has(.vbn[open]) { overflow: hidden; }
 
-.vbn-card { display: flex; flex-direction: column; }
+.vbn-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
 
 /* Navy vlak: de mascotte is gemaakt voor navy (docs/site/MASCOTTE.md). */
 .vbn-stage {
