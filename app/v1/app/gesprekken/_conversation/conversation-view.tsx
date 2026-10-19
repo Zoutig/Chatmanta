@@ -17,7 +17,7 @@ import { SourcesPanel } from './sources-panel';
 import { ConversationActions } from './conversation-actions';
 import { ConversationId } from './conversation-id';
 
-export function ConversationView({ detail, isUnanswered, questionForQA }: LoadedConversation) {
+export function ConversationView({ detail, isUnanswered, isClosed, questionForQA }: LoadedConversation) {
   const { thread, messages } = detail;
   const count = messages.length;
 
@@ -57,7 +57,12 @@ export function ConversationView({ detail, isUnanswered, questionForQA }: Loaded
         })}
       </ol>
 
-      <ConversationActions threadId={thread.id} suggestedQuestion={questionForQA} isUnanswered={isUnanswered} />
+      <ConversationActions
+        threadId={thread.id}
+        suggestedQuestion={questionForQA}
+        isUnanswered={isUnanswered}
+        isClosed={isClosed}
+      />
 
       <ConversationId id={thread.id} />
     </div>

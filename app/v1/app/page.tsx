@@ -22,6 +22,8 @@ import { createClient } from '@/lib/supabase/v1/server';
 import { getV1OverviewMetrics, type V1OverviewMetrics } from '@/lib/v1/dashboard/metrics';
 import { getShellCounts } from '@/lib/v1/dashboard/shell-counts';
 import { criticalItems, getAttentionSignals } from '@/lib/v1/dashboard/attention';
+import { getUnansweredForOrg } from '@/lib/v1/dashboard/unanswered';
+import { normalizeQuestionKey } from '@/lib/v1/dashboard/unanswered-core';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { buttonClass } from '@/app/v1/_ui/button';
 import { AttentionBlock, EmptyState, StatusPill } from '@/app/v1/_ui/feedback';
@@ -58,6 +60,7 @@ function plural(n: number, one: string, many: string): string {
 }
 
 const QA_HREF = '/v1/app/kennisbank?tab=qa&prefillQuestion=';
+const UNANSWERED_HREF = '/v1/app/gesprekken?view=unanswered';
 
 // Rondleiding: selectors bestaan in de nieuwe schil en op dit scherm.
 // '#setup-checklist' (het volgende-stap-blok) wordt door OnboardingTour
@@ -163,10 +166,11 @@ export default async function V1OverviewPage() {
     );
   }
 
-  const [m, counts, signals] = await Promise.all([
+  const [m, counts, signals, unansweredAll] = await Promise.all([
     getV1OverviewMetrics(supabase, orgId, chatbot.id),
     getShellCounts(supabase, orgId, chatbot.id),
     getAttentionSignals(supabase, orgId, chatbot.id),
+    getUnansweredForOrg(orgId, chatbot.id),
   ]);
 
   const critical = criticalItems(signals);
@@ -181,8 +185,12 @@ export default async function V1OverviewPage() {
     enabled: counts.contactRequestsEnabled,
     newCount: counts.contactRequestsNewCount,
   });
-  const unanswered = m.unanswered.slice(0, 5);
-  const top = m.topQuestions;
+  // Gedeelde definitie (zelfde als zijbalk en Gesprekken › Wist je chatbot niet):
+  // open vragen van de laatste 30 dagen, zonder off-topic en zonder al afgehandelde.
+  const openList = unansweredAll.questions.filter((q) => q.status === 'open');
+  const unanswered = openList.slice(0, 5);
+  const openKeys = new Set(openList.map((q) => q.key));
+  const top = m.topQuestions.map((q) => ({ ...q, unanswered: openKeys.has(normalizeQuestionKey(q.question)) }));
   const topMax = top.length > 0 ? Math.max(...top.map((q) => q.count)) : 1;
 
   return (
@@ -232,14 +240,20 @@ export default async function V1OverviewPage() {
 
       <div className="v1-ov-cols">
         <section className="v1-card v1-ov-card-list" aria-label="Hier wist je chatbot het niet">
-          <SectionHead title="Hier wist je chatbot het niet" link={{ href: '/v1/app/gesprekken', label: 'Alle gesprekken' }} />
+          <SectionHead
+            title="Hier wist je chatbot het niet"
+            link={{
+              href: UNANSWERED_HREF,
+              label: openList.length > unanswered.length ? `Alle ${openList.length}` : 'Werklijst',
+            }}
+          />
           {unanswered.length === 0 ? (
             <EmptyState>Alles beantwoord. Wat je chatbot niet weet, verschijnt hier.</EmptyState>
           ) : (
             <List label="Onbeantwoorde vragen">
               {unanswered.map((u) => (
                 <ListRow
-                  key={u.question}
+                  key={u.key}
                   wrap
                   title={u.question}
                   meta={[`${u.occurrences} keer gevraagd`, shortDate(u.lastSeenAt)].filter(Boolean).join(' · ')}

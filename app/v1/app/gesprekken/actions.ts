@@ -17,6 +17,9 @@ import { getSessionOrg } from '@/lib/auth';
 import { requireOrgMember } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
+import { createClient } from '@/lib/supabase/v1/server';
+import { loadUnanswered } from '@/lib/v1/dashboard/unanswered';
+import { normalizeQuestionKey } from '@/lib/v1/dashboard/unanswered-core';
 import { getOrgChatbot } from '../rag-config';
 
 const GESPREKKEN_PATH = '/v1/app/gesprekken';
@@ -62,5 +65,53 @@ export async function markConversationResolvedAction(
 
   revalidatePath(`${GESPREKKEN_PATH}/${threadId}`);
   revalidatePath(GESPREKKEN_PATH);
+  revalidatePath('/v1/app', 'layout'); // zijbalk-teller + Overzicht
   return { ok: true };
+}
+
+/**
+ * Werklijst "Wist je chatbot niet": markeer één vraag als opgelost zonder hem te
+ * beantwoorden. Er is geen eigen status-kolom per vraag; "opgelost" = de gesprekken
+ * waarin deze vraag een fallback kreeg krijgen status 'closed' (dezelfde markering als
+ * "Markeer als opgelost" in een gesprek). Stelt een bezoeker de vraag later opnieuw en
+ * weet de chatbot het weer niet, dan staat hij vanzelf weer open.
+ *
+ * SA-1: org uit de sessie; de gesprekken worden server-side bepaald uit de vraagtekst
+ * (via de RLS-session-client) en de update scoopt op org + chatbot. Geen ID's van de client.
+ */
+export async function markQuestionResolvedAction(
+  question: string,
+): Promise<{ ok: boolean; error?: string; closed?: number }> {
+  let ctx: OrgCtx;
+  try {
+    ctx = await requireOrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  const { orgId, chatbotId, sb } = ctx;
+  const key = normalizeQuestionKey(String(question ?? '').slice(0, 2000));
+  if (!key) return { ok: false, error: 'Geen vraag opgegeven.' };
+
+  const session = await createClient();
+  const overview = await loadUnanswered(session, orgId, chatbotId);
+  const target = overview.questions.find((q) => q.key === key);
+  const threadIds = target?.threadIds ?? [];
+  if (threadIds.length === 0) {
+    return {
+      ok: false,
+      error: 'Deze vraag hoort niet bij een gesprek met een bezoeker (bijvoorbeeld een testvraag). Hij verdwijnt na 30 dagen vanzelf.',
+    };
+  }
+
+  const { error } = await sb
+    .from('threads')
+    .update({ status: 'closed' })
+    .eq('organization_id', orgId)
+    .eq('chatbot_id', chatbotId)
+    .in('id', threadIds);
+  if (error) return { ok: false, error: `Opslaan mislukt: ${error.message}` };
+
+  revalidatePath(GESPREKKEN_PATH);
+  revalidatePath('/v1/app', 'layout');
+  return { ok: true, closed: threadIds.length };
 }

@@ -41,7 +41,7 @@ export default async function V1GesprekDetailPage({ params }: { params: Promise<
           </Link>
         }
       />
-      <ConversationView detail={res.detail} isUnanswered={res.isUnanswered} questionForQA={res.questionForQA} />
+      <ConversationView detail={res.detail} isUnanswered={res.isUnanswered} isClosed={res.isClosed} questionForQA={res.questionForQA} />
     </div>
   );
 }

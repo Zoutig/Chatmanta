@@ -5,16 +5,26 @@
 // Auth: getSessionOrg → AUTH_FORBIDDEN / NEXT_REDIRECT. Read via de session-client
 // (RLS): een thread van een andere org geeft null terug → 'not_found'. Geen
 // service-role nodig.
+//
+// "Onbeantwoord" volgt de gedeelde definitie (lib/v1/dashboard/unanswered.ts): het
+// gesprek heeft een fallback op een vraag die nog open staat (niet off-topic, niet
+// afgehandeld, gesprek niet "opgelost"). De vraag voor "Antwoord geven" is díe vraag,
+// ook als hij eerder in het gesprek viel dan het laatste bot-antwoord.
 
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getV1Conversation, type V1ConversationDetail } from '@/lib/v1/dashboard/conversations';
+import { getOrgChatbot } from '@/app/v1/app/rag-config';
+import { getUnansweredForOrg } from '@/lib/v1/dashboard/unanswered';
+import { normalizeQuestionKey } from '@/lib/v1/dashboard/unanswered-core';
 
 export type LoadedConversation = {
   detail: V1ConversationDetail;
   isUnanswered: boolean;
-  /** De bezoekersvraag die bij het laatste bot-antwoord hoort (voor "Antwoord geven"). */
+  /** Gesprek staat op "opgelost" (threads.status='closed'). */
+  isClosed: boolean;
+  /** De bezoekersvraag waar de bot op afhaakte (of anders de laatste vraag). */
   questionForQA: string;
 };
 
@@ -22,6 +32,14 @@ export type ConversationLoad =
   | { status: 'forbidden' }
   | { status: 'not_found' }
   | ({ status: 'ok' } & LoadedConversation);
+
+/** Bezoekersvraag direct vóór bericht `idx`. */
+function userBefore(detail: V1ConversationDetail, idx: number): string | null {
+  for (let i = idx - 1; i >= 0; i--) {
+    if (detail.messages[i].role === 'user') return detail.messages[i].content;
+  }
+  return null;
+}
 
 export async function loadConversation(id: string): Promise<ConversationLoad> {
   let orgId: string;
@@ -36,18 +54,33 @@ export async function loadConversation(id: string): Promise<ConversationLoad> {
   const detail = await getV1Conversation(supabase, orgId, id);
   if (!detail) return { status: 'not_found' };
 
-  // Status afleiden uit het laatste assistant-bericht.
-  const lastAssistant = [...detail.messages].reverse().find((m) => m.role === 'assistant');
-  const isUnanswered = lastAssistant?.kind === 'fallback';
+  const isClosed = detail.thread.status === 'closed';
+  const chatbot = await getOrgChatbot(supabase, orgId);
+  const unanswered = chatbot ? await getUnansweredForOrg(orgId, chatbot.id) : null;
+  const openKeys = new Set((unanswered?.questions ?? []).filter((q) => q.status === 'open').map((q) => q.key));
 
-  // De bezoekersvraag die bij het láátste bot-antwoord hoort: bij een onbeantwoord
-  // gesprek is dat precies de vraag waar de bot op afhaakte.
-  const lastAssistantIdx = lastAssistant ? detail.messages.indexOf(lastAssistant) : -1;
-  const question =
-    detail.messages
-      .slice(0, lastAssistantIdx >= 0 ? lastAssistantIdx : undefined)
-      .reverse()
-      .find((m) => m.role === 'user') ?? detail.messages.find((m) => m.role === 'user');
+  // Laatste fallback in dit gesprek waarvan de vraag nog open staat.
+  let openQuestion: string | null = null;
+  for (let i = detail.messages.length - 1; i >= 0 && !openQuestion; i--) {
+    const m = detail.messages[i];
+    if (m.role !== 'assistant' || m.kind !== 'fallback') continue;
+    const q = userBefore(detail, i);
+    if (q && openKeys.has(normalizeQuestionKey(q))) openQuestion = q;
+  }
+  const isUnanswered = !isClosed && openQuestion !== null && (unanswered?.openThreadIds.has(id) ?? false);
 
-  return { status: 'ok', detail, isUnanswered, questionForQA: question?.content ?? '' };
+  // Anders: de vraag bij het láátste bot-antwoord (voor "Maak Q&A van deze vraag").
+  const lastAssistantIdx = detail.messages.map((m) => m.role).lastIndexOf('assistant');
+  const fallbackQuestion =
+    (lastAssistantIdx >= 0 ? userBefore(detail, lastAssistantIdx) : null) ??
+    detail.messages.find((m) => m.role === 'user')?.content ??
+    '';
+
+  return {
+    status: 'ok',
+    detail,
+    isUnanswered,
+    isClosed,
+    questionForQA: isUnanswered && openQuestion ? openQuestion : fallbackQuestion,
+  };
 }

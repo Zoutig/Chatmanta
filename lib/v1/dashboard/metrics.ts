@@ -41,6 +41,8 @@ export type V1OverviewMetrics = {
   scannedThisMonth: number;
   latency: { p50: number | null; p95: number | null };
   topQuestions: TopQuestion[];
+  /** Ruwe fallback-groepen van deze kalendermaand. Let op: het V1-Overzicht toont de
+   *  gedeelde definitie uit unanswered.ts (30 dagen, zonder off-topic/afgehandeld). */
   unanswered: UnansweredItem[];
   setup: { hasDocument: boolean; hasKnowledgeSource: boolean; hasTraffic: boolean };
 

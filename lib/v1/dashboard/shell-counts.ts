@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
+import { getUnansweredForOrg } from './unanswered';
 
 export type ShellCounts = {
   unansweredCount: number;
@@ -20,7 +21,9 @@ export type ShellCounts = {
  * Faalveilig: bij een DB-hapering gaan de tellers terug op 0 en status op
  * 'concept' — de layout degradeert dan zonder crash.
  *
- * unansweredCount    = query_log rijen kind='fallback' (laatste 30 dagen)
+ * unansweredCount    = open onbeantwoorde VRAGEN (laatste 30 dagen), gedeelde definitie
+ *                      in unanswered-core.ts — zelfde getal als de werklijst
+ *                      "Wist je chatbot niet" in Gesprekken
  * negativeFeedback   = feedback rijen rating='down' (laatste 30 dagen)
  * contactRequestsNew = contact_requests status='new' (alle, niet soft-deleted)
  * contactRequestsEnabled = chatbots.settings.contactRequestsEnabled
@@ -38,15 +41,9 @@ export async function getShellCounts(
   since.setHours(0, 0, 0, 0);
   const sinceIso = since.toISOString();
 
-  const [unansweredRes, negFeedbackRes, contactNewRes, docRes, chatbotRes, trafficRes] = await Promise.all([
-    // Onbeantwoorde vragen: query_log-rijen met kind='fallback' deze maand.
-    client
-      .from('query_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('chatbot_id', chatbotId)
-      .eq('kind', 'fallback')
-      .gte('created_at', sinceIso),
+  const [unanswered, negFeedbackRes, contactNewRes, docRes, chatbotRes, trafficRes] = await Promise.all([
+    // Onbeantwoorde vragen: gedeelde definitie (per request gecachet, ook voor de pagina).
+    getUnansweredForOrg(orgId, chatbotId),
 
     // Negatieve feedback: thumbs-down deze maand.
     client
@@ -99,7 +96,7 @@ export async function getShellCounts(
   const hasTraffic = (trafficRes.data?.length ?? 0) > 0;
 
   return {
-    unansweredCount: unansweredRes.count ?? 0,
+    unansweredCount: unanswered.openCount,
     negativeFeedbackCount: negFeedbackRes.count ?? 0,
     contactRequestsNewCount: contactNewRes.count ?? 0,
     contactRequestsEnabled: settings.contactRequestsEnabled === true,
