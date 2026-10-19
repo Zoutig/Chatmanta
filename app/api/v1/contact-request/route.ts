@@ -27,6 +27,7 @@ import { getChatbotSettings } from '@/app/v1/app/instellingen/settings-config';
 import { validateContactBody } from '@/lib/v1/widget/contact-validate';
 import { notifyNewV1ContactRequest } from '@/lib/notifications/v1-contact-request-notify';
 import { allowOrgContactMailToday, allowVisitorContactToday } from '@/lib/v1/limits/visitor-day-limit';
+import { captureError } from '@/lib/v1/observability/error-capture';
 
 export const runtime = 'nodejs';
 
@@ -135,6 +136,17 @@ export async function POST(req: Request) {
     after(async () => {
       if (!(await allowOrgContactMailToday(organizationId))) {
         console.warn('[v1/contact-request] mail-dagcap bereikt, geen notificatie voor org', organizationId);
+        // Niet stil: één gegroepeerde melding (fingerprint per org+code) in de admin-
+        // Issues-tab, zodat wij de klant kunnen wijzen op de leads in zijn dashboard.
+        captureError({
+          surface: 'api',
+          severity: 'warning',
+          code: 'CONTACT_MAIL_CAP',
+          title: 'Mail-dagcap contactverzoeken bereikt',
+          message: 'Notificatiemails voor deze org overgeslagen; verzoeken staan wel in het dashboard.',
+          organizationId,
+          enforceCap: true,
+        });
         return;
       }
       await notifyNewV1ContactRequest(svc, {
