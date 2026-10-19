@@ -170,7 +170,9 @@ export default async function V1AdminOverviewPage() {
         <ListCard
           title="Widget nog niet live"
           items={s.widgetNotLive}
-          metaFn={(k) => (k.widgetStatus === 'detected' ? 'Gevonden, niet actief' : 'Niet geplaatst')}
+          metaFn={(k) =>
+            k.widgetStatus === 'detected' ? 'Domein ingesteld of gepauzeerd, niet live gezien' : 'Niet geplaatst'
+          }
           emptyText="Alle actieve klanten en proefklanten hebben een live widget."
         />
         <ListCard

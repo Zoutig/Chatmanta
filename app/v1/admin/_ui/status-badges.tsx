@@ -53,7 +53,9 @@ export function HealthBadge({ status }: { status: HealthStatus }) {
 
 const WIDGET: Record<WidgetStatus, { tone: Tone; label: string }> = {
   not_installed: { tone: 'warn', label: 'Niet geplaatst' },
-  detected: { tone: 'accent', label: 'Gevonden' },
+  // 'detected' = gezien-maar-gepauzeerd ÓF alleen domein ingesteld, nog nooit gezien
+  // (lib/v1/admin/overview.ts). Het label claimt dus geen installatie.
+  detected: { tone: 'accent', label: 'Ingesteld, niet live' },
   active: { tone: 'ok', label: 'Actief' },
 };
 

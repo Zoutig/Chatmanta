@@ -26,6 +26,16 @@ import {
   type TechnicalStatus,
 } from '@/lib/controlroom/types';
 
+// V1-tekst voor gedeelde (V0) health-redenen. 'detected' betekent in V1 ook "alleen
+// domein ingesteld, nog nooit gezien"; de V0-tekst "gevonden" klopt dan niet. Alleen
+// het label wijzigt hier — lib/controlroom (gedeeld met V0) blijft ongemoeid.
+const V1_HEALTH_REASON_LABELS: Record<string, string> = {
+  'Widget gevonden maar nog niet actief': 'Widget ingesteld of gepauzeerd, nog niet live gezien',
+};
+function v1HealthReasonLabel(reason: string): string {
+  return V1_HEALTH_REASON_LABELS[reason] ?? reason;
+}
+
 // ---------------------------------------------------------------------------
 // Geëxporteerde types
 // ---------------------------------------------------------------------------
@@ -351,7 +361,7 @@ async function getOrgSignals(
     commercialStatus: profile.commercialStatus,
     technicalStatus,
     health: health.status,
-    healthReasons: health.reasons,
+    healthReasons: health.reasons.map(v1HealthReasonLabel),
     widgetStatus,
     sources,
     conversationsThisWeek: threadsWeekRes.count ?? 0,

@@ -48,8 +48,9 @@ export async function WidgetTab({ orgId, chatbotId }: { orgId: string; chatbotId
               {isActive ? 'Actief' : 'Gepauzeerd'}
             </Badge>
           </Row>
-          <Row label="Gevonden op website">
+          <Row label="Gezien op website">
             {lastSeenAt ? (
+              // Host komt van de client (?h=): signaal, geen bewijs.
               <Badge tone="ok">{lastSeenOrigin ? `Ja, op ${lastSeenOrigin}` : 'Ja'}</Badge>
             ) : (
               <Badge tone="warn">Nog niet gezien</Badge>
