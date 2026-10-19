@@ -15,13 +15,28 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { costForModelUsd } from '@/lib/ai/llm';
 import { embedTexts } from '@/lib/rag/embeddings';
 import { readIndexVersion } from '@/lib/rag/ingest';
-import { embedModelFor, type IndexVersion } from '@/lib/rag/index-version';
+import { embedModelFor } from '@/lib/rag/index-version';
 import type {
   QuizAnalyseModel,
   QuizBedrijfscontext,
   QuizProbeVerdict,
   QuizQuestionInput,
 } from '@/lib/controlroom/types';
+import {
+  buildSampleText,
+  chatJsonWith,
+  parseDerive,
+  parseGeneratedQuestions,
+  pickSampleDocs,
+  verdictFor,
+  type ChatClient,
+  type ChatJsonOpts,
+  type ChatJsonResult,
+  type DeriveJson,
+  type GenJson,
+  type ProbeCategory,
+  type SampleDoc,
+} from './analysis-core';
 import {
   completeGeneratingQuiz,
   insertQuestions,
@@ -33,24 +48,19 @@ import {
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const AUX_MODEL = 'gpt-4o-mini';
-// Similarity-drempels zijn modelgebonden. v2 (3-large) geeft lagere top-1-sims; de
-// v2-waarden zijn kwantiel-gemapt op de v1-waarden (ingest-onderzoek fase A, 237 vragen:
-// zelfde fractie vragen onder de drempel → 0,55 ≈ 0,50 en 0,40 ≈ 0,37).
-const THRESHOLDS: Record<IndexVersion, { present: number; weak: number }> = {
-  v1: { present: 0.55, weak: 0.4 },
-  v2: { present: 0.5, weak: 0.37 },
-};
 const PROBE_MATCH_COUNT = 8;
 const EVIDENCE_CHARS = 700;
+// Steekproef: zelfde aantal documenten + tekens als vroeger (zelfde LLM-kosten), maar
+// gespreid over de hele kennisbank en met de intro van elk document (parent 0 en 1).
 const SAMPLE_MAX_DOCS = 12;
+const SAMPLE_CANDIDATE_DOCS = 300;
+const SAMPLE_PER_DOC_CHARS = 1500;
 const SAMPLE_CHUNKS_PER_DOC = 2;
 const SAMPLE_MAX_CHARS = 16000;
 const GEN_GAPS_CHAR_CEILING = 8000;
 const MAX_QUESTIONS = 20;
 
 // ── Categorieën ─────────────────────────────────────────────────────────────
-type ProbeCategory = { key: string; label: string; probe: string };
-
 const CATEGORY_PROBES: ProbeCategory[] = [
   { key: 'diensten', label: 'Diensten & producten', probe: 'Welke diensten en producten biedt het bedrijf aan en wat houden ze in?' },
   { key: 'prijzen', label: 'Prijzen & tarieven', probe: 'Wat kosten de diensten of producten? Tarieven, pakketten en prijzen.' },
@@ -72,35 +82,15 @@ function openai(): OpenAI {
   return _openai;
 }
 
-type ChatJsonResult<T> = { data: T | null; inputTokens: number; outputTokens: number };
-
-async function chatJson<T>(opts: {
-  model: string;
-  system: string;
-  user: string;
-  temperature: number;
-  maxTokens: number;
-}): Promise<ChatJsonResult<T>> {
-  const resp = await openai().chat.completions.create({
-    model: opts.model,
-    temperature: opts.temperature,
-    max_tokens: opts.maxTokens,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: opts.system },
-      { role: 'user', content: opts.user },
-    ],
-  });
-  const text = resp.choices[0]?.message?.content ?? '';
-  const inputTokens = resp.usage?.prompt_tokens ?? 0;
-  const outputTokens = resp.usage?.completion_tokens ?? 0;
-  let data: T | null = null;
-  try { data = JSON.parse(text) as T; } catch { data = null; }
-  return { data, inputTokens, outputTokens };
+/** JSON-call via de pure kern; parameters per model via openaiChatParams. */
+function chatJson<T>(opts: ChatJsonOpts): Promise<ChatJsonResult<T>> {
+  return chatJsonWith<T>(openai() as unknown as ChatClient, opts);
 }
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
-/** Is er analyseerbare content in de V1 kennisbank (org + chatbot-scoped)? */
+/** Is er analyseerbare content in de V1 kennisbank (org + chatbot-scoped)? Telt
+ *  alleen chunks van documenten die niet verwijderd en wel opgenomen zijn (zelfde
+ *  filter als de match-RPC); anders komt een leeggemaakte kennisbank door het gate. */
 export async function hasAnalyzableContent(
   client: SupabaseClient,
   orgId: string,
@@ -108,54 +98,91 @@ export async function hasAnalyzableContent(
 ): Promise<boolean> {
   const { count, error } = await client
     .from('document_chunks')
-    .select('id', { count: 'exact', head: true })
+    .select('id, documents!inner(id)', { count: 'exact', head: true })
     .eq('organization_id', orgId)
-    .eq('chatbot_id', chatbotId);
+    .eq('chatbot_id', chatbotId)
+    .is('documents.deleted_at', null)
+    .eq('documents.included', true);
   if (error) throw new Error(`hasAnalyzableContent: ${error.message}`);
   return (count ?? 0) > 0;
 }
 
 // ── Laag-2 steekproef ─────────────────────────────────────────────────────────
 /** V1: alle content zit in `documents` (uploads + website-paginas). Steekproef
- *  filtert op chatbot_id (chatbot-scoped, V1-standaard). */
+ *  filtert op chatbot_id (chatbot-scoped, V1-standaard). Documenten gespreid over
+ *  de hele kennisbank (pickSampleDocs); per document de intro (parent 0 en 1), met
+ *  de eerste child-chunks op volgorde als terugval. Twee tot drie queries totaal
+ *  (vroeger één per document). */
 async function fetchSample(
   client: SupabaseClient,
   orgId: string,
   chatbotId: string,
 ): Promise<string> {
-  const { data: docs } = await client
+  const { data: docRows } = await client
     .from('documents')
-    .select('id, filename')
+    .select('id, filename, metadata')
     .eq('organization_id', orgId)
     .eq('chatbot_id', chatbotId)
     .eq('included', true)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
-    .limit(SAMPLE_MAX_DOCS);
+    .limit(SAMPLE_CANDIDATE_DOCS);
 
-  if (!docs || docs.length === 0) return '';
+  const all: SampleDoc[] = ((docRows ?? []) as { id: string; filename: string; metadata: unknown }[]).map((d) => ({
+    id: d.id,
+    filename: d.filename,
+    metadata: d.metadata && typeof d.metadata === 'object' ? (d.metadata as Record<string, unknown>) : null,
+  }));
+  const docs = pickSampleDocs(all, SAMPLE_MAX_DOCS);
+  if (docs.length === 0) return '';
+  const ids = docs.map((d) => d.id);
 
-  const blocks: string[] = [];
-  let total = 0;
-  for (const doc of docs as { id: string; filename: string }[]) {
-    const { data } = await client
+  const textByDoc = new Map<string, string[]>();
+  const { data: parents } = await client
+    .from('parent_chunks')
+    .select('document_id, parent_index, content')
+    .eq('organization_id', orgId)
+    .eq('chatbot_id', chatbotId)
+    .in('document_id', ids)
+    .in('parent_index', [0, 1]);
+  const parentRows = ((parents ?? []) as { document_id: string; parent_index: number; content: string }[])
+    .slice()
+    .sort((a, b) => a.parent_index - b.parent_index);
+  for (const p of parentRows) {
+    const list = textByDoc.get(p.document_id) ?? [];
+    list.push(p.content);
+    textByDoc.set(p.document_id, list);
+  }
+
+  // Terugval voor documenten zonder parent-rijen: de eerste child-chunks op volgorde.
+  const missing = ids.filter((id) => !textByDoc.has(id));
+  if (missing.length > 0) {
+    const { data: chunks } = await client
       .from('document_chunks')
-      .select('content')
-      .eq('document_id', doc.id)
+      .select('document_id, content, metadata')
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
-      .limit(SAMPLE_CHUNKS_PER_DOC);
-    const text = (data ?? [])
-      .map((r) => (r as { content: string }).content)
-      .join('\n')
-      .slice(0, 1500);
-    if (!text.trim()) continue;
-    const block = `### ${doc.filename}\n${text}`;
-    if (total + block.length > SAMPLE_MAX_CHARS) break;
-    blocks.push(block);
-    total += block.length;
+      .in('document_id', missing)
+      .limit(missing.length * 20);
+    const byDoc = new Map<string, { idx: number; content: string }[]>();
+    for (const c of (chunks ?? []) as { document_id: string; content: string; metadata: unknown }[]) {
+      const idx = Number((c.metadata as { chunk_index?: number } | null)?.chunk_index ?? 0);
+      const list = byDoc.get(c.document_id) ?? [];
+      list.push({ idx, content: c.content });
+      byDoc.set(c.document_id, list);
+    }
+    for (const [docId, list] of byDoc) {
+      textByDoc.set(
+        docId,
+        list
+          .sort((a, b) => a.idx - b.idx)
+          .slice(0, SAMPLE_CHUNKS_PER_DOC)
+          .map((x) => x.content),
+      );
+    }
   }
-  return blocks.join('\n\n');
+
+  return buildSampleText(docs, textByDoc, { perDocChars: SAMPLE_PER_DOC_CHARS, maxChars: SAMPLE_MAX_CHARS });
 }
 
 // ── Laag 2: branche + dynamische categorieën ──────────────────────────────────
@@ -164,13 +191,6 @@ type DeriveResult = {
   dynamicCategories: ProbeCategory[];
   inputTokens: number;
   outputTokens: number;
-};
-
-type DeriveJson = {
-  branche?: string;
-  beschrijving?: string;
-  doelgroep?: string;
-  extra_categorieen?: { label?: string; zoekzin?: string }[];
 };
 
 async function deriveContext(sample: string): Promise<DeriveResult> {
@@ -197,21 +217,7 @@ async function deriveContext(sample: string): Promise<DeriveResult> {
     temperature: 0.2,
     maxTokens: 600,
   });
-  const context: QuizBedrijfscontext = {
-    branche: data?.branche?.trim() || undefined,
-    beschrijving: data?.beschrijving?.trim() || undefined,
-    doelgroep: data?.doelgroep?.trim() || undefined,
-  };
-  const fixedLabels = CATEGORY_PROBES.map((c) => c.label.toLowerCase());
-  const dynamicCategories: ProbeCategory[] = [];
-  for (const [i, raw] of (data?.extra_categorieen ?? []).entries()) {
-    const label = raw.label?.trim();
-    const probe = raw.zoekzin?.trim();
-    if (!label || !probe) continue;
-    if (fixedLabels.some((f) => f.includes(label.toLowerCase()) || label.toLowerCase().includes(f))) continue;
-    dynamicCategories.push({ key: `dyn_${i + 1}`, label, probe });
-    if (dynamicCategories.length >= 4) break;
-  }
+  const { context, dynamicCategories } = parseDerive(data, CATEGORY_PROBES);
   return { context, dynamicCategories, inputTokens, outputTokens };
 }
 
@@ -223,12 +229,6 @@ type ProbeResult = {
   verdict: QuizProbeVerdict;
   evidence: string;
 };
-
-function verdictFor(sim: number | null, v: IndexVersion): QuizProbeVerdict {
-  if (sim === null || sim < THRESHOLDS[v].weak) return 'ontbreekt';
-  if (sim < THRESHOLDS[v].present) return 'zwak';
-  return 'gedekt';
-}
 
 /** V1: match_chunks_with_parents RPC (enige match-RPC in V1; chatbot-scoped). */
 async function runProbes(
@@ -293,17 +293,6 @@ async function sufficiencyCheck(
 }
 
 // ── Generatie ──────────────────────────────────────────────────────────────────
-type GenJson = {
-  vragen?: {
-    categorie?: string;
-    categorie_label?: string;
-    context?: string;
-    vraag?: string;
-    type?: string;
-    opties?: string[] | null;
-  }[];
-};
-
 async function generateQuestions(
   gaps: ProbeResult[],
   context: QuizBedrijfscontext,
@@ -333,23 +322,7 @@ async function generateQuestions(
   const { data, inputTokens, outputTokens } = await chatJson<GenJson>({
     model, system, user, temperature: 0.4, maxTokens: 2500,
   });
-  const questions: QuizQuestionInput[] = [];
-  for (const [i, q] of (data?.vragen ?? []).entries()) {
-    const vraag = q.vraag?.trim();
-    if (!vraag) continue;
-    const type: QuizQuestionInput['type'] = q.type === 'meerkeuze' ? 'meerkeuze' : 'open';
-    questions.push({
-      categorie: q.categorie?.trim() || 'overig',
-      categorieLabel: q.categorie_label?.trim() || null,
-      context: q.context?.trim() || null,
-      vraag,
-      type,
-      opties: type === 'meerkeuze' && Array.isArray(q.opties) ? q.opties.filter((o) => typeof o === 'string') : null,
-      volgorde: i,
-      bron: 'ai',
-    });
-    if (questions.length >= MAX_QUESTIONS) break;
-  }
+  const questions = parseGeneratedQuestions(data, MAX_QUESTIONS);
   return { questions, inputTokens, outputTokens };
 }
 
