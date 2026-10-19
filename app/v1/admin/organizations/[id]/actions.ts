@@ -652,16 +652,24 @@ export async function adminPurgeAnswerCacheAction(
     const ids = (chatbots ?? []).map((c) => c.id as string);
     if (ids.length === 0) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
 
-    // Alleen voor de melding/audit: hoeveel antwoorden stonden er (null = onbekend).
-    const { count } = await svc
-      .from('answer_cache')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .in('chatbot_id', ids);
+    // Voor de melding/audit: hoeveel antwoorden stonden er (null = onbekend).
+    const countCache = async (): Promise<number | null> => {
+      const { count, error } = await svc
+        .from('answer_cache')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .in('chatbot_id', ids);
+      return error ? null : (count ?? 0);
+    };
+    const before = await countCache();
 
+    // purgeAnswerCache is best-effort (slikt een delete-fout met console.warn, bewust
+    // voor de crawler). Hier wil de admin zekerheid → achteraf opnieuw tellen.
     for (const id of ids) {
       await purgeAnswerCache(svc, orgId, id);
     }
+    const after = await countCache();
+    const removed = before != null && after != null ? Math.max(0, before - after) : null;
 
     await writeAuditLog(svc, {
       organizationId: orgId,
@@ -669,11 +677,20 @@ export async function adminPurgeAnswerCacheAction(
       action: 'answer_cache.purge',
       targetType: 'organization',
       targetId: orgId,
-      metadata: { chatbot_ids: ids, removed: count ?? null },
+      metadata: { chatbot_ids: ids, removed, remaining: after },
     });
 
     revalidatePath(`/v1/admin/organizations/${orgId}`);
-    return { removed: count ?? null, chatbots: ids.length };
+    if (after == null) {
+      fail('INTERNAL', 'Kon niet controleren of de antwoord-cache leeg is. Probeer het opnieuw.');
+    }
+    if (after > 0) {
+      fail(
+        'INTERNAL',
+        `Cache legen is (deels) mislukt: er staan nog ${after} opgeslagen antwoorden. Probeer het opnieuw.`,
+      );
+    }
+    return { removed, chatbots: ids.length };
   });
 }
 
