@@ -24,6 +24,7 @@ import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { publicStreamLine } from '@/lib/v1/widget/stream-whitelist';
+import { checkVisitorDayLimit } from '@/lib/v1/limits/visitor-day-limit';
 import {
   v1InjectionBlock,
   prepareV1WidgetChat,
@@ -141,7 +142,17 @@ export async function POST(req: Request) {
   }
   const organizationId = org.id as string;
 
-  // 4a-7. Chatbot, klant-pauze, per-org gate (rate-limit + maand-cap + dag-budget),
+  // 4a. Daglimiet per bezoeker (org + gehasht IP): één script mag de dag-/maand-
+  //     limiet van de klant niet in minuten opmaken (audit 2026-10 #4).
+  const visitorDay = await checkVisitorDayLimit(organizationId, getClientIp(req));
+  if (!visitorDay.ok) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: { kind: 'fallback', answer: visitorDay.message },
+    });
+  }
+
+  // 4b-7. Chatbot, klant-pauze, per-org gate (rate-limit + maand-cap + dag-budget),
   //       klant-settings, config (bronlinks uit, fast mode) en de runRagQuery-
   //       generator — gedeeld met de eval-suite (app/v1/app/widget-chat.ts).
   //       Terminale uitkomsten zijn niet billable (geen pipeline).

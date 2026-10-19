@@ -57,9 +57,11 @@ export class InMemoryRateLimiter implements RateLimiter {
   private readonly limit: number;
   private readonly windowMs: number;
 
-  constructor(opts?: { maxRequestsPerMin?: number }) {
+  /** `windowSec` (default 60): venster-lengte. `maxRequestsPerMin` is dan het
+   *  maximum per venster (de naam is historisch; voor een dagbucket = per dag). */
+  constructor(opts?: { maxRequestsPerMin?: number; windowSec?: number }) {
     this.limit = opts?.maxRequestsPerMin ?? DEFAULT_MAX_REQUESTS_PER_MIN;
-    this.windowMs = 60_000;
+    this.windowMs = (opts?.windowSec ?? 60) * 1000;
   }
 
   async check(key: string): Promise<RateLimitVerdict> {
@@ -114,15 +116,16 @@ export class UpstashRateLimiter implements RateLimiter {
   private readonly fallback: InMemoryRateLimiter;
   private lastAlarmAtMs = 0;
 
-  constructor(opts: { maxRequestsPerMin: number; prefix: string; redis: Redis }) {
+  constructor(opts: { maxRequestsPerMin: number; prefix: string; redis: Redis; windowSec?: number }) {
+    const windowSec = opts.windowSec ?? 60;
     this.limitValue = opts.maxRequestsPerMin;
     this.ratelimit = new Ratelimit({
       redis: opts.redis,
-      limiter: Ratelimit.slidingWindow(opts.maxRequestsPerMin, '60 s'),
+      limiter: Ratelimit.slidingWindow(opts.maxRequestsPerMin, `${windowSec} s`),
       analytics: false,
       prefix: opts.prefix,
     });
-    this.fallback = new InMemoryRateLimiter({ maxRequestsPerMin: opts.maxRequestsPerMin });
+    this.fallback = new InMemoryRateLimiter({ maxRequestsPerMin: opts.maxRequestsPerMin, windowSec });
   }
 
   check(key: string): Promise<RateLimitVerdict> {
@@ -190,7 +193,7 @@ function readEnvLimit(envName: string, fallback: number): number {
  * staan; anders InMemoryRateLimiter (fail-safe, met one-shot console.warn als
  * USE_UPSTASH wel gevraagd was maar config ontbrak).
  */
-function buildLimiter(opts: { limit: number; prefix: string }): RateLimiter {
+function buildLimiter(opts: { limit: number; prefix: string; windowSec?: number }): RateLimiter {
   const useUpstash = process.env.USE_UPSTASH === 'true';
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -201,6 +204,7 @@ function buildLimiter(opts: { limit: number; prefix: string }): RateLimiter {
       maxRequestsPerMin: opts.limit,
       prefix: opts.prefix,
       redis,
+      windowSec: opts.windowSec,
     });
   }
 
@@ -212,7 +216,7 @@ function buildLimiter(opts: { limit: number; prefix: string }): RateLimiter {
     );
   }
 
-  return new InMemoryRateLimiter({ maxRequestsPerMin: opts.limit });
+  return new InMemoryRateLimiter({ maxRequestsPerMin: opts.limit, windowSec: opts.windowSec });
 }
 
 export function getRateLimiter(): RateLimiter {
@@ -270,6 +274,26 @@ export function getClientErrorRateLimiter(): RateLimiter {
     prefix: '@chatmanta/rl-clienterr',
   });
   return _clientErrorInstance;
+}
+
+let _orgIpDayInstance: RateLimiter | null = null;
+
+/**
+ * Dagbucket per (org, bezoeker-IP) voor het publieke V1-chatpad (security-audit
+ * 2026-10, #4). De per-IP-limiter telt per minuut; zonder daggrens kan één IP de
+ * daglimiet van een klant (250 vragen) in minuten opmaken en de widget voor alle
+ * echte bezoekers platleggen. Sleutel: `org-ip-day:<orgId>:<ipHash>` (gehasht IP).
+ * `limitPerDay` komt uit lib/v1/limits/visitor-day-limit.ts. Zelfde fail-safe als
+ * de andere limiters (Upstash-storing → per-instance in-memory, nooit een 500).
+ */
+export function getOrgIpDayRateLimiter(limitPerDay: number): RateLimiter {
+  if (_orgIpDayInstance) return _orgIpDayInstance;
+  _orgIpDayInstance = buildLimiter({
+    limit: limitPerDay,
+    prefix: '@chatmanta/rl-org-ip-day',
+    windowSec: 24 * 60 * 60,
+  });
+  return _orgIpDayInstance;
 }
 
 const _firecrawlInstances = new Map<string, RateLimiter>();

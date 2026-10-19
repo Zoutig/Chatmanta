@@ -30,6 +30,7 @@ import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
 import { publicStreamLine } from '@/lib/v1/widget/stream-whitelist';
+import { checkVisitorDayLimit } from '@/lib/v1/limits/visitor-day-limit';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { v1RagConfigFor, getOrgChatbot } from '@/app/v1/app/rag-config';
 import {
@@ -161,6 +162,16 @@ export async function POST(req: Request) {
     return ndjsonOnce(requestId, queryLogId, {
       kind: 'fallback',
       response: { kind: 'fallback', answer: 'De voorbeeldchatbot is even niet beschikbaar. Probeer het later opnieuw.' },
+    });
+  }
+
+  // Daglimiet per bezoeker (org + gehasht IP), zodat één script de demo niet voor
+  // iedereen platlegt (audit 2026-10 #4).
+  const visitorDay = await checkVisitorDayLimit(organizationId, getClientIp(req));
+  if (!visitorDay.ok) {
+    return ndjsonOnce(requestId, queryLogId, {
+      kind: 'fallback',
+      response: { kind: 'fallback', answer: visitorDay.message },
     });
   }
 

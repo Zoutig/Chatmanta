@@ -24,19 +24,35 @@ export async function GET(req: Request) {
     return new NextResponse(null, { status: 401 });
   }
 
-  // M-C: per-IP hier doet (gate #1); M-C voegt per-ORG rate-limit toe.
-
   // Org-resolutie via service-role: de slug moet een bestaande, niet-verwijderde
   // org zijn. Onbekend → 401 (geen token voor een onbekende slug).
   const svc = getV1ServiceRoleClient();
   const { data, error } = await svc
     .from('organizations')
-    .select('id')
+    .select('id, suspended_at')
     .eq('slug', slug)
     .is('deleted_at', null)
     .maybeSingle();
   if (error || !data) {
     return new NextResponse(null, { status: 401 });
+  }
+
+  // Zelfde render-gates als de embed-pagina (lib/v1/widget/load-embed.ts): een
+  // opgeschorte org of een gepauzeerde/ontbrekende chatbot krijgt geen vers token
+  // (audit 2026-10 #4). 403 → de widget probeert niet opnieuw (refresh geeft null).
+  // De allowed_domains-check kan hier niet: dit verzoek komt uit onze eigen iframe,
+  // de host van de ouderpagina is hier onbekend (zie bevinding 12, frame-ancestors).
+  if (data.suspended_at) return new NextResponse(null, { status: 403 });
+  const { data: chatbot, error: botErr } = await svc
+    .from('chatbots')
+    .select('id, is_active')
+    .eq('organization_id', data.id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (botErr || !chatbot || chatbot.is_active === false) {
+    return new NextResponse(null, { status: 403 });
   }
 
   try {
