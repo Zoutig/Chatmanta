@@ -599,6 +599,69 @@ export async function setOrgLinkButtonsAction(
   });
 }
 
+// ─────────────────────────── Antwoord-cache legen ───────────────────────────
+//
+// Support-knop: een klant meldt een 'oud' antwoord, of LATEST is gepromoveerd. Leegt
+// de answer-cache van élke (niet-verwijderde) chatbot van deze org via de bestaande
+// purgeAnswerCache (delete + epoch-bump). Kost niets; de eerstvolgende vragen gaan
+// weer door de volledige pipeline. Gate = Jorion-admin; org-lookup (soft-delete-
+// filter) + chatbots gescoped op organization_id (object-level); audit-log.
+
+/** Leeg de antwoord-cache van alle chatbots van deze org. */
+export async function adminPurgeAnswerCacheAction(
+  orgId: string,
+): Promise<ActionResult<{ removed: number | null; chatbots: number }>> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    const svc = getV1ServiceRoleClient();
+
+    const { data: org, error: orgErr } = await svc
+      .from('organizations')
+      .select('id')
+      .eq('id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (orgErr) throw new Error(`org-lookup faalde: ${orgErr.message}`);
+    if (!org) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+
+    const { data: chatbots, error: cbErr } = await svc
+      .from('chatbots')
+      .select('id')
+      .eq('organization_id', orgId)
+      .is('deleted_at', null);
+    if (cbErr) throw new Error(`chatbots-lookup faalde: ${cbErr.message}`);
+    const ids = (chatbots ?? []).map((c) => c.id as string);
+    if (ids.length === 0) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
+
+    // Alleen voor de melding/audit: hoeveel antwoorden stonden er (null = onbekend).
+    const { count } = await svc
+      .from('answer_cache')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .in('chatbot_id', ids);
+
+    for (const id of ids) {
+      await purgeAnswerCache(svc, orgId, id);
+    }
+
+    await writeAuditLog(svc, {
+      organizationId: orgId,
+      userId: actorId,
+      action: 'answer_cache.purge',
+      targetType: 'organization',
+      targetId: orgId,
+      metadata: { chatbot_ids: ids, removed: count ?? null },
+    });
+
+    revalidatePath(`/v1/admin/organizations/${orgId}`);
+    return { removed: count ?? null, chatbots: ids.length };
+  });
+}
+
 // ─────────────────────────── Soft-launch — widget-domeinen ───────────────────────────
 //
 // chatbots.allowed_domains is Jorion-beheerd (de klant ziet 'm read-only). Leeg = de
