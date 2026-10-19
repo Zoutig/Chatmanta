@@ -391,12 +391,16 @@
 .cmw-send:disabled { opacity: 0.4; }
 /* Credit = link naar chatmanta.nl. --cmw-ink-3 (#5b6b7b) haalt ~5,5:1 op wit (was
    #8796a5, ~3:1). Eigen focusring in navy: de globale ring gebruikt de klantkleur,
-   die op wit te licht kan zijn. Padding maakt het klikdoel 24px hoog (WCAG 2.5.8);
-   de .cmw-foot-padding onderaan is daarom 4px kleiner. .cmw .cmw-credit-link (0,2,0)
-   wint van a-regels uit de dashboard-css waarin de previews draaien. */
-.cmw-credit { margin: 0; text-align: center; font-size: 11px; line-height: 16px; color: var(--cmw-ink-3); }
+   die op wit te licht kan zijn. Padding maakt het klikdoel 24px hoog (WCAG 2.5.8).
+   Om de foot even hoog te houden als vóór de link (16px tekst + 10px onder = 26px):
+   margin-top -4px vangt de bovenste link-padding op en de .cmw-foot-padding onderaan
+   is 4px kleiner (24 - 4 + 6 = 26). vertical-align: top voorkomt extra regelhoogte
+   door baseline-uitlijning. .cmw .cmw-credit-link (0,2,0) wint van a-regels uit de
+   dashboard-css waarin de previews draaien. */
+.cmw-credit { margin: -4px 0 0; text-align: center; font-size: 11px; line-height: 16px; color: var(--cmw-ink-3); }
 .cmw .cmw-credit-link {
   display: inline-block;
+  vertical-align: top;
   padding: 4px 6px;
   border-radius: 6px;
   color: inherit;
