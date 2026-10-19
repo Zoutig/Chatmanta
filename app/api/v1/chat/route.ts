@@ -10,7 +10,8 @@
 // alleen op verzoek) — zie applyLinkButtons in app/v1/app/widget-chat.ts.
 //
 // Format: ndjson — één JSON-object per regel. Eerst {kind:'meta', queryLogId, requestId},
-// daarna de StreamEvents uit runRagQuery.
+// daarna de StreamEvents uit runRagQuery, gefilterd door lib/v1/widget/stream-whitelist
+// (geen chunks, kosten, threshold of botversie naar de bezoeker).
 
 import { NextResponse, after } from 'next/server';
 import type { ChatResponse, ChatHistoryTurn } from '@/lib/rag/run-rag-query';
@@ -22,6 +23,7 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { verifyEmbedToken } from '@/lib/v1/widget/embed-token';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
+import { publicStreamLine } from '@/lib/v1/widget/stream-whitelist';
 import {
   v1InjectionBlock,
   prepareV1WidgetChat,
@@ -162,8 +164,10 @@ export async function POST(req: Request) {
           // Merge naar finalResponse voor query_log (cost/latency); spiegelt askV1 +
           // app/api/v0/chat. followups-done/metrics-done vullen ná answer-done aan.
           finalResponse = foldV1FinalResponse(finalResponse, event);
-          const enriched = event.kind === 'error' ? { ...event, requestId } : event;
-          controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
+          // Naar de bezoeker alleen de whitelist (geen chunks/kosten/threshold/
+          // botversie); finalResponse hierboven blijft volledig voor de logging.
+          const line = publicStreamLine(event, requestId);
+          if (line) controller.enqueue(encoder.encode(line));
         }
       } catch (err) {
         console.error('[v1/chat stream]', requestId, err instanceof Error ? err.message : err);

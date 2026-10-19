@@ -29,6 +29,7 @@ import { getV1ServiceRoleClient } from '@/lib/supabase/v1/service-role';
 import { getClientIp, getRateLimiter } from '@/lib/v0/server/rate-limit';
 import { detectInjection, INJECTION_BLOCKED_MESSAGE } from '@/lib/v0/server/injection';
 import { sameOrigin } from '@/lib/v1/widget/origin-lock';
+import { publicStreamLine } from '@/lib/v1/widget/stream-whitelist';
 import { checkOrgChatGates } from '@/lib/v1/limits/chat-gates';
 import { v1RagConfigFor, getOrgChatbot } from '@/app/v1/app/rag-config';
 import {
@@ -223,8 +224,10 @@ export async function POST(req: Request) {
               totalCostUsd: fr.totalCostUsd + event.costUsd,
             };
           }
-          const enriched = event.kind === 'error' ? { ...event, requestId } : event;
-          controller.enqueue(encoder.encode(JSON.stringify(enriched) + '\n'));
+          // Whitelist: geen chunks/kosten/threshold naar de bezoeker; alleen de
+          // brontitels die de demo-bronnenlijst toont.
+          const line = publicStreamLine(event, requestId, { includeSourceTitles: true });
+          if (line) controller.enqueue(encoder.encode(line));
         }
       } catch (err) {
         console.error('[voorbeeld/chat stream]', requestId, err instanceof Error ? err.message : err);
