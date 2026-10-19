@@ -94,9 +94,11 @@ const NDJSON_HEADERS = (requestId: string) =>
     'X-Request-Id': requestId,
   });
 
-function ndjsonOnce(requestId: string, queryLogId: string, event: object): Response {
+function ndjsonOnce(requestId: string, queryLogId: string, event: { kind: string; [k: string]: unknown }): Response {
+  // Ook terminale/gate-events via de whitelist (fail-closed): een later toegevoegd
+  // veld op zo'n event gaat nooit ongefilterd naar de bezoeker.
   const body =
-    JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n' + JSON.stringify(event) + '\n';
+    JSON.stringify({ kind: 'meta', queryLogId, requestId }) + '\n' + publicStreamLine(event, requestId);
   return new Response(body, { status: 200, headers: NDJSON_HEADERS(requestId) });
 }
 

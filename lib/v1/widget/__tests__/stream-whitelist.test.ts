@@ -133,3 +133,11 @@ test('demo-optie: alleen brontitel/url/similarity bij een answer, nooit fragment
   assert.ok(!fb.includes('sources'), 'fallback (weigering) toont geen bronnen');
   assert.ok(!JSON.stringify(ev).includes('GEHEIM-FRAGMENT'));
 });
+
+test('terminaal gate-event (ndjsonOnce-pad): extra velden vallen weg', () => {
+  const line = publicStreamLine(
+    { kind: 'fallback', reason: 'gated', gateState: { monthUsed: 1999 }, response: { kind: 'fallback', answer: 'Even niet.', debug: 'x' } } as never,
+    'r',
+  );
+  assert.deepEqual(JSON.parse(line), { kind: 'fallback', response: { kind: 'fallback', answer: 'Even niet.' } });
+});
