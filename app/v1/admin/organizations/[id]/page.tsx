@@ -111,7 +111,7 @@ export default async function OrgDeepDivePage({
   const [profile, sp, attention] = await Promise.all([
     getProfile(admin, id),
     searchParams,
-    getAdminKlantAttention(admin, id, chatbotId, Boolean(org.suspended_at)).catch(() => []),
+    getAdminKlantAttention(admin, id, chatbotId, Boolean(org.suspended_at)).catch(() => null),
   ]);
 
   const tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as string) : 'overzicht';

@@ -1,7 +1,7 @@
 // Run: node --import tsx --conditions=react-server --test lib/v1/admin/__tests__/klant-attention.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAdminAttentionItems, type AdminAttentionInput } from '../klant-attention';
+import { buildAdminAttentionItems, latestFailedCrawlError, type AdminAttentionInput } from '../klant-attention';
 import { NO_SIGNALS } from '@/lib/v1/dashboard/attention';
 
 const ORG = '00000000-0000-0000-0000-000000000001';
@@ -72,4 +72,22 @@ test('geen chatbot: geen domein-/widget-ruis', () => {
   const items = buildAdminAttentionItems(ORG, { ...calm, hasChatbot: false, allowedDomainsEmpty: true, widgetEverSeen: false });
   assert.equal(items.length, 1);
   assert.match(items[0].text, /geen chatbot/);
+});
+
+test('crawl-fout: alleen van een bron waarvan de nieuwste job mislukt is', () => {
+  const jobs = [
+    // nieuwste eerst
+    { target_id: 'B', status: 'completed', error_message: null },
+    { target_id: 'A', status: 'failed', error_message: 'A kapot' },
+    { target_id: 'B', status: 'failed', error_message: 'B oude fout' },
+    { target_id: 'X', status: 'failed', error_message: 'verwijderde bron' },
+  ];
+  assert.equal(latestFailedCrawlError(jobs, ['A', 'B']), 'A kapot');
+  assert.equal(latestFailedCrawlError(jobs, ['B']), null);
+  assert.equal(latestFailedCrawlError([], ['A']), null);
+});
+
+test('geen chatbot: link naar Beheer, niet naar de lege Botinstellingen', () => {
+  const items = buildAdminAttentionItems(ORG, { ...calm, hasChatbot: false });
+  assert.ok(items[0].href.endsWith('?tab=beheer'));
 });

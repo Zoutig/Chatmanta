@@ -12,15 +12,21 @@ import './attention-panel.css';
 const TONE: Record<AdminAttentionItem['tone'], Tone> = { danger: 'danger', warn: 'warn', info: 'accent' };
 const TONE_LABEL: Record<AdminAttentionItem['tone'], string> = { danger: 'Kritiek', warn: 'Let op', info: 'Info' };
 
-export function AttentionPanel({ orgId, items }: { orgId: string; items: AdminAttentionItem[] }) {
-  const critical = items.filter((i) => i.tone === 'danger').length;
+/** `items = null` = de signalen konden niet geladen worden: dan géén groene 'Niets
+ *  bijzonders', want een stille DB-hapering mag er niet uitzien als 'alles in orde'. */
+export function AttentionPanel({ orgId, items }: { orgId: string; items: AdminAttentionItem[] | null }) {
+  const critical = (items ?? []).filter((i) => i.tone === 'danger').length;
   return (
     <section className="v1-card v1-adm-attn" aria-labelledby="v1-adm-attn-title">
       <div className="v1-adm-card-head">
         <h2 id="v1-adm-attn-title" className="v1-section-title">
           Wat is er aan de hand
         </h2>
-        {items.length === 0 ? (
+        {items == null ? (
+          <Badge tone="warn" dot>
+            Niet geladen
+          </Badge>
+        ) : items.length === 0 ? (
           <Badge tone="ok" dot>
             Niets bijzonders
           </Badge>
@@ -31,7 +37,11 @@ export function AttentionPanel({ orgId, items }: { orgId: string; items: AdminAt
         )}
       </div>
 
-      {items.length === 0 ? (
+      {items == null ? (
+        <p className="v1-adm-muted" style={{ margin: 0 }}>
+          Kon de signalen niet laden. Herlaad de pagina.
+        </p>
+      ) : items.length === 0 ? (
         <p className="v1-adm-muted" style={{ margin: 0 }}>
           Geen limieten bereikt, de widget draait, geen mislukte crawls, onbeantwoorde vragen of open fouten.
         </p>

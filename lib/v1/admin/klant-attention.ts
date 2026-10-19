@@ -54,7 +54,10 @@ export function buildAdminAttentionItems(orgId: string, s: AdminAttentionInput):
     out.push({ tone: 'danger', text: 'Deze klant is opgeschort: de widget verschijnt niet.', href: `${base}?tab=beheer`, action: 'Naar Beheer' });
   }
   if (!s.hasChatbot) {
-    out.push({ tone: 'danger', text: 'Deze klant heeft nog geen chatbot.', href: `${base}?tab=instellingen`, action: 'Naar Botinstellingen' });
+    // Een chatbot aanmaken kan (nog) niet vanuit de admin-UI; de Beheer-tab is de plek
+    // voor klantbeheer en toont de org-status. Geen link naar Botinstellingen: die tab
+    // toont dan alleen 'geen chatbot om in te stellen'.
+    out.push({ tone: 'danger', text: 'Deze klant heeft nog geen chatbot. Vraag Sebastiaan er een aan te maken.', href: `${base}?tab=beheer`, action: 'Naar Beheer' });
   }
   if (s.monthlyQuestionsReached) {
     out.push({ tone: 'danger', text: 'De maandlimiet voor vragen is bereikt. De chatbot weigert tot de 1e van de maand.', href: `${base}?tab=beheer`, action: 'Limieten aanpassen' });
@@ -106,6 +109,50 @@ export function buildAdminAttentionItems(orgId: string, s: AdminAttentionInput):
   return out;
 }
 
+export type CrawlJobRow = { target_id: string | null; status: string; error_message: string | null };
+
+/** PURE: foutmelding bij de mislukte crawl, consistent met crawlFailed (alleen bronnen
+ *  waarvan de NIEUWSTE job mislukt is). `jobs` = nieuwste eerst. Geeft de melding van
+ *  de meest recente zo'n job; een oude fout van een inmiddels gelukte bron telt niet. */
+export function latestFailedCrawlError(jobs: CrawlJobRow[], sourceIds: string[]): string | null {
+  const live = new Set(sourceIds);
+  const seen = new Set<string>();
+  for (const j of jobs) {
+    const tid = j.target_id;
+    if (!tid || !live.has(tid) || seen.has(tid)) continue;
+    seen.add(tid);
+    if (j.status === 'failed') return j.error_message ?? null;
+  }
+  return null;
+}
+
+/** Foutmelding van de mislukte crawl voor deze chatbot (faalveilig → null). */
+async function readCrawlError(admin: SupabaseClient, orgId: string, chatbotId: string): Promise<string | null> {
+  try {
+    const { data: sources } = await admin
+      .from('knowledge_sources')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .eq('type', 'website')
+      .is('deleted_at', null);
+    const ids = (sources ?? []).map((s) => s.id as string);
+    if (ids.length === 0) return null;
+    const { data: jobs } = await admin
+      .from('processing_jobs')
+      .select('target_id, status, error_message')
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .eq('job_type', 'crawl_website')
+      .in('target_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    return latestFailedCrawlError((jobs ?? []) as CrawlJobRow[], ids);
+  } catch {
+    return null;
+  }
+}
+
 const NO_ATTENTION_SIGNALS: AttentionSignals = {
   quizReady: false,
   crawlFailed: 0,
@@ -115,7 +162,8 @@ const NO_ATTENTION_SIGNALS: AttentionSignals = {
   dailyBudgetReached: false,
 };
 
-/** Leest alle signalen voor één org. Faalveilig: een hapering = 'niets aan de hand'. */
+/** Leest alle signalen voor één org. Elke losse read is faalveilig; gooit er toch iets,
+ *  dan vangt de caller dat en toont 'kon niet laden' (niet 'niets aan de hand'). */
 export async function getAdminKlantAttention(
   admin: SupabaseClient,
   orgId: string,
@@ -144,19 +192,7 @@ export async function getAdminKlantAttention(
             () => null,
           )
       : null,
-    admin
-      .from('processing_jobs')
-      .select('error_message')
-      .eq('organization_id', orgId)
-      .eq('job_type', 'crawl_website')
-      .eq('status', 'failed')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(
-        (r) => (r.data as { error_message: string | null } | null)?.error_message ?? null,
-        () => null,
-      ),
+    chatbotId ? readCrawlError(admin, orgId, chatbotId) : null,
     chatbotId
       ? admin
           .from('query_log')
