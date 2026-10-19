@@ -167,8 +167,10 @@ async function processOrg(
   // Privacy-tab toont "laatste verwijdering" (admindashboard/klanten/[orgSlug]) —
   // alleen stempelen als er ook echt iets is aangepast/verwijderd, anders suggereert
   // de datum ten onrechte recente data-verwijdering voor een org zonder kandidaten.
+  // Ook niet stempelen als een stap faalde: dan zou de tab een geslaagde verwijdering
+  // tonen die niet (volledig) gebeurd is.
   const totalTouched = (qlCount ?? 0) + msgCount + contactRequestCandidates;
-  if (apply && totalTouched > 0) {
+  if (apply && totalTouched > 0 && !failed) {
     await upsertPrivacy(orgId, { lastDataDeletionAt: new Date().toISOString() }).catch((e) => {
       console.error('[retention] laatste-verwijdering-stempel faalde org=%s: %s', orgId, (e as Error).message);
     });

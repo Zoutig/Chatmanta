@@ -194,6 +194,7 @@ export async function deleteOrgDataAction(
     //    org-delete niet terugdraaien (log warn, ga door).
     const deletedUserIds: string[] = [];
     const skippedMultiOrgUserIds: string[] = [];
+    const skippedProtectedAdminUserIds: string[] = [];
     for (const uid of memberUserIds) {
       if (uid === actorId) {
         skippedMultiOrgUserIds.push(uid); // de handelende admin nooit zichzelf wissen
@@ -211,7 +212,7 @@ export async function deleteOrgDataAction(
       }
       // Nooit een Jorion-admin-account wissen (fail-closed, audit 2026-10).
       if (await isProtectedAdminUser(admin, uid)) {
-        skippedMultiOrgUserIds.push(uid);
+        skippedProtectedAdminUserIds.push(uid); // admin, of admin-status onbekend
         continue;
       }
       const { error: userErr } = await admin.auth.admin.deleteUser(uid);
@@ -234,6 +235,7 @@ export async function deleteOrgDataAction(
         name: org.name,
         deleted_user_ids: deletedUserIds,
         skipped_multi_org_user_ids: skippedMultiOrgUserIds,
+        skipped_protected_admin_user_ids: skippedProtectedAdminUserIds,
       },
     });
 

@@ -47,6 +47,12 @@ export type V1RetentionResult = {
  * de hele tabel wissen). dryRun (apply=false) telt alleen. Geen PII in de return of de
  * logs (alleen aantallen). Service-role: contact_requests heeft RLS aan zonder
  * DELETE-policy, dus alleen de service-role kan verwijderen.
+ *
+ * GOOIT een Error als de delete faalt (geen stil succes; een mislukte telling logt
+ * alleen). Een aanroeper
+ * die meer doet dan alleen dit (bv. de V0-retentie-cron, optie B van audit #3) moet
+ * de aanroep in een eigen try/catch zetten en de fout als failed meegeven, anders
+ * crasht de hele run en wordt ook de V0-anonimisering overgeslagen.
  */
 export async function runV1ContactRetention(
   svc: SupabaseClient,
