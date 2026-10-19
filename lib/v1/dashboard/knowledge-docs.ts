@@ -68,7 +68,7 @@ export async function loadQuizKnowledge(
       documentId: d.id as string,
       question: q?.vraag ?? filename,
       answer: a?.antwoord ?? '',
-      label: q?.categorie_label ?? q?.categorie ?? filename.replace(/^Quiz-antwoord · /, '') ?? 'Quiz',
+      label: q?.categorie_label ?? q?.categorie ?? (filename.replace(/^Quiz-antwoord · /, '') || 'Quiz'),
     };
   });
 }

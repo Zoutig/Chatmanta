@@ -42,6 +42,23 @@ test('chatJsonBody — GPT-6 krijgt max_completion_tokens i.p.v. max_tokens', ()
   assert.equal('max_tokens' in body, false);
 });
 
+test('chatJsonBody — nooit service_tier, ook niet met OPENAI_SERVICE_TIER=priority', () => {
+  const prevTier = process.env.OPENAI_SERVICE_TIER;
+  const prevEnv = process.env.VERCEL_ENV;
+  process.env.OPENAI_SERVICE_TIER = 'priority';
+  delete process.env.VERCEL_ENV;
+  try {
+    for (const model of ['gpt-4o-mini', 'gpt-6-luna']) {
+      const body = chatJsonBody({ model, system: 's', user: 'u', temperature: 0.2, maxTokens: 600 });
+      assert.equal('service_tier' in body, false, model);
+    }
+  } finally {
+    if (prevTier === undefined) delete process.env.OPENAI_SERVICE_TIER;
+    else process.env.OPENAI_SERVICE_TIER = prevTier;
+    if (prevEnv !== undefined) process.env.VERCEL_ENV = prevEnv;
+  }
+});
+
 function fakeClient(content: string, capture: Record<string, unknown>[] = []): ChatClient {
   return {
     chat: {

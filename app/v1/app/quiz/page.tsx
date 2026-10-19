@@ -20,10 +20,17 @@ export const dynamic = 'force-dynamic';
 
 const KENNISBANK = '/v1/app/kennisbank';
 
-/** Ingevulde antwoorden zonder KB-document (ingest mislukt). Antwoorden van de
- *  laatste minuten tellen nog niet mee: die kunnen nog bezig zijn. */
-function countNotIngested(answers: Parameters<typeof answersMissingIngest>[0]): number {
-  return answersMissingIngest(answers, Date.now()).length;
+/** Ingevulde antwoorden zonder KB-document (ingest mislukt), alleen op actieve vragen
+ *  (een ingetrokken vraag leest de retry ook niet meer in). Antwoorden van de laatste
+ *  minuten tellen nog niet mee: die kunnen nog bezig zijn. */
+function countNotIngested(
+  answers: (Parameters<typeof answersMissingIngest>[0][number] & { questionId: string })[],
+  activeQuestionIds: Set<string>,
+): number {
+  return answersMissingIngest(
+    answers.filter((a) => activeQuestionIds.has(a.questionId)),
+    Date.now(),
+  ).length;
 }
 
 export default async function V1QuizPage() {
@@ -67,7 +74,7 @@ export default async function V1QuizPage() {
 
   const answeredIds = new Set(answers.map((a) => a.questionId));
   const unanswered = quiz.status === 'voltooid' ? [] : questions.filter((q) => !answeredIds.has(q.id));
-  const notIngested = countNotIngested(answers);
+  const notIngested = countNotIngested(answers, new Set(questions.map((q) => q.id)));
   const retryBlock = notIngested > 0 ? <QuizIngestRetry count={notIngested} /> : null;
 
   // Voltooide quiz (alle vragen beantwoord/overgeslagen).
@@ -91,7 +98,9 @@ export default async function V1QuizPage() {
             {skippedCount > 0 ? ` (${skippedCount} overgeslagen)` : ''}.{' '}
             {notIngested > 0
               ? 'Een deel staat nog niet in je kennisbank, zie hierboven.'
-              : 'Je chatbot gebruikt ze vanaf nu in zijn antwoorden.'}
+              : answeredCount > 0
+                ? 'Je chatbot gebruikt ze vanaf nu in zijn antwoorden.'
+                : null}
           </EmptyState>
         </div>
       </div>

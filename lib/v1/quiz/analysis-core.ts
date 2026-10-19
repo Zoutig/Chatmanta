@@ -54,11 +54,19 @@ export type ChatJsonResult<T> = { data: T | null; inputTokens: number; outputTok
  * Request-body voor een JSON-chatcall. Via openaiChatParams: gpt-4o-mini/gpt-4o
  * krijgen exact de oude `temperature` + `max_tokens` (byte-identiek); een GPT-6-
  * model krijgt `max_completion_tokens` + `reasoning_effort: 'none'` i.p.v. een 400.
+ * Bewust NOOIT een service_tier (ook niet via de OPENAI_SERVICE_TIER-meethefboom):
+ * de quiz rekent zijn kosten zonder tier af (costForModelUsd), dus met priority zou
+ * hij ~de helft van de echte kosten loggen. Zo gedraagt de quiz zich als vroeger.
  */
 export function chatJsonBody(opts: ChatJsonOpts): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { service_tier: _tier, ...params } = openaiChatParams(opts.model, {
+    temperature: opts.temperature,
+    maxTokens: opts.maxTokens,
+  });
   return {
     model: opts.model,
-    ...openaiChatParams(opts.model, { temperature: opts.temperature, maxTokens: opts.maxTokens }),
+    ...params,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: opts.system },

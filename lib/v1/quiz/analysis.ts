@@ -154,16 +154,20 @@ async function fetchSample(
     textByDoc.set(p.document_id, list);
   }
 
-  // Terugval voor documenten zonder parent-rijen: de eerste child-chunks op volgorde.
+  // Terugval voor documenten zonder parent-rijen: de intro-child-chunks (chunk_index 0
+  // en 1; ingestDocument zet die key altijd). Filteren in de query zelf, zodat één groot
+  // document de limiet niet kan opslokken en elk document zijn intro krijgt.
   const missing = ids.filter((id) => !textByDoc.has(id));
   if (missing.length > 0) {
+    const introIdx = Array.from({ length: SAMPLE_CHUNKS_PER_DOC }, (_, i) => String(i));
     const { data: chunks } = await client
       .from('document_chunks')
       .select('document_id, content, metadata')
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
       .in('document_id', missing)
-      .limit(missing.length * 20);
+      .in('metadata->>chunk_index', introIdx)
+      .limit(missing.length * SAMPLE_CHUNKS_PER_DOC * 2);
     const byDoc = new Map<string, { idx: number; content: string }[]>();
     for (const c of (chunks ?? []) as { document_id: string; content: string; metadata: unknown }[]) {
       const idx = Number((c.metadata as { chunk_index?: number } | null)?.chunk_index ?? 0);

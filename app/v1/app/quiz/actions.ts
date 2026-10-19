@@ -251,10 +251,15 @@ export async function retryQuizIngestV1Action(): Promise<RetryResult> {
     const chatbot = await getOrgChatbot(sb, orgId);
     if (!chatbot) return { ok: false, error: 'Er is nog geen chatbot ingesteld.' };
 
-    const [questions, answers] = await Promise.all([listQuestions(sb, quiz.id), listAnswers(sb, quiz.id)]);
+    // Alleen actieve vragen (goedgekeurd, niet verwijderd): een antwoord op een vraag
+    // die de beheerder intussen introk, komt niet (alsnog) in de kennisbank.
+    const [questions, answers] = await Promise.all([
+      listQuestions(sb, quiz.id, { activeOnly: true }),
+      listAnswers(sb, quiz.id),
+    ]);
     const byId = new Map(questions.map((q) => [q.id, q]));
     const todo = answersMissingIngest(
-      answers.filter((a) => a.organizationId === orgId),
+      answers.filter((a) => a.organizationId === orgId && byId.has(a.questionId)),
       Date.now(),
     ).slice(0, RETRY_MAX);
 
@@ -262,10 +267,7 @@ export async function retryQuizIngestV1Action(): Promise<RetryResult> {
     let failed = 0;
     for (const a of todo) {
       const q = byId.get(a.questionId);
-      if (!q || q.organizationId !== orgId || !a.antwoord) {
-        failed += 1;
-        continue;
-      }
+      if (!q || q.organizationId !== orgId || q.verwijderd || !q.goedgekeurd || !a.antwoord) continue;
       const res = await ingestQuizAnswer(
         sb,
         { orgId, chatbotId: chatbot.id, quizId: quiz.id },
