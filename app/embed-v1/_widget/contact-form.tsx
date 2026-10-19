@@ -1,11 +1,23 @@
 'use client';
 
 // Contactformulier van de V1-widget. Verplaatst uit v1-widget.tsx en in de
-// Diepzee-stijl gezet; state, validatie, honeypot en payload zijn ongewijzigd.
-// De submit (token, refresh-op-401, route) zit bij de aanroeper.
+// Diepzee-stijl gezet. De submit (token, refresh-op-401, route) zit bij de aanroeper.
+//
+// Onderwerp (2026-10-19): voorgevuld met de laatste vraag van de bezoeker
+// (initialSubject), zichtbaar en aanpasbaar. Gaat mee in het bestaande `subject`-
+// veld van het request (route + kolom + mail + kaart kenden het al; het formulier
+// stuurde altijd null). Toestemmingstekst noemt welke gegevens en waarvoor; aan wie
+// via orgName, maar de aanroepers geven die (nog) niet mee → neutrale omschrijving
+// "het bedrijf achter deze website". organizations.name is een door de admin
+// ingevuld veld en kan een intern label zijn; zie besluit voor Sebastiaan.
 
 import { useState } from 'react';
-import { WIDGET_STRINGS, type WidgetStrings } from '@/lib/v1/widget/widget-strings';
+import {
+  CONTACT_SUBJECT_MAX,
+  WIDGET_STRINGS,
+  contactConsentText,
+  type WidgetStrings,
+} from '@/lib/v1/widget/widget-strings';
 
 export type ContactPayload = {
   name: string;
@@ -22,13 +34,20 @@ export function ContactForm({
   onSubmit,
   onDone,
   strings: t = WIDGET_STRINGS.nl,
+  orgName = null,
+  initialSubject = '',
 }: {
   onCancel: () => void;
   onSubmit: (payload: ContactPayload) => Promise<boolean>;
   onDone: () => void;
   strings?: WidgetStrings;
+  /** Bedrijfsnaam voor de toestemmingstekst (aan wie gaan de gegevens). Leeg → neutrale tekst. */
+  orgName?: string | null;
+  /** Voorgevuld onderwerp (laatste bezoekersvraag); de bezoeker kan het aanpassen. */
+  initialSubject?: string;
 }) {
   const [name, setName] = useState('');
+  const [subject, setSubject] = useState(initialSubject);
   const [preferred, setPreferred] = useState<'email' | 'call'>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -53,7 +72,7 @@ export function ContactForm({
       email: email.trim() || null,
       phone: phone.trim() || null,
       preferredContact: preferred,
-      subject: null,
+      subject: subject.trim() || null,
       message: message.trim() || null,
       company_url: honeypot,
     });
@@ -112,13 +131,18 @@ export function ContactForm({
       )}
 
       <label className="cmw-field">
+        {t.contactSubject}
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={CONTACT_SUBJECT_MAX} />
+      </label>
+
+      <label className="cmw-field">
         {t.contactMessage}
         <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={4000} />
       </label>
 
       <label className="cmw-consent">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        <span>{t.contactConsent}</span>
+        <span>{contactConsentText(t, orgName)}</span>
       </label>
 
       {error ? (

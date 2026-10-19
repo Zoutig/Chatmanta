@@ -17,10 +17,39 @@ import 'server-only';
 //      een verzoek voor org A mag nooit stil naar een generiek adres lekken.
 //
 // Geen ruwe PII in logs: we loggen alleen org-id + het Resend-resultaat-id.
+//
+// ZICHTBAAR FALEN (2026-10-19): een mislukte mail, een ontbrekend meldingsadres of
+// (alleen in productie) een overgeslagen verzending gaat naar Sentry met org-id als
+// tag en een vaste, PII-vrije reden (classifyContactNotify). Zo valt een kapotte
+// Resend-config op vóórdat een ondernemer ongemerkt leads mist. Daarna flushen:
+// @sentry/node flusht niet vanzelf en after() kan de instance laten bevriezen.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { captureServerError, flushSentry } from '@/lib/observability/sentry';
 import { sendEmail, type SendEmailResult } from './email';
 import { buildContactRequestOperatorEmail, isValidContactEmail } from './contact-request-email';
+import { classifyContactNotify } from './v1-contact-notify-failure';
+
+const ROUTE = '/api/v1/contact-request';
+
+/** Meld een mislukte notificatie aan Sentry (alleen org-id + vaste reden). Throwt nooit. */
+async function reportFailure(
+  outcome: SendEmailResult | 'no_address' | 'unexpected',
+  organizationId: string,
+): Promise<void> {
+  try {
+    const f = classifyContactNotify(outcome, process.env.VERCEL_ENV === 'production');
+    if (!f) return;
+    captureServerError(
+      new Error(`${f.code}: ${f.reason}`),
+      { route: ROUTE, code: f.code, reason: f.reason },
+      { tags: { org_id: organizationId, reason: f.reason, surface: 'v1-contact-notify' }, level: f.level },
+    );
+    await flushSentry(2000);
+  } catch (e) {
+    console.error('[v1/contact-notify] sentry-melding faalde', (e as Error).message);
+  }
+}
 
 /** De velden die de operator-mail toont. `message` = de V1-kolomnaam (V0 heet dit
  *  `toelichting`); we mappen bij het bouwen van de mail. */
@@ -43,7 +72,9 @@ function v1ContactRequestsUrl(): string {
 function logResult(r: SendEmailResult): void {
   if (r.ok) console.log(`[v1/contact-notify] verzonden (id=${r.id ?? 'n/a'})`);
   else if (r.skipped) console.log(`[v1/contact-notify] overgeslagen (${r.reason})`);
-  else console.error(`[v1/contact-notify] mislukt: ${r.error}`);
+  // Alleen de vaste reden, nooit r.error: die Resend-detail kan het ontvangers- of
+  // bezoekersadres bevatten ("invalid `to` field: …") en belandt anders in de Vercel-logs.
+  else console.error(`[v1/contact-notify] mislukt (${classifyContactNotify(r, false)?.reason ?? 'send_error'})`);
 }
 
 /** Het "account-e-mailadres" = de owner van de org (organization_members role='owner'
@@ -100,6 +131,7 @@ export async function notifyNewV1ContactRequest(
       console.error(
         `[v1/contact-notify] geen meldingsadres (org=${args.organizationId}) — verzoek staat wel in het dashboard`,
       );
+      await reportFailure('no_address', args.organizationId);
       return;
     }
 
@@ -118,7 +150,9 @@ export async function notifyNewV1ContactRequest(
       replyTo: isValidContactEmail(email) ? email : undefined,
     });
     logResult(r);
+    await reportFailure(r, args.organizationId);
   } catch (e) {
     console.error('[v1/contact-notify] onverwachte fout', (e as Error).message);
+    await reportFailure('unexpected', args.organizationId);
   }
 }

@@ -1,7 +1,90 @@
 // Run: node --import tsx --test lib/v1/widget/__tests__/widget-strings.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WIDGET_STRINGS, resolveWidgetLang, widgetUiLanguage } from '../widget-strings';
+import {
+  CONSENT_ORG_MAX,
+  CONTACT_SUBJECT_MAX,
+  WIDGET_STRINGS,
+  contactConsentText,
+  lastVisitorQuestion,
+  resolveWidgetLang,
+  widgetUiLanguage,
+} from '../widget-strings';
+import { SUBJECT_MAX } from '../contact-validate';
+
+test('contactConsentText: noemt bedrijf, gegevens en doel; geen bewaartermijn-belofte (nl + en)', () => {
+  const nl = contactConsentText(WIDGET_STRINGS.nl, 'Bakkerij Voorbeeld');
+  assert.match(nl, /Bakkerij Voorbeeld/);
+  assert.match(nl, /contact met mij op te nemen/);
+  assert.match(nl, /onderwerp en bericht/);
+  // Retentie-pinger V1 draait nog niet → de toestemming mag geen termijn beloven.
+  assert.doesNotMatch(nl, /dagen/);
+  assert.doesNotMatch(nl, /\{org\}/);
+  const en = contactConsentText(WIDGET_STRINGS.en, 'Example Bakery');
+  assert.match(en, /Example Bakery/);
+  assert.match(en, /get in touch/);
+  assert.match(en, /subject and message/);
+  assert.doesNotMatch(en, /days/);
+  assert.doesNotMatch(en, /\{org\}/);
+});
+
+test('contactConsentText: $-patronen in de naam worden letterlijk ingevuld', () => {
+  for (const name of ['Smit $& Zn', 'A $1 B', "C $` $' D", 'E $$ F']) {
+    const s = contactConsentText(WIDGET_STRINGS.nl, name);
+    assert.ok(s.startsWith(`Ik geef ${name} toestemming`), s);
+  }
+});
+
+test('contactSubject: label zegt optioneel (nl + en)', () => {
+  assert.match(WIDGET_STRINGS.nl.contactSubject, /optioneel/);
+  assert.match(WIDGET_STRINGS.en.contactSubject, /optional/);
+});
+
+test('contactConsentText: geen/lege naam → neutrale omschrijving; lange naam afgekapt', () => {
+  for (const lang of ['nl', 'en'] as const) {
+    const t = WIDGET_STRINGS[lang];
+    for (const empty of [null, undefined, '', '   ']) {
+      const s = contactConsentText(t, empty);
+      assert.ok(s.includes(t.contactConsentOrgFallback), `${lang}: fallback ontbreekt`);
+      assert.doesNotMatch(s, /\{org\}/);
+    }
+  }
+  const long = 'X'.repeat(500);
+  const s = contactConsentText(WIDGET_STRINGS.nl, long);
+  assert.ok(s.includes('X'.repeat(CONSENT_ORG_MAX)));
+  assert.ok(!s.includes('X'.repeat(CONSENT_ORG_MAX + 1)));
+  // Witruimte (ook regeleinden) wordt één spatie.
+  assert.match(contactConsentText(WIDGET_STRINGS.nl, '  De\n  Zaak '), /Ik geef De Zaak toestemming/);
+});
+
+test('contactConsent: beide talen bevatten precies één {org}-placeholder', () => {
+  for (const lang of ['nl', 'en'] as const) {
+    assert.equal(WIDGET_STRINGS[lang].contactConsent.split('{org}').length, 2, lang);
+  }
+});
+
+test('lastVisitorQuestion: laatste niet-lege bezoekersvraag, afgekapt op de subject-limiet', () => {
+  assert.equal(CONTACT_SUBJECT_MAX, SUBJECT_MAX);
+  assert.equal(lastVisitorQuestion([]), '');
+  assert.equal(lastVisitorQuestion([{ role: 'assistant', content: 'Hallo!' }]), '');
+  assert.equal(
+    lastVisitorQuestion([
+      { role: 'user', content: 'Eerste vraag' },
+      { role: 'assistant', content: 'Antwoord' },
+      { role: 'user', content: '  Wat kost   een\nofferte? ' },
+      { role: 'assistant', content: 'Daar heb ik geen informatie over.' },
+    ]),
+    'Wat kost een offerte?',
+  );
+  assert.equal(
+    lastVisitorQuestion([
+      { role: 'user', content: 'Echte vraag' },
+      { role: 'user', content: '   ' },
+    ]),
+    'Echte vraag',
+  );
+  assert.equal(lastVisitorQuestion([{ role: 'user', content: 'a'.repeat(1000) }]).length, CONTACT_SUBJECT_MAX);
+});
 
 test('widgetUiLanguage: taalspiegeling → auto, anders de vaste taal (alleen nl/en)', () => {
   assert.equal(widgetUiLanguage({ autoDetectLanguage: true, primaryLanguage: 'nl' }), 'auto');

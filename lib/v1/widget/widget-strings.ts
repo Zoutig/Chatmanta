@@ -51,7 +51,11 @@ export type WidgetStrings = {
   contactEmailAddress: string;
   contactPhoneNumber: string;
   contactMessage: string;
+  contactSubject: string;
+  /** Bevat de placeholder {org}; vul in via contactConsentText (AVG: aan wie, waarvoor, hoe lang). */
   contactConsent: string;
+  /** Vervangt {org} als de widget geen bedrijfsnaam kent. */
+  contactConsentOrgFallback: string;
   contactCancel: string;
   contactSend: string;
   contactSending: string;
@@ -81,7 +85,13 @@ export const WIDGET_STRINGS: Record<WidgetLang, WidgetStrings> = {
     contactEmailAddress: 'E-mailadres',
     contactPhoneNumber: 'Telefoonnummer',
     contactMessage: 'Bericht (optioneel)',
-    contactConsent: 'Ik geef toestemming om mijn gegevens te gebruiken om contact met mij op te nemen.',
+    contactSubject: 'Onderwerp (optioneel)',
+    // Bewust GEEN bewaartermijn: de V1-retentie-pinger draait nog niet (V1_LAUNCH_TODO
+    // #7c) en de notificatiemail valt buiten ChatManta's beheer. Pas terugzetten als
+    // dat allebei waar is.
+    contactConsent:
+      'Ik geef {org} toestemming mijn naam, contactgegevens, onderwerp en bericht te gebruiken om contact met mij op te nemen over mijn vraag.',
+    contactConsentOrgFallback: 'het bedrijf achter deze website',
     contactCancel: 'Annuleren',
     contactSend: 'Versturen',
     contactSending: 'Versturen…',
@@ -109,10 +119,46 @@ export const WIDGET_STRINGS: Record<WidgetLang, WidgetStrings> = {
     contactEmailAddress: 'Email address',
     contactPhoneNumber: 'Phone number',
     contactMessage: 'Message (optional)',
-    contactConsent: 'I consent to my details being used to contact me.',
+    contactSubject: 'Subject (optional)',
+    contactConsent:
+      'I allow {org} to use my name, contact details, subject and message to get in touch with me about my question.',
+    contactConsentOrgFallback: 'the company behind this website',
     contactCancel: 'Cancel',
     contactSend: 'Send',
     contactSending: 'Sending…',
     contactFailed: 'Sending failed. Please try again in a moment.',
   },
 };
+
+/** Max. lengte van de bedrijfsnaam in de toestemmingstekst (layout-vangnet). */
+export const CONSENT_ORG_MAX = 120;
+
+/**
+ * Toestemmingstekst van het contactformulier met de bedrijfsnaam ingevuld: de
+ * bezoeker ziet aan wie de gegevens gaan (de klant = verwerkingsverantwoordelijke),
+ * welke gegevens en waarvoor. Geen naam → neutrale omschrijving.
+ * Wordt als React-tekst gerenderd (geen HTML), dus de naam hoeft niet ge-escaped.
+ * Vervanging via een functie: een `$&`/`$1` in de naam mag geen vervangpatroon zijn.
+ */
+export function contactConsentText(t: WidgetStrings, orgName: string | null | undefined): string {
+  const name = (orgName ?? '').replace(/\s+/g, ' ').trim().slice(0, CONSENT_ORG_MAX).trim();
+  return t.contactConsent.replace('{org}', () => name || t.contactConsentOrgFallback);
+}
+
+/** Max. lengte van het onderwerp — gelijk aan SUBJECT_MAX in contact-validate. */
+export const CONTACT_SUBJECT_MAX = 300;
+
+/**
+ * Voorgevuld onderwerp voor het contactformulier: de laatste vraag die de bezoeker
+ * in dit gesprek stelde (zodat de ondernemer weet waar het over gaat). De bezoeker
+ * ziet het veld en kan het aanpassen of leegmaken. Geen vraag → ''.
+ */
+export function lastVisitorQuestion(messages: readonly { role: string; content: string }[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== 'user') continue;
+    const q = m.content.replace(/\s+/g, ' ').trim();
+    if (q) return q.slice(0, CONTACT_SUBJECT_MAX).trim();
+  }
+  return '';
+}

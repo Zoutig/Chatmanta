@@ -14,6 +14,7 @@ import { WidgetView, type WidgetMessage } from '../_widget/widget-view';
 import { ContactForm, type ContactPayload } from '../_widget/contact-form';
 import {
   WIDGET_STRINGS,
+  lastVisitorQuestion,
   resolveWidgetLang,
   type WidgetLang,
   type WidgetUiLanguage,
@@ -393,6 +394,7 @@ export function V1Widget(props: V1WidgetProps) {
           onCancel={() => setContactOpen(false)}
           onSubmit={submitContact}
           strings={t}
+          initialSubject={lastVisitorQuestion(messages)}
           onDone={() => {
             setContactOpen(false);
             setContactDone(true);
