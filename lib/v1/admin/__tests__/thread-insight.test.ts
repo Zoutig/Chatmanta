@@ -16,18 +16,26 @@ test('koppelt op vraag + tijdstip, ook met meerdere kandidaten', () => {
   assert.equal(m.get('m1'), 'q1');
 });
 
-test('geredacteerde vraag: alleen koppelen bij precies één kandidaat', () => {
+test('geredacteerde vraag: koppelt ná dezelfde redactie, ook naast andere kandidaten', () => {
   const turn = { messageId: 'm1', question: 'Bel me op 0612345678', kind: 'answer', createdAt: at(10) };
   const one = matchQueryLogRows([turn], [{ id: 'q1', question: 'Bel me op [telefoon]', kind: 'answer', createdAt: at(10) }]);
   assert.equal(one.get('m1'), 'q1');
   const two = matchQueryLogRows(
     [turn],
     [
-      { id: 'q1', question: 'Bel me op [telefoon]', kind: 'answer', createdAt: at(10) },
-      { id: 'q2', question: 'Iets anders', kind: 'answer', createdAt: at(12) },
+      { id: 'q2', question: 'Iets anders', kind: 'answer', createdAt: at(10) },
+      { id: 'q1', question: 'Bel me op [telefoon]', kind: 'answer', createdAt: at(12) },
     ],
   );
-  assert.equal(two.has('m1'), false);
+  assert.equal(two.get('m1'), 'q1');
+});
+
+test('één kandidaat met een duidelijk andere vraag: geen koppeling', () => {
+  const m = matchQueryLogRows(
+    [{ messageId: 'm1', question: 'Wat kost het?', kind: 'answer', createdAt: at(10) }],
+    [{ id: 'q-ander', question: 'Hebben jullie parkeerplaats?', kind: 'answer', createdAt: at(11) }],
+  );
+  assert.equal(m.size, 0);
 });
 
 test('buiten het tijdvenster of ander soort antwoord: geen koppeling', () => {

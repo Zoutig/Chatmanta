@@ -2,14 +2,20 @@
 // hoort (alleen lezen): cache-hit, latency, kosten, beste overeenkomst en de
 // duim-feedback van de bezoeker.
 //
-// thread_messages en query_log hebben (nog) geen directe koppeling (geen
-// query_log_id op het bericht; een kolom erbij = migratie). Beide worden wel in
-// dezelfde request weggeschreven (app/api/v1/chat/route.ts, after()), dus we
-// koppelen op tijdstip + vraag. query_log.question is PII-geredacteerd, dus een
-// exacte vraag-match is niet altijd mogelijk; dan alleen koppelen als er binnen
-// het tijdvenster precies één kandidaat is (anders liever niets dan het verkeerde).
+// thread_messages en query_log hebben (nog) geen directe koppeling. Beide worden wel
+// in dezelfde request weggeschreven (app/api/v1/chat/route.ts, after()), dus we
+// koppelen op tijdstip + vraag. query_log.question is PII-geredacteerd met
+// redactPii; daarom vergelijken we beide kanten ná diezelfde redactie. Komt de
+// vraag niet overeen, dan geen koppeling, ook niet bij één kandidaat: een andere
+// vraag wijst op een ander gesprek (liever niets dan het verkeerde).
+//
+// Een directe koppeling kan zonder migratie: de route kent queryLogId al vóór
+// appendTurn, en thread_messages heeft een metadata-jsonb-kolom (migr V1 0010).
+// Dat raakt wel het chatpad; deze heuristiek blijft dan de terugval voor oude berichten.
 //
 // matchQueryLogRows is PUUR (getest).
+
+import { redactPii } from '@/lib/observability/redact';
 
 export type QueryLogCandidate = {
   id: string;
@@ -29,7 +35,7 @@ export type AssistantTurn = {
 /** Max. afstand tussen query_log-rij en bericht. Beide worden ná de stream geschreven. */
 export const MATCH_WINDOW_MS = 2 * 60 * 1000;
 
-const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+const norm = (s: string) => redactPii(s).trim().replace(/\s+/g, ' ').toLowerCase();
 
 /** Koppelt elk bot-antwoord aan hooguit één query_log-rij (elke rij hooguit één keer). */
 export function matchQueryLogRows(
@@ -50,8 +56,9 @@ export function matchQueryLogRows(
     if (near.length === 0) continue;
     const byDistance = (a: QueryLogCandidate, b: QueryLogCandidate) =>
       Math.abs(Date.parse(a.createdAt) - tMs) - Math.abs(Date.parse(b.createdAt) - tMs);
-    const exact = t.question ? near.filter((r) => norm(r.question) === norm(t.question)).sort(byDistance) : [];
-    const pick = exact[0] ?? (near.length === 1 ? near[0] : null);
+    if (!t.question) continue;
+    const want = norm(t.question);
+    const pick = near.filter((r) => norm(r.question) === want).sort(byDistance)[0];
     if (!pick) continue;
     used.add(pick.id);
     out.set(t.messageId, pick.id);
