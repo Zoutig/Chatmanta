@@ -30,8 +30,8 @@ export default function Hero() {
           Je website beantwoordt elke klantvraag. <span className="soft">Ook om 23:00.</span>
         </h1>
         <p className="lede">
-          ChatManta leest je website en documenten en geeft bezoekers direct antwoord, met een link naar de bron.
-          Weet hij het niet? Dan zegt hij dat eerlijk en vraagt hij om hun gegevens.
+          ChatManta leest je website en documenten en geeft bezoekers direct antwoord, alleen op basis van wat
+          daarin staat. Weet hij het niet? Dan zegt hij dat eerlijk, in plaats van iets te verzinnen.
         </p>
         <div className="hero-ctas">
           <LinkButton href={ROUTES.kennismaking} arrow>

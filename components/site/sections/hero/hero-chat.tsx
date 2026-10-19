@@ -2,15 +2,14 @@
 
 import { useReducedMotion } from '../../ui/motion-hooks';
 import { useEffect, useRef } from 'react';
+import { ROUTES } from '@/lib/site/navigation';
 import { signalMascotte } from '../../mascotte/bus';
-import { Icon } from '../../ui/icon';
 import { Mark } from '../../ui/logo';
 import { createGate, prefersReducedMotion } from './gate';
 
 const USER_TEXT = 'Zijn jullie zaterdag open? Mijn band is lek.';
 const BOT_TEXT =
   'Ja, op zaterdag zijn we open van 9:00 tot 16:00. Een lekke band plakken we meestal terwijl je wacht.';
-const SOURCE = 'devrijloop.nl/openingstijden';
 
 /** Woorden als losse spans (voor het streamen); witruimte blijft gewone tekst. */
 function words(text: string) {
@@ -28,9 +27,12 @@ function words(text: string) {
 /**
  * Zelftypend voorbeeldgesprek (hero). Content-first: de SSR-HTML bevat het volledige
  * gesprek (eindstand). Pas na hydratie — en alleen zonder reduced motion — gaat de
- * loop draaien: vraag → typ-indicator → woord-voor-woord antwoord → bronlink-chip,
- * 6s rust, opnieuw. Puur visueel (`aria-live="off"`); pauzeert buiten beeld en bij
- * een verborgen tabblad (zie ./gate.ts). Unmount/reduced-motion ⇒ terug naar eindstand.
+ * loop draaien: vraag → typ-indicator → woord-voor-woord antwoord, 6s rust, opnieuw.
+ * Puur visueel (`aria-live="off"`); pauzeert buiten beeld en bij een verborgen tabblad
+ * (zie ./gate.ts). Unmount/reduced-motion ⇒ terug naar eindstand.
+ *
+ * Bewust GEEN bronlink-chip: V1 toont geen bronlinks (AGENTS.md hard rule 9), dus de site
+ * belooft ze ook niet. De voet is geen nep-invoerveld maar een echte link naar de live demo.
  */
 export function HeroChat() {
   const reduce = useReducedMotion();
@@ -39,7 +41,6 @@ export function HeroChat() {
   const userRef = useRef<HTMLDivElement>(null);
   const botRef = useRef<HTMLDivElement>(null);
   const typingRef = useRef<HTMLDivElement>(null);
-  const chipRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (reduce || prefersReducedMotion()) return;
@@ -48,13 +49,12 @@ export function HeroChat() {
     const user = userRef.current;
     const bot = botRef.current;
     const typing = typingRef.current;
-    const chip = chipRef.current;
-    if (!chat || !log || !user || !bot || !typing || !chip) return;
+    if (!chat || !log || !user || !bot || !typing) return;
 
     const ac = new AbortController();
     const gate = createGate(chat, 0.3, ac.signal);
     const ws = Array.from(bot.querySelectorAll<HTMLElement>('.w'));
-    const parts = [user, bot, chip];
+    const parts = [user, bot];
 
     const reset = () => {
       log.classList.add('prep');
@@ -83,8 +83,7 @@ export function HeroChat() {
       }
       signalMascotte({ talk: false });
       await gate.wait(250);
-      chip.classList.add('in');
-      signalMascotte({ lookAt: chip, lookMs: 1300, mode: 'happy' }); // trots op de bronvermelding
+      signalMascotte({ lookAt: bot, lookMs: 1300, mode: 'happy' }); // tevreden over het antwoord
       await gate.wait(1300);
       signalMascotte({ mode: null });
     };
@@ -114,7 +113,7 @@ export function HeroChat() {
 
   return (
     <div className="hero-chat-wrap">
-      <span className="label-ex">Voorbeeldgesprek</span>
+      <span className="label-ex">Voorbeeldgesprek · fictief bedrijf</span>
       <div
         className="chat"
         ref={chatRef}
@@ -126,7 +125,7 @@ export function HeroChat() {
             <Mark />
           </div>
           <div>
-            <div className="chat-title">Fietsmakerij De Vrijloop · voorbeeld</div>
+            <div className="chat-title">Fietsmakerij De Vrijloop</div>
             <div className="chat-sub">
               <span className="dot-live" aria-hidden="true" />
               Antwoordt uit devrijloop.nl
@@ -147,18 +146,14 @@ export function HeroChat() {
           </div>
           <div className="msg bot" ref={botRef}>
             <div className="bubble">{words(BOT_TEXT)}</div>
-            <span className="chip" ref={chipRef}>
-              <Icon name="link" />
-              Bron: <span className="u">{SOURCE}</span>
-            </span>
           </div>
         </div>
-        <div className="chat-foot" aria-hidden="true">
-          <div className="chat-input">Stel je vraag…</div>
-          <div className="chat-send">
-            <Icon name="send" />
-          </div>
-        </div>
+        <a className="chat-try" href={ROUTES.demo}>
+          Stel zelf een vraag in de live demo
+          <span className="arrow" aria-hidden="true">
+            →
+          </span>
+        </a>
       </div>
     </div>
   );

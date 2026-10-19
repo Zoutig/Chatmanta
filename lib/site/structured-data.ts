@@ -6,7 +6,7 @@ import { SITE_URL } from './navigation';
 import { PRICING, SITE_COMPANY, TIERS, monthlyPrice } from './pricing';
 
 const DESCRIPTION =
-  'Nederlandse website-chatbot die alleen antwoordt uit je eigen website en documenten, met bron erbij.';
+  'Nederlandse website-chatbot die alleen antwoordt uit je eigen website en documenten, en eerlijk zegt wanneer hij iets niet weet.';
 
 export function homeJsonLd() {
   const prices = TIERS.map((t) => monthlyPrice(t, 'yearly'));
