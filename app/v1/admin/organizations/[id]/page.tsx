@@ -134,6 +134,9 @@ export default async function OrgDeepDivePage({
           <span className="v1-adm-inline">
             <CommercialBadge status={profile.commercialStatus} />
             {profile.technicalStatusOverride && <TechnicalBadge status={profile.technicalStatusOverride} />}
+            <Link href={`/v1/admin/audit?org=${id}`} className="v1-section-link">
+              Auditlog
+            </Link>
           </span>
         }
       />

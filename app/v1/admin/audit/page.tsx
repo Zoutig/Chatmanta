@@ -4,6 +4,7 @@ import { PageHeader } from '@/app/v1/_ui/page-header';
 import { EmptyState } from '@/app/v1/_ui/feedback';
 import { DataTable } from '../_ui/data-table';
 import { formatDateTime } from '../_ui/format';
+import Link from 'next/link';
 
 // V1 §1.5 #9 — admin: audit-log-tabel ZONDER geavanceerde filters. Read-only weergave
 // van public.audit_logs (interne mutatie-trail: org.create, org_deleted, …). Cross-org
@@ -22,8 +23,14 @@ type AuditRow = {
   target_id: string | null;
   ip_hash: string | null;
   metadata: Record<string, unknown> | null;
-  organizations: { name: string }[] | null;
+  // Many-to-one embed: runtime een object, in de gegenereerde types soms een array.
+  organizations: { name: string } | { name: string }[] | null;
 };
+
+const orgNameOf = (r: AuditRow): string | null =>
+  Array.isArray(r.organizations) ? (r.organizations[0]?.name ?? null) : (r.organizations?.name ?? null);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function compact(meta: Record<string, unknown> | null): string {
   if (!meta || Object.keys(meta).length === 0) return 'Geen';
@@ -33,7 +40,10 @@ function compact(meta: Record<string, unknown> | null): string {
 
 const shortId = (id: string | null) => (id ? `${id.slice(0, 8)}…` : 'Geen');
 
-export default async function AuditLogPage() {
+export default async function AuditLogPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
+  const sp = await searchParams;
+  // ?org=<uuid>: alleen de wijzigingen bij één klant (link vanaf de klant-detail).
+  const orgFilter = sp.org && UUID_RE.test(sp.org) ? sp.org : null;
   let admin;
   try {
     admin = await getJorionAdminClient(); // gate't intern via requireJorionAdmin
@@ -44,11 +54,11 @@ export default async function AuditLogPage() {
     throw e; // NEXT_REDIRECT (geen sessie) → /v1/login
   }
 
-  const { data, error } = await admin
+  let q = admin
     .from('audit_logs')
-    .select('id, created_at, action, organization_id, user_id, target_type, target_id, ip_hash, metadata, organizations(name)')
-    .order('created_at', { ascending: false })
-    .limit(100);
+    .select('id, created_at, action, organization_id, user_id, target_type, target_id, ip_hash, metadata, organizations(name)');
+  if (orgFilter) q = q.eq('organization_id', orgFilter);
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(100);
 
   const rows = (data ?? []) as AuditRow[];
 
@@ -56,7 +66,23 @@ export default async function AuditLogPage() {
     <div className="v1-page">
       <PageHeader
         title="Auditlog"
-        description={`De laatste ${rows.length} wijzigingen door admins, over alle klanten. Alleen-lezen.`}
+        description={
+          orgFilter
+            ? `De laatste ${rows.length} wijzigingen door admins bij ${rows[0] ? (orgNameOf(rows[0]) ?? 'deze klant') : 'deze klant'}. Alleen-lezen.`
+            : `De laatste ${rows.length} wijzigingen door admins, over alle klanten. Alleen-lezen.`
+        }
+        actions={
+          orgFilter ? (
+            <span className="v1-adm-inline">
+              <Link href={`/v1/admin/organizations/${orgFilter}`} className="v1-section-link">
+                Naar de klant
+              </Link>
+              <Link href="/v1/admin/audit" className="v1-section-link">
+                Alle klanten
+              </Link>
+            </span>
+          ) : undefined
+        }
       />
 
       {error ? (
@@ -86,7 +112,15 @@ export default async function AuditLogPage() {
                   {formatDateTime(r.created_at)}
                 </td>
                 <td style={{ fontWeight: 600 }}>{r.action}</td>
-                <td>{r.organizations?.[0]?.name ?? shortId(r.organization_id)}</td>
+                <td>
+                  {r.organization_id ? (
+                    <Link href={`/v1/admin/audit?org=${r.organization_id}`} className="v1-link" title="Alleen deze klant">
+                      {orgNameOf(r) ?? shortId(r.organization_id)}
+                    </Link>
+                  ) : (
+                    'Geen'
+                  )}
+                </td>
                 <td className="v1-adm-muted" title={r.user_id ?? ''}>
                   {shortId(r.user_id)}
                 </td>

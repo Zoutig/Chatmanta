@@ -41,6 +41,11 @@ const STATUS_TONE: Record<FeedbackStatus, Tone> = {
 
 const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
+/** Gesprek-ID's zijn uuid's (thread.id). Het chat-ID-veld is vrije tekst van de klant;
+ *  alleen een uuid linken we (de gesprekspagina is org-gescoped, dus een verkeerde id
+ *  geeft gewoon 'niet gevonden'). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Lees-rij die (zoals voorheen) wegvalt als er geen waarde is. */
 function OptionalRow({ label, value }: { label: string; value: ReactNode }) {
   if (value == null || value === '') return null;
@@ -117,12 +122,30 @@ export default async function V1FeedbackDetail({ params }: { params: Promise<{ i
           <Row label="Prioriteit">
             {item.priority ? FEEDBACK_PRIORITY_LABELS[item.priority] : <EmptyValue>Geen</EmptyValue>}
           </Row>
-          <OptionalRow label="Organisatie" value={item.orgName} />
+          <Row label="Organisatie">
+            <Link href={`/v1/admin/organizations/${item.organizationId}`} className="v1-link">
+              {item.orgName}
+            </Link>
+          </Row>
           <Row label="Ingediend door">{item.submitterName ?? <EmptyValue>Onbekend</EmptyValue>}</Row>
           <Row label="E-mail">{item.submitterEmail ?? <EmptyValue>Geen</EmptyValue>}</Row>
           <Row label="Ingediend op">{formatDate(item.createdAt)}</Row>
           <Row label="Laatst bijgewerkt">{formatRelativeNL(item.updatedAt)}</Row>
-          <OptionalRow label="Chat-ID" value={item.chatId ?? undefined} />
+          <OptionalRow
+            label="Chat-ID"
+            value={
+              item.chatId && UUID_RE.test(item.chatId.trim()) ? (
+                <Link
+                  href={`/v1/admin/organizations/${item.organizationId}/gesprek/${item.chatId.trim()}`}
+                  className="v1-link"
+                >
+                  {item.chatId.trim()} (open gesprek)
+                </Link>
+              ) : (
+                (item.chatId ?? undefined)
+              )
+            }
+          />
           <OptionalRow label="Bron" value={item.source} />
         </Rows>
       </Panel>
