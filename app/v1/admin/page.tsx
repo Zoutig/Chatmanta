@@ -20,6 +20,8 @@ import { HealthBadge } from './_ui/status-badges';
 import { ReloadButton } from './_ui/reload-button';
 import { LineChart } from './_ui/line-chart';
 import { formatEur } from './_ui/format';
+import { InternalOrgsToggle } from './_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,16 +66,26 @@ function ListCard({
   );
 }
 
-export default async function V1AdminOverviewPage() {
+export default async function V1AdminOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ intern?: string | string[] }>;
+}) {
+  const showInternal = parseShowInternal((await searchParams).intern);
   let klanten: ControlRoomKlant[];
+  let hiddenCount: number;
   let credits: Awaited<ReturnType<typeof getMonthlyFirecrawlCredits>>;
   let dailyCost: Awaited<ReturnType<typeof getDailyCostThisMonth>>;
   try {
-    [klanten, credits, dailyCost] = await Promise.all([
-      getControlRoomKlanten(),
+    let list: Awaited<ReturnType<typeof getControlRoomKlanten>>;
+    [list, credits] = await Promise.all([
+      getControlRoomKlanten({ showInternal }),
       getMonthlyFirecrawlCredits(),
-      getDailyCostThisMonth(),
     ]);
+    ({ klanten, hiddenCount } = list);
+    // Zonder interne orgs telt ook de grafiek alleen echte klanten (de demo-org
+    // heeft wél query_log-rijen).
+    dailyCost = await getDailyCostThisMonth(showInternal ? undefined : klanten.map((k) => k.orgId));
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;
@@ -90,6 +102,7 @@ export default async function V1AdminOverviewPage() {
         description="Welke klanten hebben aandacht nodig? Status, crawls, gesprekken en kosten van alle klanten."
         actions={
           <>
+            <InternalOrgsToggle basePath="/v1/admin" showInternal={showInternal} hiddenCount={hiddenCount} />
             <ReloadButton />
             <Link href="/v1/admin/organizations" className={buttonClass()}>
               Alle klanten

@@ -59,6 +59,9 @@ export type OrgLimitsInput = {
 /** Zet de drie limieten van een org in één update: vragen per dag/maand (klant ziet
  *  ze) + het EUR-kostenvangnet (alleen intern). 0 = dicht. */
 export async function setOrgLimitsAction(orgId: string, input: OrgLimitsInput): Promise<ActionResult> {
+  const gate = await requireAdminActor(); // actor-id voor de audit
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
   let admin;
   try {
     admin = await getJorionAdminClient(); // gate't intern via requireJorionAdmin
@@ -91,6 +94,18 @@ export async function setOrgLimitsAction(orgId: string, input: OrgLimitsInput): 
       .select('id');
     if (error) throw new Error(`organizations update: ${error.message}`);
     if (!data?.length) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+    await writeAuditLog(admin, {
+      organizationId: orgId,
+      userId: actorId,
+      action: 'org.limits_update',
+      targetType: 'organization',
+      targetId: orgId,
+      metadata: {
+        daily_question_limit: dailyQuestions,
+        monthly_question_limit: monthlyQuestions,
+        daily_budget_eur: Math.round(dailyBudgetEur * 100) / 100,
+      },
+    });
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
   });
@@ -596,6 +611,86 @@ export async function setOrgLinkButtonsAction(
 
     revalidatePath(`/v1/admin/organizations/${orgId}`);
     return {};
+  });
+}
+
+// ─────────────────────────── Antwoord-cache legen ───────────────────────────
+//
+// Support-knop: een klant meldt een 'oud' antwoord, of LATEST is gepromoveerd. Leegt
+// de answer-cache van élke (niet-verwijderde) chatbot van deze org via de bestaande
+// purgeAnswerCache (delete + epoch-bump). Kost niets; de eerstvolgende vragen gaan
+// weer door de volledige pipeline. Gate = Jorion-admin; org-lookup (soft-delete-
+// filter) + chatbots gescoped op organization_id (object-level); audit-log.
+
+/** Leeg de antwoord-cache van alle chatbots van deze org. */
+export async function adminPurgeAnswerCacheAction(
+  orgId: string,
+): Promise<ActionResult<{ removed: number | null; chatbots: number }>> {
+  const gate = await requireAdminActor();
+  if (!gate.ok) return gate.fail;
+  const actorId = gate.actorId;
+
+  return actionTry(async () => {
+    if (!orgId) fail('INPUT_INVALID', 'Geen organisatie opgegeven.');
+    const svc = getV1ServiceRoleClient();
+
+    const { data: org, error: orgErr } = await svc
+      .from('organizations')
+      .select('id')
+      .eq('id', orgId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (orgErr) throw new Error(`org-lookup faalde: ${orgErr.message}`);
+    if (!org) fail('NOT_FOUND', 'Organisatie niet gevonden.');
+
+    const { data: chatbots, error: cbErr } = await svc
+      .from('chatbots')
+      .select('id')
+      .eq('organization_id', orgId)
+      .is('deleted_at', null);
+    if (cbErr) throw new Error(`chatbots-lookup faalde: ${cbErr.message}`);
+    const ids = (chatbots ?? []).map((c) => c.id as string);
+    if (ids.length === 0) fail('NOT_FOUND', 'Deze organisatie heeft nog geen chatbot.');
+
+    // Voor de melding/audit: hoeveel antwoorden stonden er (null = onbekend).
+    const countCache = async (): Promise<number | null> => {
+      const { count, error } = await svc
+        .from('answer_cache')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .in('chatbot_id', ids);
+      return error ? null : (count ?? 0);
+    };
+    const before = await countCache();
+
+    // purgeAnswerCache is best-effort (slikt een delete-fout met console.warn, bewust
+    // voor de crawler). Hier wil de admin zekerheid → achteraf opnieuw tellen.
+    for (const id of ids) {
+      await purgeAnswerCache(svc, orgId, id);
+    }
+    const after = await countCache();
+    const removed = before != null && after != null ? Math.max(0, before - after) : null;
+
+    await writeAuditLog(svc, {
+      organizationId: orgId,
+      userId: actorId,
+      action: 'answer_cache.purge',
+      targetType: 'organization',
+      targetId: orgId,
+      metadata: { chatbot_ids: ids, removed, remaining: after },
+    });
+
+    revalidatePath(`/v1/admin/organizations/${orgId}`);
+    if (after == null) {
+      fail('INTERNAL', 'Kon niet controleren of de antwoord-cache leeg is. Probeer het opnieuw.');
+    }
+    if (after > 0) {
+      fail(
+        'INTERNAL',
+        `Cache legen is (deels) mislukt: er staan nog ${after} opgeslagen antwoorden. Probeer het opnieuw.`,
+      );
+    }
+    return { removed, chatbots: ids.length };
   });
 }
 

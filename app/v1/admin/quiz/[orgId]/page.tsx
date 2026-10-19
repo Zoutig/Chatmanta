@@ -45,9 +45,14 @@ export default async function V1AdminQuizOrgPage({
 
   return (
     <div className="v1-page">
-      <Link href="/v1/admin/quiz" className="v1-section-link">
-        Terug naar alle quizzen
-      </Link>
+      <span className="v1-adm-inline">
+        <Link href={`/v1/admin/organizations/${orgId}?tab=bronnen`} className="v1-section-link">
+          Terug naar de klant
+        </Link>
+        <Link href="/v1/admin/quiz" className="v1-section-link">
+          Alle quizzen
+        </Link>
+      </span>
       <PageHeader
         title="Kennisbank-Quiz"
         description={`Quiz voor ${(org as { name: string }).name}. Jij keurt de vragen goed voordat de klant ze ziet.`}

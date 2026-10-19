@@ -12,6 +12,7 @@ import { MembersManager } from '../members-manager';
 import { SuspendOrgForm } from '../suspend-org-form';
 import { FastModeForm } from '../fast-mode-form';
 import { LinkButtonsForm } from '../link-buttons-form';
+import { PurgeCacheForm } from '../purge-cache-form';
 
 type Props = {
   orgId: string;
@@ -108,6 +109,21 @@ export async function BeheerTab({ orgId, slug, limits, suspendedAt }: Props) {
           </span>
         </p>
         {linkButtons !== null && <LinkButtonsForm orgId={orgId} enabled={linkButtons} />}
+      </section>
+
+      {/* Antwoord-cache */}
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title v1-adm-title-row">
+            Antwoord-cache
+            <InfoTip text="De chatbot onthoudt antwoorden op vragen die vaker gesteld worden. Klaagt een klant over een oud of verkeerd antwoord terwijl de kennisbank al klopt, of is er een nieuwe botversie, leeg dan de cache. Kost niets; de volgende vragen worden opnieuw beantwoord." />
+          </h2>
+        </div>
+        <p className="v1-adm-muted" style={{ margin: '0 0 12px' }}>
+          Wist de opgeslagen antwoorden van deze klant, zodat de chatbot weer met de huidige kennisbank en instellingen
+          antwoordt.
+        </p>
+        <PurgeCacheForm orgId={orgId} />
       </section>
 
       {/* Leden */}

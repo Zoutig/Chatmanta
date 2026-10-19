@@ -9,6 +9,8 @@
 import 'server-only';
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { parseThreadMessageSources, type ThreadMessageSource } from '@/lib/v1/conversations/sources';
+import { matchQueryLogRows, MATCH_WINDOW_MS, type AssistantTurn } from './thread-insight';
 
 type AdminClient = Awaited<ReturnType<typeof getJorionAdminClient>>;
 
@@ -107,11 +109,29 @@ export async function listAdminThreads(
   });
 }
 
+export type V1AdminTurnInsight = {
+  queryLogId: string;
+  fromCache: boolean;
+  totalMs: number | null;
+  firstTokenMs: number | null;
+  costEur: number;
+  topSimilarity: number | null;
+  sourceCount: number;
+  /** Duim van de bezoeker op dit antwoord (laatste), of null. */
+  feedback: { rating: 'up' | 'down'; comment: string | null } | null;
+};
+
 export type V1AdminMessage = {
   id: string;
   role: string;
   content: string;
   createdAt: string;
+  /** thread_messages.kind (alleen assistant): answer/fallback/smalltalk/blocked. */
+  kind: string | null;
+  /** Gebruikte bronnen (zelfde opslag als het klant-bronnenpaneel), of null. */
+  sources: ThreadMessageSource[] | null;
+  /** Gekoppelde query_log-diagnose (best-effort, zie thread-insight.ts), of null. */
+  insight: V1AdminTurnInsight | null;
 };
 
 export type V1AdminThreadDetail = {
@@ -128,32 +148,129 @@ export async function getAdminThread(
 ): Promise<V1AdminThreadDetail | null> {
   const { data: thread, error: tErr } = await admin
     .from('threads')
-    .select('id, organization_id, created_at')
+    .select('id, organization_id, chatbot_id, created_at')
     .eq('id', threadId)
     .eq('organization_id', organizationId) // org-scope
+    .is('deleted_at', null)
     .maybeSingle();
   if (tErr) throw new Error(`getAdminThread failed: ${tErr.message}`);
   if (!thread) return null;
 
   const { data: msgs, error: mErr } = await admin
     .from('thread_messages')
-    .select('id, role, content, created_at')
+    .select('id, role, content, kind, sources, created_at')
+    .eq('organization_id', organizationId)
     .eq('thread_id', threadId)
     .order('created_at', { ascending: true });
   if (mErr) throw new Error(`getAdminThread messages failed: ${mErr.message}`);
 
-  type T = { id: string; organization_id: string; created_at: string };
-  type M = { id: string; role: string; content: string; created_at: string };
+  type T = { id: string; organization_id: string; chatbot_id: string; created_at: string };
+  type M = { id: string; role: string; content: string; kind: string | null; sources: unknown; created_at: string };
   const t = thread as T;
+  const rows = (msgs ?? []) as M[];
+
+  const insights = await loadTurnInsights(admin, organizationId, t.chatbot_id, rows).catch(
+    () => new Map<string, V1AdminTurnInsight>(),
+  );
+
   return {
     id: t.id,
     organizationId: t.organization_id,
     createdAt: t.created_at,
-    messages: (msgs ?? []).map((m) => {
-      const msg = m as M;
-      return { id: msg.id, role: msg.role, content: msg.content, createdAt: msg.created_at };
-    }),
+    messages: rows.map((msg) => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.created_at,
+      kind: msg.kind ?? null,
+      sources: msg.role === 'assistant' ? parseThreadMessageSources(msg.sources) : null,
+      insight: insights.get(msg.id) ?? null,
+    })),
   };
+}
+
+/** query_log-rijen rond de berichten ophalen, koppelen (thread-insight.ts) en de
+ *  feedback erbij zoeken. Alles org+chatbot-gescoped; faalt stil naar een lege map. */
+async function loadTurnInsights(
+  admin: AdminClient,
+  organizationId: string,
+  chatbotId: string,
+  rows: Array<{ id: string; role: string; content: string; kind: string | null; created_at: string }>,
+): Promise<Map<string, V1AdminTurnInsight>> {
+  const turns: AssistantTurn[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r.role !== 'assistant') continue;
+    const prevUser = rows.slice(0, i).reverse().find((x) => x.role === 'user');
+    turns.push({ messageId: r.id, question: prevUser?.content ?? '', kind: r.kind ?? null, createdAt: r.created_at });
+  }
+  if (turns.length === 0) return new Map();
+
+  const times = turns.map((x) => Date.parse(x.createdAt)).filter(Number.isFinite);
+  if (times.length === 0) return new Map();
+  const from = new Date(Math.min(...times) - MATCH_WINDOW_MS).toISOString();
+  const to = new Date(Math.max(...times) + MATCH_WINDOW_MS).toISOString();
+
+  const { data: qlData, error: qlErr } = await admin
+    .from('query_log')
+    .select('id, question, kind, created_at, from_cache, total_ms, first_token_ms, cost_eur, top_similarity, source_count')
+    .eq('organization_id', organizationId)
+    .eq('chatbot_id', chatbotId)
+    .gte('created_at', from)
+    .lte('created_at', to)
+    .order('created_at', { ascending: true })
+    .limit(500);
+  if (qlErr || !qlData) return new Map();
+
+  type Q = {
+    id: string;
+    question: string;
+    kind: string;
+    created_at: string;
+    from_cache: boolean | null;
+    total_ms: number | null;
+    first_token_ms: number | null;
+    cost_eur: number | string | null;
+    top_similarity: number | string | null;
+    source_count: number | null;
+  };
+  const ql = qlData as Q[];
+  const match = matchQueryLogRows(
+    turns,
+    ql.map((q) => ({ id: q.id, question: q.question, kind: q.kind, createdAt: q.created_at })),
+  );
+  if (match.size === 0) return new Map();
+
+  const matchedIds = [...new Set(match.values())];
+  const { data: fbData } = await admin
+    .from('feedback')
+    .select('query_log_id, rating, comment, created_at')
+    .eq('organization_id', organizationId)
+    .in('query_log_id', matchedIds)
+    .order('created_at', { ascending: true });
+  const fbByQl = new Map<string, { rating: 'up' | 'down'; comment: string | null }>();
+  for (const f of (fbData ?? []) as Array<{ query_log_id: string; rating: string; comment: string | null }>) {
+    if (f.rating === 'up' || f.rating === 'down') fbByQl.set(f.query_log_id, { rating: f.rating, comment: f.comment });
+  }
+
+  const byId = new Map(ql.map((q) => [q.id, q]));
+  const out = new Map<string, V1AdminTurnInsight>();
+  for (const [messageId, qid] of match) {
+    const q = byId.get(qid);
+    if (!q) continue;
+    const sim = q.top_similarity == null ? null : Number(q.top_similarity);
+    out.set(messageId, {
+      queryLogId: q.id,
+      fromCache: q.from_cache === true,
+      totalMs: q.total_ms,
+      firstTokenMs: q.first_token_ms,
+      costEur: Number(q.cost_eur) || 0,
+      topSimilarity: sim != null && Number.isFinite(sim) ? sim : null,
+      sourceCount: q.source_count ?? 0,
+      feedback: fbByQl.get(q.id) ?? null,
+    });
+  }
+  return out;
 }
 
 // ─────────────────────── Bronnen ──────────────────────────

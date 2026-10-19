@@ -28,6 +28,8 @@ import {
   type UngroundedFact,
 } from '@/lib/v1/admin/bot-performance';
 import { PageHeader } from '@/app/v1/_ui/page-header';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal, SHOW_INTERNAL_PARAM } from '@/lib/v1/admin/internal-orgs';
 import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
 import { Metric, MetricGrid } from '../_ui/metric';
 import { LineChart } from '../_ui/line-chart';
@@ -37,7 +39,7 @@ import { FilterChip } from '../_ui/filter-chips';
 
 export const dynamic = 'force-dynamic';
 
-type SP = { org?: string; window?: string };
+type SP = { org?: string; window?: string; intern?: string | string[] };
 
 // ───────────────────────── opmaak ─────────────────────────
 
@@ -46,10 +48,12 @@ const fmtMs = (n: number | null) => (n == null ? 'Geen data' : `${n.toLocaleStri
 /** WINDOW_LABEL begint met een kleine letter ("laatste 30 dagen"); hier als zinsbegin. */
 const windowTitle = (w: PerfWindow) => WINDOW_LABEL[w].charAt(0).toUpperCase() + WINDOW_LABEL[w].slice(1);
 
-function hrefFor(orgId: string | null, window: PerfWindow): string {
+function hrefFor(orgId: string | null, window: PerfWindow, showInternal = false): string {
   const sp = new URLSearchParams();
   if (orgId) sp.set('org', orgId);
   sp.set('window', window);
+  // Periode wisselen mag de schakelaar 'Toon interne orgs' niet stil uitzetten.
+  if (showInternal) sp.set(SHOW_INTERNAL_PARAM, '1');
   return `/v1/admin/bot-prestaties?${sp.toString()}`;
 }
 
@@ -85,12 +89,12 @@ function Divider() {
   return <hr className="v1-adm-divider" />;
 }
 
-function WindowToggle({ window, orgId }: { window: PerfWindow; orgId: string | null }) {
+function WindowToggle({ window, orgId, showInternal = false }: { window: PerfWindow; orgId: string | null; showInternal?: boolean }) {
   const opts: PerfWindow[] = ['30d', 'month'];
   return (
     <div className="v1-adm-filter-chips" role="group" aria-label="Periode">
       {opts.map((w) => (
-        <FilterChip key={w} href={hrefFor(orgId, w)} active={w === window}>
+        <FilterChip key={w} href={hrefFor(orgId, w, showInternal)} active={w === window}>
           {windowTitle(w)}
         </FilterChip>
       ))}
@@ -426,16 +430,22 @@ function CrossOrgTable({ orgs, window }: { orgs: OrgBotPerf[]; window: PerfWindo
 
 // ───────────────────────── weergaven ─────────────────────────
 
-function OverviewView({ overview }: { overview: BotPerfOverview }) {
-  const { aggregate, orgs, daily, window, injectionAgg } = overview;
+function OverviewView({ overview, showInternal }: { overview: BotPerfOverview; showInternal: boolean }) {
+  const { aggregate, orgs, daily, window, injectionAgg, hiddenCount } = overview;
   return (
     <div className="v1-page">
       <PageHeader
         title="Botprestaties"
-        description={`${windowTitle(window)}, alle klanten.`}
+        description={`${windowTitle(window)}, ${showInternal ? 'alle orgs' : 'alle klanten (zonder interne orgs)'}.`}
         actions={
           <>
-            <WindowToggle window={window} orgId={null} />
+            <WindowToggle window={window} orgId={null} showInternal={showInternal} />
+            <InternalOrgsToggle
+              basePath="/v1/admin/bot-prestaties"
+              showInternal={showInternal}
+              hiddenCount={hiddenCount}
+              params={{ window }}
+            />
             <ReloadButton />
           </>
         }
@@ -499,8 +509,9 @@ export default async function BotPrestatiesPage({ searchParams }: { searchParams
       // Onbekende/verwijderde org → val terug op het overzicht
     }
 
-    const overview = await getBotPerfOverview(window);
-    return <OverviewView overview={overview} />;
+    const showInternal = parseShowInternal(sp.intern);
+    const overview = await getBotPerfOverview(window, { showInternal });
+    return <OverviewView overview={overview} showInternal={showInternal} />;
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return <PageHeader title="Geen toegang" description="Deze pagina is alleen voor Jorion-admins." />;

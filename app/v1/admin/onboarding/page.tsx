@@ -10,17 +10,26 @@ import { getJorionAdminClient } from '@/lib/supabase/admin';
 import { getControlRoomKlanten } from '@/lib/v1/admin/overview';
 import { ONBOARDING_PHASE_LABELS } from '@/lib/controlroom/types';
 import { isAppError } from '@/lib/errors/app-error';
-import type { OnboardingItemStatus } from '@/lib/controlroom/types';
+import type { OnboardingItem, OnboardingItemStatus } from '@/lib/controlroom/types';
+import { getOnboardingFacts } from '@/lib/v1/admin/onboarding';
+import { deriveOnboarding, onboardingProgress } from '@/lib/v1/admin/onboarding-derive';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { Badge, EmptyState } from '@/app/v1/_ui/feedback';
 import { DataTable, NumCell } from '../_ui/data-table';
 import { ReloadButton } from '../_ui/reload-button';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
 
 export const dynamic = 'force-dynamic';
 
-type ItemRow = { organization_id: string; status: string };
+type ItemRow = { id: string; organization_id: string; key: string; label: string; status: string };
 
-export default async function V1OnboardingPage() {
+export default async function V1OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ intern?: string | string[] }>;
+}) {
+  const showInternal = parseShowInternal((await searchParams).intern);
   let admin;
   try {
     admin = await getJorionAdminClient();
@@ -31,29 +40,50 @@ export default async function V1OnboardingPage() {
     throw e;
   }
 
-  const klanten = await getControlRoomKlanten();
+  const { klanten, hiddenCount } = await getControlRoomKlanten({ showInternal });
 
   // Batch-read: alle onboarding-items over alle orgs in één query.
   const { data: itemData } =
     klanten.length > 0
       ? await admin
           .from('admin_onboarding_items')
-          .select('organization_id, status')
+          .select('id, organization_id, key, label, status, sort_order')
+          .order('sort_order', { ascending: true })
           .in(
             'organization_id',
             klanten.map((k) => k.orgId),
           )
       : { data: [] as ItemRow[] };
 
-  // Aggregeer per org: totaal, klaar, geblokkeerd.
-  const statsMap = new Map<string, { total: number; done: number; blocked: number }>();
+  // Per org: opgeslagen stappen + wat uit de data blijkt (zelfde afleiding als de
+  // checklist op de klantpagina), zodat de voortgang hier niet afwijkt. Orgs zonder
+  // opgeslagen stappen (checklist nooit geopend) krijgen hier geen seed-write en tonen
+  // 'Geen stappen'.
+  const itemsByOrg = new Map<string, OnboardingItem[]>();
   for (const r of (itemData ?? []) as ItemRow[]) {
-    const s = statsMap.get(r.organization_id) ?? { total: 0, done: 0, blocked: 0 };
-    s.total += 1;
-    if ((r.status as OnboardingItemStatus) === 'done') s.done += 1;
-    if ((r.status as OnboardingItemStatus) === 'blocked') s.blocked += 1;
-    statsMap.set(r.organization_id, s);
+    const list = itemsByOrg.get(r.organization_id) ?? [];
+    list.push({
+      id: r.id,
+      organizationId: r.organization_id,
+      key: r.key,
+      label: r.label,
+      status: r.status as OnboardingItemStatus,
+      owner: null,
+      notes: null,
+      sortOrder: list.length,
+      completedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    });
+    itemsByOrg.set(r.organization_id, list);
   }
+  const facts = await Promise.all(klanten.map((k) => getOnboardingFacts(admin, k.orgId)));
+  const statsMap = new Map<string, { total: number; done: number; blocked: number }>();
+  klanten.forEach((k, i) => {
+    const stored = itemsByOrg.get(k.orgId);
+    if (!stored || stored.length === 0) return;
+    statsMap.set(k.orgId, onboardingProgress(deriveOnboarding(stored, facts[i])));
+  });
 
   const rows = klanten.map((k) => ({
     k,
@@ -71,7 +101,12 @@ export default async function V1OnboardingPage() {
       <PageHeader
         title="Onboarding"
         description="Fase, eigenaar, voortgang en volgende actie van elke klant in onboarding."
-        actions={<ReloadButton />}
+        actions={
+          <>
+            <InternalOrgsToggle basePath="/v1/admin/onboarding" showInternal={showInternal} hiddenCount={hiddenCount} />
+            <ReloadButton />
+          </>
+        }
       />
 
       <section className="v1-card">

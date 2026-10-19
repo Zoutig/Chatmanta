@@ -15,6 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import type { CrawledPage } from './firecrawl';
 import { cleanCrawledMarkdown, cleanCrawlPages } from '@/lib/rag/clean-crawl';
+import { customerDisabledUrls, type SnapshotRow } from './disabled-snapshot';
 
 type Sb = SupabaseClient;
 
@@ -104,9 +105,11 @@ export async function ingestCrawlResults(
 
   // Snapshot welke pagina's de klant had uitgezet (included=false), zodat de
   // delete-then-insert re-crawl die keuze niet stil terugdraait naar de DB-default true.
+  // Mislukte/lege rijen (status failed/excluded) zijn GEEN klantkeuze: die tellen niet
+  // mee, anders landt een geslaagde retry als 'uitgezet' (customerDisabledUrls).
   const { data: prevDisabled, error: prevErr } = await sb
     .from('documents')
-    .select('metadata')
+    .select('metadata, status, included')
     .eq('organization_id', organizationId)
     .eq('chatbot_id', chatbotId)
     .eq('knowledge_source_id', knowledgeSourceId)
@@ -116,11 +119,7 @@ export async function ingestCrawlResults(
   // Fail closed: een gefaalde snapshot zou disabledUrls leeg laten → re-crawl zou een
   // door de klant uitgezette pagina stil terug aanzetten. Liever de crawl falen.
   if (prevErr) throw new Error(`disabled-snapshot: ${prevErr.message}`);
-  const disabledUrls = new Set(
-    (prevDisabled ?? [])
-      .map((r) => ((r.metadata ?? {}) as Record<string, unknown>).source_url as string | undefined)
-      .filter((u): u is string => !!u),
-  );
+  const disabledUrls = customerDisabledUrls((prevDisabled ?? []) as SnapshotRow[]);
 
   // Alleen de opnieuw opgehaalde URLs vervangen — de rest van de bron blijft staan.
   const { error: delErr } = await sb

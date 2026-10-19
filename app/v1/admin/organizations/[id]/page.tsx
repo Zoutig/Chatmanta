@@ -1,8 +1,8 @@
 // V1 admin — klant deep-dive (tabbed).
 //
-// ?tab=-navigatie met tien tabs:
-//   Overzicht · Notities · Onboarding · Privacy en data · Gesprekken · Bronnen ·
-//   Botinstellingen · Widget · Gebruik · Beheer
+// ?tab=-navigatie met elf tabs:
+//   Overzicht · Notities · Onboarding · Privacy en data · Gesprekken ·
+//   Contactverzoeken (alleen lezen) · Bronnen · Botinstellingen · Widget · Gebruik · Beheer
 //
 // Beheer-tab bewaart de bestaande budget-editor, delete-org-form en export-link
 // (actions.ts + export/route.ts zijn ongewijzigd). Alle admin-overlay-logica
@@ -37,6 +37,9 @@ import { BronnenTab } from './_tabs/bronnen-tab';
 import { InstellingenTab } from './_tabs/instellingen-tab';
 import { WidgetTab } from './_tabs/widget-tab';
 import { UsageTab } from './_tabs/usage-tab';
+import { ContactTab } from './_tabs/contact-tab';
+import { AttentionPanel } from './_components/attention-panel';
+import { getAdminKlantAttention } from '@/lib/v1/admin/klant-attention';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +49,7 @@ const TABS = [
   { key: 'onboarding', label: 'Onboarding' },
   { key: 'privacy', label: 'Privacy en data' },
   { key: 'gesprekken', label: 'Gesprekken' },
+  { key: 'contact', label: 'Contactverzoeken' },
   { key: 'bronnen', label: 'Bronnen' },
   { key: 'instellingen', label: 'Botinstellingen' },
   { key: 'widget', label: 'Widget' },
@@ -104,7 +108,11 @@ export default async function OrgDeepDivePage({
     .maybeSingle();
   const chatbotId = (chatbotData as { id: string } | null)?.id ?? null;
 
-  const [profile, sp] = await Promise.all([getProfile(admin, id), searchParams]);
+  const [profile, sp, attention] = await Promise.all([
+    getProfile(admin, id),
+    searchParams,
+    getAdminKlantAttention(admin, id, chatbotId, Boolean(org.suspended_at)).catch(() => null),
+  ]);
 
   const tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as string) : 'overzicht';
   const basePath = `/v1/admin/organizations/${id}`;
@@ -126,9 +134,14 @@ export default async function OrgDeepDivePage({
           <span className="v1-adm-inline">
             <CommercialBadge status={profile.commercialStatus} />
             {profile.technicalStatusOverride && <TechnicalBadge status={profile.technicalStatusOverride} />}
+            <Link href={`/v1/admin/audit?org=${id}`} className="v1-section-link">
+              Auditlog
+            </Link>
           </span>
         }
       />
+
+      <AttentionPanel orgId={id} items={attention} />
 
       {/* Info-strip: vaste velden die altijd zichtbaar zijn */}
       <Panel title="Kerngegevens">
@@ -161,6 +174,7 @@ export default async function OrgDeepDivePage({
       {tab === 'onboarding' && <OnboardingTab orgId={id} />}
       {tab === 'privacy' && <PrivacyTab orgId={id} />}
       {tab === 'gesprekken' && <GesprekkenTab orgId={id} />}
+      {tab === 'contact' && <ContactTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'bronnen' && <BronnenTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'instellingen' && <InstellingenTab orgId={id} chatbotId={chatbotId} />}
       {tab === 'widget' && <WidgetTab orgId={id} chatbotId={chatbotId} />}

@@ -1,0 +1,7 @@
+/* 'Wat is er aan de hand' (klant-detail). Eigen bestand i.p.v. admin.css om
+   conflicten met parallelle admin-wijzigingen klein te houden. */
+.v1-ui .v1-adm-attn .v1-list-row { flex-wrap: wrap; gap: 8px 12px; padding: 10px 0; }
+.v1-ui .v1-adm-attn .v1-list-row + .v1-list-row { border-top: 1px solid var(--v1-line); }
+.v1-ui .v1-adm-attn-text { font-size: 13.5px; line-height: 1.5; color: var(--v1-ink); overflow-wrap: anywhere; }
+.v1-ui .v1-adm-attn .v1-list-main { flex: 1 1 220px; min-width: 0; }
+.v1-ui .v1-adm-attn-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--v1-line); font-size: 13px; }

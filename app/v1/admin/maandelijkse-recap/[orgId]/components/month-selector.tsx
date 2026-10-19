@@ -10,10 +10,13 @@ export function MonthSelector({
   current,
   options,
   basePath,
+  extraQuery,
 }: {
   current: string;
   options: MonthOption[];
   basePath: string;
+  /** Extra querystring die bij het wisselen behouden blijft (bv. 'intern=1'). */
+  extraQuery?: string;
 }) {
   const router = useRouter();
   return (
@@ -21,7 +24,7 @@ export function MonthSelector({
       className="v1-input v1-adm-select"
       aria-label="Kies maand"
       value={current}
-      onChange={(e) => router.push(`${basePath}?period=${e.target.value}`)}
+      onChange={(e) => router.push(`${basePath}?period=${e.target.value}${extraQuery ? `&${extraQuery}` : ''}`)}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>

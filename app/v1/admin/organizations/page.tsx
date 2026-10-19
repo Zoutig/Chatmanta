@@ -12,16 +12,26 @@ import { EmptyState } from '@/app/v1/_ui/feedback';
 import { DataTable, NumCell } from '../_ui/data-table';
 import { CommercialBadge, HealthBadge, TechnicalBadge, WidgetBadge } from '../_ui/status-badges';
 import { formatEur } from '../_ui/format';
+import { InternalOrgsToggle } from '../_ui/internal-toggle';
+import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
 
 export const dynamic = 'force-dynamic';
 
 const HEALTH_RANK = { red: 0, orange: 1, green: 2 } as const;
 
-export default async function OrganizationsPage() {
+export default async function OrganizationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ intern?: string | string[] }>;
+}) {
+  const showInternal = parseShowInternal((await searchParams).intern);
   let klanten;
+  let hiddenCount = 0;
   try {
     // getControlRoomKlanten roept intern getJorionAdminClient() aan.
-    klanten = (await getControlRoomKlanten()).sort(
+    const list = await getControlRoomKlanten({ showInternal });
+    hiddenCount = list.hiddenCount;
+    klanten = list.klanten.sort(
       (a, b) => HEALTH_RANK[a.health] - HEALTH_RANK[b.health] || a.name.localeCompare(b.name),
     );
   } catch (e) {
@@ -37,9 +47,12 @@ export default async function OrganizationsPage() {
         title="Klanten"
         description="Alle klanten met commerciële en technische status, gezondheid en activiteit."
         actions={
-          <Link href="/v1/admin/organizations/new" className={buttonClass()}>
-            Nieuwe klant
-          </Link>
+          <>
+            <InternalOrgsToggle basePath="/v1/admin/organizations" showInternal={showInternal} hiddenCount={hiddenCount} />
+            <Link href="/v1/admin/organizations/new" className={buttonClass()}>
+              Nieuwe klant
+            </Link>
+          </>
         }
       />
 

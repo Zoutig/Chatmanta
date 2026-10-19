@@ -75,7 +75,20 @@ export default async function V1ErrorGroupDetail({ params }: { params: Promise<{
           </Row>
           <OptionalRow label="Code" value={group.code} />
           <OptionalRow label="Onderdeel" value={group.surface} />
-          <Row label="Organisatie">{group.orgName ?? group.organizationId ?? 'Geen'}</Row>
+          <Row label="Organisatie">
+            {group.organizationId ? (
+              <span className="v1-adm-inline">
+                <Link href={`/v1/admin/organizations/${group.organizationId}`} className="v1-link">
+                  {group.orgName ?? group.organizationId}
+                </Link>
+                <Link href={`/v1/admin/issues?org=${group.organizationId}`} className="v1-section-link">
+                  Alle fouten van deze klant
+                </Link>
+              </span>
+            ) : (
+              'Geen'
+            )}
+          </Row>
           <Row label="Voorgekomen">{`${group.count}×`}</Row>
           <Row label="Eerst gezien">{formatDate(group.firstSeenAt)}</Row>
           <Row label="Laatst gezien">{formatRelativeNL(group.lastSeenAt)}</Row>

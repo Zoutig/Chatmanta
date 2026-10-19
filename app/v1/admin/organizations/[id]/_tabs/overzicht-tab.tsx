@@ -9,6 +9,10 @@ import { Metric, MetricGrid } from '@/app/v1/admin/_ui/metric';
 import { CommercialBadge, TechnicalBadge } from '@/app/v1/admin/_ui/status-badges';
 import { formatDate, formatEur } from '@/app/v1/admin/_ui/format';
 import { ProfileEditor } from '../_components/profile-editor';
+import Link from 'next/link';
+import { listErrorGroups } from '@/lib/v1/admin/errors';
+import { formatRelativeNL } from '@/lib/controlroom/format';
+import { Badge } from '@/app/v1/_ui/feedback';
 
 type Props = { orgId: string; profile: AdminOrgProfile };
 
@@ -19,7 +23,7 @@ export async function OverzichtTab({ orgId, profile }: Props) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   // Stats parallel: threads-count, kosten, bronnen-count.
-  const [threadsRes, costRes, sourcesRes] = await Promise.all([
+  const [threadsRes, costRes, sourcesRes, issues] = await Promise.all([
     admin
       .from('threads')
       .select('id', { count: 'exact', head: true })
@@ -35,6 +39,7 @@ export async function OverzichtTab({ orgId, profile }: Props) {
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId)
       .is('deleted_at', null),
+    listErrorGroups({ orgId }).catch(() => []),
   ]);
 
   const threadsThisMonth = threadsRes.count ?? 0;
@@ -75,6 +80,40 @@ export async function OverzichtTab({ orgId, profile }: Props) {
           )}
         </Rows>
       </Panel>
+
+      {/* Open fouten van deze klant (Issues, org-gefilterd) */}
+      <section className="v1-card">
+        <div className="v1-adm-card-head">
+          <h2 className="v1-section-title">Open fouten</h2>
+          <Link href={`/v1/admin/issues?org=${orgId}`} className="v1-section-link">
+            Alle fouten van deze klant
+          </Link>
+        </div>
+        {issues.length === 0 ? (
+          <p className="v1-adm-muted" style={{ margin: 0 }}>
+            Geen open fouten of waarschuwingen.
+          </p>
+        ) : (
+          <ul className="v1-list">
+            {issues.slice(0, 5).map((g) => (
+              <li key={g.id}>
+                <Link href={`/v1/admin/issues/${g.id}`} className="v1-list-row v1-list-row--link">
+                  <Badge tone={g.severity === 'error' ? 'danger' : 'warn'} dot>
+                    {g.severity === 'error' ? 'Fout' : 'Waarschuwing'}
+                  </Badge>
+                  <span className="v1-list-main">
+                    <span className="v1-list-title">{g.title}</span>
+                    <span className="v1-list-meta">{g.code}</span>
+                  </span>
+                  <span className="v1-list-meta">
+                    {g.count}×, {formatRelativeNL(g.lastSeenAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Profiel bewerken */}
       <section className="v1-card">

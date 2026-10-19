@@ -17,6 +17,7 @@
 import 'server-only';
 
 import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { listAdminOrgs, type AdminOrgListOptions } from './org-list';
 
 // ─────────── config ───────────────────────────────────────────────────────────
 
@@ -143,6 +144,8 @@ export type BotPerfOverview = {
   aggregate: BotPerfStats;
   daily: DailyLinePoint[];
   injectionAgg: InjectionSummary;
+  /** Aantal verborgen interne orgs (0 als ze getoond worden). */
+  hiddenCount: number;
 };
 
 export type BotPerfDetail = {
@@ -517,17 +520,15 @@ async function loadOrg(
 
 /** Cross-org overzicht: per-org fan-out + aggregaat + dag-trend.
  *  Gooit AUTH_FORBIDDEN door — de RSC-caller handelt dit af. */
-export async function getBotPerfOverview(window: PerfWindow): Promise<BotPerfOverview> {
+export async function getBotPerfOverview(
+  window: PerfWindow,
+  opts: AdminOrgListOptions = {},
+): Promise<BotPerfOverview> {
   const { startDate, sinceIso } = windowRange(window);
   const admin = await getJorionAdminClient();
 
-  const { data: orgsData } = await admin
-    .from('organizations')
-    .select('id, name')
-    .is('deleted_at', null)
-    .order('name', { ascending: true });
-
-  const orgList = (orgsData ?? []) as Array<{ id: string; name: string }>;
+  // Interne orgs (eval/seed/test/demo) standaard eruit — zelfde regel als Overzicht.
+  const { orgs: orgList, hiddenCount } = await listAdminOrgs(admin, opts);
   const loaded = await Promise.all(orgList.map((o) => loadOrg(o.id, o.name, sinceIso)));
 
   const allRows = loaded.flatMap((l) => l.rows);
@@ -543,6 +544,7 @@ export async function getBotPerfOverview(window: PerfWindow): Promise<BotPerfOve
     aggregate: computeBotPerfStats(allRows, aggFeedback, aggCapped),
     daily: buildFallbackTrend(allRows, startDate, new Date()),
     injectionAgg: mergeInjection(loaded.map((l) => l.org.injection)),
+    hiddenCount,
   };
 }
 
