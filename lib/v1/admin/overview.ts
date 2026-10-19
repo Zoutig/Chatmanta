@@ -410,12 +410,16 @@ export async function getDailyCostThisMonth(
   }
 
   try {
+    if (onlyOrgIds && onlyOrgIds.length === 0) return { points, totalEur: 0 };
     const admin = await getJorionAdminClient();
-    const { data, error } = await admin
+    // Org-filter IN de query (vóór de limit): anders vullen interne rijen (demo-verkeer)
+    // de MAX_COST_ROWS en vallen echte-klantrijen buiten de selectie.
+    let q = admin
       .from('query_log')
       .select('created_at, cost_eur, organization_id')
-      .gte('created_at', start.toISOString())
-      .limit(MAX_COST_ROWS);
+      .gte('created_at', start.toISOString());
+    if (onlyOrgIds) q = q.in('organization_id', onlyOrgIds);
+    const { data, error } = await q.limit(MAX_COST_ROWS);
     if (error || !data) return { points, totalEur: 0 };
     const allow = onlyOrgIds ? new Set(onlyOrgIds) : null;
     let total = 0;

@@ -29,7 +29,7 @@ import {
 } from '@/lib/v1/admin/bot-performance';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { InternalOrgsToggle } from '../_ui/internal-toggle';
-import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
+import { parseShowInternal, SHOW_INTERNAL_PARAM } from '@/lib/v1/admin/internal-orgs';
 import { Badge, InfoTip } from '@/app/v1/_ui/feedback';
 import { Metric, MetricGrid } from '../_ui/metric';
 import { LineChart } from '../_ui/line-chart';
@@ -48,10 +48,12 @@ const fmtMs = (n: number | null) => (n == null ? 'Geen data' : `${n.toLocaleStri
 /** WINDOW_LABEL begint met een kleine letter ("laatste 30 dagen"); hier als zinsbegin. */
 const windowTitle = (w: PerfWindow) => WINDOW_LABEL[w].charAt(0).toUpperCase() + WINDOW_LABEL[w].slice(1);
 
-function hrefFor(orgId: string | null, window: PerfWindow): string {
+function hrefFor(orgId: string | null, window: PerfWindow, showInternal = false): string {
   const sp = new URLSearchParams();
   if (orgId) sp.set('org', orgId);
   sp.set('window', window);
+  // Periode wisselen mag de schakelaar 'Toon interne orgs' niet stil uitzetten.
+  if (showInternal) sp.set(SHOW_INTERNAL_PARAM, '1');
   return `/v1/admin/bot-prestaties?${sp.toString()}`;
 }
 
@@ -87,12 +89,12 @@ function Divider() {
   return <hr className="v1-adm-divider" />;
 }
 
-function WindowToggle({ window, orgId }: { window: PerfWindow; orgId: string | null }) {
+function WindowToggle({ window, orgId, showInternal = false }: { window: PerfWindow; orgId: string | null; showInternal?: boolean }) {
   const opts: PerfWindow[] = ['30d', 'month'];
   return (
     <div className="v1-adm-filter-chips" role="group" aria-label="Periode">
       {opts.map((w) => (
-        <FilterChip key={w} href={hrefFor(orgId, w)} active={w === window}>
+        <FilterChip key={w} href={hrefFor(orgId, w, showInternal)} active={w === window}>
           {windowTitle(w)}
         </FilterChip>
       ))}
@@ -437,7 +439,7 @@ function OverviewView({ overview, showInternal }: { overview: BotPerfOverview; s
         description={`${windowTitle(window)}, ${showInternal ? 'alle orgs' : 'alle klanten (zonder interne orgs)'}.`}
         actions={
           <>
-            <WindowToggle window={window} orgId={null} />
+            <WindowToggle window={window} orgId={null} showInternal={showInternal} />
             <InternalOrgsToggle
               basePath="/v1/admin/bot-prestaties"
               showInternal={showInternal}

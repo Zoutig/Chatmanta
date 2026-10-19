@@ -22,7 +22,7 @@ test('eval-, seed-, test- en demo-orgs zijn intern', () => {
 });
 
 test('gewone klant-slugs zijn niet intern', () => {
-  for (const slug of ['manta-bakkerij', 'testo-b-v', 'evaluatiebureau-x', 'seedwinkel', 'demontage-bv', 'voorbeeldbedrijf']) {
+  for (const slug of ['manta-bakkerij', 'testo-b-v', 'evaluatiebureau-x', 'seedwinkel', 'demontage-bv', 'voorbeeldbedrijf', 'seed-organics', 'testbedrijfsauto', 'testbedrijfsauto-bv']) {
     assert.equal(isInternalOrg({ slug }), false, slug);
   }
 });

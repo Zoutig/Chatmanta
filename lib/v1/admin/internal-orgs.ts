@@ -22,7 +22,9 @@
 
 import { DEMO_ORG_SLUG } from '@/lib/voorbeeld/constants';
 
-const INTERNAL_SLUG_PREFIXES = ['eval-', 'seed-org', 'testbedrijf', 'test-', 'demo-'] as const;
+// Segment-grenzen: 'seed-org' en 'testbedrijf' alleen als heel woord (gevolgd door '-'
+// of het einde), zodat bv. 'seed-organics' of 'testbedrijfsauto' een klant blijft.
+const INTERNAL_SLUG_PATTERN = /^(?:(?:eval|test|demo)-|(?:seed-org|testbedrijf)(?:-|$))/;
 
 const CUSTOMER_STATUSES = new Set(['trial', 'active', 'paused', 'cancellation']);
 
@@ -36,7 +38,7 @@ export function isInternalOrg({ slug, explicitCommercialStatus }: InternalOrgInp
   if (explicitCommercialStatus && CUSTOMER_STATUSES.has(explicitCommercialStatus)) return false;
   const s = slug.trim().toLowerCase();
   if (s === DEMO_ORG_SLUG) return true;
-  return INTERNAL_SLUG_PREFIXES.some((p) => s.startsWith(p));
+  return INTERNAL_SLUG_PATTERN.test(s);
 }
 
 /** Querystring-sleutel voor de schakelaar 'Toon interne orgs'. */

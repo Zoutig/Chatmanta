@@ -24,7 +24,7 @@ import { SignalDot } from './[orgId]/components/signal-dot';
 import { ReloadButton } from '../_ui/reload-button';
 import { DataTable, NumCell } from '../_ui/data-table';
 import { InternalOrgsToggle } from '../_ui/internal-toggle';
-import { parseShowInternal } from '@/lib/v1/admin/internal-orgs';
+import { parseShowInternal, SHOW_INTERNAL_PARAM } from '@/lib/v1/admin/internal-orgs';
 import { listAdminOrgs } from '@/lib/v1/admin/org-list';
 
 export const dynamic = 'force-dynamic';
@@ -74,7 +74,12 @@ export default async function V1MaandRecapOverviewPage({
         description="Per klant de kerncijfers van de maand, signaleringen en een AI-samenvatting."
         actions={
           <>
-            <MonthSelector current={currentKey} options={options} basePath={BASE_PATH} />
+            <MonthSelector
+              current={currentKey}
+              options={options}
+              basePath={BASE_PATH}
+              extraQuery={showInternal ? `${SHOW_INTERNAL_PARAM}=1` : undefined}
+            />
             <InternalOrgsToggle
               basePath={BASE_PATH}
               showInternal={showInternal}
