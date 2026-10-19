@@ -47,7 +47,12 @@ export function V1WidgetForm({
     <div className="v1-wg">
       <AppearanceStep initial={initial} fallbackTitle={fallbackTitle} starterQuestions={starterQuestions} />
       <InstallStep slug={slug} origin={origin} allowedDomains={allowedDomains} />
-      <StatusStep liveStatus={liveStatus} widgetMissing={widgetMissing} missingAfterMs={missingAfterMs} />
+      <StatusStep
+        liveStatus={liveStatus}
+        widgetMissing={widgetMissing}
+        missingAfterMs={missingAfterMs}
+        allowedDomains={allowedDomains}
+      />
     </div>
   );
 }
