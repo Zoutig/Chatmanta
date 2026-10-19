@@ -72,7 +72,9 @@ function v1ContactRequestsUrl(): string {
 function logResult(r: SendEmailResult): void {
   if (r.ok) console.log(`[v1/contact-notify] verzonden (id=${r.id ?? 'n/a'})`);
   else if (r.skipped) console.log(`[v1/contact-notify] overgeslagen (${r.reason})`);
-  else console.error(`[v1/contact-notify] mislukt: ${r.error}`);
+  // Alleen de vaste reden, nooit r.error: die Resend-detail kan het ontvangers- of
+  // bezoekersadres bevatten ("invalid `to` field: …") en belandt anders in de Vercel-logs.
+  else console.error(`[v1/contact-notify] mislukt (${classifyContactNotify(r, false)?.reason ?? 'send_error'})`);
 }
 
 /** Het "account-e-mailadres" = de owner van de org (organization_members role='owner'
