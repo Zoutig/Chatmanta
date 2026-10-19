@@ -7,7 +7,9 @@ import { Icon } from '../ui/icon';
 import { cx } from '../ui/cx';
 import { PricingPlans } from './pricing/pricing-plans';
 import { CompareTabs } from './pricing/compare-tabs';
+import { RoiCalc } from './roi-calculator/roi-calc';
 import './pricing.css';
+import './roi-calculator.css';
 
 /**
  * Prijzen — mockup-final §10. Alles komt uit lib/site/pricing.ts (geen bedragen hardcoden).
@@ -111,13 +113,26 @@ export default function Pricing() {
   return (
     <Section id={SECTION_IDS.pricing} variant="default" className="s-pricing" labelledBy="h-price">
       <Reveal>
-        <SectionHead titleId="h-price" title="Eerlijke prijzen. Geen verrassingen." center />
+        <SectionHead titleId="h-price" title="Wat het kost" center />
       </Reveal>
       <PricingPlans />
       <div className="after-plans">
         <p>Kom je aan je limiet? Je krijgt eerst een seintje. Nooit onverwachte kosten.</p>
         <p>Introductieprijs voor onze eerste {PRICING.introSpots} klanten — levenslang vastgezet.</p>
       </div>
+      {/* Rekenhulp: was een eigen sectie, nu uitklapbaar (ronde "site rustiger", okt 2026).
+          Vervangt ook de losse "medewerker kost ±€X"-regel boven de kaarten. */}
+      <details className="cmp roi-fold" id={SECTION_IDS.roi}>
+        <summary>
+          <span className="btn btn-outline cmp-toggle">
+            <span className="when-closed">Reken uit wat het je oplevert</span>
+            <span className="when-open">Verberg rekenhulp</span> <Icon name="chev" />
+          </span>
+        </summary>
+        <div className="cmp-inner s-roi">
+          <RoiCalc />
+        </div>
+      </details>
       <details className="cmp">
         <summary>
           <span className="btn btn-outline cmp-toggle">

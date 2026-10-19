@@ -6,9 +6,19 @@
 
 .site-ui .s-pricing { background: linear-gradient(var(--bg), #fff 40%, var(--bg)); }
 
-.site-ui .s-pricing .compare-cost { max-width: 720px; margin: 0 auto 26px; text-align: center; font-size: 1.02rem; color: var(--ink-2); }
-.site-ui .s-pricing .compare-cost b { color: var(--teal-ink); font-variant-numeric: tabular-nums; }
-.site-ui .s-pricing .compare-cost small { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--faint); }
+/* ---------- Pakket-tabs (alleen <980px mét JS; zie pricing-plans.tsx) ---------- */
+.site-ui .s-pricing .plan-tabs {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; max-width: 520px; margin: 0 auto 22px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+}
+.site-ui .s-pricing .plan-tabs button {
+  min-height: 44px; border: 0; border-radius: 9px; background: none; font: inherit; font-weight: 600;
+  cursor: pointer; color: var(--muted); transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.site-ui .s-pricing .plan-tabs button[aria-selected='true'] { background: var(--ink); color: #fff; }
+.site-ui .s-pricing .plan-tabs button:focus-visible { box-shadow: var(--focus); }
+.site-ui .s-pricing .plan[hidden] { display: none; }
+@media (max-width: 979px) { .site-ui .s-pricing .toggle-wrap { margin-bottom: 16px; } }
 
 /* ---------- Toggle jaarlijks / maandelijks ---------- */
 .site-ui .s-pricing .toggle-wrap { display: flex; justify-content: center; margin-bottom: 44px; }
