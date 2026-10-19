@@ -17,6 +17,7 @@ import {
   getOrgSpendThisMonthEur,
   startOfUtcMonthIso,
 } from '@/lib/v1/limits/usage-limits';
+import { KB_UPLOADS_ONLY_FILTER } from './knowledge-docs';
 
 const SCAN_LIMIT = 500;
 const TOP_N = 5;
@@ -108,6 +109,7 @@ export async function getV1OverviewMetrics(
     websitePagesRes,
     botLifecycleRes,
     uploadsRes,
+    quizDocsRes,
   ] = await Promise.all([
     // Maand-turns (= messages) — getOrgQuestionsThisMonth telt query_log-rijen.
     getOrgQuestionsThisMonth(client, orgId),
@@ -160,11 +162,12 @@ export async function getV1OverviewMetrics(
       .limit(SCAN_LIMIT),
     // Widget-status: chatbots.allowed_domains-aanwezigheid als proxy voor "geïnstalleerd".
     client.from('chatbots').select('allowed_domains').eq('id', chatbotId).is('deleted_at', null).maybeSingle(),
-    // Actieve bronnen: Q&A-items.
+    // Actieve bronnen: Q&A-items (zelfde scope als de Q&A-tab in de Kennisbank).
     client
       .from('org_qa_items')
       .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId),
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId),
     // Actieve bronnen: gecrawlde pagina's (documents mét source_url).
     client
       .from('documents')
@@ -180,16 +183,26 @@ export async function getV1OverviewMetrics(
       .select('is_active, widget_last_seen_at')
       .eq('id', chatbotId)
       .maybeSingle(),
-    // Actieve bronnen: geüploade documenten. Zelfde filter als de Kennisbank
-    // (source='upload'), zodat Overzicht en Kennisbank hetzelfde aantal tonen.
-    // Websitepagina's en seed-documenten (v0_local) tellen niet mee; quiz- en Q&A-
-    // kennis wel (die zijn ook source='upload' en staan ook in de Kennisbank-lijst).
+    // Actieve bronnen: geüploade documenten. Zelfde filter als de Kennisbank-tab
+    // Documenten (source='upload', zonder Q&A- en quiz-documenten), zodat Overzicht
+    // en Kennisbank hetzelfde aantal tonen. Websitepagina's en seed-documenten
+    // (v0_local) tellen niet mee.
     client
       .from('documents')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId)
       .eq('chatbot_id', chatbotId)
       .eq('source', 'upload')
+      .is('deleted_at', null)
+      .or(KB_UPLOADS_ONLY_FILTER),
+    // Quiz-antwoorden in de kennisbank: tellen mee bij "Q&A" (zoals in de Q&A-tab).
+    client
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .eq('source', 'upload')
+      .eq('metadata->>origin', 'quiz')
       .is('deleted_at', null),
   ]);
 
@@ -273,7 +286,7 @@ export async function getV1OverviewMetrics(
   // --- Bronnen ---
   const websitePages = websitePagesRes.count ?? 0;
   const docUploads = uploadsRes.count ?? 0;
-  const qaItems = qaItemsRes.count ?? 0;
+  const qaItems = (qaItemsRes.count ?? 0) + (quizDocsRes.count ?? 0);
 
   // --- Setup + afgeleide statussen ---
   const hasDocument = (docRes.count ?? 0) > 0;

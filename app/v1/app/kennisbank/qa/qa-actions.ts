@@ -7,9 +7,13 @@
 // Élke mutatie scoopt .eq('organization_id').eq('chatbot_id') op de service-role-query
 // (RLS-bypass → object-level guard). Reads na mutatie via dezelfde service-role client.
 //
-// ingest-side-effects zijn altijd best-effort: bij embed-timeout of quota-fout
-// wordt de org_qa_items-rij toch opgeslagen (ingested_document_id=null).
-// De caller (UI) hoeft dit niet te weten; het row-upsert faalt nooit om ingest.
+// Ingest-fouten zijn zichtbaar, nooit stil:
+// - nieuw item: de rij wordt bewaard (ingested_document_id=null) en de action meldt
+//   notIngested=true; de lijst toont "Nog niet in je chatbot" met een retry-knop;
+// - bewerken: eerst de nieuwe ingest, pas daarna het oude document uitzetten. Faalt de
+//   ingest, dan blijft alles zoals het was (oude antwoord blijft actief) en krijgt de
+//   klant een foutmelding, zodat de bot nooit stil zijn kennis kwijtraakt;
+// - aanzetten zonder document: faalt de ingest, dan blijft het item uit + foutmelding.
 
 import { revalidatePath } from 'next/cache';
 import { getSessionOrg, requireOrgMember } from '@/lib/auth';
@@ -20,6 +24,38 @@ import { ingestDocument, purgeAnswerCache } from '@/lib/rag/ingest';
 import { getOrgChatbot } from '../../rag-config';
 
 const KENNISBANK_PATH = '/v1/app/kennisbank';
+const NOT_LEARNED =
+  'Je chatbot kon dit antwoord nu niet verwerken. Er is niets gewijzigd; probeer het zo opnieuw.';
+
+type Sb = ReturnType<typeof getV1ServiceRoleClient>;
+
+/** Lees een Q&A-paar in als RAG-document. null = ingest mislukt (gelogd). */
+async function ingestQA(sb: Sb, orgId: string, chatbotId: string, q: string, a: string): Promise<string | null> {
+  try {
+    const res = await ingestDocument(sb, {
+      organizationId: orgId,
+      chatbotId,
+      filename: `qa-${q.slice(0, 40).replace(/\s+/g, '-') || 'item'}.txt`,
+      text: `Vraag: ${q}\n\nAntwoord: ${a}`,
+      source: 'upload',
+      metadata: { origin: 'manual_qa' },
+    });
+    return res.documentId;
+  } catch (e) {
+    console.error('[v1:qa] ingest faalde', (e as Error).message);
+    return null;
+  }
+}
+
+/** Haal een (vervangen of overbodig) Q&A-document uit de retrieval. */
+async function retireDoc(sb: Sb, orgId: string, chatbotId: string, docId: string): Promise<void> {
+  await sb
+    .from('documents')
+    .update({ included: false, deleted_at: new Date().toISOString() })
+    .eq('id', docId)
+    .eq('organization_id', orgId)
+    .eq('chatbot_id', chatbotId);
+}
 
 // Inline — avoids a 'use server' → 'use client' type import cycle.
 type QAItemShape = {
@@ -73,13 +109,9 @@ async function loadQAItems(
  * Upsert een Q&A-item. Op insert: org+chatbot uit de sessie (nooit client-input).
  * Op update: dezelfde (org, chatbot, id)-scope-check dwingt object-level access af.
  *
- * Ingest-side-effect (best-effort):
- * - active=true  → ingest als RAG-document (metadata.origin='manual_qa'); bij
- *   update wordt het oude doc soft-deleted (included=false) vóór de nieuwe ingest.
- * - active=false → bestaand doc soft-deleted (included=false), geen nieuwe ingest.
- *
- * ponytail: ingest-fout → ingested_document_id=null; rij wordt toch opgeslagen.
- * Upgrade-pad: retry-queue voor mislukte ingests.
+ * Volgorde bij een actief item: eerst de nieuwe ingest; pas als die lukt wordt het
+ * oude document uit de retrieval gehaald. Zie de kop van dit bestand voor wat er bij
+ * een mislukte ingest gebeurt.
  */
 export async function upsertQAItemAction(input: {
   id?: string;
@@ -87,7 +119,7 @@ export async function upsertQAItemAction(input: {
   answer: string;
   category?: string | null;
   active: boolean;
-}): Promise<ActionResult<{ qa: QAItemShape[] }>> {
+}): Promise<ActionResult<{ qa: QAItemShape[]; notIngested: boolean }>> {
   let ctx: OrgCtx;
   try {
     ctx = await requireOrgChatbot();
@@ -101,47 +133,30 @@ export async function upsertQAItemAction(input: {
     const cat = (input.category?.trim() || null) as string | null;
     const now = new Date().toISOString();
 
-    // Op update: lees het huidige ingested_document_id (voor soft-delete van het oude doc).
+    // Op update: bestaat het item (in deze org+chatbot) en welk document hoort erbij?
     let oldDocId: string | null = null;
     if (input.id) {
-      const { data: existing } = await sb
+      const { data: existing, error: readErr } = await sb
         .from('org_qa_items')
         .select('ingested_document_id')
         .eq('id', input.id)
         .eq('organization_id', orgId)
         .eq('chatbot_id', chatbotId)
         .maybeSingle();
-      oldDocId = (existing?.ingested_document_id ?? null) as string | null;
+      if (readErr) throw new Error(`org_qa_items lezen: ${readErr.message}`);
+      if (!existing) throw new Error('Q&A-item niet gevonden.');
+      oldDocId = (existing.ingested_document_id ?? null) as string | null;
     }
 
-    // Soft-delete het vorige document (inhoud gaat sowieso veranderen bij een update).
-    if (oldDocId) {
-      await sb
-        .from('documents')
-        .update({ included: false })
-        .eq('id', oldDocId)
-        .eq('organization_id', orgId);
-    }
-
-    // Ingest het bijgewerkte Q&A-paar als de rij actief is.
-    // ponytail: best-effort — ingest-fout mag de rij-upsert niet blokkeren.
+    // 1. Nieuwe ingest (alleen als het item actief is).
     let newDocId: string | null = null;
     if (input.active) {
-      try {
-        const res = await ingestDocument(sb, {
-          organizationId: orgId,
-          chatbotId,
-          filename: `qa-${q.slice(0, 40).replace(/\s+/g, '-') || 'item'}.txt`,
-          text: `Vraag: ${q}\n\nAntwoord: ${a}`,
-          source: 'upload',
-          metadata: { origin: 'manual_qa' },
-        });
-        newDocId = res.documentId;
-      } catch {
-        // ponytail: best-effort — rij opgeslagen zonder ingest-koppeling; upgrade: retry-queue
-      }
+      newDocId = await ingestQA(sb, orgId, chatbotId, q, a);
+      // Bewerken + ingest mislukt → niets wijzigen: het oude antwoord blijft actief.
+      if (!newDocId && input.id) throw new Error(NOT_LEARNED);
     }
 
+    // 2. De rij opslaan.
     if (input.id) {
       const { error } = await sb
         .from('org_qa_items')
@@ -156,7 +171,10 @@ export async function upsertQAItemAction(input: {
         .eq('id', input.id)
         .eq('organization_id', orgId)
         .eq('chatbot_id', chatbotId);
-      if (error) throw new Error(`org_qa_items update: ${error.message}`);
+      if (error) {
+        if (newDocId) await retireDoc(sb, orgId, chatbotId, newDocId); // geen wees-document
+        throw new Error(`org_qa_items update: ${error.message}`);
+      }
     } else {
       const { error } = await sb.from('org_qa_items').insert({
         organization_id: orgId,
@@ -167,15 +185,59 @@ export async function upsertQAItemAction(input: {
         active: input.active,
         ingested_document_id: newDocId,
       });
-      if (error) throw new Error(`org_qa_items insert: ${error.message}`);
+      if (error) {
+        if (newDocId) await retireDoc(sb, orgId, chatbotId, newDocId);
+        throw new Error(`org_qa_items insert: ${error.message}`);
+      }
     }
 
+    // 3. Pas nu het vorige document uit de retrieval halen (vervangen of uitgezet).
+    if (oldDocId && oldDocId !== newDocId) await retireDoc(sb, orgId, chatbotId, oldDocId);
+
     // Q&A-content veranderde → wat de bot vindt verandert → answer-cache invalideren.
-    // ponytail: best-effort (purge-fout mag de action niet doen mislukken)
-    try {
-      await purgeAnswerCache(sb, orgId, chatbotId);
-    } catch {
-      /* best-effort */
+    // purgeAnswerCache logt zelf en gooit niet.
+    await purgeAnswerCache(sb, orgId, chatbotId);
+    revalidatePath(KENNISBANK_PATH);
+    return { qa: await loadQAItems(sb, orgId, chatbotId), notIngested: input.active && !newDocId };
+  });
+}
+
+/**
+ * Probeer een actief Q&A-item zonder document opnieuw in te lezen (na een eerdere
+ * mislukte ingest). Object-level: het item moet in deze org+chatbot bestaan. De
+ * koppeling is conditioneel (alleen als er nog geen document is), zodat een
+ * dubbelklik nooit twee documenten oplevert.
+ */
+export async function retryQAIngestAction(id: string): Promise<ActionResult<{ qa: QAItemShape[] }>> {
+  let ctx: OrgCtx;
+  try {
+    ctx = await requireOrgChatbot();
+  } catch (e) {
+    return authFail(e);
+  }
+  return actionTry(async () => {
+    const { orgId, chatbotId, sb } = ctx;
+    const { data: row } = await sb
+      .from('org_qa_items')
+      .select('question, answer, active, ingested_document_id')
+      .eq('id', id)
+      .eq('organization_id', orgId)
+      .eq('chatbot_id', chatbotId)
+      .maybeSingle();
+    if (!row) throw new Error('Q&A-item niet gevonden.');
+    if (row.active && !row.ingested_document_id) {
+      const docId = await ingestQA(sb, orgId, chatbotId, row.question as string, row.answer as string);
+      if (!docId) throw new Error('Je chatbot kon dit antwoord nog niet verwerken. Probeer het later opnieuw.');
+      const { data: linked } = await sb
+        .from('org_qa_items')
+        .update({ ingested_document_id: docId })
+        .eq('id', id)
+        .eq('organization_id', orgId)
+        .eq('chatbot_id', chatbotId)
+        .is('ingested_document_id', null)
+        .select('id');
+      if (!linked || linked.length === 0) await retireDoc(sb, orgId, chatbotId, docId);
+      else await purgeAnswerCache(sb, orgId, chatbotId);
     }
     revalidatePath(KENNISBANK_PATH);
     return { qa: await loadQAItems(sb, orgId, chatbotId) };
@@ -224,11 +286,7 @@ export async function deleteQAItemAction(id: string): Promise<ActionResult<{ qa:
         .eq('organization_id', orgId);
     }
 
-    try {
-      await purgeAnswerCache(sb, orgId, chatbotId);
-    } catch {
-      /* best-effort */
-    }
+    await purgeAnswerCache(sb, orgId, chatbotId); // logt zelf, gooit niet
     revalidatePath(KENNISBANK_PATH);
     return { qa: await loadQAItems(sb, orgId, chatbotId) };
   });
@@ -274,20 +332,10 @@ export async function setQAActiveAction(
           .eq('id', existingDocId)
           .eq('organization_id', orgId);
       } else {
-        // Geen bestaand document → ingest (best-effort).
-        try {
-          const res = await ingestDocument(sb, {
-            organizationId: orgId,
-            chatbotId,
-            filename: 'qa-toggle.txt',
-            text: `Vraag: ${row.question}\n\nAntwoord: ${row.answer}`,
-            source: 'upload',
-            metadata: { origin: 'manual_qa' },
-          });
-          newDocId = res.documentId;
-        } catch {
-          // ponytail: best-effort — active=true zonder ingest-koppeling is acceptabel
-        }
+        // Geen bestaand document → ingest. Mislukt dat, dan blijft het item uit en
+        // krijgt de klant een melding (niet stil "aan" zonder dat de bot het kent).
+        newDocId = await ingestQA(sb, orgId, chatbotId, row.question as string, row.answer as string);
+        if (!newDocId) throw new Error('Je chatbot kon dit antwoord nu niet verwerken. Probeer het zo opnieuw.');
       }
     } else if (existingDocId) {
       // Deactiveren → out of retrieval zetten (soft-delete).
@@ -307,11 +355,7 @@ export async function setQAActiveAction(
       .eq('chatbot_id', chatbotId);
     if (error) throw new Error(`org_qa_items toggle: ${error.message}`);
 
-    try {
-      await purgeAnswerCache(sb, orgId, chatbotId);
-    } catch {
-      /* best-effort */
-    }
+    await purgeAnswerCache(sb, orgId, chatbotId); // logt zelf, gooit niet
     revalidatePath(KENNISBANK_PATH);
     return { qa: await loadQAItems(sb, orgId, chatbotId) };
   });

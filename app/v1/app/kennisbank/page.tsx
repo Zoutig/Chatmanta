@@ -7,6 +7,7 @@ import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
 import { getActiveQuizForOrg } from '@/lib/v1/quiz/data';
+import { KB_UPLOADS_ONLY_FILTER, loadQuizKnowledge } from '@/lib/v1/dashboard/knowledge-docs';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { getOrgChatbot } from '../rag-config';
 import { getWebsiteSources } from './crawl-data';
@@ -43,9 +44,11 @@ export default async function V1KennisbankPage({
   }
 
   // Lees alle tab-data parallel (session-client, RLS).
-  const [sourcesRes, docRows, chunkCounts, qaRows, activeQuiz] = await Promise.all([
+  const [sourcesRes, docRows, chunkCounts, qaRows, activeQuiz, quizKnowledge] = await Promise.all([
     getWebsiteSources(supabase, orgId, chatbot.id).catch(() => []),
 
+    // Documenten-tab: alleen echte uploads. Q&A- en quiz-documenten (ook source
+    // 'upload') hebben hun eigen plek in de Q&A-tab.
     supabase
       .from('documents')
       .select('id, filename, status, created_at')
@@ -53,6 +56,7 @@ export default async function V1KennisbankPage({
       .eq('chatbot_id', chatbot.id)
       .eq('source', 'upload')
       .is('deleted_at', null)
+      .or(KB_UPLOADS_ONLY_FILTER)
       .order('created_at', { ascending: false })
       .then(({ data }) => data ?? []),
 
@@ -81,6 +85,9 @@ export default async function V1KennisbankPage({
 
     // Actieve kennisquiz (best-effort, nooit blokkeren); zelfde berekening als Overzicht.
     getActiveQuizForOrg(supabase, orgId).catch(() => null),
+
+    // Quiz-antwoorden die als document in de kennisbank staan (Q&A-tab).
+    loadQuizKnowledge(supabase, orgId, chatbot.id).catch(() => []),
   ]);
 
   const quizOpen =
@@ -110,6 +117,7 @@ export default async function V1KennisbankPage({
       initialDocs={docs}
       initialSources={sourcesRes}
       initialQA={initialQA}
+      initialQuiz={quizKnowledge}
       prefillQuestion={prefillQuestion}
       quizOpen={quizOpen}
     />

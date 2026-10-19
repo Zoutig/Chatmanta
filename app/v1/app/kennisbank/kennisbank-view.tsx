@@ -25,7 +25,7 @@ import type { WebsiteSource } from './types';
 import { parseKbTab, type KbTab } from './kb-tab';
 import { V1Documents, extOf, type FailedUpload, type UploadedDoc } from './v1-documents';
 import { WebsiteTab } from './components/website-tab';
-import { QATab, type QAItem } from './qa/qa-tab';
+import { QATab, type QAItem, type QuizKnowledgeItem } from './qa/qa-tab';
 
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
 const ACCEPT = ALLOWED_DOC_EXT.map((e) => `.${e}`).join(',');
@@ -50,6 +50,7 @@ export function KennisbankView({
   initialDocs,
   initialSources,
   initialQA,
+  initialQuiz = [],
   prefillQuestion,
   quizOpen,
 }: {
@@ -57,6 +58,7 @@ export function KennisbankView({
   initialDocs: UploadedDoc[];
   initialSources: WebsiteSource[];
   initialQA: QAItem[];
+  initialQuiz?: QuizKnowledgeItem[];
   prefillQuestion?: string;
   quizOpen: boolean;
 }) {
@@ -71,6 +73,7 @@ export function KennisbankView({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [sources, setSources] = useState<WebsiteSource[]>(initialSources);
   const [qa, setQa] = useState<QAItem[]>(initialQA);
+  const [quizItems, setQuizItems] = useState<QuizKnowledgeItem[]>(initialQuiz);
   const [crawlRequest, setCrawlRequest] = useState(0);
   const [qaRequest, setQaRequest] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -223,7 +226,7 @@ export function KennisbankView({
   const tabs = [
     { id: 'documenten' as const, label: 'Documenten', count: docs.filter((d) => !d.id.startsWith('uploading-')).length },
     { id: 'website' as const, label: 'Website', count: pageCount },
-    { id: 'qa' as const, label: 'Q&A', count: qa.length },
+    { id: 'qa' as const, label: 'Q&A', count: qa.length + quizItems.length },
   ];
   const panelProps = (id: KbTab) => ({
     id: `${ID_PREFIX}-panel-${id}`,
@@ -284,7 +287,14 @@ export function KennisbankView({
           <WebsiteTab sources={sources} setSources={setSources} crawlRequest={crawlRequest} />
         </div>
         <div {...panelProps('qa')}>
-          <QATab items={qa} setItems={setQa} prefillQuestion={prefillQuestion} newRequest={qaRequest} />
+          <QATab
+            items={qa}
+            setItems={setQa}
+            quizItems={quizItems}
+            setQuizItems={setQuizItems}
+            prefillQuestion={prefillQuestion}
+            newRequest={qaRequest}
+          />
         </div>
       </div>
 
