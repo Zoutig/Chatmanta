@@ -37,6 +37,8 @@ import { BronnenTab } from './_tabs/bronnen-tab';
 import { InstellingenTab } from './_tabs/instellingen-tab';
 import { WidgetTab } from './_tabs/widget-tab';
 import { UsageTab } from './_tabs/usage-tab';
+import { AttentionPanel } from './_components/attention-panel';
+import { getAdminKlantAttention } from '@/lib/v1/admin/klant-attention';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,7 +106,11 @@ export default async function OrgDeepDivePage({
     .maybeSingle();
   const chatbotId = (chatbotData as { id: string } | null)?.id ?? null;
 
-  const [profile, sp] = await Promise.all([getProfile(admin, id), searchParams]);
+  const [profile, sp, attention] = await Promise.all([
+    getProfile(admin, id),
+    searchParams,
+    getAdminKlantAttention(admin, id, chatbotId, Boolean(org.suspended_at)).catch(() => []),
+  ]);
 
   const tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as string) : 'overzicht';
   const basePath = `/v1/admin/organizations/${id}`;
@@ -129,6 +135,8 @@ export default async function OrgDeepDivePage({
           </span>
         }
       />
+
+      <AttentionPanel orgId={id} items={attention} />
 
       {/* Info-strip: vaste velden die altijd zichtbaar zijn */}
       <Panel title="Kerngegevens">

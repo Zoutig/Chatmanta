@@ -1,6 +1,6 @@
 // V1 admin — Issues: gelogde fouten uit alle onderdelen.
-//   * Geen org-filter (orgs uit de DB zijn onbeperkt; een zoekbare org-filter is een
-//     apart feature als er behoefte aan is).
+//   * Org-filter via ?org=<uuid> (link vanaf de klant-detail en per issue-rij); geen
+//     zoekbare org-keuzelijst.
 //   * listErrorGroups / getErrorSummary via lib/v1/admin/errors (getJorionAdminClient).
 //   * Auth: requireJorionAdmin via getJorionAdminClient() intern; catch AUTH_FORBIDDEN.
 
@@ -35,7 +35,9 @@ const SURFACES: ErrorSurface[] = ['widget', 'dashboard', 'chatbot', 'api', 'cron
 const STATUSES: ErrorStatus[] = ['open', 'resolved', 'ignored'];
 const STATUS_LABEL: Record<ErrorStatus, string> = { open: 'Open', resolved: 'Opgelost', ignored: 'Genegeerd' };
 
-type SP = { status?: string; sev?: string; surface?: string };
+type SP = { status?: string; sev?: string; surface?: string; org?: string };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function buildHref(sp: SP, patch: Partial<SP>): string {
   const merged: Record<string, string> = {};
@@ -109,7 +111,17 @@ export default async function V1IssuesPage({ searchParams }: { searchParams: Pro
     ? (sp.surface as ErrorSurface)
     : undefined;
 
-  const [summary, groups] = await Promise.all([getErrorSummary(), listErrorGroups({ status, severity, surface })]);
+  const orgId = sp.org && UUID_RE.test(sp.org) ? sp.org : undefined;
+
+  const [summary, groups, orgRow] = await Promise.all([
+    getErrorSummary(),
+    listErrorGroups({ status, severity, surface, orgId }),
+    orgId
+      ? getJorionAdminClient().then((a) =>
+          a.from('organizations').select('name').eq('id', orgId).maybeSingle().then((r) => r.data as { name: string } | null),
+        )
+      : null,
+  ]);
 
   return (
     <div className="v1-page">
@@ -142,6 +154,16 @@ export default async function V1IssuesPage({ searchParams }: { searchParams: Pro
               Ook info
             </FilterChip>
           </FilterRow>
+          {orgId ? (
+            <FilterRow label="Klant">
+              <FilterChip active href={`/v1/admin/organizations/${orgId}`}>
+                {orgRow?.name ?? 'Onbekende klant'}
+              </FilterChip>
+              <FilterChip active={false} href={buildHref(sp, { org: '' })}>
+                Alle klanten
+              </FilterChip>
+            </FilterRow>
+          ) : null}
           <FilterRow label="Onderdeel">
             <FilterChip active={!surface} href={buildHref(sp, { surface: '' })}>
               Alle

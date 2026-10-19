@@ -3,6 +3,7 @@ import { isAppError } from '@/lib/errors/app-error';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { formatDateTime } from '../_ui/format';
 import { JobsClient, type JobRow } from './jobs-client';
+import Link from 'next/link';
 
 // V1 admin — cross-org crawl-jobs + retry. Reads via getJorionAdminClient() (service-role
 // NÁ requireJorionAdmin; admin is geen org-member → RLS-session-client zou 0 rijen geven).
@@ -21,7 +22,12 @@ type JobDb = {
   organizations: { name: string } | null;
 };
 
-export default async function AdminJobsPage() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function AdminJobsPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
+  const sp = await searchParams;
+  // ?org=<uuid>: alleen de crawls van één klant (link vanaf de klant-detail).
+  const orgFilter = sp.org && UUID_RE.test(sp.org) ? sp.org : null;
   let admin;
   try {
     admin = await getJorionAdminClient();
@@ -32,12 +38,12 @@ export default async function AdminJobsPage() {
     throw e; // NEXT_REDIRECT → /v1/login
   }
 
-  const { data: jobsData, error } = await admin
+  let jobsQuery = admin
     .from('processing_jobs')
     .select('id, organization_id, target_id, status, attempts, error_message, created_at, organizations(name)')
-    .eq('job_type', 'crawl_website')
-    .order('created_at', { ascending: false })
-    .limit(JOB_LIMIT);
+    .eq('job_type', 'crawl_website');
+  if (orgFilter) jobsQuery = jobsQuery.eq('organization_id', orgFilter);
+  const { data: jobsData, error } = await jobsQuery.order('created_at', { ascending: false }).limit(JOB_LIMIT);
   const jobs = (jobsData ?? []) as unknown as JobDb[];
 
   // Bron-host per job (target_id → knowledge_source). Eén lookup voor alle getoonde jobs.
@@ -81,7 +87,23 @@ export default async function AdminJobsPage() {
     <div className="v1-page">
       <PageHeader
         title="Crawls en taken"
-        description="Website-crawls van alle klanten. Opnieuw proberen start een nieuwe crawl en kost Firecrawl-tegoed."
+        description={
+          orgFilter
+            ? `Website-crawls van ${jobs[0]?.organizations?.name ?? 'deze klant'}. Opnieuw proberen start een nieuwe crawl en kost Firecrawl-tegoed.`
+            : 'Website-crawls van alle klanten. Opnieuw proberen start een nieuwe crawl en kost Firecrawl-tegoed.'
+        }
+        actions={
+          orgFilter ? (
+            <span className="v1-adm-inline">
+              <Link href={`/v1/admin/organizations/${orgFilter}`} className="v1-section-link">
+                Naar de klant
+              </Link>
+              <Link href="/v1/admin/jobs" className="v1-section-link">
+                Alle klanten
+              </Link>
+            </span>
+          ) : undefined
+        }
       />
       {error ? (
         <p role="alert" className="v1-alert v1-alert--error">
