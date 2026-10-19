@@ -15,7 +15,7 @@ export function DemoSidebarFoot() {
         <Globe size={16} strokeWidth={1.8} aria-hidden="true" />
         Voorbeeldwebsite
       </Link>
-      <a href={ROUTES.home} className="v1-nav-item v1-nav-item--quiet">
+      <a href={ROUTES.home} className="v1-nav-item v1-nav-item--quiet vb-nav-home">
         <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
         Naar chatmanta.nl
       </a>

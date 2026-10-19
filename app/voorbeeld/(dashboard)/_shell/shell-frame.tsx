@@ -83,7 +83,7 @@ export function ShellFrame({
           ChatManta
         </Link>
         {/* Demo: vaste weg terug naar de marketingsite, zonder eerst het menu te openen. */}
-        <a href={ROUTES.home} className="vb-mobile-home">
+        <a href={ROUTES.home} className="vb-mobile-home" aria-label="Naar chatmanta.nl">
           <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
           chatmanta.nl
         </a>
