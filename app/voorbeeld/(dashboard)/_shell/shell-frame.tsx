@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import { ArrowLeft, Menu } from 'lucide-react';
+import { ROUTES } from '@/lib/site/navigation';
 import type { ChatbotStatus } from '@/lib/v0/klantendashboard/types';
 import { BrandMark } from '@/app/v1/_ui/brand-mark';
 import { ToastProvider } from '@/app/v1/_ui/toast';
@@ -81,6 +82,11 @@ export function ShellFrame({
           <BrandMark />
           ChatManta
         </Link>
+        {/* Demo: vaste weg terug naar de marketingsite, zonder eerst het menu te openen. */}
+        <a href={ROUTES.home} className="vb-mobile-home">
+          <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
+          chatmanta.nl
+        </a>
       </header>
 
       <button
