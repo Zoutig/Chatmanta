@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/v1/server';
 import type { User } from '@supabase/supabase-js';
 import { AppError } from '@/lib/errors/app-error';
+import { countVerifiedFactors, requiresAal2StepUp } from '@/lib/security/mfa-gate';
 
 // Auth helpers for server-side route protection. Use these at the top of
 // every Server Component, Server Action, and Route Handler that needs an
@@ -79,19 +80,26 @@ export async function requireJorionAdmin(): Promise<User> {
     throw new AppError('AUTH_FORBIDDEN', { message: 'Jorion-admin role required' });
   }
 
-  // M-E §2 — idiomatische Supabase AAL2 step-up. Blokkeer ALLEEN als de admin MFA
-  // HEEFT (nextLevel === 'aal2') maar deze sessie nog niet aal2 is. Niet-ge-enrollde
-  // admins (nextLevel !== 'aal2') laten we door — anders breekt het admin-dashboard
-  // tot MFA-enrollment (= ops). Enrollen activeert de gate automatisch.
-  const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aalErr) {
-    // Expliciete fail-open: deze admin is al via is_jorion_admin geverifieerd. We
-    // kiezen beschikbaarheid boven een transiënte 2e-factor-check voor een reeds-
-    // geverifieerde admin. Flip naar fail-closed (throw) als een strenger MFA-beleid
-    // gewenst is.
-    console.error('[auth] AAL-check faalde — fail-open (admin is al is_jorion_admin-geverifieerd):', aalErr.message);
-  } else if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
-    throw new AppError('AUTH_FORBIDDEN', { message: '2FA vereist — voltooi de tweede stap.' });
+  // M-E §2 — AAL2 step-up. Blokkeer ALLEEN als de admin MFA HEEFT maar deze sessie
+  // nog niet aal2 is. Niet-ge-enrollde admins laten we door — anders breekt het
+  // admin-dashboard tot MFA-enrollment (= ops). Enrollen activeert de gate automatisch.
+  // Audit 2026-10 #6: "heeft MFA" komt uit de door getUser() geverifieerde user (niet
+  // uit de bewerkbare cookie, zoals getAuthenticatorAssuranceLevel() zonder jwt doet),
+  // en het huidige niveau uit de aal-claim van een geverifieerd JWT (getClaims()).
+  const verifiedFactorCount = countVerifiedFactors(user.factors);
+  if (verifiedFactorCount > 0) {
+    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims();
+    if (claimsErr || !claimsData) {
+      // Expliciete fail-open (ongewijzigd beleid): deze admin is al via is_jorion_admin
+      // geverifieerd. We kiezen beschikbaarheid boven een transiënte 2e-factor-check.
+      // Flip naar fail-closed (throw) als een strenger MFA-beleid gewenst is.
+      console.error(
+        '[auth] AAL-check faalde — fail-open (admin is al is_jorion_admin-geverifieerd):',
+        claimsErr?.message ?? 'geen claims',
+      );
+    } else if (requiresAal2StepUp({ verifiedFactorCount, currentLevel: claimsData.claims.aal })) {
+      throw new AppError('AUTH_FORBIDDEN', { message: '2FA vereist — voltooi de tweede stap.' });
+    }
   }
   return user;
 }
