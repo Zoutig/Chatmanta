@@ -6,21 +6,18 @@
 // dus te spoofen. Een heartbeat is een SIGNAAL ("de widget is ergens ingesloten
 // geladen"), nooit bewijs van een installatie op een bepaald domein.
 
-/** Hostname zonder poort, lowercase, zonder leidende "www.". Leeg/ongeldig → null. */
+import { normalizeHost as normalizeAllowlistHost } from '@/lib/widget/origin-allowlist';
+
+/**
+ * Hostname zonder schema, pad, poort en leidende "www.", lowercase. Leeg/ongeldig → null.
+ * Dezelfde normalisatie als de allowlist-match (lib/widget/origin-allowlist.ts), zodat
+ * "zelfde host" overal hetzelfde betekent; alleen de loader-sentinel 'onbekend' vangen
+ * we hier af.
+ */
 export function normalizeHost(raw: string | null | undefined): string | null {
   if (typeof raw !== 'string') return null;
-  let h = raw.trim().toLowerCase();
-  if (!h || h === 'onbekend') return null;
-  // Accepteer ook een volledige URL (Referer) i.p.v. een kale hostname.
-  if (h.includes('://')) {
-    try {
-      h = new URL(h).hostname;
-    } catch {
-      return null;
-    }
-  }
-  h = h.replace(/:\d+$/, '').replace(/^www\./, '');
-  return h || null;
+  if (raw.trim().toLowerCase() === 'onbekend') return null;
+  return normalizeAllowlistHost(raw);
 }
 
 /** True als de host onze eigen ChatManta-app is (incl. www↔apex-variant). */
