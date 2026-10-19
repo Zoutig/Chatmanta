@@ -31,7 +31,7 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
 
   const { data: org } = await svc
     .from('organizations')
-    .select('id, suspended_at')
+    .select('id, name, suspended_at')
     .eq('slug', slug)
     .is('deleted_at', null)
     .maybeSingle();
@@ -85,6 +85,9 @@ export async function loadV1Embed(slug: string, parentHost: string | null): Prom
       botVersion: chatbot.bot_version,
       appearance,
       contactRequestsEnabled,
+      // Bedrijfsnaam voor de toestemmingstekst van het contactformulier (AVG: aan
+      // wie gaan de gegevens). Alleen meegeven als het formulier er is.
+      contactOrgName: contactRequestsEnabled ? ((org.name as string | null) ?? null) : null,
       linkButtonsEnabled,
       uiLanguage: widgetUiLanguage(settings),
     },

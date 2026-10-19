@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { renderMarkdownLite } from '@/lib/widget/render-markdown-lite';
 import { toWidgetAppearance } from '@/lib/v1/widget/appearance';
 import { cleanHistory, isRetryable, retryTarget, type HistoryTurn } from '@/lib/v1/widget/chat-history';
+import { lastVisitorQuestion } from '@/lib/v1/widget/widget-strings';
 import { WidgetView, type WidgetMessage } from '@/app/embed-v1/_widget/widget-view';
 import { v1Font } from '@/app/v1/_ui/fonts';
 import { ContactForm, type ContactPayload } from '@/app/embed-v1/_widget/contact-form';
@@ -32,6 +33,8 @@ const MSG_FAILED = 'Er ging iets mis. Probeer het zo nog eens.';
 const MSG_DROPPED = 'De verbinding viel weg.';
 
 const SESSION_KEY = 'chatmanta-voorbeeld:widget-sessie';
+// Fictief bedrijf van de voorbeeldwebsite (titel + toestemmingstekst).
+const DEMO_ORG_NAME = 'De Helmduin';
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; streaming?: boolean; error?: boolean };
 type Session = { threadId: string; messages: Msg[]; open: boolean; contactDone: boolean };
@@ -57,7 +60,7 @@ export function DemoWidgetMount() {
   const hydrated = useHydrated();
   const settings = useDemoSettings();
   const widget = useDemoWidgetState();
-  const appearance = toWidgetAppearance(settings, 'De Helmduin');
+  const appearance = toWidgetAppearance(settings, DEMO_ORG_NAME);
 
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -237,6 +240,8 @@ export function DemoWidgetMount() {
         <ContactForm
           onCancel={() => setContactOpen(false)}
           onSubmit={submitContact}
+          orgName={DEMO_ORG_NAME}
+          initialSubject={lastVisitorQuestion(messages)}
           onDone={() => {
             setContactOpen(false);
             setContactDone(true);

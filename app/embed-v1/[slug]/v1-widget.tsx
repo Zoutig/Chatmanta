@@ -14,6 +14,7 @@ import { WidgetView, type WidgetMessage } from '../_widget/widget-view';
 import { ContactForm, type ContactPayload } from '../_widget/contact-form';
 import {
   WIDGET_STRINGS,
+  lastVisitorQuestion,
   resolveWidgetLang,
   type WidgetLang,
   type WidgetUiLanguage,
@@ -31,6 +32,8 @@ export type V1WidgetProps = {
    * enkel de UI-zichtbaarheid.
    */
   contactRequestsEnabled?: boolean;
+  /** Bedrijfsnaam (organizations.name) voor de toestemmingstekst van het contactformulier. */
+  contactOrgName?: string | null;
   /**
    * Linkknoppen (organizations.link_buttons_enabled, migr 0031). Aan → links in een
    * door de server geschoond antwoord worden klikbaar, losse links als knop. Default
@@ -393,6 +396,8 @@ export function V1Widget(props: V1WidgetProps) {
           onCancel={() => setContactOpen(false)}
           onSubmit={submitContact}
           strings={t}
+          orgName={props.contactOrgName ?? null}
+          initialSubject={lastVisitorQuestion(messages)}
           onDone={() => {
             setContactOpen(false);
             setContactDone(true);
