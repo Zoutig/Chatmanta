@@ -261,7 +261,7 @@ body:has(.site-ui) {
 .site-ui .btn-sm { --h: 40px; padding: 0 14px; font-size: 0.88rem; border-radius: 10px; }
 .site-ui .btn-block { width: 100%; }
 
-/* ---------- Risk-reversal-lijstje (hero, prijskaarten) ---------- */
+/* ---------- Risk-reversal-lijstje (prijskaarten) ---------- */
 .site-ui .rr { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 16px 0 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
 .site-ui .rr li { display: inline-flex; align-items: center; gap: 6px; }
 .site-ui .rr svg { width: 14px; height: 14px; color: var(--teal); }
@@ -316,6 +316,9 @@ body:has(.site-ui) {
 .site-ui .chat-try { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 0 16px; border-top: 1px solid var(--line); background: #fbfcfd; font-size: 0.9rem; font-weight: 600; color: var(--teal-ink); text-decoration: none; }
 .site-ui .chat-try:hover { color: var(--ink); background: var(--surface-2); }
 .site-ui .chat-try:hover .arrow { transform: translateX(2px); }
+/* .chat heeft overflow:hidden → de globale focusring (buiten het element) wordt weggeknipt.
+   Daarom hier een ring binnen de link zelf. */
+.site-ui .chat-try:focus-visible { box-shadow: inset 0 0 0 3px var(--teal); outline: 2px solid transparent; outline-offset: -4px; border-radius: 0 0 var(--r-lg) var(--r-lg); }
 .site-ui .label-ex { position: absolute; top: -11px; left: 18px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0; padding: 3px 9px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); box-shadow: var(--sh-1); z-index: 2; }
 /* NB: de mockup bedoelde .chat-sub/.chat-title op mobiel te verbergen/verkleinen, maar
    door de cascade-volgorde wint daar de basisregel: de goedgekeurde render toont de

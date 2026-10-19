@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { NAV_ITEMS, PAGE_ORDER, SECTION_IDS, anchor, type SectionKey } from '../navigation';
+import { LEGACY_SECTION_IDS, NAV_ITEMS, PAGE_ORDER, SECTION_IDS, anchor, type SectionKey } from '../navigation';
 
 test('pagina telt hooguit 8 secties, hero eerst en slot-CTA laatst', () => {
   assert.ok(PAGE_ORDER.length <= 8, `nu ${PAGE_ORDER.length} secties`);
@@ -35,4 +35,12 @@ test('nav volgt de paginavolgorde (actieve-sectie-indicator rekent daarop)', () 
 test('anchor bouwt /#id', () => {
   assert.equal(anchor('pricing'), '/#prijzen');
   assert.equal(anchor('roi'), '/#rekenhulp');
+});
+
+test('oude ankers blijven als alias bestaan en botsen niet met huidige sectie-ids', () => {
+  const current = new Set<string>(Object.values(SECTION_IDS));
+  for (const id of Object.values(LEGACY_SECTION_IDS)) {
+    assert.ok(!current.has(id), `${id} botst met een huidige sectie-id`);
+  }
+  assert.deepEqual(new Set(Object.values(LEGACY_SECTION_IDS)), new Set(['probleem', 'vertrouwen', 'dashboard']));
 });

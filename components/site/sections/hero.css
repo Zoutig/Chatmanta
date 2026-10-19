@@ -38,9 +38,9 @@
 
 /* Mascotte (components/site/mascotte, docs/site/MASCOTTE.md): zwemt boven de chat, rechtsboven
    op het paneel. De extra padding-top van de stage maakt ruimte zodat hij de chat niet bedekt.
-   Mobiel bewust kleiner (ronde "site rustiger", okt 2026): min(52vw, 220px), niet onder ~180px
-   want dan wordt het gezicht onleesbaar (MASCOTTE.md). */
-.site-ui .s-hero .hero-mascotte { position: absolute; z-index: 2; width: min(52vw, 220px); top: -24px; right: -12px; }
+   Mobiel bewust kleiner (ronde "site rustiger", okt 2026): clamp(180px, 52vw, 220px): nooit onder
+   ~180px, want dan wordt het gezicht onleesbaar (MASCOTTE.md). */
+.site-ui .s-hero .hero-mascotte { position: absolute; z-index: 2; width: clamp(180px, 52vw, 220px); top: -24px; right: -12px; }
 .site-ui .s-hero .hero-stage { padding-top: 112px; padding-bottom: 32px; }
 @media (min-width: 1024px) {
   .site-ui .s-hero .hero-mascotte { width: 420px; top: -64px; right: -70px; }

@@ -220,8 +220,10 @@ export function HonestSplit({
             {note}
           </span>
         ) : (
-          // Illustratie van de contactknop in de widget; nog onzichtbaar (prep)? Dan ook niet voorgelezen.
+          // Illustratie van de contactknop in de widget (geen echte knop, dus cursor:default en een
+          // sr-only-voorvoegsel); nog onzichtbaar (prep)? Dan ook niet voorgelezen.
           <span className={cx('callback', s.extra && 'in')} aria-hidden={s.prep && !s.extra ? true : undefined}>
+            <span className="sr-only">Knop in de chat: </span>
             {callback}
           </span>
         )}

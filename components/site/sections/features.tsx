@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { SECTION_IDS } from '@/lib/site/navigation';
+import { LEGACY_SECTION_IDS, SECTION_IDS } from '@/lib/site/navigation';
 import { Reveal } from '../ui/reveal';
 import { Section, SectionHead } from '../ui/section';
 import './features.css';
@@ -43,6 +43,8 @@ const ITEMS: ReadonlyArray<{ id: string; title: string; body: string; plan?: str
 export default function Features() {
   return (
     <Section id={SECTION_IDS.features} variant="default" className="s-features" labelledBy="h-feat">
+      {/* Alias voor oude links naar de vervallen dashboard-sectie (screenshot staat nu hier). */}
+      <span id={LEGACY_SECTION_IDS.dashboard} aria-hidden="true" />
       <Reveal>
         <SectionHead titleId="h-feat" title="Wat je erbij krijgt" />
       </Reveal>

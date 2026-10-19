@@ -30,7 +30,18 @@ export const SECTION_IDS = {
 export type SectionKey = keyof typeof SECTION_IDS;
 
 /**
- * Volgorde van de secties op `/` (app/(site)/page.tsx volgt dit). Ronde "site rustiger"
+ * Ankers van secties die in de ronde "site rustiger" (okt 2026) zijn opgegaan in een andere.
+ * Ze blijven als alias-id bestaan, zodat eerder gedeelde links (mail, LinkedIn) niet stil
+ * bovenaan de pagina landen: probleem en vertrouwen → "eerlijk", dashboard → "functies".
+ */
+export const LEGACY_SECTION_IDS = {
+  problem: 'probleem',
+  trust: 'vertrouwen',
+  dashboard: 'dashboard',
+} as const;
+
+/**
+ * Volgorde van de secties op `/` (app/(site)/page.tsx rendert de pagina hieruit). Ronde "site rustiger"
  * (okt 2026): 12 → 8 secties; bewijs (demo) en "eerlijk" staan vooraan. Vervallen als
  * eigen sectie: vertrouwensstrook (nu in "eerlijk"), probleem (opgegaan in "eerlijk"),
  * dashboard (screenshot nu in "functies", alleen desktop), rekenhulp (uitklapbaar in "prijzen").

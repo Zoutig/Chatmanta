@@ -31,7 +31,7 @@
 .site-ui .s-honest .fake-note svg { width: 13px; height: 13px; }
 
 /* contactknop van de widget (illustratie, niet klikbaar) */
-.site-ui .s-honest .callback { align-self: flex-start; margin-top: 10px; padding: 7px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: var(--aqua-pale); border: 1px solid rgba(94, 234, 212, 0.45); transition: opacity var(--base) var(--ease), transform var(--base) var(--ease); }
+.site-ui .s-honest .callback { cursor: default; align-self: flex-start; margin-top: 10px; padding: 7px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: var(--aqua-pale); border: 1px solid rgba(94, 234, 212, 0.45); transition: opacity var(--base) var(--ease), transform var(--base) var(--ease); }
 
 /* typ-engine-staten (alleen na hydratie, zonder reduced motion) */
 .site-ui .s-honest .prep .msg { opacity: 0; transform: translateY(8px); }

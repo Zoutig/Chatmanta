@@ -109,7 +109,8 @@ function PlanCard({
       className={cx('plan', tier.featured && 'groei')}
       data-plan={tier.id}
       id={`plan-${tier.id}`}
-      aria-labelledby={headId}
+      // Tab-modus: het paneel wordt gelabeld door zijn tab (WAI-ARIA APG), anders door de kop.
+      aria-labelledby={panel ? `plan-tab-${tier.id}` : headId}
       // Smal scherm + JS: één kaart tegelijk; de kaart is dan het paneel van zijn tab.
       role={panel ? 'tabpanel' : undefined}
       hidden={panel ? !panel.active : undefined}

@@ -1,6 +1,6 @@
 /* Sectie features — sectie-specifieke stijl. Contract: docs/site/CONTRACT.md.
    - Elke selector begint met `.site-ui .s-features` (root-klasse van deze sectie).
-   - Keyframes heten `features-<naam>` (er zijn er bewust geen meer).
+   - Deze sectie heeft geen eigen keyframes meer (nieuwe: noem ze `features-<naam>`).
    - Tokens + gedeelde klassen staan in app/(site)/site.css.
    Ronde "site rustiger" (okt 2026): typografische lijst i.p.v. de bento met micro-demo's;
    de dashboard-screenshot (voorheen een eigen sectie) staat hier, alleen vanaf 900px. */

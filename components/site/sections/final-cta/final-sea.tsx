@@ -1,7 +1,7 @@
 'use client';
 
 import { useReducedMotion } from '../../ui/motion-hooks';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { Mark } from '../../ui/logo';
 
 /** Breekpunt waarop de golf naast de tekst staat; daaronder is de zee verborgen. Gelijk aan final-cta.css. */
@@ -9,6 +9,21 @@ const SIDE_MQ = '(min-width: 960px)';
 const VB_W = 1000;
 const VB_H = 420;
 const DURATION = 3200;
+
+function subscribeSide(cb: () => void) {
+  const mq = window.matchMedia(SIDE_MQ);
+  mq.addEventListener('change', cb);
+  return () => mq.removeEventListener('change', cb);
+}
+
+/** true vanaf 960px (na hydratie); volgt ook draaien/vergroten van het venster. */
+function useSide(): boolean {
+  return useSyncExternalStore(
+    subscribeSide,
+    () => window.matchMedia(SIDE_MQ).matches,
+    () => false,
+  );
+}
 
 /**
  * Signatuurmoment slot-CTA (mockup "Slot-CTA: manta trekt één golflijn (eenmalig)"):
@@ -28,16 +43,20 @@ export function FinalSea() {
   const pathRef = useRef<SVGPathElement>(null);
   const mantaRef = useRef<HTMLSpanElement>(null);
   const reduce = useReducedMotion();
+  const side = useSide();
+  // Eenmaal gezwommen? Dan bij een latere herstart (venster smal → breed) direct de eindstand.
+  const played = useRef(false);
 
   useEffect(() => {
     const sea = seaRef.current;
     const path = pathRef.current;
     const manta = mantaRef.current;
     if (!sea || !path || !manta) return;
-    // Onder 960px is de zee verborgen (final-cta.css): niets meten of animeren.
-    if (!window.matchMedia(SIDE_MQ).matches) return;
+    // Onder 960px is de zee verborgen (final-cta.css): niets meten of animeren. Wordt het venster
+    // later breder (tablet draaien), dan start dit effect opnieuw via `side`.
+    if (!side) return;
 
-    const end = () => (window.matchMedia(SIDE_MQ).matches ? 0.78 : 0.9);
+    const end = () => 0.78;
     const place = (t: number) => {
       const L = path.getTotalLength();
       const pt = path.getPointAtLength(L * t);
@@ -58,7 +77,7 @@ export function FinalSea() {
     };
     window.addEventListener('resize', onResize);
 
-    if (reduce || typeof IntersectionObserver === 'undefined') {
+    if (reduce || played.current || typeof IntersectionObserver === 'undefined') {
       done = true;
       place(end());
       manta.style.opacity = '0.95';
@@ -72,6 +91,7 @@ export function FinalSea() {
       ([e]) => {
         if (!e?.isIntersecting || done) return;
         done = true;
+        played.current = true;
         io.disconnect();
         manta.style.transition = 'opacity 400ms';
         manta.style.opacity = '0.95';
@@ -95,7 +115,7 @@ export function FinalSea() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
     };
-  }, [reduce]);
+  }, [reduce, side]);
 
   return (
     <div className="final-sea" ref={seaRef} aria-hidden="true">

@@ -8,6 +8,7 @@ import { cx } from '../ui/cx';
 import { PricingPlans } from './pricing/pricing-plans';
 import { CompareTabs } from './pricing/compare-tabs';
 import { RoiCalc } from './roi-calculator/roi-calc';
+import { OpenOnHash } from './pricing/open-on-hash';
 import './pricing.css';
 import './roi-calculator.css';
 
@@ -133,6 +134,8 @@ export default function Pricing() {
           <RoiCalc />
         </div>
       </details>
+      {/* Gedeelde links naar /#rekenhulp openen de uitklapper i.p.v. op een dichte knop te landen. */}
+      <OpenOnHash id={SECTION_IDS.roi} />
       <details className="cmp">
         <summary>
           <span className="btn btn-outline cmp-toggle">

@@ -1,4 +1,4 @@
-import { SECTION_IDS } from '@/lib/site/navigation';
+import { LEGACY_SECTION_IDS, SECTION_IDS } from '@/lib/site/navigation';
 import { Icon } from '../ui/icon';
 import { Reveal } from '../ui/reveal';
 import { Section, SectionHead } from '../ui/section';
@@ -25,6 +25,8 @@ const GOOD: Seg[] = [
 export default function Honest() {
   return (
     <Section id={SECTION_IDS.honest} variant="dark" className="s-honest" labelledBy="h-honest">
+      {/* Alias voor oude links naar de vervallen probleem-sectie. */}
+      <span id={LEGACY_SECTION_IDS.problem} aria-hidden="true" />
       <Reveal>
         <SectionHead
           titleId="h-honest"
@@ -46,7 +48,7 @@ export default function Honest() {
         }
         goodLabel="ChatManta"
       />
-      <ul className="strip" aria-label="Waarom je ChatManta kunt vertrouwen">
+      <ul className="strip" id={LEGACY_SECTION_IDS.trust} aria-label="Waarom je ChatManta kunt vertrouwen">
         <li>
           <Icon name="shieldCheck" />
           Antwoordt alleen uit jouw content
