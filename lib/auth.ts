@@ -90,14 +90,14 @@ export async function requireJorionAdmin(): Promise<User> {
   if (verifiedFactorCount > 0) {
     const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims();
     if (claimsErr || !claimsData) {
-      // Expliciete fail-open (ongewijzigd beleid): deze admin is al via is_jorion_admin
-      // geverifieerd. We kiezen beschikbaarheid boven een transiënte 2e-factor-check.
-      // Flip naar fail-closed (throw) als een strenger MFA-beleid gewenst is.
-      console.error(
-        '[auth] AAL-check faalde — fail-open (admin is al is_jorion_admin-geverifieerd):',
-        claimsErr?.message ?? 'geen claims',
-      );
-    } else if (requiresAal2StepUp({ verifiedFactorCount, currentLevel: claimsData.claims.aal })) {
+      // Fail-CLOSED (audit 2026-10, review): dit pad raakt alleen nog admins die MFA
+      // HEBBEN. Fail-open zou juist voor hen een aal1-sessie doorlaten bij een JWKS-/
+      // claims-fout. Admins zonder MFA komen hier niet en merken niets. Een transiënte
+      // fout = even opnieuw proberen; dat weegt minder dan een omzeilde 2e factor.
+      console.error('[auth] AAL-check faalde — fail-closed:', claimsErr?.message ?? 'geen claims');
+      throw new AppError('AUTH_FORBIDDEN', { message: '2FA-controle mislukt — probeer het opnieuw.' });
+    }
+    if (requiresAal2StepUp({ verifiedFactorCount, currentLevel: claimsData.claims.aal })) {
       throw new AppError('AUTH_FORBIDDEN', { message: '2FA vereist — voltooi de tweede stap.' });
     }
   }
