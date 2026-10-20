@@ -15,6 +15,7 @@ import type { Metadata } from 'next';
 import { requireJorionAdmin } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { getJorionAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/v1/server';
 import { PageHeader } from '@/app/v1/_ui/page-header';
 import { AdminFrame } from './_shell/admin-frame';
 
@@ -55,9 +56,31 @@ async function getNavCounts(): Promise<{ quizCount: number; feedbackCount: numbe
   return { quizCount, feedbackCount };
 }
 
-export default async function V1AdminLayout({ children }: { children: React.ReactNode }) {
+const emailNaam = (email: string) => {
+  const deel = email.split('@')[0] ?? '';
+  return deel.charAt(0).toUpperCase() + deel.slice(1);
+};
+
+/** Wie is er ingelogd (voor de zijbalk) en hoort die bij een klant-org? Eigen rijen
+ *  via de sessie-client (RLS); faalt stil naar alleen het e-mailadres. */
+async function getAccount(userId: string, email: string): Promise<{ name: string; email: string; hasOrg: boolean }> {
   try {
-    await requireJorionAdmin();
+    const supabase = await createClient();
+    const [profile, member] = await Promise.all([
+      supabase.from('users').select('full_name').eq('id', userId).maybeSingle(),
+      supabase.from('organization_members').select('organization_id').eq('user_id', userId).limit(1).maybeSingle(),
+    ]);
+    const fullName = typeof profile.data?.full_name === 'string' ? profile.data.full_name.trim() : '';
+    return { name: fullName || emailNaam(email), email, hasOrg: !!member.data };
+  } catch {
+    return { name: emailNaam(email), email, hasOrg: false };
+  }
+}
+
+export default async function V1AdminLayout({ children }: { children: React.ReactNode }) {
+  let user: Awaited<ReturnType<typeof requireJorionAdmin>>;
+  try {
+    user = await requireJorionAdmin();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
       return (
@@ -69,10 +92,16 @@ export default async function V1AdminLayout({ children }: { children: React.Reac
     throw e; // NEXT_REDIRECT (geen sessie) → laat propageren naar /v1/login
   }
 
-  const counts = await getNavCounts();
+  const [counts, account] = await Promise.all([getNavCounts(), getAccount(user.id, user.email ?? '')]);
 
   return (
-    <AdminFrame quizCount={counts.quizCount} feedbackCount={counts.feedbackCount}>
+    <AdminFrame
+      quizCount={counts.quizCount}
+      feedbackCount={counts.feedbackCount}
+      accountName={account.name}
+      accountEmail={account.email}
+      hasOrg={account.hasOrg}
+    >
       {children}
     </AdminFrame>
   );

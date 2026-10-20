@@ -16,6 +16,7 @@
 // Alle reads via de session-client (RLS); geen service-role.
 
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getSessionOrg } from '@/lib/auth';
 import { isAppError } from '@/lib/errors/app-error';
 import { createClient } from '@/lib/supabase/v1/server';
@@ -133,12 +134,26 @@ function buildStats(m: V1OverviewMetrics, contacts: { enabled: boolean; newCount
   return stats;
 }
 
+async function isJorionAdmin(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return false;
+  const { data } = await supabase
+    .from('users')
+    .select('is_jorion_admin')
+    .eq('id', auth.user.id)
+    .maybeSingle();
+  return data?.is_jorion_admin === true;
+}
+
 export default async function V1OverviewPage() {
   let session: Awaited<ReturnType<typeof getSessionOrg>>;
   try {
     session = await getSessionOrg();
   } catch (e) {
     if (isAppError(e) && e.code === 'AUTH_FORBIDDEN') {
+      // Admin zonder klant-org (bv. na de invite) → naar het admin-dashboard.
+      if (await isJorionAdmin()) redirect('/v1/admin');
       return (
         <div className="v1-page">
           <PageHeader title="Geen toegang" description="Je bent geen lid van deze organisatie." />

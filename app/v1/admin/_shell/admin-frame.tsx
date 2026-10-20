@@ -11,17 +11,30 @@ import { AdminSidebar } from './sidebar';
 export function AdminFrame({
   quizCount,
   feedbackCount,
+  accountName,
+  accountEmail,
+  hasOrg,
   children,
 }: {
   quizCount: number;
   feedbackCount: number;
+  accountName: string;
+  accountEmail: string;
+  hasOrg: boolean;
   children: ReactNode;
 }) {
   return (
     <ShellFrame
       homeHref="/v1/admin"
       sidebar={(closeNav) => (
-        <AdminSidebar quizCount={quizCount} feedbackCount={feedbackCount} onNavigate={closeNav} />
+        <AdminSidebar
+          quizCount={quizCount}
+          feedbackCount={feedbackCount}
+          accountName={accountName}
+          accountEmail={accountEmail}
+          hasOrg={hasOrg}
+          onNavigate={closeNav}
+        />
       )}
     >
       {children}
